@@ -1,8 +1,9 @@
-# Zählerstand-App im LXC-Container — Installation in 5 Schritten
+# Zählerstand-App im LXC-Container — Installation in einer Zeile
 
-Diese Anleitung führt einen Neueinsteiger in 10 Minuten zur lauffähigen App
-in einem Debian-13-Container (Trixie). Du brauchst keine Programmiererfahrung,
-nur Zugriff auf einen Proxmox-Host (oder einen anderen LXC-fähigen Linux-Host).
+Diese Anleitung führt einen Neueinsteiger in unter 10 Minuten zur lauffähigen
+App in einem Debian-13-Container (Trixie). Du brauchst keine
+Programmiererfahrung, nur Zugriff auf einen Proxmox-Host (oder einen anderen
+LXC-fähigen Linux-Host).
 
 > **Daten-Hinweis vorab:** Die App speichert ihre Daten in einer SQLite-Datei
 > (`/opt/zaehler/data/meters.db`). Verlierst du diese Datei, sind alle
@@ -35,59 +36,18 @@ In den Container einsteigen: `pct enter 200`.
 
 ---
 
-## 2. Repo-Zugriff einrichten
+## 2. Installation starten
 
-Wenn dein GitHub-Repo **öffentlich** ist, überspring diesen Abschnitt — du
-kannst gleich weitermachen.
-
-Bei **privatem** Repo brauchst du einen Deploy-Key. Im Container, **als root**:
+Im Container — als root — **eine einzige Zeile** einfügen:
 
 ```bash
-apt update && apt install -y --no-install-recommends git ca-certificates curl openssh-client
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/muelley86/zaehler/main/deploy/lxc/install.sh)"
 ```
 
-```bash
-useradd --system --create-home --home-dir /opt/zaehler --shell /bin/bash zaehler
-```
-
-```bash
-sudo -u zaehler ssh-keygen -t ed25519 -N '' -f /opt/zaehler/.ssh/id_ed25519 -C "lxc-zaehler"
-```
-
-```bash
-cat /opt/zaehler/.ssh/id_ed25519.pub
-```
-
-Den ausgegebenen Schlüssel **in den Browser** kopieren:
-
-- GitHub → dein Repo → **Settings → Deploy keys → Add deploy key**
-- **Title**: `lxc-zaehler`
-- **Key**: einfügen
-- **Allow write access**: NICHT anhaken
-- **Add key**
-
-Verifizieren:
-
-```bash
-sudo -u zaehler ssh -T git@github.com
-```
-
-Bei der Frage `Are you sure you want to continue connecting`: `yes`.
-Erwartet: `Hi DEIN-USER/zaehler! You've successfully authenticated...`.
-
----
-
-## 3. Installation starten
-
-> Ersetze `DEIN-USERNAME/zaehler` durch deinen tatsächlichen GitHub-Pfad.
-
-```bash
-sudo -u zaehler git clone git@github.com:DEIN-USERNAME/zaehler.git /opt/zaehler/repo \
-  && bash /opt/zaehler/repo/deploy/lxc/zaehler.sh install
-```
-
-Der Installer öffnet einen geführten Wizard (im Stil der Proxmox Helper Scripts)
-auf Basis von `whiptail`:
+Der Bootstrap installiert die nötigen Mindest-Pakete, legt den App-User
+`zaehler` an, klont das Repository nach `/opt/zaehler/repo` und startet danach
+den geführten Wizard (im Stil der Proxmox Helper Scripts) auf Basis von
+`whiptail`:
 
 1. **Willkommen** — Bestätigung, dass es losgehen soll
 2. **Modus wählen** — *Standard* (Defaults: `0.0.0.0:8000`, Backup `03:30`) oder
@@ -105,13 +65,15 @@ funktioniert der Installer auch headless — er nimmt dann Defaults und folgende
 ENV-Variablen:
 
 ```bash
-REPO_URL=https://...  ADMIN_USER=admin  ADMIN_PASSWORD='dein-langes-passwort' \
-  bash /opt/zaehler/repo/deploy/lxc/zaehler.sh install
+ADMIN_USER=admin ADMIN_PASSWORD='dein-langes-passwort' \
+  bash -c "$(curl -fsSL https://raw.githubusercontent.com/muelley86/zaehler/main/deploy/lxc/install.sh)"
 ```
+
+Forks: `REPO_URL=https://github.com/<dein-fork>/zaehler.git` zusätzlich setzen.
 
 ---
 
-## 4. Im Browser öffnen
+## 3. Im Browser öffnen
 
 Container-IP ermitteln (falls nicht gemerkt):
 
@@ -124,7 +86,7 @@ mit deinem Admin-User → Force-Change-Dialog → neues Passwort setzen → fert
 
 ---
 
-## 5. (Optional) Reverse-Proxy mit HTTPS
+## 4. (Optional) Reverse-Proxy mit HTTPS
 
 Solange die App nur im Heimnetz läuft, ist Schritt 4 ausreichend. Sobald du
 sie per Domainname und HTTPS bereitstellen willst, schalte einen Reverse-Proxy

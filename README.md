@@ -55,20 +55,22 @@ pnpm dev
 
 ## Produktion — LXC-Container
 
-Die ausführliche, anfängerfreundliche Anleitung mit allen Schritten von
-Container-Erstellung über Backups bis Updates steht in
-**[`deploy/lxc/README.md`](./deploy/lxc/README.md)**.
+Die ausführliche, anfängerfreundliche Anleitung mit Container-Erstellung,
+Backups und Updates steht in **[`deploy/lxc/README.md`](./deploy/lxc/README.md)**.
 
-Im Wesentlichen drei Befehle:
+**Installation in einem Befehl** — im frischen Debian-13-Container als `root`:
 
 ```sh
-# 1) Im Container Repo klonen (privates Repo: vorher Deploy-Key — siehe LXC-README §2)
-sudo -u zaehler git clone git@github.com:DEIN-USER/zaehler.git /opt/zaehler/repo
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/muelley86/zaehler/main/deploy/lxc/install.sh)"
+```
 
-# 2) Erstinstallation — fragt interaktiv nach Admin-Passwort, richtet Backup-Timer ein
-bash /opt/zaehler/repo/deploy/lxc/zaehler.sh install
+Der Bootstrap zieht das Repo, danach läuft der whiptail-Wizard durch alle
+Eingaben (Admin-Username + Passwort, optional Bind-Host/Port, Backup-Zeit).
+Am Ende zeigt der Wizard die App-URL.
 
-# 3) Spätere Komplett-Updates (System, Tools, App)
+Spätere Komplett-Updates (System, Tools, App):
+
+```sh
 sudo bash /opt/zaehler/repo/deploy/lxc/zaehler.sh upgrade-all
 ```
 
@@ -114,5 +116,13 @@ liegen sie in `/opt/zaehler/data/meters.env`. Wichtige Optionen:
 
 ## Lizenz / Status
 
-Privat-Projekt, kein Open-Source-Release vorgesehen. Code in `CLAUDE.md`
-beschriebene Konventionen folgen.
+Privates Hobby-Projekt, öffentlich gemacht, damit der Bootstrap-Einzeiler
+ohne Auth funktioniert. Es gibt keine Veröffentlichungs- oder
+Support-Verpflichtung. Konventionen sind in `CLAUDE.md` beschrieben.
+
+**Sicherheits-Hinweis:** Das Repo enthält bewusst **keine** Geheimnisse —
+Secrets (Session-Key, DB-Pfad, etc.) liegen in `meters.env` außerhalb des
+Repos und werden bei der Erstinstallation zufällig generiert. Wenn du den
+Code forkst, prüfe vor jedem Commit, dass keine eigenen Konfig-Daten oder
+Backups versehentlich mitcommittet werden (das `.gitignore` blockt
+`.env`, `*.db` und `data/` standardmäßig).
