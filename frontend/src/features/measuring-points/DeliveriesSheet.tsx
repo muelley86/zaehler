@@ -4,7 +4,7 @@ import { Trash2 } from 'lucide-react';
 
 import { Button, Sheet, TextField } from '@/components/ui';
 import { ApiError, api } from '@/lib/api';
-import { formatDe, parseDe } from '@/lib/format';
+import { formatDateDe, formatDe, parseDe } from '@/lib/format';
 import type { DeliveryRead, RegisterRead } from '@/lib/types';
 
 export function DeliveriesSheet({
@@ -90,6 +90,7 @@ export function DeliveriesSheet({
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
               required
+              numeric
             />
           </div>
           <TextField
@@ -105,43 +106,42 @@ export function DeliveriesSheet({
 
         <div>
           <div className="mb-2 flex items-baseline justify-between">
-            <div className="text-ios-footnote uppercase tracking-wide text-ios-secondary">
-              Bisherige Lieferungen
-            </div>
+            <div className="text-caption-bold uppercase text-tertiary">Bisherige Lieferungen</div>
             {items.length > 0 ? (
-              <div className="text-ios-footnote text-ios-tertiary">
+              <div className="num text-caption text-tertiary">
                 Σ {formatDe(totalRefilled)} {register.unit}
               </div>
             ) : null}
           </div>
           {items.length === 0 ? (
-            <div className="rounded-ios bg-ios-elevated p-4 text-center text-ios-footnote text-ios-tertiary">
+            <div className="rounded-card border-hairline border-border bg-fill p-4 text-center text-caption text-tertiary">
               Noch keine Lieferungen erfasst.
             </div>
           ) : (
-            <ul className="divide-y divide-ios-separator/60 overflow-hidden rounded-ios bg-ios-elevated">
+            <ul className="divide-y divide-separator overflow-hidden rounded-card border-hairline border-border bg-fill/60">
               {items.map((d) => (
-                <li key={d.id} className="flex items-center gap-3 px-3 py-2">
+                <li key={d.id} className="flex items-center gap-3 px-4 py-3">
                   <div className="min-w-0 flex-1">
-                    <div className="text-ios-body">{d.delivery_date}</div>
+                    <div className="num text-body text-label">{formatDateDe(d.delivery_date)}</div>
                     {d.note ? (
-                      <div className="text-ios-footnote text-ios-tertiary">{d.note}</div>
+                      <div className="text-caption text-tertiary">{d.note}</div>
                     ) : null}
-                    <div className="text-ios-caption text-ios-tertiary">
-                      {d.created_by_username ?? '—'} · {d.created_at.replace('T', ' ').slice(0, 16)}
+                    <div className="text-caption text-tertiary">
+                      {d.created_by_username ?? '—'} ·{' '}
+                      <span className="num">
+                        {d.created_at.replace('T', ' ').slice(0, 16)}
+                      </span>
                     </div>
                   </div>
                   <div className="text-right">
-                    <div className="font-rounded text-ios-headline tabular-nums">
-                      {formatDe(d.amount)}
-                    </div>
-                    <div className="text-ios-caption text-ios-tertiary">{register.unit}</div>
+                    <div className="num text-headline text-primary">+ {formatDe(d.amount)}</div>
+                    <div className="text-caption text-tertiary">{register.unit}</div>
                   </div>
                   <button
                     type="button"
                     onClick={() => void remove(d.id)}
                     aria-label="Löschen"
-                    className="flex h-8 w-8 items-center justify-center rounded-full text-ios-red hover:bg-ios-red/10"
+                    className="flex h-8 w-8 items-center justify-center rounded-full text-danger transition-colors hover:bg-danger/10"
                   >
                     <Trash2 size={14} />
                   </button>

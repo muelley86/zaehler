@@ -18,6 +18,7 @@ import { DashboardPage } from '@/features/dashboard/DashboardPage';
 import { RecordReadingPage } from '@/features/readings/RecordReadingPage';
 import { ReadingsListPage } from '@/features/readings/ReadingsListPage';
 import { MeasuringPointsAdminPage } from '@/features/measuring-points/MeasuringPointsAdminPage';
+import { MeasuringPointDetailPage } from '@/features/measuring-points/MeasuringPointDetailPage';
 import { UsersAdminPage } from '@/features/admin/UsersAdminPage';
 import { LocationsAdminPage } from '@/features/admin/LocationsAdminPage';
 import { AuditLogPage } from '@/features/admin/AuditLogPage';
@@ -28,7 +29,7 @@ export function App() {
   const location = useLocation();
 
   if (loading) {
-    return <div className="flex h-full items-center justify-center text-ios-tertiary">Lade…</div>;
+    return <div className="flex h-full items-center justify-center text-tertiary">Lade…</div>;
   }
 
   if (!me) {
@@ -65,6 +66,14 @@ export function App() {
           element={
             <AdminOnly>
               <MeasuringPointsAdminPage />
+            </AdminOnly>
+          }
+        />
+        <Route
+          path="/messstellen/:id"
+          element={
+            <AdminOnly>
+              <MeasuringPointDetailPage />
             </AdminOnly>
           }
         />

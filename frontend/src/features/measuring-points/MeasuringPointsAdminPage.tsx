@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
-import { ChevronDown, ChevronUp, Trash2 } from 'lucide-react';
+import { ChevronDown, ChevronUp, ExternalLink, Plus, Trash2 } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 import {
   Button,
@@ -11,7 +12,9 @@ import {
   Sheet,
   Switch,
   TextField,
+  TypeBadge,
 } from '@/components/ui';
+import { PageGlows } from '@/components/PageGlows';
 import { DeliveriesSheet } from './DeliveriesSheet';
 import { ApiError, api } from '@/lib/api';
 import { parseDe } from '@/lib/format';
@@ -22,6 +25,7 @@ import type {
   PhysicalMeterRead,
   RegisterRead,
 } from '@/lib/types';
+import { cx } from '@/components/ui/cx';
 
 const TYPE_LABELS: Record<MeterType, string> = {
   electricity: 'Strom',
@@ -53,22 +57,30 @@ export function MeasuringPointsAdminPage() {
   const refresh = () => setTick((t) => t + 1);
 
   return (
-    <div className="space-y-5 pb-4">
+    <PageContainer>
       <LargeTitle title="Messstellen" />
-
       {error ? (
-        <div className="mx-4 rounded-ios-lg bg-ios-red/15 p-3 text-ios-red">{error}</div>
+        <div className="rounded-card border-hairline border-danger/40 bg-danger/10 p-3 text-danger">
+          {error}
+        </div>
       ) : null}
 
-      <div className="space-y-5 px-4">
-        <CreateForm locations={locations} onCreated={refresh} />
+      <CreateForm locations={locations} onCreated={refresh} />
 
-        <div className="space-y-3">
-          {(points ?? []).map((mp) => (
-            <MPCard key={mp.id} mp={mp} locations={locations} onChanged={refresh} />
-          ))}
-        </div>
+      <div className="space-y-3">
+        {(points ?? []).map((mp) => (
+          <MPCard key={mp.id} mp={mp} locations={locations} onChanged={refresh} />
+        ))}
       </div>
+    </PageContainer>
+  );
+}
+
+function PageContainer({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="relative min-h-full overflow-hidden bg-bg">
+      <PageGlows accent="electricity" />
+      <div className="relative z-10 space-y-5 p-4 pb-12 md:p-7">{children}</div>
     </div>
   );
 }
@@ -104,30 +116,46 @@ function MPCard({
 
   return (
     <Card padded={false}>
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left"
-      >
-        <div className="min-w-0">
-          <div className="truncate text-ios-headline">{mp.name}</div>
-          <div className="text-ios-footnote text-ios-tertiary">
-            {TYPE_LABELS[mp.type]}
-            {mp.location_name ? ` · ${mp.location_name}` : ''}
+      <div className="flex items-center gap-2 px-5 py-4">
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          className="flex min-w-0 flex-1 items-center gap-3 text-left"
+          aria-expanded={open}
+          aria-controls={`mp-${mp.id}-body`}
+        >
+          <TypeBadge type={mp.type} size="sm" />
+          <div className="min-w-0 flex-1">
+            <div className="truncate text-headline tracking-tight text-label">{mp.name}</div>
+            <div className="text-caption text-tertiary">
+              {TYPE_LABELS[mp.type]}
+              {mp.location_name ? ` · ${mp.location_name}` : ''}
+            </div>
           </div>
-        </div>
-        {open ? (
-          <ChevronUp size={18} className="text-ios-tertiary" />
-        ) : (
-          <ChevronDown size={18} className="text-ios-tertiary" />
-        )}
-      </button>
+          {open ? (
+            <ChevronUp size={18} className="shrink-0 text-tertiary" />
+          ) : (
+            <ChevronDown size={18} className="shrink-0 text-tertiary" />
+          )}
+        </button>
+        <Link
+          to={`/messstellen/${mp.id}`}
+          className="rounded-pill border-hairline border-border bg-fill p-2 text-tertiary transition-colors hover:bg-fill-strong hover:text-label"
+          aria-label="Detail-Ansicht öffnen"
+          title="Detail-Ansicht"
+        >
+          <ExternalLink size={14} />
+        </Link>
+      </div>
 
       {open ? (
-        <div className="space-y-3 border-t border-ios-separator/60 p-4">
+        <div
+          id={`mp-${mp.id}-body`}
+          className="space-y-3 border-t-hairline border-separator p-5"
+        >
           <div className="flex flex-wrap gap-2">
             <Button variant="bordered" size="sm" onClick={() => setEditing((v) => !v)}>
-              {editing ? 'Schließen' : 'Bearbeiten'}
+              {editing ? 'Schließen' : 'Stammdaten'}
             </Button>
             <Button
               variant="plain"
@@ -135,13 +163,13 @@ function MPCard({
               leftIcon={<Trash2 size={14} />}
               onClick={() => void deleteMp()}
               disabled={busy}
-              className="text-ios-red hover:bg-ios-red/10"
+              className="text-danger hover:bg-danger/10"
             >
               Löschen
             </Button>
           </div>
           {deleteError ? (
-            <div className="rounded-ios-lg bg-ios-red/15 p-3 text-ios-footnote text-ios-red">
+            <div className="rounded-card border-hairline border-danger/40 bg-danger/10 p-3 text-caption text-danger">
               {deleteError}
             </div>
           ) : null}
@@ -236,7 +264,7 @@ function MPEditForm({
         <>
           <ToggleRow label="Bidirektional (Einspeisung)" checked={bidi} onChange={setBidi} />
           <ToggleRow label="Doppeltarif (HT/NT)" checked={dual} onChange={setDual} />
-          <div className="text-ios-caption text-ios-tertiary">
+          <div className="text-caption text-tertiary">
             Hinweis: Register werden nicht automatisch angepasst — beim nächsten Zählerwechsel
             wirken sich die Flags auf den neuen Zähler aus.
           </div>
@@ -249,10 +277,11 @@ function MPEditForm({
           value={tankCapacity}
           onChange={(e) => setTankCapacity(e.target.value)}
           hint="leer = nicht gesetzt; wird für Prozent-Anzeige genutzt"
+          numeric
         />
       ) : null}
       {error ? (
-        <div className="rounded-ios-lg bg-ios-red/15 p-3 text-ios-footnote text-ios-red">
+        <div className="rounded-card border-hairline border-danger/40 bg-danger/10 p-3 text-caption text-danger">
           {error}
         </div>
       ) : null}
@@ -273,8 +302,8 @@ function ToggleRow({
   onChange: (v: boolean) => void;
 }) {
   return (
-    <div className="flex items-center justify-between rounded-ios bg-ios-elevated px-3 py-2.5">
-      <span className="text-ios-body">{label}</span>
+    <div className="flex items-center justify-between rounded-pill border-hairline border-border bg-fill px-3.5 py-2.5">
+      <span className="text-body text-label">{label}</span>
       <Switch checked={checked} onChange={onChange} ariaLabel={label} />
     </div>
   );
@@ -294,32 +323,30 @@ function MeterPanel({
   const [deliveriesFor, setDeliveriesFor] = useState<RegisterRead | null>(null);
 
   return (
-    <div className="rounded-ios-lg border border-ios-separator/60 p-3">
+    <div className="rounded-card border-hairline border-border bg-fill/60 p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="text-ios-headline">SN {meter.serial_number}</div>
-        <div className="text-ios-footnote text-ios-tertiary">
+        <div className="num text-headline text-label">SN {meter.serial_number}</div>
+        <div className="num text-caption text-tertiary">
           {meter.installed_at} – {meter.removed_at ?? 'aktiv'}
         </div>
       </div>
-      <ul className="mt-2 space-y-1 text-ios-footnote">
+      <ul className="mt-2 space-y-1.5">
         {meter.registers.map((r) => (
-          <li key={r.id} className="flex items-center gap-2">
-            <code className="rounded bg-ios-fill/15 px-1.5 py-0.5 text-ios-caption">
+          <li key={r.id} className="flex items-center gap-2 text-body-sm">
+            <code className="num rounded-badge bg-primary-soft px-1.5 py-0.5 text-caption font-semibold text-primary-deep">
               {r.obis_code}
             </code>
-            <span>
-              {r.label} <span className="text-ios-tertiary">({r.unit})</span>
+            <span className="text-label">
+              {r.label} <span className="text-tertiary">({r.unit})</span>
             </span>
             {!r.is_active ? (
-              <span className="rounded-full bg-ios-fill/15 px-2 text-ios-caption text-ios-secondary">
-                inaktiv
-              </span>
+              <span className="rounded-full bg-fill px-2 text-caption text-secondary">inaktiv</span>
             ) : null}
             {r.accepts_deliveries ? (
               <button
                 type="button"
                 onClick={() => setDeliveriesFor(r)}
-                className="ml-auto rounded-full bg-ios-blue/15 px-2 py-0.5 text-ios-caption text-ios-blue"
+                className="ml-auto rounded-full bg-primary-soft px-2 py-0.5 text-caption font-semibold text-primary-deep"
               >
                 Befüllungen
               </button>
@@ -327,7 +354,7 @@ function MeterPanel({
           </li>
         ))}
       </ul>
-      <div className="mt-2 flex flex-wrap gap-1.5">
+      <div className="mt-3 flex flex-wrap gap-1.5">
         <Button variant="plain" size="sm" onClick={() => setEdit((v) => !v)}>
           {edit ? 'Schließen' : 'Stammdaten'}
         </Button>
@@ -481,12 +508,15 @@ function CreateForm({
         <button
           type="button"
           onClick={() => setOpen(true)}
-          className="flex w-full items-center px-4 py-3 text-left text-ios-blue"
+          className={cx(
+            'flex w-full items-center gap-2 px-5 py-3.5 text-left text-body font-semibold text-primary-deep transition-colors hover:bg-fill/40',
+          )}
         >
-          + Messstelle anlegen
+          <Plus size={16} strokeWidth={2.5} />
+          Messstelle anlegen
         </button>
       ) : (
-        <form onSubmit={(e) => void handleSubmit(e)} className="space-y-3 p-4">
+        <form onSubmit={(e) => void handleSubmit(e)} className="space-y-3 p-5">
           <TextField label="Name" value={name} onChange={(e) => setName(e.target.value)} required />
           <Select label="Typ" value={type} onChange={(e) => setType(e.target.value as MeterType)}>
             <option value="electricity">Strom</option>
@@ -533,6 +563,7 @@ function CreateForm({
                 value={oilHours}
                 onChange={(e) => setOilHours(e.target.value)}
                 hint="leer = 0"
+                numeric
               />
               <TextField
                 label="Anfangs-Tankstand (Liter)"
@@ -540,6 +571,7 @@ function CreateForm({
                 value={oilTank}
                 onChange={(e) => setOilTank(e.target.value)}
                 hint="leer = nicht erfassen"
+                numeric
               />
               <TextField
                 label="Tankvolumen (Liter)"
@@ -547,11 +579,12 @@ function CreateForm({
                 value={tankCapacity}
                 onChange={(e) => setTankCapacity(e.target.value)}
                 hint="für Prozent-Anzeige; optional"
+                numeric
               />
             </>
           ) : null}
           {error ? (
-            <div className="rounded-ios-lg bg-ios-red/15 p-3 text-ios-footnote text-ios-red">
+            <div className="rounded-card border-hairline border-danger/40 bg-danger/10 p-3 text-caption text-danger">
               {error}
             </div>
           ) : null}
@@ -644,7 +677,7 @@ function ReplaceMeterForm({
         required
       />
       <div>
-        <div className="mb-2 text-ios-footnote text-ios-secondary">Endstände (alt)</div>
+        <div className="mb-2 text-caption-bold uppercase text-tertiary">Endstände (alt)</div>
         <div className="space-y-2">
           {obis.map((code) => (
             <TextField
@@ -654,12 +687,13 @@ function ReplaceMeterForm({
               value={final[code] ?? ''}
               onChange={(e) => setFinal((s) => ({ ...s, [code]: e.target.value }))}
               required
+              numeric
             />
           ))}
         </div>
       </div>
       <div>
-        <div className="mb-2 text-ios-footnote text-ios-secondary">Anfangsstände (neu)</div>
+        <div className="mb-2 text-caption-bold uppercase text-tertiary">Anfangsstände (neu)</div>
         <div className="space-y-2">
           {obis.map((code) => (
             <TextField
@@ -668,12 +702,13 @@ function ReplaceMeterForm({
               inputMode="decimal"
               value={initial[code] ?? ''}
               onChange={(e) => setInitial((s) => ({ ...s, [code]: e.target.value }))}
+              numeric
             />
           ))}
         </div>
       </div>
       {error ? (
-        <div className="rounded-ios-lg bg-ios-red/15 p-3 text-ios-footnote text-ios-red">
+        <div className="rounded-card border-hairline border-danger/40 bg-danger/10 p-3 text-caption text-danger">
           {error}
         </div>
       ) : null}
