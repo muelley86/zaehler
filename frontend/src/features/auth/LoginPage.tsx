@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import type { FormEvent } from 'react';
+import { Gauge } from 'lucide-react';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 
 import { Button, Card, TextField } from '@/components/ui';
+import { PageGlows } from '@/components/PageGlows';
 import { ApiError } from '@/lib/api';
 import { useAuth } from './AuthProvider';
 
@@ -36,13 +38,19 @@ export function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-full items-center justify-center bg-ios-bg p-4 pt-safe-top">
-      <Card className="w-full max-w-sm" padded={false}>
-        <div className="px-5 pb-2 pt-6">
-          <div className="font-rounded text-ios-largetitle">Zählerstand</div>
-          <div className="mt-1 text-ios-subhead text-ios-secondary">Anmelden</div>
+    <div className="relative flex min-h-full items-center justify-center overflow-hidden bg-bg p-4 pt-safe-top">
+      <PageGlows accent="electricity" />
+      <Card className="relative z-10 w-full max-w-sm" padded={false}>
+        <div className="flex flex-col items-center gap-3 px-6 pb-2 pt-8 text-center">
+          <div className="flex h-14 w-14 items-center justify-center rounded-card bg-gradient-primary text-white shadow-glow-primary">
+            <Gauge size={28} strokeWidth={2.5} />
+          </div>
+          <div>
+            <div className="text-title-1 tracking-tight text-label">Zählerstand</div>
+            <div className="mt-1 text-body text-secondary">Anmelden</div>
+          </div>
         </div>
-        <form onSubmit={(e) => void handleSubmit(e)} className="space-y-4 px-5 pb-6 pt-2">
+        <form onSubmit={(e) => void handleSubmit(e)} className="space-y-4 px-6 pb-6 pt-4">
           <TextField
             label="Benutzername"
             type="text"

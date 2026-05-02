@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import type { FormEvent } from 'react';
+import { KeyRound } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 import { Button, Card, LargeTitle, TextField } from '@/components/ui';
+import { PageGlows } from '@/components/PageGlows';
 import { ApiError, api } from '@/lib/api';
 import type { Me } from '@/lib/types';
 import { useAuth } from './AuthProvider';
@@ -39,15 +41,21 @@ export function ChangePasswordPage() {
     }
   }
 
-  // Force-change-Modus: dann ist kein AppShell drum, wir zentrieren
+  // Force-change-Modus: kein AppShell drum, zentrierte Karte mit Glows.
   if (me?.force_password_change) {
     return (
-      <div className="flex min-h-full items-center justify-center bg-ios-bg p-4 pt-safe-top">
-        <Card className="w-full max-w-sm" padded={false}>
-          <div className="px-5 pb-2 pt-6">
-            <div className="font-rounded text-ios-title">Passwort setzen</div>
-            <div className="mt-1 text-ios-subhead text-ios-secondary">
-              Beim ersten Login ist das erforderlich.
+      <div className="relative flex min-h-full items-center justify-center overflow-hidden bg-bg p-4 pt-safe-top">
+        <PageGlows accent="electricity" />
+        <Card className="relative z-10 w-full max-w-sm" padded={false}>
+          <div className="flex flex-col items-center gap-3 px-6 pb-2 pt-8 text-center">
+            <div className="flex h-14 w-14 items-center justify-center rounded-card bg-gradient-primary text-white shadow-glow-primary">
+              <KeyRound size={26} strokeWidth={2.5} />
+            </div>
+            <div>
+              <div className="text-title-2 tracking-tight text-label">Passwort setzen</div>
+              <div className="mt-1 text-body text-secondary">
+                Beim ersten Login ist das erforderlich.
+              </div>
             </div>
           </div>
           <FormBody
@@ -67,9 +75,9 @@ export function ChangePasswordPage() {
   }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-5 p-4 md:p-6">
       <LargeTitle title="Passwort ändern" />
-      <div className="px-4">
+      <div className="max-w-md">
         <Card padded={false}>
           <FormBody
             current={current}
@@ -110,7 +118,7 @@ function FormBody({
   onSubmit: (e: FormEvent<HTMLFormElement>) => void;
 }) {
   return (
-    <form onSubmit={onSubmit} className="space-y-4 px-5 pb-6 pt-2">
+    <form onSubmit={onSubmit} className="space-y-4 px-6 pb-6 pt-4">
       <TextField
         label="Aktuelles Passwort"
         type="password"
