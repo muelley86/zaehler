@@ -34,7 +34,7 @@ DATA_DIR="${DATA_DIR:-$APP_DIR/data}"
 BACKUP_DIR="${BACKUP_DIR:-$APP_DIR/backups}"
 SERVICE_NAME="${SERVICE_NAME:-zaehler.service}"
 REPO_URL="${REPO_URL:-https://example.invalid/REPLACE-ME.git}"
-PYTHON_BIN="${PYTHON_BIN:-python3.12}"
+PYTHON_BIN="${PYTHON_BIN:-python3}"
 PNPM_VERSION="${PNPM_VERSION:-9}"
 
 # -----------------------------------------------------------------------------
@@ -93,7 +93,7 @@ cmd_install() {
     apt-get install -y --no-install-recommends \
         ca-certificates curl git build-essential pkg-config sudo \
         sqlite3 locales \
-        "$PYTHON_BIN" "${PYTHON_BIN}-venv" "${PYTHON_BIN}-dev" \
+        python3 python3-venv python3-dev \
         nodejs npm
 
     step "2/8  Locale auf de_DE.UTF-8 setzen"
@@ -441,7 +441,7 @@ ${C_BOLD}zaehler.sh — Verwaltungsskript für die Zählerstand-App${C_RESET}
     DATA_DIR             Default: \$APP_DIR/data
     BACKUP_DIR           Default: \$APP_DIR/backups
     SERVICE_NAME         Default: zaehler.service
-    PYTHON_BIN           Default: python3.12
+    PYTHON_BIN           Default: python3 (Distri-Default)
     PNPM_VERSION         Default: 9
 
   ${C_BOLD}Beispiele:${C_RESET}
