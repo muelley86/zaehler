@@ -46,32 +46,32 @@ export function Row(props: RowProps) {
     <div
       className={cx(
         'flex min-h-[44px] items-center gap-3 px-4 py-2.5',
-        destructive && 'text-ios-red',
+        destructive && 'text-danger',
         className,
       )}
     >
       {icon ? (
-        <span className="flex h-7 w-7 shrink-0 items-center justify-center text-ios-blue">
+        <span className="flex h-7 w-7 shrink-0 items-center justify-center text-primary">
           {icon}
         </span>
       ) : null}
       <div className="min-w-0 flex-1">
-        <div className="truncate text-ios-body">{label}</div>
+        <div className="truncate text-body font-medium text-label">{label}</div>
         {sublabel ? (
-          <div className="truncate text-ios-footnote text-ios-tertiary">{sublabel}</div>
+          <div className="truncate text-caption text-tertiary">{sublabel}</div>
         ) : null}
       </div>
       {value !== undefined && value !== null ? (
-        <div className="shrink-0 text-ios-body text-ios-tertiary">{value}</div>
+        <div className="num shrink-0 text-body text-secondary">{value}</div>
       ) : null}
       {trailing}
-      {showChevron ? <ChevronRight size={18} className="shrink-0 text-ios-tertiary" /> : null}
+      {showChevron ? <ChevronRight size={18} className="shrink-0 text-tertiary" /> : null}
     </div>
   );
 
   const wrapClass = cx(
-    'block w-full text-left',
-    isInteractive && 'cursor-pointer hover:bg-ios-elevated/40 active:bg-ios-elevated/70',
+    'block w-full text-left transition-colors',
+    isInteractive && 'cursor-pointer hover:bg-fill/40 active:bg-fill/70',
   );
 
   if ('to' in props && props.to) {
@@ -99,9 +99,9 @@ export function Row(props: RowProps) {
 }
 
 export function RowSeparator() {
-  return <div className="ml-12 h-px bg-ios-separator/60" />;
+  return <div className="ml-12 h-px bg-separator" />;
 }
 
 export function RowGroup({ children }: { children: ReactNode }) {
-  return <div className="divide-y divide-ios-separator/60">{children}</div>;
+  return <div className="divide-y divide-separator">{children}</div>;
 }

@@ -12,11 +12,11 @@ export function EmptyState({
   action?: ReactNode;
 }) {
   return (
-    <div className="flex flex-col items-center justify-center gap-3 rounded-ios-lg bg-ios-surface p-10 text-center shadow-ios-card">
-      {icon ? <div className="text-ios-tertiary">{icon}</div> : null}
-      <div className="text-ios-headline">{title}</div>
+    <div className="flex flex-col items-center justify-center gap-3 rounded-card border-hairline border-border bg-surface glass p-10 text-center shadow-glass dark:shadow-glass-dark">
+      {icon ? <div className="text-tertiary">{icon}</div> : null}
+      <div className="text-headline text-label">{title}</div>
       {description ? (
-        <div className="max-w-sm text-ios-subhead text-ios-secondary">{description}</div>
+        <div className="max-w-sm text-body text-secondary">{description}</div>
       ) : null}
       {action ? <div className="pt-2">{action}</div> : null}
     </div>

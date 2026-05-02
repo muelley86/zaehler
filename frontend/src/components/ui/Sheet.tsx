@@ -32,27 +32,35 @@ export function Sheet({
         type="button"
         aria-label="Schließen"
         onClick={onClose}
-        className="absolute inset-0 bg-black/40"
+        className="absolute inset-0 bg-black/40 backdrop-blur-sm"
       />
       <div
         className={cx(
-          'relative z-10 w-full max-w-lg rounded-t-ios-xl bg-ios-surface shadow-ios-elevated',
-          'md:max-h-[80vh] md:rounded-ios-xl',
+          'relative z-10 w-full max-w-lg border-hairline border-border bg-surface-high glass',
+          'shadow-glass dark:shadow-glass-dark',
+          'rounded-t-sheet md:rounded-card',
+          'md:max-h-[80vh]',
           'max-h-[90vh] overflow-y-auto pb-[env(safe-area-inset-bottom)]',
         )}
       >
-        <div className="sticky top-0 flex items-center justify-between border-b border-ios-separator/60 bg-ios-surface px-4 py-3">
-          <div className="text-ios-headline">{title}</div>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Schließen"
-            className="flex h-8 w-8 items-center justify-center rounded-full bg-ios-fill/15 text-ios-secondary hover:bg-ios-fill/25"
-          >
-            <X size={16} />
-          </button>
+        {/* Handle-Bar nur auf Mobile sichtbar */}
+        <div className="sticky top-0 z-10 bg-surface-high/95 glass">
+          <div className="flex justify-center pt-2 md:hidden">
+            <div className="h-1 w-9 rounded-full bg-fill-strong" />
+          </div>
+          <div className="flex items-center justify-between border-b-hairline border-separator px-5 py-3">
+            <div className="text-headline text-label">{title}</div>
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Schließen"
+              className="flex h-8 w-8 items-center justify-center rounded-full bg-fill text-secondary transition-colors hover:bg-fill-strong"
+            >
+              <X size={16} />
+            </button>
+          </div>
         </div>
-        <div className="p-4">{children}</div>
+        <div className="p-5">{children}</div>
       </div>
     </div>
   );

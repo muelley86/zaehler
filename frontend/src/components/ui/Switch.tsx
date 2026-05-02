@@ -20,14 +20,14 @@ export function Switch({
       disabled={disabled}
       onClick={() => onChange(!checked)}
       className={cx(
-        'relative inline-flex h-[31px] w-[51px] shrink-0 cursor-pointer items-center rounded-full transition-colors',
-        checked ? 'bg-ios-green' : 'bg-ios-fill/30',
+        'relative inline-flex h-[31px] w-[51px] shrink-0 cursor-pointer items-center rounded-full border-hairline transition-colors',
+        checked ? 'border-transparent bg-gradient-primary' : 'border-border bg-fill',
         disabled && 'cursor-not-allowed opacity-40',
       )}
     >
       <span
         className={cx(
-          'inline-block h-[27px] w-[27px] rounded-full bg-white shadow transition-transform',
+          'inline-block h-[27px] w-[27px] rounded-full bg-white shadow-[0_2px_4px_rgba(0,0,0,0.18)] transition-transform',
           checked ? 'translate-x-[22px]' : 'translate-x-[2px]',
         )}
       />

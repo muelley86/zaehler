@@ -14,16 +14,14 @@ export function Section({
   className?: string;
 }) {
   return (
-    <section className={cx('space-y-1.5', className)}>
+    <section className={cx('space-y-2', className)}>
       {header ? (
-        <div className="px-4 text-ios-footnote uppercase tracking-wide text-ios-tertiary">
-          {header}
-        </div>
+        <div className="px-1 text-caption-bold uppercase text-tertiary">{header}</div>
       ) : null}
-      <div className="overflow-hidden rounded-ios-lg bg-ios-surface shadow-ios-card">
+      <div className="overflow-hidden rounded-card border-hairline border-border bg-surface glass shadow-glass dark:shadow-glass-dark">
         {children}
       </div>
-      {footer ? <div className="px-4 text-ios-footnote text-ios-tertiary">{footer}</div> : null}
+      {footer ? <div className="px-1 text-caption text-tertiary">{footer}</div> : null}
     </section>
   );
 }

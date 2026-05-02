@@ -18,9 +18,11 @@ export function Pill({
       type="button"
       onClick={onClick}
       className={cx(
-        'rounded-full transition-colors',
-        size === 'sm' ? 'px-2.5 py-1 text-ios-caption' : 'px-3 py-1.5 text-ios-footnote',
-        active ? 'bg-ios-blue text-white' : 'bg-ios-fill/15 text-ios-label hover:bg-ios-fill/25',
+        'whitespace-nowrap rounded-full border-hairline font-medium tracking-tight transition-[background,color,border-color]',
+        size === 'sm' ? 'px-2.5 py-1 text-caption' : 'px-3 py-1.5 text-body-sm',
+        active
+          ? 'border-transparent bg-gradient-primary text-white shadow-glow-primary'
+          : 'border-border bg-fill text-secondary hover:bg-fill-strong',
       )}
     >
       {children}

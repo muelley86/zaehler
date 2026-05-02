@@ -2,18 +2,30 @@ import type { ReactNode } from 'react';
 
 import { cx } from './cx';
 
+/**
+ * Liquid-Glass-Karte. `solid` deaktiviert backdrop-blur (für Bereiche, in
+ * denen kein Hintergrund-Glow durchschimmert oder die Karte über einer
+ * anderen Glas-Schicht liegt).
+ */
 export function Card({
   children,
   className,
   padded = true,
+  solid = false,
 }: {
   children: ReactNode;
   className?: string;
   padded?: boolean;
+  solid?: boolean;
 }) {
   return (
     <div
-      className={cx('rounded-ios-lg bg-ios-surface shadow-ios-card', padded && 'p-4', className)}
+      className={cx(
+        'rounded-card border-hairline border-border shadow-glass dark:shadow-glass-dark',
+        solid ? 'bg-surface-solid' : 'bg-surface glass',
+        padded && 'p-5',
+        className,
+      )}
     >
       {children}
     </div>

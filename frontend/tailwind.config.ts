@@ -102,6 +102,9 @@ const config: Config = {
       backdropSaturate: {
         glass: '180%',
       },
+      borderWidth: {
+        hairline: '0.5px',
+      },
       fontSize: {
         // ---- Liquid-Glass Type-Scale ----
         display: [

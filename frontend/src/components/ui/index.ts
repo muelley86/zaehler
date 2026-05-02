@@ -9,4 +9,6 @@ export { Select } from './Select';
 export { Sheet } from './Sheet';
 export { Switch } from './Switch';
 export { TextField } from './TextField';
+export { TypeBadge, TYPE_META } from './TypeBadge';
+export type { MeterType } from './TypeBadge';
 export { cx } from './cx';

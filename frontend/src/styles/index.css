@@ -184,3 +184,68 @@ input[type='date'] {
   outline-offset: 2px;
   border-radius: inherit;
 }
+
+/* ===========================================================
+   Liquid-Glass Component-Layer — Type-Gradients und -Glows
+   =========================================================== */
+@layer components {
+  /* Linear-Gradients für TypeBadge (135deg, color → 70 % alpha) */
+  .bg-type-electricity {
+    background: linear-gradient(
+      135deg,
+      var(--electricity),
+      color-mix(in oklch, var(--electricity), transparent 30%)
+    );
+  }
+  .bg-type-gas {
+    background: linear-gradient(
+      135deg,
+      var(--gas),
+      color-mix(in oklch, var(--gas), transparent 30%)
+    );
+  }
+  .bg-type-water {
+    background: linear-gradient(
+      135deg,
+      var(--water),
+      color-mix(in oklch, var(--water), transparent 30%)
+    );
+  }
+  .bg-type-oil {
+    background: linear-gradient(
+      135deg,
+      var(--oil),
+      color-mix(in oklch, var(--oil), transparent 30%)
+    );
+  }
+  .bg-gradient-primary {
+    background: linear-gradient(135deg, var(--primary), var(--primary-deep));
+  }
+
+  /* Type-Glows: warmer Drop-Shadow + Inset-Highlight */
+  .shadow-glow-primary {
+    box-shadow:
+      0 4px 12px oklch(0.72 0.17 55 / 0.55),
+      0 1px 0 rgba(255, 255, 255, 0.3) inset;
+  }
+  .shadow-glow-electricity {
+    box-shadow:
+      0 4px 12px oklch(0.78 0.16 80 / 0.4),
+      0 1px 0 rgba(255, 255, 255, 0.3) inset;
+  }
+  .shadow-glow-gas {
+    box-shadow:
+      0 4px 12px oklch(0.72 0.14 35 / 0.4),
+      0 1px 0 rgba(255, 255, 255, 0.3) inset;
+  }
+  .shadow-glow-water {
+    box-shadow:
+      0 4px 12px oklch(0.7 0.13 220 / 0.4),
+      0 1px 0 rgba(255, 255, 255, 0.3) inset;
+  }
+  .shadow-glow-oil {
+    box-shadow:
+      0 4px 12px oklch(0.55 0.1 40 / 0.4),
+      0 1px 0 rgba(255, 255, 255, 0.3) inset;
+  }
+}

@@ -15,21 +15,25 @@ interface ButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'cla
 }
 
 const baseClasses =
-  'inline-flex items-center justify-center gap-2 rounded-ios font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40 select-none';
+  'inline-flex items-center justify-center gap-2 rounded-pill font-semibold transition-[background,box-shadow,opacity] disabled:cursor-not-allowed disabled:opacity-40 select-none tracking-tight';
 
 const sizeClasses: Record<Size, string> = {
-  sm: 'h-8 px-3 text-ios-footnote',
-  md: 'h-11 px-4 text-ios-body',
-  lg: 'h-12 px-5 text-ios-headline',
+  sm: 'h-8 px-3 text-caption',
+  md: 'h-10 px-4 text-body',
+  lg: 'h-12 px-5 text-headline',
 };
 
 const variantClasses: Record<Variant, string> = {
-  filled: 'bg-ios-blue text-white hover:brightness-110 active:brightness-95',
-  tinted: 'bg-ios-blue/15 text-ios-blue hover:bg-ios-blue/25 active:bg-ios-blue/30',
-  plain: 'text-ios-blue hover:bg-ios-blue/10 active:bg-ios-blue/15',
-  destructive: 'bg-ios-red text-white hover:brightness-110 active:brightness-95',
+  filled:
+    'text-white bg-gradient-primary shadow-glow-primary hover:brightness-105 active:brightness-95',
+  tinted:
+    'text-primary-deep bg-[color-mix(in_oklch,var(--primary),transparent_82%)] hover:bg-[color-mix(in_oklch,var(--primary),transparent_72%)] active:bg-[color-mix(in_oklch,var(--primary),transparent_62%)]',
+  plain:
+    'text-primary-deep hover:bg-[color-mix(in_oklch,var(--primary),transparent_88%)] active:bg-[color-mix(in_oklch,var(--primary),transparent_78%)]',
+  destructive:
+    'text-white bg-[linear-gradient(135deg,var(--red),color-mix(in_oklch,var(--red),black_15%))] shadow-[0_4px_12px_oklch(0.65_0.20_25/0.55)] hover:brightness-105 active:brightness-95',
   bordered:
-    'border border-ios-separator bg-transparent text-ios-label hover:bg-ios-elevated/40 active:bg-ios-elevated/60',
+    'text-label bg-fill border-hairline border-border hover:bg-fill-strong active:bg-fill-strong',
 };
 
 export function Button({
