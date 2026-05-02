@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8" />
+<title>Zähler App · Liquid Glass Redesign</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+  html, body, #root { margin: 0; padding: 0; height: 100%; }
+  body { font-family: 'Inter Tight', system-ui, -apple-system, sans-serif; background: oklch(0.96 0.008 70); }
+  button { font-family: inherit; cursor: pointer; }
+  input { font-family: inherit; }
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-thumb { background: rgba(120,100,80,0.2); border-radius: 4px; }
+  @keyframes blink { 50% { opacity: 0; } }
+</style>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel" src="design-canvas.jsx"></script>
+<script type="text/babel" src="tweaks-panel.jsx"></script>
+<script type="text/babel" src="design-system.jsx"></script>
+<script type="text/babel" src="screens-dashboard.jsx"></script>
+<script type="text/babel" src="screens-mobile.jsx"></script>
+<script type="text/babel" src="screens-desktop.jsx"></script>
+<script type="text/babel" src="screens-admin.jsx"></script>
+
+<script type="text/babel">
+const TWEAKS_DEFAULTS = /*EDITMODE-BEGIN*/{
+  "density": "comfortable"
+}/*EDITMODE-END*/;
+
+// iPhone Frame
+function Phone({ theme = 'light', children }) {
+  return (
+    <div style={{
+      width: 390, height: 844,
+      borderRadius: 56,
+      background: theme === 'dark' ? '#0a0807' : '#1a1614',
+      padding: 12,
+      boxShadow: theme === 'dark'
+        ? '0 30px 80px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.06), inset 0 0 0 1px rgba(255,255,255,0.04)'
+        : '0 30px 80px rgba(60,40,20,0.18), 0 0 0 1px rgba(0,0,0,0.04), inset 0 0 0 1px rgba(255,255,255,0.05)',
+      position: 'relative',
+    }}>
+      <div style={{
+        width: '100%', height: '100%', borderRadius: 44,
+        overflow: 'hidden', position: 'relative',
+        background: theme === 'dark' ? '#0a0807' : 'white',
+      }}>
+        {/* Dynamic island */}
+        <div style={{
+          position: 'absolute', top: 12, left: '50%', transform: 'translateX(-50%)',
+          width: 120, height: 32, borderRadius: 20,
+          background: '#000', zIndex: 100,
+        }} />
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function Browser({ theme = 'light', children }) {
+  const t = window.TOKENS[theme];
+  return (
+    <div style={{
+      width: 1280, height: 820,
+      borderRadius: 14,
+      background: theme === 'dark' ? '#1a1614' : '#fafaf8',
+      boxShadow: theme === 'dark'
+        ? '0 30px 80px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.06)'
+        : '0 30px 80px rgba(60,40,20,0.15), 0 0 0 1px rgba(0,0,0,0.04)',
+      overflow: 'hidden',
+      display: 'flex', flexDirection: 'column',
+    }}>
+      <div style={{
+        height: 40, background: theme === 'dark' ? '#2a2422' : '#ebe9e6',
+        display: 'flex', alignItems: 'center', padding: '0 16px', gap: 8,
+        borderBottom: `0.5px solid ${theme === 'dark' ? '#3a3432' : '#dad7d3'}`,
+      }}>
+        <div style={{ display: 'flex', gap: 7 }}>
+          <div style={{ width: 12, height: 12, borderRadius: '50%', background: '#ff5f57' }} />
+          <div style={{ width: 12, height: 12, borderRadius: '50%', background: '#febc2e' }} />
+          <div style={{ width: 12, height: 12, borderRadius: '50%', background: '#28c840' }} />
+        </div>
+        <div style={{
+          flex: 1, maxWidth: 380, marginLeft: 16,
+          padding: '5px 12px', borderRadius: 7,
+          background: theme === 'dark' ? '#1a1614' : 'white',
+          fontSize: 12, color: theme === 'dark' ? '#aaa' : '#666',
+          fontFamily: 'ui-monospace, monospace',
+        }}>zaehler.local:8000</div>
+      </div>
+      <div style={{ flex: 1, overflow: 'hidden' }}>{children}</div>
+    </div>
+  );
+}
+
+function App() {
+  const { tweaks } = window.useTweaks ? window.useTweaks(TWEAKS_DEFAULTS) : { tweaks: TWEAKS_DEFAULTS };
+  const { DesignCanvas, DCSection, DCArtboard } = window;
+
+  return (
+    <>
+      <DesignCanvas>
+
+        <DCSection id="dashboard-mobile" title="Dashboard · Mobile" subtitle="Variante A · Cards · Light + Dark">
+          <DCArtboard id="dash-a-light" label="Dashboard · Light" width={414} height={868}>
+            <Phone theme="light"><window.DashboardA theme="light" /></Phone>
+          </DCArtboard>
+          <DCArtboard id="dash-a-dark" label="Dashboard · Dark" width={414} height={868}>
+            <Phone theme="dark"><window.DashboardA theme="dark" /></Phone>
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="erfassen" title="Erfassen · Mobile" subtitle="Variante A · Sheet mit großer Zahl + Plausibilitätscheck">
+          <DCArtboard id="erf-a-light" label="Erfassen · Light" width={414} height={868}>
+            <Phone theme="light"><window.ErfassenA theme="light" /></Phone>
+          </DCArtboard>
+          <DCArtboard id="erf-a-dark" label="Erfassen · Dark" width={414} height={868}>
+            <Phone theme="dark"><window.ErfassenA theme="dark" /></Phone>
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="liste" title="Erfassungen · Verlauf" subtitle="Variante A · gruppiert nach Tag">
+          <DCArtboard id="liste-a-light" label="Verlauf · Light" width={414} height={868}>
+            <Phone theme="light"><window.ListeA theme="light" /></Phone>
+          </DCArtboard>
+          <DCArtboard id="liste-a-dark" label="Verlauf · Dark" width={414} height={868}>
+            <Phone theme="dark"><window.ListeA theme="dark" /></Phone>
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="login" title="Login · Mobile" subtitle="Variante A · Hero-Logo + Glas-Card">
+          <DCArtboard id="login-a-light" label="Login · Light" width={414} height={868}>
+            <Phone theme="light"><window.LoginA theme="light" /></Phone>
+          </DCArtboard>
+          <DCArtboard id="login-a-dark" label="Login · Dark" width={414} height={868}>
+            <Phone theme="dark"><window.LoginA theme="dark" /></Phone>
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="mehr" title="Mehr · Settings + Admin">
+          <DCArtboard id="mehr-light" label="Mehr · Light" width={414} height={868}>
+            <Phone theme="light"><window.MehrA theme="light" /></Phone>
+          </DCArtboard>
+          <DCArtboard id="mehr-dark" label="Mehr · Dark" width={414} height={868}>
+            <Phone theme="dark"><window.MehrA theme="dark" /></Phone>
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="desktop" title="Desktop · Dashboard" subtitle="Übersicht aller Zähler">
+          <DCArtboard id="desk-a-light" label="Dashboard · Light" width={1300} height={840}>
+            <Browser theme="light"><window.DashboardDesktopA theme="light" /></Browser>
+          </DCArtboard>
+          <DCArtboard id="desk-a-dark" label="Dashboard · Dark" width={1300} height={840}>
+            <Browser theme="dark"><window.DashboardDesktopA theme="dark" /></Browser>
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="admin-mp" title="Admin · Messstellen" subtitle="Liste aller Messstellen mit Filtern">
+          <DCArtboard id="admin-mp-light" label="Messstellen · Light" width={1300} height={840}>
+            <Browser theme="light"><window.AdminMeasuringPoints theme="light" /></Browser>
+          </DCArtboard>
+          <DCArtboard id="admin-mp-dark" label="Messstellen · Dark" width={1300} height={840}>
+            <Browser theme="dark"><window.AdminMeasuringPoints theme="dark" /></Browser>
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="admin-mp-detail" title="Admin · Messstelle Detail" subtitle="Stammdaten, Verbrauchskurve und Register-Verwaltung">
+          <DCArtboard id="admin-mpd-light" label="Detail · Light" width={1300} height={840}>
+            <Browser theme="light"><window.AdminMeasuringPointDetail theme="light" /></Browser>
+          </DCArtboard>
+          <DCArtboard id="admin-mpd-dark" label="Detail · Dark" width={1300} height={840}>
+            <Browser theme="dark"><window.AdminMeasuringPointDetail theme="dark" /></Browser>
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="admin-loc" title="Admin · Standorte" subtitle="Standort-Stammdaten">
+          <DCArtboard id="admin-loc-light" label="Standorte · Light" width={1300} height={840}>
+            <Browser theme="light"><window.AdminLocations theme="light" /></Browser>
+          </DCArtboard>
+          <DCArtboard id="admin-loc-dark" label="Standorte · Dark" width={1300} height={840}>
+            <Browser theme="dark"><window.AdminLocations theme="dark" /></Browser>
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="admin-users" title="Admin · Benutzer" subtitle="Benutzer-Verwaltung mit Rollen">
+          <DCArtboard id="admin-users-light" label="Benutzer · Light" width={1300} height={840}>
+            <Browser theme="light"><window.AdminUsers theme="light" /></Browser>
+          </DCArtboard>
+          <DCArtboard id="admin-users-dark" label="Benutzer · Dark" width={1300} height={840}>
+            <Browser theme="dark"><window.AdminUsers theme="dark" /></Browser>
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="admin-audit" title="Admin · Audit Log" subtitle="Chronologisches Protokoll aller Schreibvorgänge">
+          <DCArtboard id="admin-audit-light" label="Audit · Light" width={1300} height={840}>
+            <Browser theme="light"><window.AdminAudit theme="light" /></Browser>
+          </DCArtboard>
+          <DCArtboard id="admin-audit-dark" label="Audit · Dark" width={1300} height={840}>
+            <Browser theme="dark"><window.AdminAudit theme="dark" /></Browser>
+          </DCArtboard>
+        </DCSection>
+
+      </DesignCanvas>
+
+      {window.TweaksPanel && (
+        <window.TweaksPanel defaults={TWEAKS_DEFAULTS}>
+          {({ tweaks, setTweak }) => (
+            <window.TweakSection title="Layout">
+              <window.TweakRadio
+                label="Density"
+                value={tweaks.density}
+                options={[
+                  { value: 'compact', label: 'Kompakt' },
+                  { value: 'comfortable', label: 'Komfortabel' },
+                ]}
+                onChange={(v) => setTweak('density', v)}
+              />
+              <div style={{ fontSize: 11, color: '#888', marginTop: 8, lineHeight: 1.5 }}>
+                Theme & Variante schaltest du direkt am Artboard-Label um — alle 4 Kombinationen sind nebeneinander zu sehen. Klicke ein Artboard für Fullscreen-Fokus.
+              </div>
+            </window.TweakSection>
+          )}
+        </window.TweaksPanel>
+      )}
+    </>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
