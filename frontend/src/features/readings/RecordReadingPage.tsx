@@ -2,7 +2,17 @@ import { useEffect, useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
 import { Check, Gauge } from 'lucide-react';
 
-import { Button, EmptyState, LargeTitle, Pill, Section, Select, TextField } from '@/components/ui';
+import {
+  Button,
+  EmptyState,
+  LargeTitle,
+  Pill,
+  Section,
+  Select,
+  TextField,
+  TypeBadge,
+} from '@/components/ui';
+import { PageGlows } from '@/components/PageGlows';
 import { ApiError, api } from '@/lib/api';
 import { formatDateTimeDe, formatDe, nowForInput, parseDe } from '@/lib/format';
 import type {
@@ -11,7 +21,9 @@ import type {
   PhysicalMeterRead,
   ReadingRead,
   RegisterRead,
+  RegisterStateRead,
 } from '@/lib/types';
+import { cx } from '@/components/ui/cx';
 
 interface ActiveRegister {
   measuringPoint: MeasuringPointRead;
@@ -23,6 +35,9 @@ type Mode = 'reading' | 'delivery';
 
 export function RecordReadingPage() {
   const [points, setPoints] = useState<MeasuringPointRead[] | null>(null);
+  const [stateByRegister, setStateByRegister] = useState<Map<number, RegisterStateRead>>(
+    () => new Map(),
+  );
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -41,6 +56,29 @@ export function RecordReadingPage() {
         if (err instanceof ApiError) setError(err.problem.detail ?? err.problem.title);
       });
   }, []);
+
+  // Letzte Stände nachladen, damit der Plausibilitätscheck (Delta) funktionieren kann.
+  useEffect(() => {
+    if (!points) return;
+    let cancelled = false;
+    void Promise.all(
+      points.map((mp) =>
+        api
+          .get<RegisterStateRead[]>(`/measuring-points/${mp.id}/state`)
+          .catch(() => [] as RegisterStateRead[]),
+      ),
+    ).then((results) => {
+      if (cancelled) return;
+      const next = new Map<number, RegisterStateRead>();
+      for (const list of results) {
+        for (const s of list) next.set(s.register_id, s);
+      }
+      setStateByRegister(next);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [points]);
 
   const activeRegisters = useMemo<ActiveRegister[]>(() => {
     if (!points) return [];
@@ -66,7 +104,6 @@ export function RecordReadingPage() {
     [activeRegisters, mode],
   );
 
-  // Wenn der aktuell gewählte Register beim Modus-Wechsel nicht mehr passt → ersten Eintrag wählen.
   useEffect(() => {
     if (filteredRegisters.length === 0) {
       setRegisterId(null);
@@ -79,6 +116,24 @@ export function RecordReadingPage() {
   }, [filteredRegisters, registerId]);
 
   const hasDeliveryTargets = activeRegisters.some((ar) => ar.register.accepts_deliveries);
+
+  const selected = useMemo(
+    () => filteredRegisters.find((ar) => ar.register.id === registerId) ?? null,
+    [filteredRegisters, registerId],
+  );
+
+  const lastState = registerId !== null ? stateByRegister.get(registerId) ?? null : null;
+  const parsedValue = (() => {
+    try {
+      return value.trim() === '' ? null : Number(parseDe(value));
+    } catch {
+      return null;
+    }
+  })();
+  const lastValue = lastState?.last_reading_value ? Number(lastState.last_reading_value) : null;
+  const delta =
+    parsedValue !== null && lastValue !== null && mode === 'reading' ? parsedValue - lastValue : null;
+  const deltaIsNegative = delta !== null && delta < 0 && !selected?.register.accepts_deliveries;
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -108,6 +163,20 @@ export function RecordReadingPage() {
       }
       setValue('');
       setNote('');
+      // State neu laden für aktuellen Plausibilitätscheck
+      if (points) {
+        void Promise.all(
+          points.map((mp) =>
+            api
+              .get<RegisterStateRead[]>(`/measuring-points/${mp.id}/state`)
+              .catch(() => [] as RegisterStateRead[]),
+          ),
+        ).then((results) => {
+          const next = new Map<number, RegisterStateRead>();
+          for (const list of results) for (const s of list) next.set(s.register_id, s);
+          setStateByRegister(next);
+        });
+      }
     } catch (err) {
       if (err instanceof ApiError) setError(err.problem.detail ?? err.problem.title);
       else if (err instanceof RangeError) setError(err.message);
@@ -119,35 +188,34 @@ export function RecordReadingPage() {
 
   if (!points) {
     return (
-      <div className="space-y-5">
+      <PageContainer>
         <LargeTitle title="Erfassen" />
-        <div className="px-4 text-ios-tertiary">Lade…</div>
-      </div>
+        <div className="text-tertiary">Lade…</div>
+      </PageContainer>
     );
   }
   if (activeRegisters.length === 0) {
     return (
-      <div className="space-y-5">
+      <PageContainer>
         <LargeTitle title="Erfassen" />
-        <div className="px-4">
-          <EmptyState
-            icon={<Gauge size={32} />}
-            title="Keine aktiven Register"
-            description="Lege zuerst eine Messstelle an."
-          />
-        </div>
-      </div>
+        <EmptyState
+          icon={<Gauge size={32} />}
+          title="Keine aktiven Register"
+          description="Lege zuerst eine Messstelle an."
+        />
+      </PageContainer>
     );
   }
 
   const valueLabel = mode === 'delivery' ? 'Liefermenge' : 'Stand';
   const dateLabel = mode === 'delivery' ? 'Lieferdatum' : 'Ablesedatum';
+  const unit = selected?.register.unit ?? '';
 
   return (
-    <form onSubmit={(e) => void handleSubmit(e)} className="space-y-5 pb-28 md:pb-8">
-      <LargeTitle title="Erfassen" />
+    <PageContainer>
+      <form onSubmit={(e) => void handleSubmit(e)} className="space-y-5 pb-28 md:pb-8">
+        <LargeTitle title="Erfassen" />
 
-      <div className="space-y-5 px-4">
         {hasDeliveryTargets ? (
           <div className="flex flex-wrap items-center gap-1.5">
             <Pill active={mode === 'reading'} onClick={() => setMode('reading')}>
@@ -168,7 +236,7 @@ export function RecordReadingPage() {
         ) : (
           <>
             <Section header="Register">
-              <div className="p-4">
+              <div className="p-5">
                 <Select
                   value={registerId ?? ''}
                   onChange={(e) => setRegisterId(Number(e.target.value))}
@@ -180,11 +248,55 @@ export function RecordReadingPage() {
                     </option>
                   ))}
                 </Select>
+                {selected ? (
+                  <div className="mt-3 flex items-center gap-2.5 text-caption text-tertiary">
+                    <TypeBadge type={selected.measuringPoint.type} size="sm" />
+                    <span className="font-mono">{selected.register.obis_code}</span>
+                    {selected.measuringPoint.location_name ? (
+                      <span>· {selected.measuringPoint.location_name}</span>
+                    ) : null}
+                  </div>
+                ) : null}
               </div>
             </Section>
 
+            {/* Hero-Number-Anzeige + Eingabefeld kombiniert */}
             <Section header={mode === 'delivery' ? 'Lieferung' : 'Erfassung'}>
-              <div className="space-y-4 p-4">
+              <div className="space-y-4 p-5">
+                {/* Großer Live-Wert oberhalb des Feldes */}
+                <div className="flex items-baseline justify-center gap-2 py-2">
+                  <span
+                    className={cx(
+                      'num text-display leading-none tracking-tighter',
+                      parsedValue === null ? 'text-quaternary' : 'text-label',
+                    )}
+                  >
+                    {parsedValue === null ? '—' : formatDe(parsedValue)}
+                  </span>
+                  {unit ? (
+                    <span className="text-headline text-secondary">{unit}</span>
+                  ) : null}
+                </div>
+
+                {/* Plausibilitätscheck-Delta */}
+                {delta !== null ? (
+                  <div
+                    data-testid="reading-delta"
+                    className={cx(
+                      'mx-auto w-fit rounded-full px-3 py-1 text-caption font-semibold',
+                      deltaIsNegative
+                        ? 'bg-danger/15 text-danger'
+                        : 'bg-success/15 text-success',
+                    )}
+                  >
+                    {deltaIsNegative ? '⚠ ' : '+'}
+                    {formatDe(delta)} {unit}
+                    {lastState?.last_reading_at
+                      ? ` seit ${formatDateTimeDe(lastState.last_reading_at)}`
+                      : ''}
+                  </div>
+                ) : null}
+
                 <TextField
                   label={valueLabel}
                   type="text"
@@ -194,7 +306,8 @@ export function RecordReadingPage() {
                   onChange={(e) => setValue(e.target.value)}
                   placeholder={mode === 'delivery' ? 'z. B. 1.500' : 'z. B. 12.345,678'}
                   required
-                  inputClassName="text-ios-title font-rounded"
+                  numeric
+                  inputClassName="text-headline"
                 />
                 <TextField
                   label={dateLabel}
@@ -217,30 +330,45 @@ export function RecordReadingPage() {
         )}
 
         {error ? (
-          <div className="rounded-ios-lg bg-ios-red/15 p-3 text-ios-footnote text-ios-red">
+          <div
+            data-testid="record-error"
+            className="rounded-card border-hairline border-danger/40 bg-danger/10 p-3 text-caption text-danger"
+          >
             {error}
           </div>
         ) : null}
         {success ? (
-          <div className="rounded-ios-lg bg-ios-green/15 p-3 text-ios-footnote text-ios-green">
+          <div
+            data-testid="record-success"
+            className="rounded-card border-hairline border-success/40 bg-success/10 p-3 text-caption text-success"
+          >
             {success}
           </div>
         ) : null}
-      </div>
 
-      {/* Sticky save bar */}
-      <div className="fixed bottom-0 left-0 right-0 z-10 border-t border-ios-separator/60 bg-ios-bg/90 px-4 py-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] backdrop-blur md:static md:border-0 md:bg-transparent md:p-0 md:px-4 md:pb-0 md:pt-2">
-        <Button
-          type="submit"
-          variant="filled"
-          size="lg"
-          fullWidth
-          leftIcon={<Check size={18} />}
-          disabled={busy || filteredRegisters.length === 0}
-        >
-          {busy ? 'Speichere…' : 'Speichern'}
-        </Button>
-      </div>
-    </form>
+        {/* Sticky save bar */}
+        <div className="fixed bottom-0 left-0 right-0 z-10 border-t-hairline border-border bg-surface-high glass px-4 py-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] md:static md:border-0 md:bg-transparent md:p-0 md:pt-2">
+          <Button
+            type="submit"
+            variant="filled"
+            size="lg"
+            fullWidth
+            leftIcon={<Check size={18} />}
+            disabled={busy || filteredRegisters.length === 0}
+          >
+            {busy ? 'Speichere…' : 'Speichern'}
+          </Button>
+        </div>
+      </form>
+    </PageContainer>
+  );
+}
+
+function PageContainer({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="relative min-h-full overflow-hidden bg-bg">
+      <PageGlows accent="electricity" />
+      <div className="relative z-10 p-4 md:p-7">{children}</div>
+    </div>
   );
 }
