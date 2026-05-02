@@ -691,6 +691,60 @@ cmd_status() {
 }
 
 # -----------------------------------------------------------------------------
+# reset-password — Passwort eines Users (z. B. Admin) neu setzen
+# -----------------------------------------------------------------------------
+
+cmd_reset_password() {
+    require_root
+    [ -d "$REPO_DIR/.git" ] || die "Kein Repository unter $REPO_DIR — bitte erst 'install' ausführen."
+
+    ensure_whiptail
+    local user="${ADMIN_USER:-admin}"
+    local pw="${ADMIN_PASSWORD:-}"
+
+    if is_interactive; then
+        while :; do
+            user=$(wt_input "Passwort zurücksetzen" \
+                "Username, dessen Passwort neu gesetzt werden soll." \
+                "$user") || die "Abgebrochen."
+            valid_user "$user" && break
+            wt_msgbox "Ungültiger Username" "Username muss 2-32 Zeichen lang sein und mit einem Buchstaben beginnen."
+        done
+        if [ -z "$pw" ]; then
+            while :; do
+                pw=$(wt_password "Neues Passwort" \
+                    "Neues Passwort für '$user' (mindestens 12 Zeichen).\nDer Benutzer muss es beim nächsten Login ändern.") || die "Abgebrochen."
+                if [ "${#pw}" -lt 12 ]; then
+                    wt_msgbox "Zu kurz" "Mindestens 12 Zeichen."
+                    pw=""
+                    continue
+                fi
+                local pw_confirm
+                pw_confirm=$(wt_password "Passwort bestätigen" "Bitte erneut eingeben.") || die "Abgebrochen."
+                if [ "$pw" != "$pw_confirm" ]; then
+                    wt_msgbox "Stimmt nicht überein" "Die beiden Eingaben unterscheiden sich."
+                    pw=""
+                    continue
+                fi
+                break
+            done
+        fi
+    else
+        if [ -z "$pw" ]; then
+            die "Non-interactive Modus — bitte ADMIN_USER und ADMIN_PASSWORD setzen.
+  ADMIN_USER=admin ADMIN_PASSWORD='neues-pw-12-zeichen' sudo bash $0 reset-password"
+        fi
+    fi
+
+    msg_run "reset-password '$user' (force-change beim nächsten Login)"
+    as_user "cd '$REPO_DIR/backend' && uv run python -m meters.cli reset-password --username '$user' --password '$pw' --force-change"
+    ok "Passwort für '$user' zurückgesetzt"
+    if is_interactive; then
+        wt_msgbox "Fertig" "Passwort für '$user' wurde gesetzt.\n\nBeim nächsten Login wird ein neues Passwort verlangt." || true
+    fi
+}
+
+# -----------------------------------------------------------------------------
 # help
 # -----------------------------------------------------------------------------
 
@@ -713,6 +767,10 @@ ${C_BOLD}zaehler.sh — Verwaltungsskript für die Zählerstand-App${C_RESET}
     backup               Sofort einen DB-Snapshot erzeugen
     restore <datei.gz>   Backup einspielen (stoppt Service, ersetzt DB,
                          startet Service neu)
+
+  ${C_BOLD}Benutzer-Verwaltung:${C_RESET}
+    reset-password       Passwort eines Users neu setzen (z. B. Admin
+                         vergessen) — fragt User+Passwort interaktiv
 
   ${C_BOLD}Diagnose:${C_RESET}
     status               Übersicht: Service, Versionen, DB, Backups, Repo
@@ -755,6 +813,7 @@ case "${1:-help}" in
     upgrade-all)     cmd_upgrade_all ;;
     backup)          cmd_backup ;;
     restore)         cmd_restore "${2:-}" ;;
+    reset-password)  cmd_reset_password ;;
     status)          cmd_status ;;
     help|-h|--help)  cmd_help ;;
     *)

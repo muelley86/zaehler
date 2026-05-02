@@ -4,6 +4,7 @@ Aufruf:
 
     uv run python -m meters.cli create-admin --username admin --password "<pw>"
     uv run python -m meters.cli create-admin --username admin --password "<pw>" --email admin@x.tld
+    uv run python -m meters.cli reset-password --username admin --password "<pw>" --force-change
 """
 
 from __future__ import annotations
@@ -44,6 +45,28 @@ def _cmd_create_admin(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_reset_password(args: argparse.Namespace) -> int:
+    if len(args.password) < 12:
+        print("Passwort muss mindestens 12 Zeichen haben.", file=sys.stderr)
+        return 2
+
+    with SessionLocal() as db:
+        user = db.scalar(select(User).where(User.username == args.username))
+        if user is None:
+            print(f"Benutzer '{args.username}' nicht gefunden.", file=sys.stderr)
+            return 1
+        user.password_hash = hash_password(args.password)
+        user.is_active = True
+        if args.force_change:
+            user.force_password_change = True
+        db.commit()
+        print(
+            f"Passwort für '{user.username}' (id={user.id}) zurückgesetzt"
+            + (" — Änderung beim nächsten Login erzwungen." if args.force_change else ".")
+        )
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="meters.cli")
     sub = parser.add_subparsers(dest="cmd", required=True)
@@ -58,6 +81,19 @@ def main(argv: list[str] | None = None) -> int:
         help="Admin muss beim ersten Login das Passwort ändern.",
     )
     create.set_defaults(func=_cmd_create_admin)
+
+    reset = sub.add_parser(
+        "reset-password",
+        help="Passwort eines bestehenden Benutzers neu setzen (z. B. wenn vergessen).",
+    )
+    reset.add_argument("--username", required=True)
+    reset.add_argument("--password", required=True)
+    reset.add_argument(
+        "--force-change",
+        action="store_true",
+        help="Benutzer muss beim nächsten Login ein neues Passwort setzen.",
+    )
+    reset.set_defaults(func=_cmd_reset_password)
 
     args = parser.parse_args(argv)
     func = args.func
