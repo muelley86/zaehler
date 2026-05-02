@@ -73,11 +73,7 @@ export function DeliveriesSheet({
   const totalRefilled = items.reduce((acc, d) => acc + Number(d.amount), 0);
 
   return (
-    <Sheet
-      open={open}
-      onClose={onClose}
-      title={`Befüllungen · ${register.label}`}
-    >
+    <Sheet open={open} onClose={onClose} title={`Befüllungen · ${register.label}`}>
       <div className="space-y-5">
         <form onSubmit={(e) => void add(e)} className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
@@ -109,7 +105,7 @@ export function DeliveriesSheet({
 
         <div>
           <div className="mb-2 flex items-baseline justify-between">
-            <div className="text-ios-footnote text-ios-secondary uppercase tracking-wide">
+            <div className="text-ios-footnote uppercase tracking-wide text-ios-secondary">
               Bisherige Lieferungen
             </div>
             {items.length > 0 ? (
@@ -132,8 +128,7 @@ export function DeliveriesSheet({
                       <div className="text-ios-footnote text-ios-tertiary">{d.note}</div>
                     ) : null}
                     <div className="text-ios-caption text-ios-tertiary">
-                      {d.created_by_username ?? '—'} ·{' '}
-                      {d.created_at.replace('T', ' ').slice(0, 16)}
+                      {d.created_by_username ?? '—'} · {d.created_at.replace('T', ' ').slice(0, 16)}
                     </div>
                   </div>
                   <div className="text-right">

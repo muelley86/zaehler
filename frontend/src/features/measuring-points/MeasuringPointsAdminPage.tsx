@@ -124,13 +124,9 @@ function MPCard({
       </button>
 
       {open ? (
-        <div className="border-t border-ios-separator/60 p-4 space-y-3">
+        <div className="space-y-3 border-t border-ios-separator/60 p-4">
           <div className="flex flex-wrap gap-2">
-            <Button
-              variant="bordered"
-              size="sm"
-              onClick={() => setEditing((v) => !v)}
-            >
+            <Button variant="bordered" size="sm" onClick={() => setEditing((v) => !v)}>
               {editing ? 'Schließen' : 'Bearbeiten'}
             </Button>
             <Button
@@ -223,12 +219,7 @@ function MPEditForm({
 
   return (
     <form onSubmit={(e) => void handleSubmit(e)} className="space-y-3">
-      <TextField
-        label="Name"
-        value={name}
-        onChange={(e) => setName(e.target.value)}
-        required
-      />
+      <TextField label="Name" value={name} onChange={(e) => setName(e.target.value)} required />
       <Select
         label="Standort"
         value={locationId ?? ''}
@@ -246,8 +237,8 @@ function MPEditForm({
           <ToggleRow label="Bidirektional (Einspeisung)" checked={bidi} onChange={setBidi} />
           <ToggleRow label="Doppeltarif (HT/NT)" checked={dual} onChange={setDual} />
           <div className="text-ios-caption text-ios-tertiary">
-            Hinweis: Register werden nicht automatisch angepasst — beim nächsten
-            Zählerwechsel wirken sich die Flags auf den neuen Zähler aus.
+            Hinweis: Register werden nicht automatisch angepasst — beim nächsten Zählerwechsel
+            wirken sich die Flags auf den neuen Zähler aus.
           </div>
         </>
       ) : null}
@@ -358,11 +349,7 @@ function MeterPanel({
       ) : null}
 
       <Sheet open={replace} onClose={() => setReplace(false)} title="Zähler tauschen">
-        <ReplaceMeterForm
-          mp={mp}
-          onClose={() => setReplace(false)}
-          onReplaced={onChanged}
-        />
+        <ReplaceMeterForm mp={mp} onClose={() => setReplace(false)} onReplaced={onChanged} />
       </Sheet>
 
       {deliveriesFor ? (
@@ -376,13 +363,7 @@ function MeterPanel({
   );
 }
 
-function MeterEditForm({
-  meter,
-  onSaved,
-}: {
-  meter: PhysicalMeterRead;
-  onSaved: () => void;
-}) {
+function MeterEditForm({ meter, onSaved }: { meter: PhysicalMeterRead; onSaved: () => void }) {
   const [serial, setSerial] = useState(meter.serial_number);
   const [installedAt, setInstalledAt] = useState(meter.installed_at);
   const [removedAt, setRemovedAt] = useState(meter.removed_at ?? '');
@@ -507,11 +488,7 @@ function CreateForm({
       ) : (
         <form onSubmit={(e) => void handleSubmit(e)} className="space-y-3 p-4">
           <TextField label="Name" value={name} onChange={(e) => setName(e.target.value)} required />
-          <Select
-            label="Typ"
-            value={type}
-            onChange={(e) => setType(e.target.value as MeterType)}
-          >
+          <Select label="Typ" value={type} onChange={(e) => setType(e.target.value as MeterType)}>
             <option value="electricity">Strom</option>
             <option value="gas">Gas</option>
             <option value="water">Wasser</option>
@@ -675,9 +652,7 @@ function ReplaceMeterForm({
               label={code}
               inputMode="decimal"
               value={final[code] ?? ''}
-              onChange={(e) =>
-                setFinal((s) => ({ ...s, [code]: e.target.value }))
-              }
+              onChange={(e) => setFinal((s) => ({ ...s, [code]: e.target.value }))}
               required
             />
           ))}
@@ -692,9 +667,7 @@ function ReplaceMeterForm({
               label={code}
               inputMode="decimal"
               value={initial[code] ?? ''}
-              onChange={(e) =>
-                setInitial((s) => ({ ...s, [code]: e.target.value }))
-              }
+              onChange={(e) => setInitial((s) => ({ ...s, [code]: e.target.value }))}
             />
           ))}
         </div>

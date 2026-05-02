@@ -249,7 +249,7 @@ export function DashboardPage() {
         }
       />
 
-      <div className="px-4 space-y-5">
+      <div className="space-y-5 px-4">
         <Section header="Filter">
           <div className="space-y-4 p-4">
             <FilterRow label="Standorte">
@@ -285,7 +285,7 @@ export function DashboardPage() {
               <span className="text-ios-tertiary">—</span>
               <DateInput value={to} onChange={setTo} aria-label="bis" />
             </FilterRow>
-            {(locationFilter.size || typeFilter.size || from || to) ? (
+            {locationFilter.size || typeFilter.size || from || to ? (
               <button
                 type="button"
                 onClick={() => {
@@ -449,7 +449,7 @@ function MeasuringPointCard({
   return (
     <Card>
       <div className="mb-3 flex flex-wrap items-baseline gap-2">
-        <h2 className="text-ios-title2 font-rounded">{mp.name}</h2>
+        <h2 className="font-rounded text-ios-title2">{mp.name}</h2>
         <span className="rounded-full bg-ios-fill/15 px-2 py-0.5 text-ios-caption uppercase tracking-wide text-ios-secondary">
           {TYPE_LABELS[mp.type]}
         </span>
@@ -492,10 +492,7 @@ function MeasuringPointCard({
           </div>
           <ul className="mt-1 space-y-0.5">
             {Array.from(consumptionTotals.entries()).map(([code, t]) => (
-              <li
-                key={code}
-                className="flex items-baseline justify-between gap-3 text-ios-body"
-              >
+              <li key={code} className="flex items-baseline justify-between gap-3 text-ios-body">
                 <span className="truncate">{labelByObis.get(code) ?? code}</span>
                 <span className="font-rounded tabular-nums">
                   {formatDe(t.sum)}{' '}
@@ -527,11 +524,7 @@ function MeasuringPointCard({
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={series} margin={{ top: 10, right: 16, bottom: 8, left: 8 }}>
               <CartesianGrid strokeDasharray="3 3" stroke={theme.grid} />
-              <XAxis
-                dataKey="date"
-                tick={{ fontSize: 11, fill: theme.axis }}
-                stroke={theme.axis}
-              />
+              <XAxis dataKey="date" tick={{ fontSize: 11, fill: theme.axis }} stroke={theme.axis} />
               <YAxis
                 tick={{ fontSize: 11, fill: theme.axis }}
                 stroke={theme.axis}
@@ -622,10 +615,10 @@ function TankTile({
     percent === null
       ? 'bg-ios-fill/30'
       : percent < 20
-      ? 'bg-ios-red'
-      : percent < 50
-      ? 'bg-ios-orange'
-      : 'bg-ios-green';
+        ? 'bg-ios-red'
+        : percent < 50
+          ? 'bg-ios-orange'
+          : 'bg-ios-green';
 
   return (
     <div className="rounded-ios-lg bg-ios-elevated/60 p-4">
@@ -660,8 +653,7 @@ function TankTile({
           </div>
         ) : (
           <div>
-            Tankvolumen nicht gesetzt — für Prozent-Anzeige in Messstellen-Stammdaten
-            ergänzen.
+            Tankvolumen nicht gesetzt — für Prozent-Anzeige in Messstellen-Stammdaten ergänzen.
           </div>
         )}
         <div>
@@ -809,8 +801,7 @@ function ConsumptionSummary({
     }
     return Array.from(map.values()).sort(
       (a, b) =>
-        TYPE_ORDER.indexOf(a.type) - TYPE_ORDER.indexOf(b.type) ||
-        a.label.localeCompare(b.label),
+        TYPE_ORDER.indexOf(a.type) - TYPE_ORDER.indexOf(b.type) || a.label.localeCompare(b.label),
     );
   }, [consumption]);
 
@@ -820,16 +811,13 @@ function ConsumptionSummary({
     <Section header="Verbrauch im gewählten Zeitraum">
       {buckets.length === 0 ? (
         <div className="p-4 text-ios-footnote text-ios-tertiary">
-          Im gewählten Zeitraum gibt es keine zwei aufeinanderfolgenden Erfassungen, aus
-          denen ein Verbrauch berechnet werden könnte.
+          Im gewählten Zeitraum gibt es keine zwei aufeinanderfolgenden Erfassungen, aus denen ein
+          Verbrauch berechnet werden könnte.
         </div>
       ) : (
         <ul className="divide-y divide-ios-separator/60">
           {buckets.map((b) => (
-            <li
-              key={b.label}
-              className="flex items-baseline justify-between gap-3 px-4 py-3"
-            >
+            <li key={b.label} className="flex items-baseline justify-between gap-3 px-4 py-3">
               <div className="min-w-0 flex-1 truncate text-ios-body">{b.label}</div>
               <div className="font-rounded text-ios-headline tabular-nums">
                 {formatDe(b.sum)}{' '}

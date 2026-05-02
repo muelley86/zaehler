@@ -35,7 +35,7 @@ body,
 }
 
 body {
-  @apply bg-ios-bg text-ios-label font-sans;
+  @apply bg-ios-bg font-sans text-ios-label;
   -webkit-tap-highlight-color: transparent;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;

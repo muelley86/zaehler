@@ -1,11 +1,4 @@
-import {
-  Gauge,
-  KeyRound,
-  LogOut,
-  MapPin,
-  ScrollText,
-  Users,
-} from 'lucide-react';
+import { Gauge, KeyRound, LogOut, MapPin, ScrollText, Users } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 import { useAuth } from '@/features/auth/AuthProvider';
@@ -25,7 +18,7 @@ export function MorePage() {
     <div className="space-y-5">
       <LargeTitle title="Mehr" subtitle={`Angemeldet als ${me?.username ?? ''}`} />
 
-      <div className="px-4 space-y-5">
+      <div className="space-y-5 px-4">
         {isAdmin ? (
           <Section header="Verwaltung">
             <RowGroup>
@@ -39,11 +32,7 @@ export function MorePage() {
 
         <Section header="Account">
           <RowGroup>
-            <Row
-              to="/passwort-aendern"
-              icon={<KeyRound size={20} />}
-              label="Passwort ändern"
-            />
+            <Row to="/passwort-aendern" icon={<KeyRound size={20} />} label="Passwort ändern" />
             <Row
               onClick={() => void handleLogout()}
               icon={<LogOut size={20} />}

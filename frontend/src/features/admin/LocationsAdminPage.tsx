@@ -2,14 +2,7 @@ import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import { Pencil, Trash2 } from 'lucide-react';
 
-import {
-  Button,
-  EmptyState,
-  LargeTitle,
-  Section,
-  Sheet,
-  TextField,
-} from '@/components/ui';
+import { Button, EmptyState, LargeTitle, Section, Sheet, TextField } from '@/components/ui';
 import { ApiError, api } from '@/lib/api';
 import type { LocationRead } from '@/lib/types';
 
@@ -57,11 +50,7 @@ export function LocationsAdminPage() {
         )}
       </div>
 
-      <Sheet
-        open={editing !== null}
-        onClose={() => setEditing(null)}
-        title="Standort bearbeiten"
-      >
+      <Sheet open={editing !== null} onClose={() => setEditing(null)} title="Standort bearbeiten">
         {editing ? (
           <EditForm
             loc={editing}
@@ -108,16 +97,9 @@ function LocationItem({
       <div className="flex items-center gap-3">
         <div className="min-w-0 flex-1">
           <div className="text-ios-body">{loc.name}</div>
-          {loc.note ? (
-            <div className="text-ios-footnote text-ios-tertiary">{loc.note}</div>
-          ) : null}
+          {loc.note ? <div className="text-ios-footnote text-ios-tertiary">{loc.note}</div> : null}
         </div>
-        <Button
-          variant="plain"
-          size="sm"
-          leftIcon={<Pencil size={14} />}
-          onClick={onEdit}
-        >
+        <Button variant="plain" size="sm" leftIcon={<Pencil size={14} />} onClick={onEdit}>
           Bearbeiten
         </Button>
         <Button

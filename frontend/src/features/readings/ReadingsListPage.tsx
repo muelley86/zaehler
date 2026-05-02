@@ -3,24 +3,10 @@ import type { FormEvent } from 'react';
 import { Download, Pencil, Search, Trash2 } from 'lucide-react';
 
 import { useAuth } from '@/features/auth/AuthProvider';
-import {
-  Button,
-  EmptyState,
-  LargeTitle,
-  Pill,
-  Section,
-  Sheet,
-  TextField,
-} from '@/components/ui';
+import { Button, EmptyState, LargeTitle, Pill, Section, Sheet, TextField } from '@/components/ui';
 import { ApiError, api } from '@/lib/api';
 import { formatDateTimeDe, formatDe, parseDe, toInputDateTime } from '@/lib/format';
-import type {
-  DeliveryRead,
-  Me,
-  MeasuringPointRead,
-  MeterType,
-  ReadingRead,
-} from '@/lib/types';
+import type { DeliveryRead, Me, MeasuringPointRead, MeterType, ReadingRead } from '@/lib/types';
 
 type ItemKind = 'reading' | 'correction' | 'delivery';
 
@@ -330,7 +316,7 @@ export function ReadingsListPage() {
         }
       />
 
-      <div className="px-4 space-y-5">
+      <div className="space-y-5 px-4">
         <Section header="Filter">
           <div className="space-y-3 p-4">
             <TextField
@@ -425,14 +411,14 @@ export function ReadingsListPage() {
                 Lieferungen ({counts.delivery})
               </Pill>
             </FilterRow>
-            {(locationFilter.size ||
-              typeFilter.size ||
-              mpFilter.size ||
-              obisFilter.size ||
-              from ||
-              to ||
-              search ||
-              kindFilter.size) ? (
+            {locationFilter.size ||
+            typeFilter.size ||
+            mpFilter.size ||
+            obisFilter.size ||
+            from ||
+            to ||
+            search ||
+            kindFilter.size ? (
               <button
                 type="button"
                 onClick={() => {
@@ -502,9 +488,7 @@ export function ReadingsListPage() {
       <Sheet
         open={editTarget !== null}
         onClose={() => setEditTarget(null)}
-        title={
-          editTarget?.kind === 'delivery' ? 'Lieferung bearbeiten' : 'Erfassung bearbeiten'
-        }
+        title={editTarget?.kind === 'delivery' ? 'Lieferung bearbeiten' : 'Erfassung bearbeiten'}
       >
         {editTarget?.kind === 'reading' ? (
           <EditForm
@@ -594,7 +578,7 @@ function ReadingItem({
             {reading.created_at.replace('T', ' ').slice(0, 16)}
           </div>
         </div>
-        <div className="text-right shrink-0">
+        <div className="shrink-0 text-right">
           <div className="font-rounded text-ios-headline tabular-nums">
             {formatDe(reading.value)}
           </div>
@@ -773,7 +757,7 @@ function DeliveryItem({
             {delivery.created_at.replace('T', ' ').slice(0, 16)}
           </div>
         </div>
-        <div className="text-right shrink-0">
+        <div className="shrink-0 text-right">
           <div className="font-rounded text-ios-headline tabular-nums text-ios-blue">
             + {formatDe(delivery.amount)}
           </div>

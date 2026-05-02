@@ -20,9 +20,7 @@ export function Pill({
       className={cx(
         'rounded-full transition-colors',
         size === 'sm' ? 'px-2.5 py-1 text-ios-caption' : 'px-3 py-1.5 text-ios-footnote',
-        active
-          ? 'bg-ios-blue text-white'
-          : 'bg-ios-fill/15 text-ios-label hover:bg-ios-fill/25',
+        active ? 'bg-ios-blue text-white' : 'bg-ios-fill/15 text-ios-label hover:bg-ios-fill/25',
       )}
     >
       {children}

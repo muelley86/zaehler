@@ -28,9 +28,7 @@ export function App() {
   const location = useLocation();
 
   if (loading) {
-    return (
-      <div className="flex h-full items-center justify-center text-ios-tertiary">Lade…</div>
-    );
+    return <div className="flex h-full items-center justify-center text-ios-tertiary">Lade…</div>;
   }
 
   if (!me) {

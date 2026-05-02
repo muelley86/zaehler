@@ -33,7 +33,13 @@ interface NavItem {
 }
 
 const NAV: NavItem[] = [
-  { to: '/', label: 'Dashboard', icon: <LayoutDashboard size={22} />, end: true, mobileTabBar: true },
+  {
+    to: '/',
+    label: 'Dashboard',
+    icon: <LayoutDashboard size={22} />,
+    end: true,
+    mobileTabBar: true,
+  },
   { to: '/erfassen', label: 'Erfassen', icon: <PencilLine size={22} />, mobileTabBar: true },
   {
     to: '/erfassungen',
@@ -65,7 +71,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       {/* Sidebar (Desktop) */}
       <aside className="hidden md:flex md:w-60 md:shrink-0 md:flex-col md:border-r md:border-ios-separator md:bg-ios-surface md:pt-safe-top">
         <div className="px-5 pb-2 pt-5">
-          <div className="text-ios-title2 font-rounded">Zählerstand</div>
+          <div className="font-rounded text-ios-title2">Zählerstand</div>
         </div>
         <nav className="flex flex-1 flex-col gap-0.5 p-2">
           {visible.map((n) => (
@@ -76,9 +82,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               className={({ isActive }) =>
                 cx(
                   'flex items-center gap-3 rounded-ios px-3 py-2 text-ios-body',
-                  isActive
-                    ? 'bg-ios-blue text-white'
-                    : 'text-ios-label hover:bg-ios-elevated/50',
+                  isActive ? 'bg-ios-blue text-white' : 'text-ios-label hover:bg-ios-elevated/50',
                 )
               }
             >

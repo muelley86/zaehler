@@ -2,15 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
 import { Check, Gauge } from 'lucide-react';
 
-import {
-  Button,
-  EmptyState,
-  LargeTitle,
-  Pill,
-  Section,
-  Select,
-  TextField,
-} from '@/components/ui';
+import { Button, EmptyState, LargeTitle, Pill, Section, Select, TextField } from '@/components/ui';
 import { ApiError, api } from '@/lib/api';
 import { formatDateTimeDe, formatDe, nowForInput, parseDe } from '@/lib/format';
 import type {
@@ -28,7 +20,6 @@ interface ActiveRegister {
 }
 
 type Mode = 'reading' | 'delivery';
-
 
 export function RecordReadingPage() {
   const [points, setPoints] = useState<MeasuringPointRead[] | null>(null);
@@ -108,17 +99,12 @@ export function RecordReadingPage() {
           `Stand gespeichert: ${formatDe(created.value)} (${formatDateTimeDe(created.reading_at)}).`,
         );
       } else {
-        const created = await api.post<DeliveryRead>(
-          `/registers/${registerId}/deliveries`,
-          {
-            amount: numeric,
-            delivery_date: readingAt.slice(0, 10),
-            note: note || null,
-          },
-        );
-        setSuccess(
-          `Lieferung erfasst: ${formatDe(created.amount)} (${created.delivery_date}).`,
-        );
+        const created = await api.post<DeliveryRead>(`/registers/${registerId}/deliveries`, {
+          amount: numeric,
+          delivery_date: readingAt.slice(0, 10),
+          note: note || null,
+        });
+        setSuccess(`Lieferung erfasst: ${formatDe(created.amount)} (${created.delivery_date}).`);
       }
       setValue('');
       setNote('');
@@ -215,9 +201,7 @@ export function RecordReadingPage() {
                   type={mode === 'delivery' ? 'date' : 'datetime-local'}
                   value={mode === 'delivery' ? readingAt.slice(0, 10) : readingAt}
                   onChange={(e) =>
-                    setReadingAt(
-                      mode === 'delivery' ? `${e.target.value}T12:00` : e.target.value,
-                    )
+                    setReadingAt(mode === 'delivery' ? `${e.target.value}T12:00` : e.target.value)
                   }
                   required
                 />

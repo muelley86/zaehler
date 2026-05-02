@@ -23,9 +23,7 @@ export function Section({
       <div className="overflow-hidden rounded-ios-lg bg-ios-surface shadow-ios-card">
         {children}
       </div>
-      {footer ? (
-        <div className="px-4 text-ios-footnote text-ios-tertiary">{footer}</div>
-      ) : null}
+      {footer ? <div className="px-4 text-ios-footnote text-ios-tertiary">{footer}</div> : null}
     </section>
   );
 }

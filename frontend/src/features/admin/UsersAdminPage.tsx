@@ -178,11 +178,7 @@ function CreateUserForm({ onCreated }: { onCreated: () => void }) {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
           />
-          <Select
-            label="Rolle"
-            value={role}
-            onChange={(e) => setRole(e.target.value as UserRole)}
-          >
+          <Select label="Rolle" value={role} onChange={(e) => setRole(e.target.value as UserRole)}>
             <option value="recorder">recorder</option>
             <option value="admin">admin</option>
           </Select>

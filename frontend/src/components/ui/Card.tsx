@@ -13,11 +13,7 @@ export function Card({
 }) {
   return (
     <div
-      className={cx(
-        'rounded-ios-lg bg-ios-surface shadow-ios-card',
-        padded && 'p-4',
-        className,
-      )}
+      className={cx('rounded-ios-lg bg-ios-surface shadow-ios-card', padded && 'p-4', className)}
     >
       {children}
     </div>

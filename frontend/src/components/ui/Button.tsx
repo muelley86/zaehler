@@ -24,14 +24,10 @@ const sizeClasses: Record<Size, string> = {
 };
 
 const variantClasses: Record<Variant, string> = {
-  filled:
-    'bg-ios-blue text-white hover:brightness-110 active:brightness-95',
-  tinted:
-    'bg-ios-blue/15 text-ios-blue hover:bg-ios-blue/25 active:bg-ios-blue/30',
-  plain:
-    'text-ios-blue hover:bg-ios-blue/10 active:bg-ios-blue/15',
-  destructive:
-    'bg-ios-red text-white hover:brightness-110 active:brightness-95',
+  filled: 'bg-ios-blue text-white hover:brightness-110 active:brightness-95',
+  tinted: 'bg-ios-blue/15 text-ios-blue hover:bg-ios-blue/25 active:bg-ios-blue/30',
+  plain: 'text-ios-blue hover:bg-ios-blue/10 active:bg-ios-blue/15',
+  destructive: 'bg-ios-red text-white hover:brightness-110 active:brightness-95',
   bordered:
     'border border-ios-separator bg-transparent text-ios-label hover:bg-ios-elevated/40 active:bg-ios-elevated/60',
 };

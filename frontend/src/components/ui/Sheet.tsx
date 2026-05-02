@@ -37,8 +37,8 @@ export function Sheet({
       <div
         className={cx(
           'relative z-10 w-full max-w-lg rounded-t-ios-xl bg-ios-surface shadow-ios-elevated',
-          'md:rounded-ios-xl md:max-h-[80vh]',
-          'pb-[env(safe-area-inset-bottom)] max-h-[90vh] overflow-y-auto',
+          'md:max-h-[80vh] md:rounded-ios-xl',
+          'max-h-[90vh] overflow-y-auto pb-[env(safe-area-inset-bottom)]',
         )}
       >
         <div className="sticky top-0 flex items-center justify-between border-b border-ios-separator/60 bg-ios-surface px-4 py-3">

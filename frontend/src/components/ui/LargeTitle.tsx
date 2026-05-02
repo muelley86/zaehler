@@ -16,12 +16,10 @@ export function LargeTitle({
   return (
     <div className={cx('px-4 pb-2 pt-1 md:pt-2', className)}>
       <div className="flex items-end justify-between gap-3">
-        <h1 className="text-ios-largetitle font-rounded">{title}</h1>
+        <h1 className="font-rounded text-ios-largetitle">{title}</h1>
         {trailing ? <div className="pb-2">{trailing}</div> : null}
       </div>
-      {subtitle ? (
-        <div className="mt-1 text-ios-subhead text-ios-secondary">{subtitle}</div>
-      ) : null}
+      {subtitle ? <div className="mt-1 text-ios-subhead text-ios-secondary">{subtitle}</div> : null}
     </div>
   );
 }

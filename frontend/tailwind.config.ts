@@ -15,12 +15,7 @@ const config: Config = {
           'Arial',
           'sans-serif',
         ],
-        rounded: [
-          'ui-rounded',
-          '"SF Pro Rounded"',
-          'system-ui',
-          'sans-serif',
-        ],
+        rounded: ['ui-rounded', '"SF Pro Rounded"', 'system-ui', 'sans-serif'],
       },
       colors: {
         ios: {

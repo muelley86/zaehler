@@ -38,14 +38,11 @@ export function LoginPage() {
   return (
     <div className="flex min-h-full items-center justify-center bg-ios-bg p-4 pt-safe-top">
       <Card className="w-full max-w-sm" padded={false}>
-        <div className="px-5 pt-6 pb-2">
-          <div className="text-ios-largetitle font-rounded">Zählerstand</div>
+        <div className="px-5 pb-2 pt-6">
+          <div className="font-rounded text-ios-largetitle">Zählerstand</div>
           <div className="mt-1 text-ios-subhead text-ios-secondary">Anmelden</div>
         </div>
-        <form
-          onSubmit={(e) => void handleSubmit(e)}
-          className="space-y-4 px-5 pb-6 pt-2"
-        >
+        <form onSubmit={(e) => void handleSubmit(e)} className="space-y-4 px-5 pb-6 pt-2">
           <TextField
             label="Benutzername"
             type="text"

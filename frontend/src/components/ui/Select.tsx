@@ -16,16 +16,14 @@ export function Select({ label, hint, className, children, ...rest }: SelectProp
       ) : null}
       <span className="flex items-center rounded-ios bg-ios-elevated px-3">
         <select
-          className="h-11 w-full bg-transparent text-ios-body outline-none appearance-none pr-7"
+          className="h-11 w-full appearance-none bg-transparent pr-7 text-ios-body outline-none"
           {...rest}
         >
           {children}
         </select>
         <span className="pointer-events-none -ml-5 text-ios-tertiary">▾</span>
       </span>
-      {hint ? (
-        <span className="mt-1 block text-ios-footnote text-ios-tertiary">{hint}</span>
-      ) : null}
+      {hint ? <span className="mt-1 block text-ios-footnote text-ios-tertiary">{hint}</span> : null}
     </label>
   );
 }
