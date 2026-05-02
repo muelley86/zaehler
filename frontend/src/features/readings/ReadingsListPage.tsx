@@ -3,10 +3,27 @@ import type { FormEvent } from 'react';
 import { Download, Pencil, Search, Trash2 } from 'lucide-react';
 
 import { useAuth } from '@/features/auth/AuthProvider';
-import { Button, EmptyState, LargeTitle, Pill, Section, Sheet, TextField } from '@/components/ui';
+import {
+  Button,
+  EmptyState,
+  LargeTitle,
+  Pill,
+  Section,
+  Sheet,
+  TextField,
+  TypeBadge,
+} from '@/components/ui';
+import { PageGlows } from '@/components/PageGlows';
 import { ApiError, api } from '@/lib/api';
-import { formatDateTimeDe, formatDe, parseDe, toInputDateTime } from '@/lib/format';
+import {
+  formatDateDe,
+  formatDateTimeDe,
+  formatDe,
+  parseDe,
+  toInputDateTime,
+} from '@/lib/format';
 import type { DeliveryRead, Me, MeasuringPointRead, MeterType, ReadingRead } from '@/lib/types';
+import { cx } from '@/components/ui/cx';
 
 type ItemKind = 'reading' | 'correction' | 'delivery';
 
@@ -35,6 +52,24 @@ interface RegisterIndex {
 type EditTarget =
   | { kind: 'reading'; reading: ReadingRead; info: RegisterIndex }
   | { kind: 'delivery'; delivery: DeliveryRead; info: RegisterIndex };
+
+type Item =
+  | {
+      kind: 'reading' | 'correction';
+      day: string;
+      date: string;
+      info: RegisterIndex;
+      reading: ReadingRead;
+      sortKey: string;
+    }
+  | {
+      kind: 'delivery';
+      day: string;
+      date: string;
+      info: RegisterIndex;
+      delivery: DeliveryRead;
+      sortKey: string;
+    };
 
 export function ReadingsListPage() {
   const { me } = useAuth();
@@ -79,9 +114,8 @@ export function ReadingsListPage() {
     deliveryParams.set('limit', '5000');
     if (from) deliveryParams.set('from_date', from);
     if (to) deliveryParams.set('to_date', to);
-    const params = deliveryParams;
     api
-      .get<DeliveryRead[]>(`/deliveries?${params}`)
+      .get<DeliveryRead[]>(`/deliveries?${deliveryParams}`)
       .then(setDeliveries)
       .catch((err: unknown) => {
         if (err instanceof ApiError) setError(err.problem.detail ?? err.problem.title);
@@ -116,21 +150,25 @@ export function ReadingsListPage() {
     return index;
   }, [points]);
 
-  type Item =
-    | {
-        kind: 'reading' | 'correction';
-        date: string;
-        info: RegisterIndex;
-        reading: ReadingRead;
-        sortKey: string;
+  // Vorwert pro Reading-ID (chronologisch im selben Register).
+  const prevValueByReading = useMemo<Map<number, number | null>>(() => {
+    const byRegister = new Map<number, ReadingRead[]>();
+    for (const r of readings) {
+      const list = byRegister.get(r.register_id) ?? [];
+      list.push(r);
+      byRegister.set(r.register_id, list);
+    }
+    const out = new Map<number, number | null>();
+    for (const list of byRegister.values()) {
+      list.sort((a, b) => a.reading_at.localeCompare(b.reading_at));
+      let prev: number | null = null;
+      for (const r of list) {
+        out.set(r.id, prev);
+        prev = Number(r.value);
       }
-    | {
-        kind: 'delivery';
-        date: string;
-        info: RegisterIndex;
-        delivery: DeliveryRead;
-        sortKey: string;
-      };
+    }
+    return out;
+  }, [readings]);
 
   const items = useMemo<Item[]>(() => {
     const out: Item[] = [];
@@ -139,6 +177,7 @@ export function ReadingsListPage() {
       if (!info) continue;
       out.push({
         kind: isCorrection(r) ? 'correction' : 'reading',
+        day: r.reading_at.slice(0, 10),
         date: r.reading_at,
         info,
         reading: r,
@@ -150,6 +189,7 @@ export function ReadingsListPage() {
       if (!info) continue;
       out.push({
         kind: 'delivery',
+        day: d.delivery_date,
         date: d.delivery_date,
         info,
         delivery: d,
@@ -187,6 +227,17 @@ export function ReadingsListPage() {
       return true;
     });
   }, [items, locationFilter, typeFilter, mpFilter, obisFilter, search, kindFilter]);
+
+  // Tag-Gruppen für die Anzeige
+  const groupedByDay = useMemo(() => {
+    const groups = new Map<string, Item[]>();
+    for (const item of filtered) {
+      const arr = groups.get(item.day) ?? [];
+      arr.push(item);
+      groups.set(item.day, arr);
+    }
+    return Array.from(groups.entries()).sort((a, b) => b[0].localeCompare(a[0]));
+  }, [filtered]);
 
   const counts = useMemo(() => {
     const c: Record<ItemKind, number> = { reading: 0, correction: 0, delivery: 0 };
@@ -284,23 +335,25 @@ export function ReadingsListPage() {
 
   if (error) {
     return (
-      <div className="space-y-5">
+      <PageContainer>
         <LargeTitle title="Erfassungen" />
-        <div className="mx-4 rounded-ios-lg bg-ios-red/15 p-3 text-ios-red">{error}</div>
-      </div>
+        <div className="rounded-card border-hairline border-danger/40 bg-danger/10 p-3 text-danger">
+          {error}
+        </div>
+      </PageContainer>
     );
   }
   if (!points) {
     return (
-      <div className="space-y-5">
+      <PageContainer>
         <LargeTitle title="Erfassungen" />
-        <div className="px-4 text-ios-tertiary">Lade…</div>
-      </div>
+        <div className="text-tertiary">Lade…</div>
+      </PageContainer>
     );
   }
 
   return (
-    <div className="space-y-5 pb-4">
+    <PageContainer>
       <LargeTitle
         title="Erfassungen"
         trailing={
@@ -316,174 +369,168 @@ export function ReadingsListPage() {
         }
       />
 
-      <div className="space-y-5 px-4">
-        <Section header="Filter">
-          <div className="space-y-3 p-4">
-            <TextField
-              type="text"
-              placeholder="Suchen (Messstelle, Notiz, SN…)"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              trailing={<Search size={16} className="text-ios-tertiary" />}
-            />
-            <FilterRow label="Standorte">
-              {locations.map(([id, name]) => (
-                <Pill
-                  key={String(id)}
-                  active={locationFilter.has(id)}
-                  onClick={() => setLocationFilter(toggle(locationFilter, id))}
-                >
-                  {name}
-                </Pill>
-              ))}
+      <Section header="Filter">
+        <div className="space-y-3 p-5">
+          <TextField
+            type="text"
+            placeholder="Suchen (Messstelle, Notiz, SN…)"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            trailing={<Search size={16} className="text-tertiary" />}
+          />
+          <FilterRow label="Standorte">
+            {locations.map(([id, name]) => (
               <Pill
-                active={locationFilter.has(null)}
-                onClick={() => setLocationFilter(toggle(locationFilter, null))}
+                key={String(id)}
+                active={locationFilter.has(id)}
+                onClick={() => setLocationFilter(toggle(locationFilter, id))}
               >
-                ohne Standort
+                {name}
               </Pill>
-            </FilterRow>
-            <FilterRow label="Zählerart">
-              {(Object.keys(TYPE_LABELS) as MeterType[]).map((t) => (
-                <Pill
-                  key={t}
-                  active={typeFilter.has(t)}
-                  onClick={() => setTypeFilter(toggle(typeFilter, t))}
-                >
-                  {TYPE_LABELS[t]}
-                </Pill>
-              ))}
-            </FilterRow>
-            <FilterRow label="Messstellen">
-              {points.map((mp) => (
-                <Pill
-                  key={mp.id}
-                  active={mpFilter.has(mp.id)}
-                  onClick={() => setMpFilter(toggle(mpFilter, mp.id))}
-                >
-                  {mp.name}
-                </Pill>
-              ))}
-            </FilterRow>
-            <FilterRow label="OBIS">
-              {obisCodes.map((code) => (
-                <Pill
-                  key={code}
-                  active={obisFilter.has(code)}
-                  onClick={() => setObisFilter(toggle(obisFilter, code))}
-                >
-                  {code}
-                </Pill>
-              ))}
-            </FilterRow>
-            <FilterRow label="Zeitraum">
-              <input
-                type="date"
-                value={from}
-                onChange={(e) => setFrom(e.target.value)}
-                className="rounded-ios bg-ios-elevated px-3 py-1.5 text-ios-footnote"
-              />
-              <span className="text-ios-tertiary">—</span>
-              <input
-                type="date"
-                value={to}
-                onChange={(e) => setTo(e.target.value)}
-                className="rounded-ios bg-ios-elevated px-3 py-1.5 text-ios-footnote"
-              />
-            </FilterRow>
-            <FilterRow label="Art">
+            ))}
+            <Pill
+              active={locationFilter.has(null)}
+              onClick={() => setLocationFilter(toggle(locationFilter, null))}
+            >
+              ohne Standort
+            </Pill>
+          </FilterRow>
+          <FilterRow label="Zählerart">
+            {(Object.keys(TYPE_LABELS) as MeterType[]).map((t) => (
               <Pill
-                active={kindFilter.has('reading')}
-                onClick={() => setKindFilter(toggle(kindFilter, 'reading'))}
+                key={t}
+                active={typeFilter.has(t)}
+                onClick={() => setTypeFilter(toggle(typeFilter, t))}
               >
-                Erfassungen ({counts.reading})
+                {TYPE_LABELS[t]}
               </Pill>
+            ))}
+          </FilterRow>
+          <FilterRow label="Messstellen">
+            {points.map((mp) => (
               <Pill
-                active={kindFilter.has('correction')}
-                onClick={() => setKindFilter(toggle(kindFilter, 'correction'))}
+                key={mp.id}
+                active={mpFilter.has(mp.id)}
+                onClick={() => setMpFilter(toggle(mpFilter, mp.id))}
               >
-                Bestandskorrekturen ({counts.correction})
+                {mp.name}
               </Pill>
+            ))}
+          </FilterRow>
+          <FilterRow label="OBIS">
+            {obisCodes.map((code) => (
               <Pill
-                active={kindFilter.has('delivery')}
-                onClick={() => setKindFilter(toggle(kindFilter, 'delivery'))}
+                key={code}
+                active={obisFilter.has(code)}
+                onClick={() => setObisFilter(toggle(obisFilter, code))}
               >
-                Lieferungen ({counts.delivery})
+                {code}
               </Pill>
-            </FilterRow>
-            {locationFilter.size ||
-            typeFilter.size ||
-            mpFilter.size ||
-            obisFilter.size ||
-            from ||
-            to ||
-            search ||
-            kindFilter.size ? (
-              <button
-                type="button"
-                onClick={() => {
-                  setLocationFilter(new Set());
-                  setTypeFilter(new Set());
-                  setMpFilter(new Set());
-                  setObisFilter(new Set());
-                  setFrom('');
-                  setTo('');
-                  setKindFilter(new Set());
-                  setSearch('');
-                }}
-                className="text-ios-footnote text-ios-blue"
-              >
-                Filter zurücksetzen
-              </button>
-            ) : null}
-            <div className="text-ios-caption text-ios-tertiary">
-              {readings.length} Stände + {deliveries.length} Lieferungen geladen (je max 5000)
-            </div>
+            ))}
+          </FilterRow>
+          <FilterRow label="Zeitraum">
+            <DateInput value={from} onChange={setFrom} aria-label="von" />
+            <span className="text-tertiary">—</span>
+            <DateInput value={to} onChange={setTo} aria-label="bis" />
+          </FilterRow>
+          <FilterRow label="Art">
+            <Pill
+              active={kindFilter.has('reading')}
+              onClick={() => setKindFilter(toggle(kindFilter, 'reading'))}
+            >
+              Erfassungen ({counts.reading})
+            </Pill>
+            <Pill
+              active={kindFilter.has('correction')}
+              onClick={() => setKindFilter(toggle(kindFilter, 'correction'))}
+            >
+              Bestandskorrekturen ({counts.correction})
+            </Pill>
+            <Pill
+              active={kindFilter.has('delivery')}
+              onClick={() => setKindFilter(toggle(kindFilter, 'delivery'))}
+            >
+              Lieferungen ({counts.delivery})
+            </Pill>
+          </FilterRow>
+          {locationFilter.size ||
+          typeFilter.size ||
+          mpFilter.size ||
+          obisFilter.size ||
+          from ||
+          to ||
+          search ||
+          kindFilter.size ? (
+            <button
+              type="button"
+              onClick={() => {
+                setLocationFilter(new Set());
+                setTypeFilter(new Set());
+                setMpFilter(new Set());
+                setObisFilter(new Set());
+                setFrom('');
+                setTo('');
+                setKindFilter(new Set());
+                setSearch('');
+              }}
+              className="text-caption font-semibold text-primary"
+            >
+              Filter zurücksetzen
+            </button>
+          ) : null}
+          <div className="text-caption text-tertiary">
+            {readings.length} Stände + {deliveries.length} Lieferungen geladen (je max 5000)
           </div>
-        </Section>
+        </div>
+      </Section>
 
-        {filtered.length === 0 ? (
-          <EmptyState title="Keine Treffer." />
-        ) : (
-          <Section header={`${filtered.length} Einträge`}>
-            <ul className="divide-y divide-ios-separator/60">
-              {filtered.map((item) =>
-                item.kind === 'delivery' ? (
-                  <DeliveryItem
-                    key={`d-${item.delivery.id}`}
-                    delivery={item.delivery}
-                    info={item.info}
-                    me={me}
-                    onEdit={() =>
-                      setEditTarget({
-                        kind: 'delivery',
-                        delivery: item.delivery,
-                        info: item.info,
-                      })
-                    }
-                    onChanged={refresh}
-                  />
-                ) : (
-                  <ReadingItem
-                    key={`r-${item.reading.id}`}
-                    reading={item.reading}
-                    info={item.info}
-                    me={me}
-                    onEdit={() =>
-                      setEditTarget({
-                        kind: 'reading',
-                        reading: item.reading,
-                        info: item.info,
-                      })
-                    }
-                    onChanged={refresh}
-                  />
-                ),
-              )}
-            </ul>
-          </Section>
-        )}
-      </div>
+      {filtered.length === 0 ? (
+        <EmptyState title="Keine Treffer." />
+      ) : (
+        <div className="space-y-5">
+          {groupedByDay.map(([day, group]) => (
+            <Section key={day} header={dayLabel(day)} footer={`${group.length} Einträge`}>
+              <ul className="divide-y divide-separator">
+                {group.map((item) =>
+                  item.kind === 'delivery' ? (
+                    <DeliveryItem
+                      key={`d-${item.delivery.id}`}
+                      delivery={item.delivery}
+                      info={item.info}
+                      me={me}
+                      onEdit={() =>
+                        setEditTarget({
+                          kind: 'delivery',
+                          delivery: item.delivery,
+                          info: item.info,
+                        })
+                      }
+                      onChanged={refresh}
+                    />
+                  ) : (
+                    <ReadingItem
+                      key={`r-${item.reading.id}`}
+                      reading={item.reading}
+                      info={item.info}
+                      kind={item.kind}
+                      previous={prevValueByReading.get(item.reading.id) ?? null}
+                      me={me}
+                      onEdit={() =>
+                        setEditTarget({
+                          kind: 'reading',
+                          reading: item.reading,
+                          info: item.info,
+                        })
+                      }
+                      onChanged={refresh}
+                    />
+                  ),
+                )}
+              </ul>
+            </Section>
+          ))}
+        </div>
+      )}
 
       <Sheet
         open={editTarget !== null}
@@ -512,26 +559,61 @@ export function ReadingsListPage() {
           />
         ) : null}
       </Sheet>
+    </PageContainer>
+  );
+}
+
+function PageContainer({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="relative min-h-full overflow-hidden bg-bg">
+      <PageGlows accent="electricity" />
+      <div className="relative z-10 space-y-5 p-4 pb-12 md:p-7">{children}</div>
     </div>
+  );
+}
+
+function DateInput({
+  value,
+  onChange,
+  ...rest
+}: {
+  value: string;
+  onChange: (s: string) => void;
+} & Omit<React.InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange' | 'type'>) {
+  return (
+    <input
+      type="date"
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      className="num rounded-pill border-hairline border-border bg-fill px-3 py-1.5 text-body-sm text-label outline-none focus:border-primary focus:bg-surface-solid"
+      {...rest}
+    />
   );
 }
 
 function ReadingItem({
   reading,
   info,
+  kind,
+  previous,
   me,
   onEdit,
   onChanged,
 }: {
   reading: ReadingRead;
   info: RegisterIndex;
+  kind: 'reading' | 'correction';
+  previous: number | null;
   me: Me | null;
   onEdit: () => void;
   onChanged: () => void;
 }) {
   const editable = me ? canEdit(me, reading) : false;
-  const correction = isCorrection(reading);
+  const correction = kind === 'correction';
   const [busy, setBusy] = useState(false);
+
+  const current = Number(reading.value);
+  const delta = !correction && previous !== null ? current - previous : null;
 
   async function remove() {
     if (
@@ -552,37 +634,48 @@ function ReadingItem({
   }
 
   return (
-    <li className={`px-4 py-3 ${correction ? 'bg-ios-orange/5' : ''}`}>
+    <li className="px-5 py-3.5">
       <div className="flex items-start gap-3">
+        <TypeBadge type={info.mpType} size="sm" />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-baseline gap-2">
-            <span className="text-ios-headline">{info.mpName}</span>
-            <span className="rounded-full bg-ios-fill/15 px-1.5 py-0.5 text-ios-caption text-ios-secondary">
+            <span className="text-body font-semibold text-label">{info.mpName}</span>
+            <span className="num rounded-badge bg-fill px-1.5 py-0.5 text-caption text-secondary">
               {info.obisCode}
             </span>
             {correction ? (
-              <span className="rounded-full bg-ios-orange/20 px-2 py-0.5 text-ios-caption font-medium text-ios-orange">
+              <span className="rounded-full bg-[color-mix(in_oklch,var(--gas),transparent_82%)] px-2 py-0.5 text-caption font-semibold text-gas">
                 Korrektur
               </span>
             ) : null}
           </div>
-          <div className="text-ios-footnote text-ios-tertiary">
+          <div className="num text-caption text-tertiary">
             {formatDateTimeDe(reading.reading_at)} · SN {info.serialNumber}
             {info.locationName ? ` · ${info.locationName}` : ''}
           </div>
           {reading.note ? (
-            <div className="mt-1 text-ios-footnote text-ios-secondary">{reading.note}</div>
+            <div className="mt-1 text-caption text-secondary">{reading.note}</div>
           ) : null}
-          <div className="mt-1 text-ios-caption text-ios-tertiary">
+          <div className="mt-1 text-caption text-tertiary">
             {reading.created_by_username ?? '—'} ·{' '}
-            {reading.created_at.replace('T', ' ').slice(0, 16)}
+            <span className="num">{reading.created_at.replace('T', ' ').slice(0, 16)}</span>
           </div>
         </div>
         <div className="shrink-0 text-right">
-          <div className="font-rounded text-ios-headline tabular-nums">
-            {formatDe(reading.value)}
-          </div>
-          <div className="text-ios-caption text-ios-tertiary">{info.unit}</div>
+          <div className="num text-headline text-label">{formatDe(reading.value)}</div>
+          <div className="text-caption text-tertiary">{info.unit}</div>
+          {delta !== null ? (
+            <div
+              data-testid="reading-row-delta"
+              className={cx(
+                'num mt-1 text-caption font-semibold',
+                delta < 0 ? 'text-danger' : 'text-success',
+              )}
+            >
+              {delta < 0 ? '' : '+'}
+              {formatDe(delta)}
+            </div>
+          ) : null}
         </div>
       </div>
       <div className="mt-2 flex justify-end gap-1.5">
@@ -601,7 +694,95 @@ function ReadingItem({
           leftIcon={<Trash2 size={14} />}
           disabled={!editable || busy}
           onClick={() => void remove()}
-          className="text-ios-red hover:bg-ios-red/10"
+          className="text-danger hover:bg-danger/10"
+        >
+          Löschen
+        </Button>
+      </div>
+    </li>
+  );
+}
+
+function DeliveryItem({
+  delivery,
+  info,
+  me,
+  onEdit,
+  onChanged,
+}: {
+  delivery: DeliveryRead;
+  info: RegisterIndex;
+  me: Me | null;
+  onEdit: () => void;
+  onChanged: () => void;
+}) {
+  const editable = me?.role === 'admin';
+  const [busy, setBusy] = useState(false);
+
+  async function remove() {
+    if (
+      !window.confirm(
+        `Lieferung vom ${delivery.delivery_date} (${info.mpName}, ${formatDe(delivery.amount)} ${info.unit}) wirklich löschen?`,
+      )
+    )
+      return;
+    setBusy(true);
+    try {
+      await api.delete(`/deliveries/${delivery.id}`);
+      onChanged();
+    } catch (err) {
+      if (err instanceof ApiError) window.alert(err.problem.detail ?? err.problem.title);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <li className="bg-[color-mix(in_oklch,var(--primary),transparent_94%)] px-5 py-3.5">
+      <div className="flex items-start gap-3">
+        <TypeBadge type={info.mpType} size="sm" />
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-baseline gap-2">
+            <span className="text-body font-semibold text-label">{info.mpName}</span>
+            <span className="rounded-full bg-primary-soft px-2 py-0.5 text-caption font-semibold text-primary-deep">
+              Lieferung
+            </span>
+          </div>
+          <div className="text-caption text-tertiary">
+            <span className="num">{formatDateDe(delivery.delivery_date)}</span> · {info.label}
+            {info.locationName ? ` · ${info.locationName}` : ''}
+          </div>
+          {delivery.note ? (
+            <div className="mt-1 text-caption text-secondary">{delivery.note}</div>
+          ) : null}
+          <div className="mt-1 text-caption text-tertiary">
+            {delivery.created_by_username ?? '—'} ·{' '}
+            <span className="num">{delivery.created_at.replace('T', ' ').slice(0, 16)}</span>
+          </div>
+        </div>
+        <div className="shrink-0 text-right">
+          <div className="num text-headline text-primary">+ {formatDe(delivery.amount)}</div>
+          <div className="text-caption text-tertiary">{info.unit}</div>
+        </div>
+      </div>
+      <div className="mt-2 flex justify-end gap-1.5">
+        <Button
+          variant="plain"
+          size="sm"
+          leftIcon={<Pencil size={14} />}
+          disabled={!editable}
+          onClick={onEdit}
+          title={editable ? 'Bearbeiten' : 'Nur Admin'}
+        >
+          Bearbeiten
+        </Button>
+        <Button
+          variant="plain"
+          size="sm"
+          leftIcon={<Trash2 size={14} />}
+          disabled={!editable || busy}
+          onClick={() => void remove()}
+          className="text-danger hover:bg-danger/10"
         >
           Löschen
         </Button>
@@ -649,8 +830,8 @@ function EditForm({
 
   return (
     <form onSubmit={(e) => void save(e)} className="space-y-4">
-      <div className="text-ios-footnote text-ios-tertiary">
-        {info.mpName} · {info.obisCode} ({info.unit})
+      <div className="text-caption text-tertiary">
+        {info.mpName} · <span className="num">{info.obisCode}</span> ({info.unit})
       </div>
       <TextField
         label="Stand"
@@ -658,7 +839,7 @@ function EditForm({
         inputMode="decimal"
         value={value}
         onChange={(e) => setValue(e.target.value)}
-        inputClassName="font-rounded"
+        numeric
       />
       <TextField
         label="Ablesezeitpunkt"
@@ -682,111 +863,6 @@ function EditForm({
         </Button>
       </div>
     </form>
-  );
-}
-
-function FilterRow({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <div className="mb-1.5 text-ios-footnote text-ios-secondary">{label}</div>
-      <div className="flex flex-wrap items-center gap-1.5">{children}</div>
-    </div>
-  );
-}
-
-function toggle<T>(set: Set<T>, value: T): Set<T> {
-  const next = new Set(set);
-  if (next.has(value)) next.delete(value);
-  else next.add(value);
-  return next;
-}
-
-function DeliveryItem({
-  delivery,
-  info,
-  me,
-  onEdit,
-  onChanged,
-}: {
-  delivery: DeliveryRead;
-  info: RegisterIndex;
-  me: Me | null;
-  onEdit: () => void;
-  onChanged: () => void;
-}) {
-  const editable = me?.role === 'admin';
-  const [busy, setBusy] = useState(false);
-
-  async function remove() {
-    if (
-      !window.confirm(
-        `Lieferung vom ${delivery.delivery_date} (${info.mpName}, ${formatDe(delivery.amount)} ${info.unit}) wirklich löschen?`,
-      )
-    )
-      return;
-    setBusy(true);
-    try {
-      await api.delete(`/deliveries/${delivery.id}`);
-      onChanged();
-    } catch (err) {
-      if (err instanceof ApiError) window.alert(err.problem.detail ?? err.problem.title);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <li className="bg-ios-blue/5 px-4 py-3">
-      <div className="flex items-start gap-3">
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-baseline gap-2">
-            <span className="text-ios-headline">{info.mpName}</span>
-            <span className="rounded-full bg-ios-blue/20 px-2 py-0.5 text-ios-caption font-medium text-ios-blue">
-              Lieferung
-            </span>
-          </div>
-          <div className="text-ios-footnote text-ios-tertiary">
-            {delivery.delivery_date} · {info.label}
-            {info.locationName ? ` · ${info.locationName}` : ''}
-          </div>
-          {delivery.note ? (
-            <div className="mt-1 text-ios-footnote text-ios-secondary">{delivery.note}</div>
-          ) : null}
-          <div className="mt-1 text-ios-caption text-ios-tertiary">
-            {delivery.created_by_username ?? '—'} ·{' '}
-            {delivery.created_at.replace('T', ' ').slice(0, 16)}
-          </div>
-        </div>
-        <div className="shrink-0 text-right">
-          <div className="font-rounded text-ios-headline tabular-nums text-ios-blue">
-            + {formatDe(delivery.amount)}
-          </div>
-          <div className="text-ios-caption text-ios-tertiary">{info.unit}</div>
-        </div>
-      </div>
-      <div className="mt-2 flex justify-end gap-1.5">
-        <Button
-          variant="plain"
-          size="sm"
-          leftIcon={<Pencil size={14} />}
-          disabled={!editable}
-          onClick={onEdit}
-          title={editable ? 'Bearbeiten' : 'Nur Admin'}
-        >
-          Bearbeiten
-        </Button>
-        <Button
-          variant="plain"
-          size="sm"
-          leftIcon={<Trash2 size={14} />}
-          disabled={!editable || busy}
-          onClick={() => void remove()}
-          className="text-ios-red hover:bg-ios-red/10"
-        >
-          Löschen
-        </Button>
-      </div>
-    </li>
   );
 }
 
@@ -833,7 +909,7 @@ function DeliveryEditForm({
 
   return (
     <form onSubmit={onSubmit} className="space-y-4">
-      <div className="text-ios-footnote text-ios-tertiary">
+      <div className="text-caption text-tertiary">
         {info.mpName} · {info.label} ({info.unit})
       </div>
       <TextField
@@ -842,7 +918,7 @@ function DeliveryEditForm({
         inputMode="decimal"
         value={amount}
         onChange={(e) => setAmount(e.target.value)}
-        inputClassName="font-rounded"
+        numeric
       />
       <TextField
         label="Lieferdatum"
@@ -867,6 +943,37 @@ function DeliveryEditForm({
       </div>
     </form>
   );
+}
+
+function FilterRow({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <div className="mb-1.5 text-caption-bold uppercase text-tertiary">{label}</div>
+      <div className="flex flex-wrap items-center gap-1.5">{children}</div>
+    </div>
+  );
+}
+
+function dayLabel(day: string): string {
+  const today = new Date();
+  const todayKey = toLocalDayKey(today);
+  const yesterday = new Date(today.getTime() - 86_400_000);
+  const yKey = toLocalDayKey(yesterday);
+  if (day === todayKey) return 'Heute';
+  if (day === yKey) return 'Gestern';
+  return formatDateDe(day);
+}
+
+function toLocalDayKey(d: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+function toggle<T>(set: Set<T>, value: T): Set<T> {
+  const next = new Set(set);
+  if (next.has(value)) next.delete(value);
+  else next.add(value);
+  return next;
 }
 
 function isCorrection(reading: ReadingRead): boolean {
