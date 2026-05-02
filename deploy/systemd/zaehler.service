@@ -43,8 +43,11 @@ PrivateDevices=true
 ProtectKernelTunables=true
 ProtectKernelModules=true
 ProtectControlGroups=true
-# Nur das Daten-Verzeichnis ist beschreibbar. Alles andere ist read-only.
-ReadWritePaths=/opt/zaehler/data
+# Schreibzugriff auf das gesamte App-Verzeichnis — uv legt dort seinen Cache
+# (~/.cache/uv) und die virtuelle Umgebung (backend/.venv) an, der Frontend-
+# Build schreibt nach backend/src/meters/static/. Außerhalb von /opt/zaehler
+# bleibt das Dateisystem read-only.
+ReadWritePaths=/opt/zaehler
 RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
 LockPersonality=true
 
