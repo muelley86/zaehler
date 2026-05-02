@@ -96,13 +96,27 @@ require_root() {
 }
 
 # Führt einen Befehl als App-User aus, mit ge-source-tem Profil (PATH ~/.local/bin).
+# Sourct außerdem $DATA_DIR/meters.env, falls vorhanden — damit haben CLI-Aufrufe
+# (alembic, meters.cli) dieselbe DATABASE_URL wie der systemd-Service.
 as_user() {
-    sudo -u "$APP_USER" -H bash -lc "$*"
+    sudo -u "$APP_USER" -H bash -lc "set -a; [ -f '$DATA_DIR/meters.env' ] && . '$DATA_DIR/meters.env'; set +a; $*"
 }
 
 # Prüft, ob ein Befehl im PATH des Users 'zaehler' verfügbar ist.
 user_has() {
     sudo -u "$APP_USER" -H bash -lc "command -v $1 >/dev/null 2>&1"
+}
+
+# Stellt sicher, dass eine bestehende meters.env die für CLI-Aufrufe nötigen
+# Keys enthält. Idempotent — fügt nur fehlendes hinzu, ändert nichts an
+# vorhandenen Werten.
+ensure_env_file() {
+    local env_file="$DATA_DIR/meters.env"
+    [ -f "$env_file" ] || return 0
+    if ! grep -q '^METERS_DATABASE_URL=' "$env_file"; then
+        echo "METERS_DATABASE_URL=sqlite:///$DATA_DIR/meters.db" >> "$env_file"
+        ok "meters.env: DATABASE_URL ergänzt"
+    fi
 }
 
 # Erzeugt /etc/sudoers.d/zaehler-restart (idempotent), damit der App-User den
@@ -297,13 +311,20 @@ cmd_install() {
         secret_key=$("$PYTHON_BIN" -c 'import secrets; print(secrets.token_urlsafe(48))')
         cat >> "$env_file" <<EOF
 METERS_SECRET_KEY=$secret_key
+METERS_DATABASE_URL=sqlite:///$DATA_DIR/meters.db
 METERS_BIND_HOST=$WIZ_BIND_HOST
 METERS_BIND_PORT=$WIZ_BIND_PORT
 METERS_COOKIE_SECURE=False
 EOF
         ok "Konfiguration mit zufälligem SECRET_KEY angelegt"
     else
-        ok "Konfiguration existiert bereits — unverändert"
+        # Bestehende meters.env idempotent ergänzen, falls Schlüssel fehlen
+        if ! grep -q '^METERS_DATABASE_URL=' "$env_file"; then
+            echo "METERS_DATABASE_URL=sqlite:///$DATA_DIR/meters.db" >> "$env_file"
+            ok "DATABASE_URL in bestehender meters.env ergänzt"
+        else
+            ok "Konfiguration existiert bereits — unverändert"
+        fi
     fi
 
     step "5/10  uv und pnpm installieren / aktualisieren"
@@ -517,6 +538,7 @@ cmd_upgrade_app() {
     [ -d "$REPO_DIR/.git" ] || die "Kein Repository unter $REPO_DIR — bitte erst 'install' ausführen."
 
     ensure_sudo_rule
+    ensure_env_file
 
     step "1/6  Backup der Datenbank"
     "$REPO_DIR/deploy/lxc/backup.sh" || warn "Backup fehlgeschlagen — Update wird trotzdem fortgesetzt."
