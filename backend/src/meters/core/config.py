@@ -40,6 +40,12 @@ class Settings(BaseSettings):
     cookie_secure: bool = False
     cookie_samesite: str = "strict"
 
+    # Server-Bindung — wird von ``meters.server`` als startbarem Modul gelesen.
+    # Default 0.0.0.0 für direkten LAN-Zugriff; auf 127.0.0.1 setzen, sobald ein
+    # Reverse-Proxy mit HTTPS davor steht.
+    bind_host: str = "0.0.0.0"
+    bind_port: int = 8000
+
     static_dir: Path = Path(__file__).resolve().parent.parent / "static"
 
 

@@ -27,9 +27,10 @@ Environment=METERS_DATABASE_URL=sqlite:////opt/zaehler/data/meters.db
 # Das führende '-' weist systemd an, das Fehlen NICHT als Fehler zu werten.
 EnvironmentFile=-/opt/zaehler/data/meters.env
 
-# Uvicorn lauscht nur lokal — der Reverse-Proxy auf dem Host terminiert TLS
-# und leitet an 127.0.0.1:8000 weiter.
-ExecStart=/opt/zaehler/.local/bin/uv run uvicorn meters.main:app --host 127.0.0.1 --port 8000
+# Bind-Host und -Port kommen aus meters.env (METERS_BIND_HOST, METERS_BIND_PORT).
+# Default: 0.0.0.0:8000 — direkter LAN-Zugriff.
+# Sobald ein HTTPS-Reverse-Proxy davor steht, in meters.env auf 127.0.0.1 setzen.
+ExecStart=/opt/zaehler/.local/bin/uv run python -m meters.server
 
 Restart=on-failure
 RestartSec=3
