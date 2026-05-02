@@ -1,0 +1,56 @@
+# Deployment
+
+Die anfängerfreundliche, vollständige Schritt-für-Schritt-Anleitung mit
+Container-Erstellung, Updates und Backups steht in:
+
+→ [`deploy/lxc/README.md`](../deploy/lxc/README.md)
+
+Alles läuft über ein zentrales Verwaltungsskript:
+**`/opt/zaehler/repo/deploy/lxc/zaehler.sh`**
+
+## Wichtigste Kommandos (im Container, als root)
+
+| Aktion | Befehl |
+|---|---|
+| Erstinstallation | `REPO_URL=… bash zaehler.sh install` |
+| **Komplett-Update** (System + Tools + App) | `bash zaehler.sh upgrade-all` |
+| Nur System (apt) | `bash zaehler.sh upgrade-system` |
+| Nur Tools (uv + pnpm) | `bash zaehler.sh upgrade-tools` |
+| Nur App-Code | `bash zaehler.sh upgrade-app` |
+| Sofort-Backup | `bash zaehler.sh backup` |
+| Backup einspielen | `bash zaehler.sh restore <datei.gz>` |
+| Status-Bericht | `bash zaehler.sh status` |
+| Initialer Admin | `cd /opt/zaehler/repo/backend && uv run python -m meters.cli create-admin --username admin --password '…' --force-change` |
+
+## Datenpfad
+
+- DB-Datei: `/opt/zaehler/data/meters.db`
+- Konfiguration: `/opt/zaehler/data/meters.env`
+- Backups: `/opt/zaehler/backups/`
+
+Die `data/`- und `backups/`-Verzeichnisse werden vom Skript **nie** gelöscht
+oder überschrieben. Verlierst du sie trotzdem (z. B. weil der ganze Container
+gelöscht wird), hilft nur ein externes Backup.
+
+## Update-Strategie
+
+Der `upgrade-all`-Workflow ist konservativ:
+
+1. **System** — `apt update && apt upgrade && apt autoremove`. Gibt Hinweis,
+   wenn ein Reboot wegen Kernel-Update nötig ist.
+2. **Tools** — `uv self update`, `pnpm self-update`. Hält die Toolchain
+   automatisch aktuell.
+3. **App** —
+   1. Vor jeder Aktion automatisches DB-Backup
+   2. Code-Update via `git pull --ff-only`
+   3. Backend-Abhängigkeiten via `uv sync --frozen`
+   4. Frontend-Build via `pnpm install --frozen-lockfile && pnpm build`
+   5. Datenbank-Migrationen via `uv run alembic upgrade head`
+   6. Service-Neustart
+
+Schlägt einer der Schritte 3.2-3.5 fehl, bleibt der alte Service laufen — die
+SQLite-Datei wird nicht angefasst, du hast trotzdem ein frisches Backup, und
+kannst den Fehler in Ruhe beheben.
+
+Für regelmäßige automatische Updates (z. B. wöchentlich) kann ein einfacher
+Cron-Job eingerichtet werden — siehe README, Abschnitt 6.

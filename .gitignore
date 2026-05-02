@@ -1,0 +1,51 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+.tox/
+
+# Virtuelle Umgebungen
+.venv/
+venv/
+env/
+
+# --- Node / Frontend ---
+node_modules/
+dist/
+build/
+.vite/
+*.tsbuildinfo
+coverage/
+
+# --- App-Daten (SQLite) ---
+data/*.db
+data/*.db-journal
+data/*.db-wal
+data/*.db-shm
+
+# --- Sekrete & lokale Configs ---
+.env
+.env.*
+!.env.example
+*.local
+
+# --- IDE & OS ---
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.shared.json
+.DS_Store
+Thumbs.db
+
+# --- Logs ---
+*.log
+logs/

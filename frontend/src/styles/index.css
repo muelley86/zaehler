@@ -1,0 +1,55 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --ios-bg: 242 242 247;
+  --ios-surface: 255 255 255;
+  --ios-elev: 255 255 255;
+  --ios-fill: 120 120 128;
+  --ios-label: 0 0 0;
+  --ios-secondary: 60 60 67;
+  --ios-tertiary: 142 142 147;
+  --ios-separator: 198 198 200;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ios-bg: 0 0 0;
+    --ios-surface: 28 28 30;
+    --ios-elev: 44 44 46;
+    --ios-fill: 120 120 128;
+    --ios-label: 255 255 255;
+    --ios-secondary: 235 235 245;
+    --ios-tertiary: 152 152 157;
+    --ios-separator: 56 56 58;
+    color-scheme: dark;
+  }
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  @apply bg-ios-bg text-ios-label font-sans;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+input,
+select,
+textarea,
+button {
+  font: inherit;
+  color: inherit;
+}
+
+input[type='date'] {
+  /* iOS-Safari spacing fix */
+  min-height: 1.5rem;
+}

@@ -1,0 +1,140 @@
+from __future__ import annotations
+
+from typing import Any
+
+from fastapi.testclient import TestClient
+
+
+def test_create_and_list_locations(admin_client: TestClient) -> None:
+    resp = admin_client.post(
+        "/api/v1/locations", json={"name": "Keller", "note": "unter dem Treppen"}
+    )
+    assert resp.status_code == 201, resp.text
+    listing = admin_client.get("/api/v1/locations")
+    assert listing.status_code == 200
+    rows: list[dict[str, Any]] = listing.json()
+    assert any(r["name"] == "Keller" for r in rows)
+
+
+def test_duplicate_location_name_409(admin_client: TestClient) -> None:
+    admin_client.post("/api/v1/locations", json={"name": "Garage"})
+    resp = admin_client.post("/api/v1/locations", json={"name": "Garage"})
+    assert resp.status_code == 409
+
+
+def test_recorder_cannot_create_location(recorder_client: TestClient) -> None:
+    resp = recorder_client.post("/api/v1/locations", json={"name": "Dachboden"})
+    assert resp.status_code == 403
+
+
+def test_measuring_point_with_location(admin_client: TestClient) -> None:
+    loc = admin_client.post("/api/v1/locations", json={"name": "Heizraum"}).json()
+    mp = admin_client.post(
+        "/api/v1/measuring-points",
+        json={
+            "name": "Wasser HZ",
+            "type": "water",
+            "location_id": loc["id"],
+            "is_bidirectional": False,
+            "has_dual_tariff": False,
+            "serial_number": "W-HZ-1",
+            "installed_at": "2024-01-01",
+            "initial_values": {"water": "10.0"},
+        },
+    ).json()
+    assert mp["location_id"] == loc["id"]
+    assert mp["location_name"] == "Heizraum"
+
+
+def test_update_measuring_point_location_and_flags(admin_client: TestClient) -> None:
+    loc1 = admin_client.post("/api/v1/locations", json={"name": "Halle"}).json()
+    loc2 = admin_client.post("/api/v1/locations", json={"name": "Werkstatt"}).json()
+    mp = admin_client.post(
+        "/api/v1/measuring-points",
+        json={
+            "name": "Strom Halle",
+            "type": "electricity",
+            "location_id": loc1["id"],
+            "is_bidirectional": False,
+            "has_dual_tariff": False,
+            "serial_number": "S-1",
+            "installed_at": "2024-01-01",
+        },
+    ).json()
+    resp = admin_client.patch(
+        f"/api/v1/measuring-points/{mp['id']}",
+        json={
+            "name": "Strom Halle (umbenannt)",
+            "location_id": loc2["id"],
+            "has_dual_tariff": True,
+        },
+    )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["name"] == "Strom Halle (umbenannt)"
+    assert body["location_id"] == loc2["id"]
+    assert body["has_dual_tariff"] is True
+
+
+def test_clear_location(admin_client: TestClient) -> None:
+    loc = admin_client.post("/api/v1/locations", json={"name": "Schuppen"}).json()
+    mp = admin_client.post(
+        "/api/v1/measuring-points",
+        json={
+            "name": "X",
+            "type": "water",
+            "location_id": loc["id"],
+            "is_bidirectional": False,
+            "has_dual_tariff": False,
+            "serial_number": "S-2",
+            "installed_at": "2024-01-01",
+            "initial_values": {"water": "0"},
+        },
+    ).json()
+    resp = admin_client.patch(f"/api/v1/measuring-points/{mp['id']}", json={"clear_location": True})
+    assert resp.status_code == 200
+    assert resp.json()["location_id"] is None
+
+
+def test_update_physical_meter_serial(admin_client: TestClient) -> None:
+    mp = admin_client.post(
+        "/api/v1/measuring-points",
+        json={
+            "name": "G",
+            "type": "gas",
+            "is_bidirectional": False,
+            "has_dual_tariff": False,
+            "serial_number": "TYPO-1",
+            "installed_at": "2024-01-01",
+            "initial_values": {"7.8.0": "0"},
+        },
+    ).json()
+    meter_id = mp["physical_meters"][0]["id"]
+    resp = admin_client.patch(
+        f"/api/v1/physical-meters/{meter_id}",
+        json={"serial_number": "RICHTIG-1"},
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["serial_number"] == "RICHTIG-1"
+
+
+def test_update_register_label(admin_client: TestClient) -> None:
+    mp = admin_client.post(
+        "/api/v1/measuring-points",
+        json={
+            "name": "G2",
+            "type": "gas",
+            "is_bidirectional": False,
+            "has_dual_tariff": False,
+            "serial_number": "G-2",
+            "installed_at": "2024-01-01",
+            "initial_values": {"7.8.0": "0"},
+        },
+    ).json()
+    register_id = mp["physical_meters"][0]["registers"][0]["id"]
+    resp = admin_client.patch(
+        f"/api/v1/registers/{register_id}",
+        json={"label": "Erdgas (kalibriert)"},
+    )
+    assert resp.status_code == 200
+    assert resp.json()["label"] == "Erdgas (kalibriert)"

@@ -1,0 +1,52 @@
+# systemd-Unit für die Zählerstand-App.
+#
+# Pfade nehmen an, dass die Anwendung unter /opt/zaehler installiert ist und
+# der App-Benutzer "zaehler" heißt. Anpassen, falls anders deployed.
+# Aktivierung: siehe deploy/lxc/README.md, Abschnitt 4.6.
+
+[Unit]
+Description=Zaehlerstand-App (FastAPI + Uvicorn)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=zaehler
+Group=zaehler
+WorkingDirectory=/opt/zaehler/backend
+
+# uv und pnpm liegen im User-lokalen .local/bin
+Environment=PATH=/opt/zaehler/.local/bin:/usr/local/bin:/usr/bin:/bin
+Environment=PYTHONUNBUFFERED=1
+
+# Standardpfad für die SQLite-Datenbank. Der Pfad wird durch meters.env
+# überschrieben werden, falls die Datei existiert.
+Environment=METERS_DATABASE_URL=sqlite:////opt/zaehler/data/meters.db
+
+# Optionale Konfigurationsdatei (METERS_SECRET_KEY, METERS_COOKIE_SECURE, ...).
+# Das führende '-' weist systemd an, das Fehlen NICHT als Fehler zu werten.
+EnvironmentFile=-/opt/zaehler/data/meters.env
+
+# Uvicorn lauscht nur lokal — der Reverse-Proxy auf dem Host terminiert TLS
+# und leitet an 127.0.0.1:8000 weiter.
+ExecStart=/opt/zaehler/.local/bin/uv run uvicorn meters.main:app --host 127.0.0.1 --port 8000
+
+Restart=on-failure
+RestartSec=3
+
+# --- Hardening (siehe systemd.exec(5)) ---
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+# Nur das Daten-Verzeichnis ist beschreibbar. Alles andere ist read-only.
+ReadWritePaths=/opt/zaehler/data
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+LockPersonality=true
+
+[Install]
+WantedBy=multi-user.target
