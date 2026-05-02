@@ -22,7 +22,9 @@ import {
   Section,
   Sheet,
   TextField,
+  TypeBadge,
 } from '@/components/ui';
+import { PageGlows } from '@/components/PageGlows';
 import { ApiError, api } from '@/lib/api';
 import { formatDateTimeDe, formatDe, nowForInput, parseDe } from '@/lib/format';
 import { useChartTheme } from '@/lib/useChartTheme';
@@ -192,48 +194,44 @@ export function DashboardPage() {
 
   if (error) {
     return (
-      <div className="space-y-5">
+      <PageContainer>
         <LargeTitle title="Dashboard" />
-        <div className="px-4">
-          <Card>
-            <div className="text-ios-red">{error}</div>
-          </Card>
-        </div>
-      </div>
+        <Card>
+          <div className="text-danger">{error}</div>
+        </Card>
+      </PageContainer>
     );
   }
   if (!points) {
     return (
-      <div className="space-y-5">
+      <PageContainer>
         <LargeTitle title="Dashboard" />
-        <div className="px-4 text-ios-tertiary">Lade…</div>
-      </div>
+        <div className="text-tertiary">Lade…</div>
+      </PageContainer>
     );
   }
   if (points.length === 0) {
     return (
-      <div className="space-y-5">
+      <PageContainer>
         <LargeTitle title="Dashboard" />
-        <div className="px-4">
-          <EmptyState
-            icon={<Plus size={32} />}
-            title="Noch keine Messstellen"
-            description="Lege deine erste Strom-, Gas- oder Wasser-Messstelle an."
-            action={
-              <Link to="/messstellen">
-                <Button variant="filled" leftIcon={<Plus size={16} />}>
-                  Messstelle anlegen
-                </Button>
-              </Link>
-            }
-          />
-        </div>
-      </div>
+        <EmptyState
+          icon={<Plus size={32} />}
+          title="Noch keine Messstellen"
+          description="Lege deine erste Strom-, Gas- oder Wasser-Messstelle an."
+          action={
+            <Link to="/messstellen">
+              <Button variant="filled" leftIcon={<Plus size={16} />}>
+                Messstelle anlegen
+              </Button>
+            </Link>
+          }
+        />
+      </PageContainer>
     );
   }
 
   return (
-    <div className="space-y-5 pb-4">
+    <PageContainer>
       <LargeTitle
         title="Dashboard"
         trailing={
@@ -249,88 +247,95 @@ export function DashboardPage() {
         }
       />
 
-      <div className="space-y-5 px-4">
-        <Section header="Filter">
-          <div className="space-y-4 p-4">
-            <FilterRow label="Standorte">
-              {locationOptions.map(([id, name]) => (
-                <Pill
-                  key={String(id)}
-                  active={locationFilter.has(id)}
-                  onClick={() => setLocationFilter(toggle(locationFilter, id))}
-                >
-                  {name}
-                </Pill>
-              ))}
+      <Section header="Filter">
+        <div className="space-y-4 p-5">
+          <FilterRow label="Standorte">
+            {locationOptions.map(([id, name]) => (
               <Pill
-                active={locationFilter.has(null)}
-                onClick={() => setLocationFilter(toggle(locationFilter, null))}
+                key={String(id)}
+                active={locationFilter.has(id)}
+                onClick={() => setLocationFilter(toggle(locationFilter, id))}
               >
-                ohne Standort
+                {name}
               </Pill>
-            </FilterRow>
-            <FilterRow label="Zählerart">
-              {(Object.keys(TYPE_LABELS) as MeterType[]).map((t) => (
-                <Pill
-                  key={t}
-                  active={typeFilter.has(t)}
-                  onClick={() => setTypeFilter(toggle(typeFilter, t))}
-                >
-                  {TYPE_LABELS[t]}
-                </Pill>
-              ))}
-            </FilterRow>
-            <FilterRow label="Zeitraum">
-              <DateInput value={from} onChange={setFrom} aria-label="von" />
-              <span className="text-ios-tertiary">—</span>
-              <DateInput value={to} onChange={setTo} aria-label="bis" />
-            </FilterRow>
-            {locationFilter.size || typeFilter.size || from || to ? (
-              <button
-                type="button"
-                onClick={() => {
-                  setLocationFilter(new Set());
-                  setTypeFilter(new Set());
-                  setFrom('');
-                  setTo('');
-                }}
-                className="text-ios-footnote text-ios-blue"
+            ))}
+            <Pill
+              active={locationFilter.has(null)}
+              onClick={() => setLocationFilter(toggle(locationFilter, null))}
+            >
+              ohne Standort
+            </Pill>
+          </FilterRow>
+          <FilterRow label="Zählerart">
+            {(Object.keys(TYPE_LABELS) as MeterType[]).map((t) => (
+              <Pill
+                key={t}
+                active={typeFilter.has(t)}
+                onClick={() => setTypeFilter(toggle(typeFilter, t))}
               >
-                Filter zurücksetzen
-              </button>
-            ) : null}
-          </div>
-        </Section>
+                {TYPE_LABELS[t]}
+              </Pill>
+            ))}
+          </FilterRow>
+          <FilterRow label="Zeitraum">
+            <DateInput value={from} onChange={setFrom} aria-label="von" />
+            <span className="text-tertiary">—</span>
+            <DateInput value={to} onChange={setTo} aria-label="bis" />
+          </FilterRow>
+          {locationFilter.size || typeFilter.size || from || to ? (
+            <button
+              type="button"
+              onClick={() => {
+                setLocationFilter(new Set());
+                setTypeFilter(new Set());
+                setFrom('');
+                setTo('');
+              }}
+              className="text-caption font-semibold text-primary"
+            >
+              Filter zurücksetzen
+            </button>
+          ) : null}
+        </div>
+      </Section>
 
-        <ConsumptionSummary points={filteredPoints} consumption={filteredConsumption} />
+      <ConsumptionSummary points={filteredPoints} consumption={filteredConsumption} />
 
-        {filteredPoints.length === 0 ? (
-          <EmptyState
-            icon={<Filter size={32} />}
-            title="Keine Messstellen entsprechen dem Filter"
+      {filteredPoints.length === 0 ? (
+        <EmptyState
+          icon={<Filter size={32} />}
+          title="Keine Messstellen entsprechen dem Filter"
+        />
+      ) : (
+        filteredPoints.map((mp) => (
+          <MeasuringPointCard
+            key={mp.id}
+            mp={mp}
+            consumption={(consumptions[mp.id] ?? []).filter((p) => {
+              if (from && p.period_end < from) return false;
+              if (to && p.period_end > to) return false;
+              return true;
+            })}
+            readings={(readingsByMP[mp.id] ?? []).filter((r) => {
+              const day = r.reading_at.slice(0, 10);
+              if (from && day < from) return false;
+              if (to && day > to) return false;
+              return true;
+            })}
+            state={states[mp.id] ?? []}
+            onChanged={() => setTick((t) => t + 1)}
           />
-        ) : (
-          filteredPoints.map((mp) => (
-            <MeasuringPointCard
-              key={mp.id}
-              mp={mp}
-              consumption={(consumptions[mp.id] ?? []).filter((p) => {
-                if (from && p.period_end < from) return false;
-                if (to && p.period_end > to) return false;
-                return true;
-              })}
-              readings={(readingsByMP[mp.id] ?? []).filter((r) => {
-                const day = r.reading_at.slice(0, 10);
-                if (from && day < from) return false;
-                if (to && day > to) return false;
-                return true;
-              })}
-              state={states[mp.id] ?? []}
-              onChanged={() => setTick((t) => t + 1)}
-            />
-          ))
-        )}
-      </div>
+        ))
+      )}
+    </PageContainer>
+  );
+}
+
+function PageContainer({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="relative min-h-full overflow-hidden bg-bg">
+      <PageGlows accent="electricity" />
+      <div className="relative z-10 space-y-5 p-4 pb-12 md:p-7">{children}</div>
     </div>
   );
 }
@@ -338,7 +343,7 @@ export function DashboardPage() {
 function FilterRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <div className="mb-2 text-ios-footnote text-ios-secondary">{label}</div>
+      <div className="mb-2 text-caption-bold uppercase text-tertiary">{label}</div>
       <div className="flex flex-wrap items-center gap-1.5">{children}</div>
     </div>
   );
@@ -357,7 +362,7 @@ function DateInput({
       type="date"
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="rounded-ios bg-ios-elevated px-3 py-1.5 text-ios-footnote text-ios-label"
+      className="num rounded-pill border-hairline border-border bg-fill px-3 py-1.5 text-body-sm text-label outline-none focus:border-primary focus:bg-surface-solid"
       {...rest}
     />
   );
@@ -392,7 +397,6 @@ function MeasuringPointCard({
   );
 
   // Stand-Serie (reading_date → value pro OBIS)
-  // OBIS pro Reading anhand Register-Index aus mp ableiten
   const obisByRegister = new Map<number, string>();
   for (const meter of mp.physical_meters) {
     for (const r of meter.registers) obisByRegister.set(r.id, r.obis_code);
@@ -411,7 +415,6 @@ function MeasuringPointCard({
 
   const series = mode === 'consumption' ? consumptionSeries : levelSeries;
 
-  // OBIS-Codes je nach Modus aus den passenden Daten
   const obisCodes =
     mode === 'consumption'
       ? Array.from(new Set(consumption.map((p) => p.obis_code)))
@@ -438,7 +441,6 @@ function MeasuringPointCard({
     return mode === 'consumption' ? `Verbrauch · ${base}` : base;
   };
 
-  // Verbrauchssumme pro OBIS-Code im Zeitraum (für die numerische Anzeige).
   const consumptionTotals = new Map<string, { sum: number; unit: string }>();
   for (const p of consumption) {
     const e = consumptionTotals.get(p.obis_code) ?? { sum: 0, unit: p.unit };
@@ -448,21 +450,20 @@ function MeasuringPointCard({
 
   return (
     <Card>
-      <div className="mb-3 flex flex-wrap items-baseline gap-2">
-        <h2 className="font-rounded text-ios-title2">{mp.name}</h2>
-        <span className="rounded-full bg-ios-fill/15 px-2 py-0.5 text-ios-caption uppercase tracking-wide text-ios-secondary">
-          {TYPE_LABELS[mp.type]}
-        </span>
-        {mp.location_name ? (
-          <span className="text-ios-footnote text-ios-tertiary">· {mp.location_name}</span>
-        ) : null}
-        {unit ? (
-          <span className="ml-auto text-ios-caption text-ios-tertiary">in {unit}</span>
-        ) : null}
+      <div className="mb-4 flex flex-wrap items-center gap-3">
+        <TypeBadge type={mp.type} size="md" />
+        <div className="min-w-0 flex-1">
+          <h2 className="truncate text-title-3 text-label">{mp.name}</h2>
+          <div className="text-caption text-tertiary">
+            {TYPE_LABELS[mp.type]}
+            {mp.location_name ? ` · ${mp.location_name}` : ''}
+          </div>
+        </div>
+        {unit ? <span className="text-caption text-tertiary">in {unit}</span> : null}
       </div>
 
       {state.length > 0 ? (
-        <div className="mb-3 space-y-2">
+        <div className="mb-4 space-y-2.5">
           {state
             .filter((s) => s.accepts_deliveries)
             .map((s) => (
@@ -474,7 +475,7 @@ function MeasuringPointCard({
               />
             ))}
           {state.some((s) => !s.accepts_deliveries) ? (
-            <div className="grid gap-2 sm:grid-cols-2">
+            <div className="grid gap-2.5 sm:grid-cols-2">
               {state
                 .filter((s) => !s.accepts_deliveries)
                 .map((s) => (
@@ -486,17 +487,15 @@ function MeasuringPointCard({
       ) : null}
 
       {consumptionTotals.size > 0 ? (
-        <div className="mb-3 rounded-ios-lg bg-ios-elevated/60 p-3">
-          <div className="text-ios-footnote uppercase tracking-wide text-ios-tertiary">
-            Verbrauch im Zeitraum
-          </div>
-          <ul className="mt-1 space-y-0.5">
+        <div className="mb-4 rounded-card border-hairline border-border bg-fill/60 p-4">
+          <div className="text-caption-bold uppercase text-tertiary">Verbrauch im Zeitraum</div>
+          <ul className="mt-2 space-y-1">
             {Array.from(consumptionTotals.entries()).map(([code, t]) => (
-              <li key={code} className="flex items-baseline justify-between gap-3 text-ios-body">
-                <span className="truncate">{labelByObis.get(code) ?? code}</span>
-                <span className="font-rounded tabular-nums">
+              <li key={code} className="flex items-baseline justify-between gap-3 text-body">
+                <span className="truncate text-label">{labelByObis.get(code) ?? code}</span>
+                <span className="num text-headline text-label">
                   {formatDe(t.sum)}{' '}
-                  <span className="text-ios-footnote text-ios-tertiary">{t.unit}</span>
+                  <span className="text-caption text-tertiary">{t.unit}</span>
                 </span>
               </li>
             ))}
@@ -504,7 +503,7 @@ function MeasuringPointCard({
         </div>
       ) : null}
 
-      <div className="mb-2 flex flex-wrap items-center gap-1.5">
+      <div className="mb-3 flex flex-wrap items-center gap-1.5">
         <Pill active={mode === 'consumption'} onClick={() => setMode('consumption')}>
           Verbrauch
         </Pill>
@@ -514,7 +513,7 @@ function MeasuringPointCard({
       </div>
 
       {series.length === 0 ? (
-        <p className="text-ios-footnote text-ios-tertiary">
+        <p className="text-caption text-tertiary">
           {mode === 'consumption'
             ? 'Keine Verbrauchsdaten im gewählten Zeitraum.'
             : 'Keine Stände im gewählten Zeitraum.'}
@@ -611,58 +610,55 @@ function TankTile({
     capacity && capacity > 0 && current !== null
       ? Math.max(0, Math.min(100, (current / capacity) * 100))
       : null;
-  const fillBarColor =
-    percent === null
-      ? 'bg-ios-fill/30'
-      : percent < 20
-        ? 'bg-ios-red'
-        : percent < 50
-          ? 'bg-ios-orange'
-          : 'bg-ios-green';
 
   return (
-    <div className="rounded-ios-lg bg-ios-elevated/60 p-4">
-      <div className="text-ios-footnote uppercase tracking-wide text-ios-tertiary">
-        {state.label}
-      </div>
-      <div className="mt-1 flex items-baseline gap-2">
-        <span className="font-rounded text-ios-largetitle tabular-nums">
-          {current !== null ? formatDe(current) : '—'}
-        </span>
-        <span className="text-ios-headline text-ios-secondary">{state.unit}</span>
+    <div className="rounded-card border-hairline border-border bg-fill/60 p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="text-caption-bold uppercase text-tertiary">{state.label}</div>
         {percent !== null ? (
-          <span className="ml-auto font-rounded text-ios-title2 tabular-nums text-ios-secondary">
+          <span className="rounded-full bg-primary-soft px-2 py-0.5 text-caption font-semibold text-primary-deep">
             {formatDe(percent, { maximumFractionDigits: 0 })} %
           </span>
         ) : null}
       </div>
 
+      <div className="mt-2 flex items-baseline gap-1.5">
+        <span className="num text-display leading-none tracking-tighter text-label">
+          {current !== null ? formatDe(current) : '—'}
+        </span>
+        <span className="text-headline text-secondary">{state.unit}</span>
+        {capacity ? (
+          <span className="num ml-auto text-caption text-tertiary">
+            / {formatDe(capacity)} {state.unit}
+          </span>
+        ) : null}
+      </div>
+
       {percent !== null ? (
-        <div className="mt-2 h-2 overflow-hidden rounded-full bg-ios-fill/15">
+        <div className="mt-3 h-3 overflow-hidden rounded-full bg-fill shadow-[inset_0_1px_2px_rgba(0,0,0,0.06)]">
           <div
-            className={`h-full ${fillBarColor} transition-all`}
-            style={{ width: `${percent.toFixed(1)}%` }}
+            className="h-full rounded-full bg-gradient-to-r from-primary to-electricity transition-all"
+            style={{
+              width: `${percent.toFixed(1)}%`,
+              boxShadow: '0 0 12px color-mix(in oklch, var(--primary), transparent 50%)',
+            }}
           />
         </div>
       ) : null}
 
-      <div className="mt-2 space-y-0.5 text-ios-caption text-ios-tertiary">
-        {capacity ? (
-          <div>
-            Tankvolumen: {formatDe(capacity)} {state.unit}
-          </div>
-        ) : (
+      <div className="mt-3 space-y-0.5 text-caption text-tertiary">
+        {!capacity ? (
           <div>
             Tankvolumen nicht gesetzt — für Prozent-Anzeige in Messstellen-Stammdaten ergänzen.
           </div>
-        )}
+        ) : null}
         <div>
           {state.last_reading_at
             ? `Letzter Stand: ${formatDe(state.last_reading_value ?? '0')} ${state.unit} (${formatDateTimeDe(state.last_reading_at)})`
             : 'noch keine Erfassung'}
         </div>
         {Number(state.refilled_since) > 0 ? (
-          <div className="text-ios-blue">
+          <div className="text-primary">
             + {formatDe(state.refilled_since)} {state.unit} seit letzter Erfassung geliefert
           </div>
         ) : null}
@@ -719,20 +715,20 @@ function CorrectionForm({
 
   return (
     <form onSubmit={(e) => void save(e)} className="space-y-4">
-      <div className="text-ios-footnote text-ios-tertiary">
+      <div className="text-caption text-tertiary">
         {mp.name} · {state.label} ({state.unit})
       </div>
       {state.last_reading_at ? (
-        <div className="rounded-ios bg-ios-elevated p-3 text-ios-footnote">
-          <div className="text-ios-tertiary">Bisheriger Stand:</div>
-          <div className="font-rounded text-ios-headline tabular-nums">
+        <div className="rounded-card border-hairline border-border bg-fill/60 p-3 text-caption">
+          <div className="text-tertiary">Bisheriger Stand:</div>
+          <div className="num text-headline text-label">
             {formatDe(state.last_reading_value ?? '0')} {state.unit}
-            <span className="ml-2 text-ios-caption text-ios-tertiary">
+            <span className="ml-2 text-caption text-tertiary">
               ({formatDateTimeDe(state.last_reading_at)})
             </span>
           </div>
           {Number(state.refilled_since) > 0 ? (
-            <div className="text-ios-caption text-ios-blue">
+            <div className="text-caption text-primary">
               + {formatDe(state.refilled_since)} {state.unit} seitdem geliefert
             </div>
           ) : null}
@@ -745,6 +741,7 @@ function CorrectionForm({
         onChange={(e) => setValue(e.target.value)}
         required
         hint="z. B. nach Tankablesung"
+        numeric
       />
       <TextField
         label="Zeitpunkt"
@@ -753,12 +750,7 @@ function CorrectionForm({
         onChange={(e) => setReadingAt(e.target.value)}
         required
       />
-      <TextField
-        label="Notiz"
-        value={note}
-        onChange={(e) => setNote(e.target.value)}
-        error={error}
-      />
+      <TextField label="Notiz" value={note} onChange={(e) => setNote(e.target.value)} error={error} />
       <div className="flex gap-2">
         <Button type="submit" variant="filled" disabled={busy} fullWidth>
           {busy ? 'Speichere…' : 'Korrektur speichern'}
@@ -810,18 +802,18 @@ function ConsumptionSummary({
   return (
     <Section header="Verbrauch im gewählten Zeitraum">
       {buckets.length === 0 ? (
-        <div className="p-4 text-ios-footnote text-ios-tertiary">
+        <div className="p-5 text-caption text-tertiary">
           Im gewählten Zeitraum gibt es keine zwei aufeinanderfolgenden Erfassungen, aus denen ein
           Verbrauch berechnet werden könnte.
         </div>
       ) : (
-        <ul className="divide-y divide-ios-separator/60">
+        <ul className="divide-y divide-separator">
           {buckets.map((b) => (
-            <li key={b.label} className="flex items-baseline justify-between gap-3 px-4 py-3">
-              <div className="min-w-0 flex-1 truncate text-ios-body">{b.label}</div>
-              <div className="font-rounded text-ios-headline tabular-nums">
+            <li key={b.label} className="flex items-baseline justify-between gap-3 px-5 py-3">
+              <div className="min-w-0 flex-1 truncate text-body text-label">{b.label}</div>
+              <div className="num text-headline text-label">
                 {formatDe(b.sum)}{' '}
-                <span className="text-ios-footnote text-ios-tertiary">{b.unit}</span>
+                <span className="text-caption text-tertiary">{b.unit}</span>
               </div>
             </li>
           ))}
@@ -835,15 +827,15 @@ const TYPE_ORDER: MeterType[] = ['electricity', 'gas', 'water', 'oil'];
 
 function CurrentStateTile({ state }: { state: RegisterStateRead }) {
   return (
-    <div className="rounded-ios-lg bg-ios-elevated/60 p-3">
-      <div className="text-ios-footnote text-ios-tertiary">{state.label}</div>
-      <div className="mt-1 flex items-baseline gap-1">
-        <span className="font-rounded text-ios-title2 tabular-nums">
+    <div className="rounded-card border-hairline border-border bg-fill/60 p-4">
+      <div className="text-caption-bold uppercase text-tertiary">{state.label}</div>
+      <div className="mt-1.5 flex items-baseline gap-1.5">
+        <span className="num text-title-1 leading-none tracking-tighter text-label">
           {state.current_value !== null ? formatDe(state.current_value) : '—'}
         </span>
-        <span className="text-ios-footnote text-ios-secondary">{state.unit}</span>
+        <span className="text-body text-secondary">{state.unit}</span>
       </div>
-      <div className="mt-1 text-ios-caption text-ios-tertiary">
+      <div className="mt-2 text-caption text-tertiary">
         {state.last_reading_at
           ? `Stand vom ${formatDateTimeDe(state.last_reading_at)}`
           : 'noch keine Erfassung'}
