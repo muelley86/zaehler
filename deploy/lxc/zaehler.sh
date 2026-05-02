@@ -153,7 +153,7 @@ PY
 
     step "7/8  Backend-Abhängigkeiten, Frontend-Build, Migrationen"
     as_user "cd '$REPO_DIR/backend' && uv sync --frozen"
-    as_user "cd '$REPO_DIR/frontend' && pnpm install --frozen-lockfile && pnpm build"
+    as_user "cd '$REPO_DIR/frontend' && pnpm install --frozen-lockfile && NODE_OPTIONS=--max-old-space-size=2048 pnpm build"
     as_user "cd '$REPO_DIR/backend' && uv run alembic upgrade head"
 
     step "8/8  systemd-Unit + sudo-Regel"
@@ -262,7 +262,7 @@ cmd_upgrade_app() {
     as_user "cd '$REPO_DIR/backend' && uv sync --frozen"
 
     step "4/6  Frontend bauen"
-    as_user "cd '$REPO_DIR/frontend' && pnpm install --frozen-lockfile && pnpm build"
+    as_user "cd '$REPO_DIR/frontend' && pnpm install --frozen-lockfile && NODE_OPTIONS=--max-old-space-size=2048 pnpm build"
 
     step "5/6  Datenbank-Migrationen"
     as_user "cd '$REPO_DIR/backend' && uv run alembic upgrade head"

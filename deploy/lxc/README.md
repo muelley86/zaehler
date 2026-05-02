@@ -35,7 +35,10 @@ Updates aller Komponenten, Backups, Wiederherstellung und Status-Diagnose.
 ## 1. Voraussetzungen
 
 - Ein Proxmox-Host (oder ein anderer LXC-fähiger Linux-Host) mit Internetzugriff.
-- 1 GB RAM, 4 GB Plattenplatz, 1 vCPU im Container reichen aus.
+- 2 GB RAM, 4 GB Plattenplatz, 1 vCPU im Container.
+  (1 GB reicht im Betrieb — aber der Frontend-Build mit `pnpm build` während
+  Installation und Updates braucht spitzenmäßig ~1,5 GB. Wer auf 1 GB sparen
+  will, muss vor jedem Update den Swap hochziehen.)
 - Eine Debian-13-Vorlage (`debian-13-standard_*.tar.zst`) — in Proxmox unter
   *Storage → CT Templates → Templates → Debian 13.0 standard* herunterladbar.
 - Optional: ein Reverse-Proxy auf dem Host (Caddy, nginx, Traefik) für HTTPS.
@@ -50,7 +53,7 @@ Updates aller Komponenten, Backups, Wiederherstellung und Status-Diagnose.
 2. **Allgemein**: ID frei wählen, Hostname `zaehler`, Passwort vergeben.
 3. **Vorlage**: `debian-13-standard`.
 4. **Festplatte**: 4 GB.
-5. **CPU**: 1 Core. **RAM**: 1024 MB. **Swap**: 512 MB.
+5. **CPU**: 1 Core. **RAM**: 2048 MB. **Swap**: 1024 MB.
 6. **Netzwerk**: IPv4 = `dhcp` oder feste IP.
 7. Bestätigen, Container starten.
 
@@ -59,7 +62,7 @@ Updates aller Komponenten, Backups, Wiederherstellung und Status-Diagnose.
 ```bash
 pct create 200 local:vztmpl/debian-13-standard_*.tar.zst \
   --hostname zaehler \
-  --cores 1 --memory 1024 --swap 512 \
+  --cores 1 --memory 2048 --swap 1024 \
   --rootfs local-lvm:4 \
   --net0 name=eth0,bridge=vmbr0,ip=dhcp \
   --unprivileged 1 \
