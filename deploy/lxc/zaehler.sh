@@ -519,7 +519,7 @@ cmd_upgrade_app() {
     ensure_sudo_rule
 
     step "1/6  Backup der Datenbank"
-    "$REPO_DIR/deploy/lxc/backup.sh"
+    "$REPO_DIR/deploy/lxc/backup.sh" || warn "Backup fehlgeschlagen — Update wird trotzdem fortgesetzt."
 
     step "2/6  Code aktualisieren (git pull)"
     as_user "cd '$REPO_DIR' && git fetch --tags && git pull --ff-only"

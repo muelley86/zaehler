@@ -17,8 +17,8 @@ BACKUP_DIR="${BACKUP_DIR:-/opt/zaehler/backups}"
 KEEP="${KEEP:-30}"
 
 if [ ! -f "$DB_FILE" ]; then
-    echo "Datenbank $DB_FILE nicht gefunden." >&2
-    exit 1
+    echo "Keine Datenbank unter $DB_FILE — Backup übersprungen (Container vermutlich frisch installiert)." >&2
+    exit 0
 fi
 
 mkdir -p "$BACKUP_DIR"
