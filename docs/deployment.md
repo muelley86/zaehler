@@ -12,7 +12,7 @@ Alles läuft über ein zentrales Verwaltungsskript:
 
 | Aktion | Befehl |
 |---|---|
-| Erstinstallation | `REPO_URL=… bash zaehler.sh install` |
+| Erstinstallation | `bash zaehler.sh install` (whiptail-Wizard: Modus-Wahl, Admin-Daten, optionale Erweitert-Einstellungen, Bestätigung, dann Installation) |
 | **Komplett-Update** (System + Tools + App) | `bash zaehler.sh upgrade-all` |
 | Nur System (apt) | `bash zaehler.sh upgrade-system` |
 | Nur Tools (uv + pnpm) | `bash zaehler.sh upgrade-tools` |
@@ -20,7 +20,7 @@ Alles läuft über ein zentrales Verwaltungsskript:
 | Sofort-Backup | `bash zaehler.sh backup` |
 | Backup einspielen | `bash zaehler.sh restore <datei.gz>` |
 | Status-Bericht | `bash zaehler.sh status` |
-| Initialer Admin | `cd /opt/zaehler/repo/backend && uv run python -m meters.cli create-admin --username admin --password '…' --force-change` |
+| Weiteren Admin nachträglich anlegen | `cd /opt/zaehler/repo/backend && uv run python -m meters.cli create-admin --username admin --password '…' --force-change` |
 
 ## Datenpfad
 

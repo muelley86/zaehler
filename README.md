@@ -59,28 +59,23 @@ Die ausführliche, anfängerfreundliche Anleitung mit allen Schritten von
 Container-Erstellung über Backups bis Updates steht in
 **[`deploy/lxc/README.md`](./deploy/lxc/README.md)**.
 
-Kurzfassung — alles läuft über das zentrale Verwaltungsskript
-`deploy/lxc/zaehler.sh`:
+Im Wesentlichen drei Befehle:
 
 ```sh
-# Im Container, als root: einmaliges Klonen + Erstinstallation
-apt update && apt install -y git ca-certificates curl
-git clone https://example.invalid/REPLACE-ME.git /opt/zaehler/repo
-REPO_URL=https://example.invalid/REPLACE-ME.git \
-    bash /opt/zaehler/repo/deploy/lxc/zaehler.sh install
+# 1) Im Container Repo klonen (privates Repo: vorher Deploy-Key — siehe LXC-README §2)
+sudo -u zaehler git clone git@github.com:DEIN-USER/zaehler.git /opt/zaehler/repo
 
-# Komplett-Update: System-Pakete + uv/pnpm + App-Code (mit DB-Backup)
+# 2) Erstinstallation — fragt interaktiv nach Admin-Passwort, richtet Backup-Timer ein
+bash /opt/zaehler/repo/deploy/lxc/zaehler.sh install
+
+# 3) Spätere Komplett-Updates (System, Tools, App)
 sudo bash /opt/zaehler/repo/deploy/lxc/zaehler.sh upgrade-all
-
-# Diagnose
-sudo bash /opt/zaehler/repo/deploy/lxc/zaehler.sh status
 ```
 
-Das Skript bietet auch granular die Subkommandos `upgrade-system`,
-`upgrade-tools`, `upgrade-app`, `backup`, `restore` und `help`.
-App-Updates legen automatisch ein DB-Backup an. Die SQLite-Datei unter
-`/opt/zaehler/data/meters.db` wird **niemals** durch das Skript verändert oder
-überschrieben.
+Granulare Kommandos: `upgrade-system`, `upgrade-tools`, `upgrade-app`,
+`backup`, `restore`, `status`, `help`. App-Updates legen automatisch ein
+DB-Backup an. `data/meters.db` wird durch das Skript **niemals** verändert
+oder überschrieben.
 
 ## Tests, Lint, Typcheck
 
