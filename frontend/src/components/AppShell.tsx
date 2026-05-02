@@ -1,9 +1,13 @@
 /**
- * Haupt-Layout der App.
+ * Haupt-Layout der App im Liquid-Glass-Stil.
  *
- * Mobile (<= md): kompakter Header oben und Bottom-Tab-Bar unten.
- * Desktop (>= md): Sidebar links mit allen Routen, kein Tab-Bar.
- * Admin-Routen sind nur sichtbar, wenn der angemeldete User Admin-Rechte hat.
+ * Mobile (<= md): kompakter Header oben mit Logo-Lockup + Bottom-Tab-Bar
+ * unten (Glasflächen, 4 Tabs: Dashboard / Erfassen-CTA / Erfassungen / Mehr).
+ * Desktop (>= md): 240-px-Sidebar links mit Logo, primären Routen,
+ * Admin-Sektion und Profil-Footer.
+ *
+ * Admin-Routen (Messstellen, Standorte, Benutzer, Audit) sind nur für
+ * Admin-User sichtbar.
  */
 
 import type { ReactNode } from 'react';
@@ -15,6 +19,7 @@ import {
   MapPin,
   MoreHorizontal,
   PencilLine,
+  Plus,
   ScrollText,
   Users,
 } from 'lucide-react';
@@ -29,121 +34,215 @@ interface NavItem {
   icon: ReactNode;
   end?: boolean;
   adminOnly?: boolean;
-  mobileTabBar?: boolean;
 }
 
-const NAV: NavItem[] = [
-  {
-    to: '/',
-    label: 'Dashboard',
-    icon: <LayoutDashboard size={22} />,
-    end: true,
-    mobileTabBar: true,
-  },
-  { to: '/erfassen', label: 'Erfassen', icon: <PencilLine size={22} />, mobileTabBar: true },
-  {
-    to: '/erfassungen',
-    label: 'Erfassungen',
-    icon: <ClipboardList size={22} />,
-    mobileTabBar: true,
-  },
-  { to: '/messstellen', label: 'Messstellen', icon: <Gauge size={22} />, adminOnly: true },
-  { to: '/standorte', label: 'Standorte', icon: <MapPin size={22} />, adminOnly: true },
-  { to: '/benutzer', label: 'Benutzer', icon: <Users size={22} />, adminOnly: true },
-  { to: '/audit', label: 'Audit', icon: <ScrollText size={22} />, adminOnly: true },
+const PRIMARY_NAV: NavItem[] = [
+  { to: '/', label: 'Dashboard', icon: <LayoutDashboard size={18} />, end: true },
+  { to: '/erfassen', label: 'Erfassen', icon: <PencilLine size={18} /> },
+  { to: '/erfassungen', label: 'Erfassungen', icon: <ClipboardList size={18} /> },
 ];
+
+const ADMIN_NAV: NavItem[] = [
+  { to: '/messstellen', label: 'Messstellen', icon: <Gauge size={18} /> },
+  { to: '/standorte', label: 'Standorte', icon: <MapPin size={18} /> },
+  { to: '/benutzer', label: 'Benutzer', icon: <Users size={18} /> },
+  { to: '/audit', label: 'Audit', icon: <ScrollText size={18} /> },
+];
+
+function LogoLockup({ size = 'md' }: { size?: 'sm' | 'md' }) {
+  const square = size === 'sm' ? 'h-7 w-7' : 'h-8 w-8';
+  return (
+    <div className="flex items-center gap-2.5" data-testid="logo-lockup">
+      <div
+        className={cx(
+          'flex items-center justify-center rounded-[9px] bg-gradient-primary text-white shadow-glow-primary',
+          square,
+        )}
+      >
+        <Gauge size={size === 'sm' ? 16 : 18} strokeWidth={2.5} />
+      </div>
+      <div className="text-headline tracking-tight text-label">Zählerstand</div>
+    </div>
+  );
+}
+
+function Avatar({ name, role }: { name: string; role: string }) {
+  const initial = (name[0] ?? '?').toUpperCase();
+  return (
+    <div className="flex min-w-0 items-center gap-2.5">
+      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-primary text-body-sm font-bold text-white">
+        {initial}
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="truncate text-body-sm font-semibold text-label">{name}</div>
+        <div className="truncate text-caption text-tertiary">{role}</div>
+      </div>
+    </div>
+  );
+}
 
 export function AppShell({ children }: { children: ReactNode }) {
   const { me, logout } = useAuth();
   const navigate = useNavigate();
   const isAdmin = me?.role === 'admin';
 
-  const visible = NAV.filter((n) => !n.adminOnly || isAdmin);
-  const tabBar = NAV.filter((n) => n.mobileTabBar);
-
   async function handleLogout() {
     await logout();
     navigate('/login', { replace: true });
   }
 
+  const sidebarLink = ({ isActive }: { isActive: boolean }) =>
+    cx(
+      'relative flex items-center gap-2.5 rounded-pill px-2.5 py-2 text-body-sm tracking-tight transition-colors',
+      isActive
+        ? 'bg-fill font-semibold text-label'
+        : 'font-medium text-secondary hover:bg-fill/60 hover:text-label',
+    );
+
+  const renderActiveRail = ({ isActive }: { isActive: boolean }) =>
+    isActive ? (
+      <span
+        aria-hidden
+        className="absolute -left-1.5 top-2 bottom-2 w-[3px] rounded-full bg-primary"
+      />
+    ) : null;
+
+  const tabBarLink = ({ isActive }: { isActive: boolean }) =>
+    cx(
+      'flex flex-col items-center gap-1 px-1 pt-2 pb-1.5 text-[10px] font-medium tracking-tight transition-colors',
+      isActive ? 'text-primary' : 'text-tertiary',
+    );
+
   return (
     <div className="flex min-h-full flex-col md:flex-row">
-      {/* Sidebar (Desktop) */}
-      <aside className="hidden md:flex md:w-60 md:shrink-0 md:flex-col md:border-r md:border-ios-separator md:bg-ios-surface md:pt-safe-top">
-        <div className="px-5 pb-2 pt-5">
-          <div className="font-rounded text-ios-title2">Zählerstand</div>
+      {/* ============ Sidebar (Desktop) ============ */}
+      <aside
+        data-testid="app-sidebar"
+        className={cx(
+          'hidden md:flex md:w-60 md:shrink-0 md:flex-col',
+          'md:border-r-hairline md:border-border md:bg-surface md:glass',
+          'md:pt-safe-top md:px-3 md:pb-3 md:pt-5',
+        )}
+      >
+        <div className="px-2 pb-4">
+          <LogoLockup />
         </div>
-        <nav className="flex flex-1 flex-col gap-0.5 p-2">
-          {visible.map((n) => (
-            <NavLink
-              key={n.to}
-              to={n.to}
-              end={n.end ?? false}
-              className={({ isActive }) =>
-                cx(
-                  'flex items-center gap-3 rounded-ios px-3 py-2 text-ios-body',
-                  isActive ? 'bg-ios-blue text-white' : 'text-ios-label hover:bg-ios-elevated/50',
-                )
-              }
-            >
-              <span className="opacity-80">{n.icon}</span>
-              {n.label}
+
+        <nav className="flex flex-col gap-0.5">
+          {PRIMARY_NAV.map((n) => (
+            <NavLink key={n.to} to={n.to} end={n.end ?? false} className={sidebarLink}>
+              {(state) => (
+                <>
+                  {renderActiveRail(state)}
+                  <span className={cx('shrink-0', state.isActive ? 'opacity-100' : 'opacity-70')}>
+                    {n.icon}
+                  </span>
+                  {n.label}
+                </>
+              )}
             </NavLink>
           ))}
+
+          {isAdmin && (
+            <>
+              <div className="px-2.5 pb-1.5 pt-4 text-caption-bold uppercase text-tertiary">
+                Administration
+              </div>
+              {ADMIN_NAV.map((n) => (
+                <NavLink key={n.to} to={n.to} className={sidebarLink}>
+                  {(state) => (
+                    <>
+                      {renderActiveRail(state)}
+                      <span
+                        className={cx('shrink-0', state.isActive ? 'opacity-100' : 'opacity-70')}
+                      >
+                        {n.icon}
+                      </span>
+                      {n.label}
+                    </>
+                  )}
+                </NavLink>
+              ))}
+            </>
+          )}
         </nav>
-        <div className="border-t border-ios-separator p-3">
-          <div className="px-2 pb-2 text-ios-footnote text-ios-tertiary">
-            {me?.username} · {me?.role}
+
+        <div className="mt-auto border-t-hairline border-separator px-1 pt-3">
+          <div className="flex items-center gap-2 px-1">
+            <Avatar name={me?.username ?? '–'} role={me?.role ?? ''} />
+            <button
+              type="button"
+              onClick={() => void handleLogout()}
+              aria-label="Abmelden"
+              data-testid="sidebar-logout"
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-tertiary transition-colors hover:bg-fill hover:text-danger"
+            >
+              <LogOut size={16} />
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={() => void handleLogout()}
-            className="flex w-full items-center gap-3 rounded-ios px-3 py-2 text-ios-body text-ios-red hover:bg-ios-red/10"
-          >
-            <LogOut size={20} />
-            Abmelden
-          </button>
         </div>
       </aside>
 
-      {/* Main */}
+      {/* ============ Main + Mobile-Chrome ============ */}
       <div className="flex min-h-0 flex-1 flex-col">
-        {/* Mobile header (sticky, shows app name as compact title) */}
-        <header className="sticky top-0 z-20 flex items-center justify-between gap-2 border-b border-ios-separator/60 bg-ios-bg/85 px-4 pb-2 pt-safe-top backdrop-blur md:hidden">
-          <div className="pt-3 text-ios-headline">Zählerstand</div>
-          <div className="pt-3 text-ios-footnote text-ios-tertiary">{me?.username}</div>
+        {/* Mobile-Header */}
+        <header
+          data-testid="app-mobile-header"
+          className="sticky top-0 z-20 flex items-center justify-between gap-2 border-b-hairline border-border bg-surface glass px-4 pb-2.5 pt-safe-top md:hidden"
+        >
+          <div className="pt-3">
+            <LogoLockup size="sm" />
+          </div>
+          <div className="pt-3 text-caption text-tertiary">{me?.username}</div>
         </header>
 
         <main className="min-h-0 flex-1 overflow-y-auto pb-24 md:pb-8">{children}</main>
 
-        {/* Mobile bottom tab bar */}
-        <nav className="fixed bottom-0 left-0 right-0 z-20 grid grid-cols-4 border-t border-ios-separator/60 bg-ios-surface/90 pb-safe-bottom backdrop-blur md:hidden">
-          {tabBar.map((n) => (
-            <NavLink
-              key={n.to}
-              to={n.to}
-              end={n.end ?? false}
-              className={({ isActive }) =>
-                cx(
-                  'flex flex-col items-center gap-0.5 px-1 pb-1 pt-2 text-ios-caption',
-                  isActive ? 'text-ios-blue' : 'text-ios-tertiary',
-                )
-              }
-            >
-              {n.icon}
-              <span>{n.label}</span>
-            </NavLink>
-          ))}
-          <NavLink
-            to="/mehr"
-            className={({ isActive }) =>
-              cx(
-                'flex flex-col items-center gap-0.5 px-1 pb-1 pt-2 text-ios-caption',
-                isActive ? 'text-ios-blue' : 'text-ios-tertiary',
-              )
-            }
-          >
-            <MoreHorizontal size={22} />
+        {/* Mobile-Bottom-Tab-Bar */}
+        <nav
+          data-testid="app-tabbar"
+          className={cx(
+            'fixed bottom-0 left-0 right-0 z-20 grid grid-cols-4',
+            'border-t-hairline border-border bg-surface-high glass',
+            'pb-safe-bottom md:hidden',
+          )}
+        >
+          <NavLink to="/" end className={tabBarLink}>
+            <LayoutDashboard size={22} strokeWidth={2} />
+            <span>Dashboard</span>
+          </NavLink>
+
+          {/* Erfassen-CTA — prominenter Plus-Button im Primary-Gradient */}
+          <NavLink to="/erfassen" className="flex flex-col items-center gap-1 pt-1.5 pb-1.5">
+            {({ isActive }) => (
+              <>
+                <span
+                  className={cx(
+                    'flex h-9 w-9 items-center justify-center rounded-[12px]',
+                    'bg-gradient-primary text-white shadow-glow-primary',
+                    isActive && 'ring-2 ring-primary ring-offset-2 ring-offset-surface-high',
+                  )}
+                >
+                  <Plus size={20} strokeWidth={2.5} />
+                </span>
+                <span
+                  className={cx(
+                    'text-[10px] font-medium tracking-tight',
+                    isActive ? 'text-primary' : 'text-tertiary',
+                  )}
+                >
+                  Erfassen
+                </span>
+              </>
+            )}
+          </NavLink>
+
+          <NavLink to="/erfassungen" className={tabBarLink}>
+            <ClipboardList size={22} strokeWidth={2} />
+            <span>Erfassungen</span>
+          </NavLink>
+          <NavLink to="/mehr" className={tabBarLink}>
+            <MoreHorizontal size={22} strokeWidth={2} />
             <span>Mehr</span>
           </NavLink>
         </nav>
