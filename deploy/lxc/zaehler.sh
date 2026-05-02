@@ -264,10 +264,28 @@ cmd_upgrade_app() {
     step "4/6  Frontend bauen"
     as_user "cd '$REPO_DIR/frontend' && pnpm install --frozen-lockfile && NODE_OPTIONS=--max-old-space-size=2048 pnpm build"
 
-    step "5/6  Datenbank-Migrationen"
+    step "5/7  Datenbank-Migrationen"
     as_user "cd '$REPO_DIR/backend' && uv run alembic upgrade head"
 
-    step "6/6  Service neu starten"
+    step "6/7  systemd-Unit synchronisieren (falls geändert)"
+    local unit_src="$REPO_DIR/deploy/systemd/$SERVICE_NAME"
+    local unit_dst="/etc/systemd/system/$SERVICE_NAME"
+    if [ -f "$unit_src" ] && ! cmp -s "$unit_src" "$unit_dst" 2>/dev/null; then
+        if [ "$(id -u)" -eq 0 ]; then
+            install -m 0644 "$unit_src" "$unit_dst"
+            systemctl daemon-reload
+            ok "systemd-Unit aktualisiert"
+        else
+            warn "Die systemd-Unit hat sich geändert, aber wir laufen nicht als root."
+            warn "Führe einmalig als root aus, damit die neue Unit aktiv wird:"
+            warn "  sudo install -m 0644 $unit_src $unit_dst"
+            warn "  sudo systemctl daemon-reload"
+        fi
+    else
+        log "systemd-Unit unverändert"
+    fi
+
+    step "7/7  Service neu starten"
     if [ "$(id -u)" -eq 0 ]; then
         systemctl restart "$SERVICE_NAME"
     else
