@@ -8,6 +8,10 @@ Abhängigkeiten zur Laufzeit.
 
 Die fachliche Spezifikation steht in [`CLAUDE.md`](./CLAUDE.md).
 
+> Anfänger? In [`docs/anleitung.md`](./docs/anleitung.md) steht eine
+> kompakte Schritt-für-Schritt-Anleitung für Container-Installation,
+> eigene Code-Änderungen nach GitHub pushen und Container-Updates.
+
 ## Funktionsumfang (Stand: aktuell)
 
 - Mehrere Messstellen-Typen: **Strom** (mit HT/NT und bidirektional), **Gas**,
