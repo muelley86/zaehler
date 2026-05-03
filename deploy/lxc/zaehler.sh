@@ -758,6 +758,57 @@ cmd_status() {
 }
 
 # -----------------------------------------------------------------------------
+# rollback — App auf einen früheren Tag/Commit umschalten und neu bauen
+# -----------------------------------------------------------------------------
+
+cmd_rollback() {
+    require_root
+    local ref="${1:-}"
+    [ -n "$ref" ] || die "Bitte Tag/Branch/Commit angeben. Beispiel:
+  sudo bash $0 rollback v0.1.0
+  sudo bash $0 rollback abc1234"
+    [ -d "$REPO_DIR/.git" ] || die "Kein Repository unter $REPO_DIR — bitte erst 'install' ausführen."
+
+    ensure_sudo_rule
+    ensure_env_file
+
+    step "0/6  Existenz von '$ref' prüfen"
+    if ! as_user "git -C '$REPO_DIR' rev-parse --verify '$ref^{commit}' >/dev/null 2>&1"; then
+        as_user "git -C '$REPO_DIR' fetch --all --tags --quiet"
+        if ! as_user "git -C '$REPO_DIR' rev-parse --verify '$ref^{commit}' >/dev/null 2>&1"; then
+            die "Tag/Commit '$ref' nicht gefunden — verfügbar: \
+$(as_user "git -C '$REPO_DIR' tag" | tr '\n' ' ')"
+        fi
+    fi
+
+    step "1/6  Backup der Datenbank"
+    "$REPO_DIR/deploy/lxc/backup.sh" || warn "Backup fehlgeschlagen — Rollback wird trotzdem fortgesetzt."
+
+    step "2/6  Auf '$ref' wechseln (detached HEAD)"
+    as_user "git -C '$REPO_DIR' checkout --quiet '$ref'"
+
+    step "3/6  Backend-Abhängigkeiten"
+    as_user "cd '$REPO_DIR/backend' && uv sync --frozen --quiet"
+
+    step "4/6  Frontend bauen"
+    as_user "cd '$REPO_DIR/frontend' && pnpm install --frozen-lockfile --silent && NODE_OPTIONS=--max-old-space-size=2048 pnpm build"
+
+    step "5/6  Datenbank prüfen"
+    msg_info "Achtung: ein Rollback führt KEIN automatisches alembic downgrade aus."
+    msg_info "Falls die alte Code-Version eine ältere Datenbank-Migration erwartet,"
+    msg_info "musst du manuell entweder das passende Backup einspielen (sudo bash $0 restore …)"
+    msg_info "oder die DB downgraden (cd $REPO_DIR/backend && uv run alembic downgrade <revision>)."
+
+    step "6/6  Service neu starten"
+    if [ "$(id -u)" -eq 0 ]; then
+        systemctl restart "$SERVICE_NAME"
+    else
+        sudo systemctl restart "$SERVICE_NAME"
+    fi
+    ok "Auf '$ref' zurückgerollt. Mit 'sudo bash $0 upgrade-app' kommst du wieder auf den aktuellen main-Stand."
+}
+
+# -----------------------------------------------------------------------------
 # audit — Dependency-Audit fürs Frontend (pnpm) und Backend (pip-audit)
 # -----------------------------------------------------------------------------
 
@@ -852,6 +903,8 @@ ${C_BOLD}zaehler.sh — Verwaltungsskript für die Zählerstand-App${C_RESET}
     backup               Sofort einen DB-Snapshot erzeugen
     restore <datei.gz>   Backup einspielen (stoppt Service, ersetzt DB,
                          startet Service neu)
+    rollback <ref>       Auf eine frühere Tag/Commit-Version zurückgehen
+                         (Backup → checkout → build → restart)
 
   ${C_BOLD}Benutzer-Verwaltung:${C_RESET}
     reset-password       Passwort eines Users neu setzen (z. B. Admin
@@ -903,6 +956,7 @@ case "${1:-help}" in
     upgrade-all)     cmd_upgrade_all ;;
     backup)          cmd_backup ;;
     restore)         cmd_restore "${2:-}" ;;
+    rollback)        cmd_rollback "${2:-}" ;;
     reset-password)  cmd_reset_password ;;
     audit)           cmd_audit ;;
     status)          cmd_status ;;

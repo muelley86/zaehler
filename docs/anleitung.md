@@ -1,12 +1,15 @@
 # Schritt-für-Schritt-Anleitung für Anfänger
 
-Diese Anleitung beschreibt zwei Dinge in voller Länge — auch wenn du Linux,
-Git oder Container noch nie wirklich benutzt hast:
+Diese Anleitung beschreibt sieben Dinge in voller Länge — auch wenn du
+Linux, Git oder Container noch nie wirklich benutzt hast:
 
 1. **Teil 1** — Wie du die Zählerstand-App in einen LXC-Container installierst.
 2. **Teil 2** — Wie du am Code Änderungen vornimmst und nach GitHub hochlädst.
 3. **Teil 3** — Wie der Container die neuen Versionen bekommt.
 4. **Teil 4** — Was tun, wenn etwas nicht klappt.
+5. **Teil 5** — HTTPS-Reverse-Proxy mit Caddy einrichten.
+6. **Teil 6** — Zwei-Faktor-Authentisierung (2FA) aktivieren.
+7. **Teil 7** — Versionen taggen und im Notfall zurückrollen.
 
 Was du **vorab brauchst**:
 
@@ -287,6 +290,308 @@ neuen Container anlegen, Bootstrap-Einzeiler laufen lassen, alte
 
 ---
 
+## Teil 5 — HTTPS-Reverse-Proxy mit Caddy
+
+Solange die App nur im lokalen Heimnetz läuft, ist HTTP ausreichend. Sobald
+du sie aber unter einer Domain bereitstellen oder über das Internet
+erreichbar machen willst, **muss** ein HTTPS-Reverse-Proxy davor — sonst
+wandern Passwort und Session-Cookie unverschlüsselt durchs Netz.
+
+Das Setup folgt einem festen Ablauf:
+
+```
+[Internet] --443--> [Caddy auf dem Proxmox-Host] --8000--> [LXC-Container]
+```
+
+### 5.1 DNS einrichten
+
+Bei deinem DNS-Anbieter einen A- oder AAAA-Record auf die öffentliche IP
+deines Routers setzen, z. B.
+
+```
+zaehler.example.com.   A   203.0.113.42
+```
+
+Auf dem Router Port 80 und 443 an den Proxmox-Host weiterleiten (TCP).
+80 braucht Caddy für die Let's-Encrypt-HTTP-Challenge, 443 ist der
+HTTPS-Listener.
+
+### 5.2 Caddy auf dem Proxmox-Host installieren
+
+```bash
+sudo apt update
+sudo apt install -y caddy
+```
+
+(Bei Debian/Ubuntu liefert das System-Paket Caddy 2.x; alternativ
+`https://caddyserver.com/download`.)
+
+### 5.3 Caddyfile schreiben
+
+Datei `/etc/caddy/Caddyfile` editieren:
+
+```caddyfile
+zaehler.example.com {
+    reverse_proxy <container-ip>:8000 {
+        # Container-IP herausfinden im Container per `hostname -I`.
+        header_up X-Forwarded-For {remote_host}
+        header_up X-Forwarded-Proto {scheme}
+    }
+}
+```
+
+```bash
+sudo systemctl reload caddy
+```
+
+Caddy holt sich beim ersten Aufruf automatisch ein Let's-Encrypt-
+Zertifikat. Im Browser `https://zaehler.example.com` testen — Schloss-Symbol
+muss erscheinen.
+
+### 5.4 App im Container auf Reverse-Proxy umstellen
+
+Im **Container** (per `pct enter <id>`):
+
+```bash
+sudo nano /opt/zaehler/data/meters.env
+```
+
+Diese vier Zeilen setzen (oder ergänzen, falls fehlend):
+
+```ini
+METERS_BIND_HOST=127.0.0.1
+METERS_COOKIE_SECURE=True
+METERS_TRUST_PROXY=True
+METERS_ALLOWED_ORIGINS=https://zaehler.example.com
+```
+
+Was bedeuten die Werte?
+
+| Schlüssel | Wirkung |
+|---|---|
+| `METERS_BIND_HOST=127.0.0.1` | App lauscht nur lokal, Caddy ist der einzige Weg rein |
+| `METERS_COOKIE_SECURE=True` | Session-Cookie wird nur über HTTPS gesendet |
+| `METERS_TRUST_PROXY=True` | Backend wertet `X-Forwarded-For` aus (sonst würden Audit-Log und Rate-Limiter immer Caddys IP sehen) |
+| `METERS_ALLOWED_ORIGINS=https://…` | CSRF-Schutz: Origin-Check für POST/PATCH/DELETE |
+
+Service neu starten:
+
+```bash
+sudo systemctl restart zaehler.service
+```
+
+> Tipp: Bei einem **frischen** Install kannst du dir den manuellen Schritt
+> sparen — der Wizard fragt aktiv nach dem Reverse-Proxy und füllt diese
+> Werte automatisch ein.
+
+### 5.5 Verifizieren
+
+```bash
+curl -fsSI https://zaehler.example.com/api/v1/health
+```
+
+Erwartet: `HTTP/2 200`. Plus die Header `Strict-Transport-Security` und
+`X-Frame-Options: DENY` müssen vorhanden sein — die kommen jetzt vom
+Backend, sind ein Indiz für ein korrektes HTTPS-Setup.
+
+---
+
+## Teil 6 — Zwei-Faktor-Authentisierung (MFA)
+
+Sobald die App von außen erreichbar ist, ist 2FA Pflicht. Es schützt
+deinen Account auch dann, wenn dein Passwort durch ein Datenleck oder
+Phishing in falsche Hände gerät.
+
+### 6.1 Was du brauchst
+
+- Eine **Authenticator-App** auf dem Smartphone:
+  - Google Authenticator, Authy, Microsoft Authenticator, 1Password,
+    Bitwarden, KeePassXC — alle funktionieren.
+- 5 Minuten Zeit.
+
+### 6.2 2FA aktivieren
+
+1. In der App einloggen → unten rechts **Mehr**.
+2. Section **Zwei-Faktor-Authentisierung** → "**2FA jetzt einrichten**".
+3. QR-Code scannen mit der Authenticator-App. Die App zeigt jetzt einen
+   6-stelligen Code an, der sich alle 30 Sekunden ändert.
+4. Den aktuellen Code im Eingabefeld eintippen → **Aktivieren**.
+5. Es erscheinen **10 Backup-Codes**. Diese sind dein Notfall-Schlüssel,
+   wenn du das Smartphone verlierst.
+
+### 6.3 Backup-Codes sicher aufbewahren
+
+- "**Drucken**" klicken → ausdrucken und ins Sparbuch oder den Safe legen.
+- Oder "**Kopieren**" → in einem Passwort-Manager (1Password, Bitwarden)
+  als Anhang speichern.
+- **Niemals** ungeschützt in einer Datei auf der Festplatte oder in einer
+  E-Mail.
+
+Jeder Code funktioniert genau einmal. Sind alle 10 verbraucht oder
+kompromittiert: in **Mehr → 2FA → Backup-Codes neu generieren** klicken,
+alte werden sofort ungültig.
+
+### 6.4 Login mit 2FA
+
+Beim nächsten Login fragt die App nach dem Schritt 1 (Username + Passwort)
+zusätzlich nach einem Sicherheitscode:
+
+1. Authenticator-App öffnen → 6-stelligen Code ablesen → eingeben → fertig.
+2. Wenn das Smartphone gerade nicht da ist: einen 16-stelligen Backup-Code
+   eingeben (mit oder ohne Bindestrich, Klein-/Großschreibung egal).
+
+### 6.5 2FA wieder ausschalten
+
+**Mehr → 2FA → 2FA deaktivieren** → aktuelles Passwort + ein gültiger
+Code (Authenticator oder Backup) → Bestätigen. Die App löscht das Secret
+und alle restlichen Backup-Codes.
+
+### 6.6 Was wenn ich Smartphone UND Backup-Codes verloren habe?
+
+Dann brauchst du Container-Zugang als root:
+
+```bash
+# DB-Editor öffnen
+sudo sqlite3 /opt/zaehler/data/meters.db
+```
+
+```sql
+UPDATE user SET totp_enabled = 0, totp_secret = NULL WHERE username = 'kmueller';
+.quit
+```
+
+Service neu starten:
+
+```bash
+sudo systemctl restart zaehler.service
+```
+
+Anschließend ohne 2FA einloggen, in Mehr → 2FA neu einrichten, neue
+Backup-Codes ausdrucken.
+
+> Wichtig: dieser Notausstieg setzt voraus, dass du root-Zugriff auf
+> den Container hast. Externer Angreifer ohne diesen Zugang kommt damit
+> nicht weiter.
+
+---
+
+## Teil 7 — Versionen taggen und zurückrollen
+
+Git verwaltet automatisch jede Änderung als **Commit** mit eindeutiger ID.
+Ein **Tag** ist ein menschen-lesbarer Name für einen Commit, den du als
+"funktionierende Version" markierst. Im Notfall kannst du jederzeit auf
+einen alten Tag zurückkehren.
+
+### 7.1 Eine Version markieren (Tag)
+
+Auf deinem **PC** im Projektordner:
+
+```bash
+git pull --tags                          # alle existierenden Tags holen
+git tag -a v1.0.0 -m "Erste stabile Version: 2FA + HTTPS-Setup komplett"
+git push origin v1.0.0                   # Tag auf GitHub hochladen
+```
+
+`-a` macht einen "annotated tag" — mit Autor, Datum und Nachricht. Auf
+GitHub erscheint der Tag unter
+`https://github.com/muelley86/zaehler/tags` und kann auch als **Release**
+mit Changelog/ZIP-Download veröffentlicht werden:
+
+GitHub → dein Repo → **Releases** → **Draft a new release** → Tag wählen
+→ Beschreibung schreiben → **Publish release**.
+
+### 7.2 Versionsschema (Empfehlung)
+
+[Semantic Versioning](https://semver.org/):
+
+| Beispiel | Wann erhöhen |
+|---|---|
+| `v1.0.0` → `v1.0.1` | Bugfix, kein Verhaltensunterschied |
+| `v1.0.1` → `v1.1.0` | Neue Funktion, abwärtskompatibel |
+| `v1.1.0` → `v2.0.0` | Inkompatible Änderung (DB-Migration mit Datenverlust, geänderte API) |
+
+Vor 1.0.0 darf alles "Beta" sein — Tags wie `v0.1.0`, `v0.2.0`, etc.
+
+### 7.3 Welche Tags gibt es?
+
+```bash
+git tag                          # lokal
+git ls-remote --tags origin      # auf GitHub
+```
+
+Auf GitHub: **Code → Branches/Tags-Dropdown → Tags-Tab**.
+
+### 7.4 Im Notfall zurück: Container auf alte Version
+
+Im **Container**:
+
+```bash
+sudo bash /opt/zaehler/repo/deploy/lxc/zaehler.sh rollback v1.0.0
+```
+
+Was passiert:
+
+1. **Backup** der aktuellen Datenbank (sicher ist sicher).
+2. `git checkout v1.0.0` (Repo wechselt auf den Tag).
+3. `uv sync` — Backend-Pakete der alten Version.
+4. `pnpm install + build` — Frontend wird mit altem Code neu gebaut.
+5. systemd-Service neu starten.
+
+> **Wichtiger Hinweis zur Datenbank:** Falls die *neuere* Version eine
+> Datenbank-Migration eingeführt hat (neue Spalten, neue Tabellen), läuft
+> der alte Code möglicherweise nicht ohne Weiteres mit der neueren DB.
+> In dem Fall:
+>
+> - Entweder ein **Backup** einspielen, das **vor** der Migration
+>   entstanden ist (`zaehler.sh restore <ältere-datei.gz>`), und
+>   dann den `rollback` ausführen.
+> - Oder die DB manuell auf die alte Migration herunterstufen:
+>
+>   ```bash
+>   sudo -u zaehler -H bash -lc \
+>     "cd /opt/zaehler/repo/backend && uv run alembic downgrade <revision>"
+>   ```
+>
+> `<revision>` ist die ID der gewünschten älteren Migration (siehe
+> `backend/alembic/versions/`-Verzeichnis im Repo).
+
+### 7.5 Zurück zum aktuellen Stand
+
+Nach erfolgreichem Test der alten Version oder nach behobenem Problem:
+
+```bash
+sudo bash /opt/zaehler/repo/deploy/lxc/zaehler.sh upgrade-app
+```
+
+bringt den Container wieder auf den Stand von `main`.
+
+### 7.6 Lokal auf einen alten Tag schauen
+
+Auf deinem **PC**, ohne den main-Branch zu verlieren:
+
+```bash
+git checkout v1.0.0      # repo zeigt den Stand vom Tag
+# … Code anschauen, verifizieren …
+git checkout main        # zurück auf den aktuellen Branch
+```
+
+> Bei `git checkout v1.0.0` warnt Git mit "detached HEAD" — das ist
+> normal und nicht gefährlich, solange du danach wieder auf einen Branch
+> wechselst.
+
+### 7.7 Wann taggen?
+
+Sinnvolle Trigger:
+
+- **Vor jeder größeren Änderung**: `v0.4.0` als "Stand vor Refactor X".
+- **Nach jeder erfolgreich getesteten Version**: `v1.0.0`.
+- **Vor einer Migration**, die Datenmodell-Felder verändert.
+- **Vor dem Update auf eine neue Major-Library** (FastAPI, React, …).
+
+So hast du in der Not immer einen Punkt, auf den du zurückkannst.
+
+---
+
 ## Anhang — Mini-Cheatsheet
 
 ### Wichtige Pfade im Container
@@ -307,6 +612,7 @@ neuen Container anlegen, Bootstrap-Einzeiler laufen lassen, alte
 | `upgrade-all` | System + Tools + App in einem Lauf |
 | `backup` | Sofort einen DB-Snapshot erzeugen |
 | `restore <datei.gz>` | Backup einspielen |
+| `rollback <tag>` | App auf eine ältere Tag/Commit-Version zurückrollen |
 | `reset-password` | Passwort eines Users (z. B. Admin) neu setzen |
 | `audit` | Dependency-Audit für Frontend (pnpm) und Backend (pip-audit) |
 | `status` | Übersicht: Service, Versionen, DB, Backups, Repo |
@@ -341,6 +647,11 @@ neuen Container anlegen, Bootstrap-Einzeiler laufen lassen, alte
 | `git commit -m "…"` | Commit erstellen |
 | `git push` | Commits zu GitHub hochladen |
 | `git restore <datei>` | Änderung rückgängig (vor `git add`) |
+| `git tag -a vX.Y.Z -m "…"` | Aktuellen Stand als Version markieren |
+| `git push origin vX.Y.Z` | Tag zu GitHub hochladen |
+| `git tag` | Alle lokalen Tags |
+| `git checkout vX.Y.Z` | Repo lokal auf diesen Tag (detached HEAD) |
+| `git checkout main` | Zurück auf Branch main |
 
 ---
 
