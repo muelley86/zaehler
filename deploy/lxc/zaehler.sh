@@ -104,8 +104,11 @@ require_root() {
 # Führt einen Befehl als App-User aus, mit ge-source-tem Profil (PATH ~/.local/bin).
 # Sourct außerdem $DATA_DIR/meters.env, falls vorhanden — damit haben CLI-Aufrufe
 # (alembic, meters.cli) dieselbe DATABASE_URL wie der systemd-Service.
+# Wechselt initial ins $HOME des App-Users — sonst startet die Subshell mit
+# CWD = /root (das CWD vom root-Caller), und Tools wie pnpm scannen parent-
+# Dirs nach package.json, was mit EACCES failt.
 as_user() {
-    sudo -u "$APP_USER" -H bash -lc "set -a; [ -f '$DATA_DIR/meters.env' ] && . '$DATA_DIR/meters.env'; set +a; $*"
+    sudo -u "$APP_USER" -H bash -lc "cd; set -a; [ -f '$DATA_DIR/meters.env' ] && . '$DATA_DIR/meters.env'; set +a; $*"
 }
 
 # Prüft, ob ein Befehl im PATH des Users 'zaehler' verfügbar ist.
