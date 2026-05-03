@@ -142,8 +142,6 @@ WIZ_BIND_PORT="8000"
 WIZ_ADMIN_USER="admin"
 WIZ_ADMIN_PASSWORD=""
 WIZ_BACKUP_TIME="03:30"
-WIZ_HTTPS_PROXY="no"
-WIZ_REVERSE_PROXY_HOST=""
 
 # Heuristik: kann der Wizard interaktive Dialoge zeigen?
 is_interactive() { [ -t 0 ] && [ -t 1 ] && have_whiptail; }
@@ -222,43 +220,10 @@ install_wizard() {
         done
     fi
 
-    # Sicherheits-Setup — beeinflusst Cookie-Secure, Trust-Proxy und Bind-Host.
-    # Drei realistische Topologien, weil "Reverse-Proxy ja/nein" zu grob war
-    # (NPM/Caddy auf eigenem Host braucht andere Werte als auf demselben Host).
-    local proxy_mode
-    proxy_mode=$(wt_menu "Netzwerk-Topologie" \
-        "Wie greifst du auf die App zu?" \
-        "lan-only"  "Nur direkt im Heimnetz (HTTP)" \
-        "proxy-same"  "Reverse-Proxy auf gleichem Host (nur HTTPS)" \
-        "proxy-other" "Reverse-Proxy auf anderem Host + IP-Zugriff" \
-        "abort"     "Abbrechen") || die "Abgebrochen."
-    [ "$proxy_mode" = "abort" ] && die "Abgebrochen."
-
-    case "$proxy_mode" in
-        lan-only)
-            WIZ_HTTPS_PROXY="no"
-            # Bind 0.0.0.0, kein Trust-Proxy, kein Cookie-Secure.
-            ;;
-        proxy-same)
-            # Reverse-Proxy auf demselben Host — App lauscht NUR auf
-            # 127.0.0.1, alles HTTPS-Only.
-            WIZ_HTTPS_PROXY="yes"
-            WIZ_BIND_HOST="127.0.0.1"
-            WIZ_REVERSE_PROXY_HOST=$(wt_input "Hostname des Reverse-Proxy" \
-                "Unter welchem Hostname / welcher Domain ist die App erreichbar?\nWird in METERS_ALLOWED_ORIGINS eingetragen (CSRF-Schutz)." \
-                "${WIZ_REVERSE_PROXY_HOST:-zaehler.example.com}") || die "Abgebrochen."
-            ;;
-        proxy-other)
-            # Reverse-Proxy auf anderem Host (NPM, separates Caddy etc.) UND
-            # paralleler IP-Zugriff im LAN. Bind bleibt 0.0.0.0; Trust-Proxy
-            # damit X-Forwarded-For vom NPM korrekt gewertet wird; Cookie
-            # bleibt aber NICHT secure, weil sonst HTTP-IP-Login bricht.
-            WIZ_HTTPS_PROXY="proxy-other"
-            WIZ_REVERSE_PROXY_HOST=$(wt_input "Hostname des Reverse-Proxy" \
-                "Unter welchem Hostname ist die App via Proxy erreichbar?\nWird in METERS_ALLOWED_ORIGINS eingetragen (CSRF-Schutz)." \
-                "${WIZ_REVERSE_PROXY_HOST:-zaehler.example.com}") || die "Abgebrochen."
-            ;;
-    esac
+    # Netzwerk-Setup wird im install-Wizard NICHT abgefragt. Default ist
+    # immer das maximal-funktionierende Setup (App per IP im LAN sofort
+    # erreichbar). Wer HTTPS-Härtung will, ruft nach dem Install
+    # `zaehler.sh configure-network` auf — interaktiv, fehlerfrei.
 
     # Admin-Daten — auch im Standard-Modus immer abfragen
     while :; do
@@ -290,12 +255,7 @@ install_wizard() {
     fi
 
     # Zusammenfassung + finale Bestätigung
-    local proxy_line
-    case "$WIZ_HTTPS_PROXY" in
-        yes)         proxy_line="Reverse-Proxy : gleicher Host, HTTPS via $WIZ_REVERSE_PROXY_HOST" ;;
-        proxy-other) proxy_line="Reverse-Proxy : anderer Host, HTTPS via $WIZ_REVERSE_PROXY_HOST, HTTP-IP-Zugriff bleibt erlaubt" ;;
-        *)           proxy_line="Reverse-Proxy : nein (HTTP, nur LAN)" ;;
-    esac
+    local proxy_line="Netzwerk      : App per IP im LAN (HTTP). HTTPS-Härtung mit 'zaehler.sh configure-network' nachträglich."
     if ! wt_yesno "Bereit zur Installation" "Folgende Konfiguration wird verwendet:
 
   Repository    : $WIZ_REPO_URL
@@ -354,37 +314,11 @@ cmd_install() {
 
     step "4/10  Konfiguration ($DATA_DIR/meters.env)"
     local env_file="$DATA_DIR/meters.env"
+    # Defaults: App per IP im LAN sofort erreichbar. Härtung via
+    # `zaehler.sh configure-network` (interaktiv) nach dem Install.
     local cookie_secure_value="False"
-    local trust_proxy_value="False"
+    local trust_proxy_value="True"
     local allowed_origins_value=""
-    case "$WIZ_HTTPS_PROXY" in
-        yes)
-            # Proxy auf gleichem Host → nur HTTPS-Pfad → Cookies secure.
-            cookie_secure_value="True"
-            trust_proxy_value="True"
-            [ -n "$WIZ_REVERSE_PROXY_HOST" ] && \
-                allowed_origins_value="https://$WIZ_REVERSE_PROXY_HOST"
-            ;;
-        proxy-other)
-            # Proxy auf anderem Host plus paralleler HTTP-LAN-Zugriff.
-            # Cookie KANN nicht secure sein, sonst bricht der HTTP-Login.
-            # Trust-Proxy ist sicher, weil unsere Origin-Check-Middleware
-            # zusätzlich den Origin gegen die Allow-List prüft.
-            cookie_secure_value="False"
-            trust_proxy_value="True"
-            if [ -n "$WIZ_REVERSE_PROXY_HOST" ]; then
-                # Beide Origins erlauben: HTTPS via Proxy + HTTP per Container-IP.
-                local container_ip
-                container_ip=$(hostname -I 2>/dev/null | awk '{print $1}')
-                allowed_origins_value="https://$WIZ_REVERSE_PROXY_HOST"
-                [ -n "$container_ip" ] && \
-                    allowed_origins_value="$allowed_origins_value,http://$container_ip:$WIZ_BIND_PORT"
-            fi
-            ;;
-        no|"")
-            # LAN-Only — schon initialisiert.
-            ;;
-    esac
     if [ ! -f "$env_file" ]; then
         install -m 0600 -o "$APP_USER" -g "$APP_USER" /dev/null "$env_file"
         local secret_key
@@ -807,6 +741,116 @@ cmd_status() {
 }
 
 # -----------------------------------------------------------------------------
+# configure-network — Topologie nachträglich umstellen ohne meters.env-Editieren
+# -----------------------------------------------------------------------------
+
+# Schreibt vier Schlüssel idempotent in meters.env: legt sie an, wenn sie
+# fehlen, ersetzt vorhandene Werte, lässt alles andere in Ruhe.
+_set_env_key() {
+    local file="$1" key="$2" value="$3"
+    if [ ! -f "$file" ]; then
+        die "meters.env nicht gefunden: $file"
+    fi
+    if grep -q "^${key}=" "$file"; then
+        # Sichere sed-Variante: | als Trennzeichen, weil Werte Slashes enthalten
+        local escaped
+        escaped=$(printf '%s' "$value" | sed -e 's/[\\&|]/\\&/g')
+        sed -i "s|^${key}=.*|${key}=${escaped}|" "$file"
+    else
+        printf '%s=%s\n' "$key" "$value" >> "$file"
+    fi
+}
+
+cmd_configure_network() {
+    require_root
+    local env_file="$DATA_DIR/meters.env"
+    [ -f "$env_file" ] || die "Konfiguration $env_file fehlt — bitte erst 'install' ausführen."
+
+    ensure_whiptail
+    local mode
+    mode=$(wt_menu "Netzwerk-Topologie" \
+        "Wie soll die App erreichbar sein?\n\nAlle drei Optionen schreiben die nötigen Werte direkt in meters.env und starten den Service neu — du musst keinen Editor öffnen." \
+        "lan-only"    "Nur direkt im LAN per IP (Standard, HTTP)" \
+        "proxy-other" "Plus HTTPS via Proxy auf anderem Host" \
+        "proxy-same"  "Strikt HTTPS via Proxy auf gleichem Host" \
+        "abort"       "Abbrechen") || die "Abgebrochen."
+    [ "$mode" = "abort" ] && die "Abgebrochen."
+
+    local container_ip
+    container_ip=$(hostname -I 2>/dev/null | awk '{print $1}')
+    local current_port
+    current_port=$(grep -E '^METERS_BIND_PORT=' "$env_file" | cut -d= -f2 | tr -d ' "')
+    [ -z "$current_port" ] && current_port=8000
+
+    local bind_host cookie_secure trust_proxy origins=""
+    case "$mode" in
+        lan-only)
+            bind_host="0.0.0.0"
+            cookie_secure="False"
+            trust_proxy="True"
+            origins=""
+            ;;
+        proxy-other)
+            local proxy_domain
+            proxy_domain=$(wt_input "Proxy-Domain" \
+                "Hostname/Domain, unter der die App via HTTPS-Proxy erreichbar ist:" \
+                "zaehler.lan") || die "Abgebrochen."
+            bind_host="0.0.0.0"
+            cookie_secure="False"
+            trust_proxy="True"
+            origins="https://$proxy_domain"
+            [ -n "$container_ip" ] && origins="$origins,http://$container_ip:$current_port"
+            ;;
+        proxy-same)
+            local proxy_domain
+            proxy_domain=$(wt_input "Proxy-Domain" \
+                "Hostname/Domain, unter der die App via HTTPS-Proxy erreichbar ist:" \
+                "zaehler.lan") || die "Abgebrochen."
+            bind_host="127.0.0.1"
+            cookie_secure="True"
+            trust_proxy="True"
+            origins="https://$proxy_domain"
+            ;;
+    esac
+
+    msg_run "meters.env aktualisieren"
+    _set_env_key "$env_file" "METERS_BIND_HOST" "$bind_host"
+    _set_env_key "$env_file" "METERS_COOKIE_SECURE" "$cookie_secure"
+    _set_env_key "$env_file" "METERS_TRUST_PROXY" "$trust_proxy"
+    _set_env_key "$env_file" "METERS_ALLOWED_ORIGINS" "$origins"
+    ok "BIND_HOST=$bind_host  COOKIE_SECURE=$cookie_secure  TRUST_PROXY=$trust_proxy"
+    [ -n "$origins" ] && ok "ALLOWED_ORIGINS=$origins"
+
+    msg_run "Service neu starten"
+    systemctl restart "$SERVICE_NAME"
+    sleep 2
+
+    msg_run "Erreichbarkeit testen"
+    local probe_host="$bind_host"
+    [ "$probe_host" = "0.0.0.0" ] && probe_host="$container_ip"
+    if curl -sS -o /dev/null -w "" --max-time 3 "http://$probe_host:$current_port/api/v1/health"; then
+        ok "App antwortet unter http://$probe_host:$current_port"
+    else
+        warn "App antwortet noch nicht unter http://$probe_host:$current_port — prüfe 'systemctl status $SERVICE_NAME'"
+    fi
+
+    if is_interactive; then
+        local url_lines=""
+        if [ -n "$container_ip" ]; then
+            url_lines="• Direkt-IP   :  http://$container_ip:$current_port"
+        fi
+        case "$mode" in
+            proxy-other|proxy-same)
+                local proxy_line
+                proxy_line=$(grep -oE 'https://[^,]+' <<<"$origins" | head -1)
+                url_lines="$url_lines\n• Reverse-Proxy:  $proxy_line"
+                ;;
+        esac
+        wt_msgbox "Netzwerk konfiguriert" "Topologie: $mode\n\n$url_lines\n\nMit 'sudo bash $0 status' kannst du jederzeit den Service- und Bind-Status prüfen." || true
+    fi
+}
+
+# -----------------------------------------------------------------------------
 # rollback — App auf einen früheren Tag/Commit umschalten und neu bauen
 # -----------------------------------------------------------------------------
 
@@ -959,7 +1003,11 @@ ${C_BOLD}zaehler.sh — Verwaltungsskript für die Zählerstand-App${C_RESET}
     reset-password       Passwort eines Users neu setzen (z. B. Admin
                          vergessen) — fragt User+Passwort interaktiv
 
-  ${C_BOLD}Sicherheit:${C_RESET}
+  ${C_BOLD}Netzwerk / Sicherheit:${C_RESET}
+    configure-network    Netzwerk-Topologie nachträglich umstellen
+                         (LAN-Only / HTTPS-Proxy auf anderem oder
+                         gleichem Host) — schreibt meters.env automatisch
+                         und startet den Service neu
     audit                Dependency-Audit (pnpm audit + pip-audit) —
                          meldet bekannte Schwachstellen in Front- und
                          Backend-Abhängigkeiten
@@ -1003,12 +1051,13 @@ case "${1:-help}" in
     upgrade-tools)   cmd_upgrade_tools ;;
     upgrade-app)     cmd_upgrade_app ;;
     upgrade-all)     cmd_upgrade_all ;;
-    backup)          cmd_backup ;;
-    restore)         cmd_restore "${2:-}" ;;
-    rollback)        cmd_rollback "${2:-}" ;;
-    reset-password)  cmd_reset_password ;;
-    audit)           cmd_audit ;;
-    status)          cmd_status ;;
+    backup)              cmd_backup ;;
+    restore)             cmd_restore "${2:-}" ;;
+    rollback)            cmd_rollback "${2:-}" ;;
+    reset-password)      cmd_reset_password ;;
+    configure-network)   cmd_configure_network ;;
+    audit)               cmd_audit ;;
+    status)              cmd_status ;;
     help|-h|--help)  cmd_help ;;
     *)
         warn "Unbekanntes Kommando: ${1}"

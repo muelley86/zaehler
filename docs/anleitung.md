@@ -493,60 +493,41 @@ sudo certbot --nginx -d zaehler.example.com
 sudo systemctl reload nginx
 ```
 
-### 5.3 App im Container auf Reverse-Proxy umstellen
+### 5.3 App im Container auf Reverse-Proxy umstellen — ohne Editor
 
-Im **Container** (per `pct enter <id>`):
+Du musst **nicht** mehr in `meters.env` rumeditieren. Im Container:
 
 ```bash
-sudo nano /opt/zaehler/data/meters.env
+sudo bash /opt/zaehler/repo/deploy/lxc/zaehler.sh configure-network
 ```
 
-**Zwei Topologien**, jeweils mit anderen Werten:
+Wizard fragt dich aus drei Topologien:
 
-#### Variante 1 — Reverse-Proxy auf demselben Host
+| Auswahl | Wann passt das |
+|---|---|
+| **Nur direkt im LAN per IP (Standard, HTTP)** | kein Reverse-Proxy, App ist nur im Heimnetz nötig |
+| **Plus HTTPS via Proxy auf anderem Host** | NPM/Caddy/nginx läuft in einem **anderen** Container/VM. App bleibt parallel per IP erreichbar |
+| **Strikt HTTPS via Proxy auf gleichem Host** | Caddy/nginx läuft direkt **neben** der App, keine HTTP-IP-Erreichbarkeit gewünscht |
 
-Strikt HTTPS, App ist nur lokal erreichbar:
+Bei den Proxy-Optionen fragt der Wizard nach der **Domain**, unter der
+die App via Proxy erreichbar ist. Er schreibt dann automatisch die
+richtigen vier Schlüssel in `meters.env` (`BIND_HOST`,
+`COOKIE_SECURE`, `TRUST_PROXY`, `ALLOWED_ORIGINS`), startet den Service
+neu und prüft, ob er antwortet.
 
-```ini
-METERS_BIND_HOST=127.0.0.1
-METERS_COOKIE_SECURE=True
-METERS_TRUST_PROXY=True
-METERS_ALLOWED_ORIGINS=https://zaehler.example.com
-```
-
-#### Variante 2 — Reverse-Proxy auf anderem Host (z. B. NPM-Container)
-
-NPM muss die App über die LAN-IP erreichen können, gleichzeitig willst
-du im Heimnetz weiter direkt per `http://<container-ip>:8000` zugreifen
-können:
-
-```ini
-METERS_BIND_HOST=0.0.0.0
-METERS_COOKIE_SECURE=False
-METERS_TRUST_PROXY=True
-METERS_ALLOWED_ORIGINS=https://zaehler.example.com,http://<container-ip>:8000
-```
-
-`COOKIE_SECURE=False` ist hier zwingend — sonst würde der HTTP-IP-Login
-keine Cookies mehr setzen können. Der CSRF-Schutz bleibt trotzdem aktiv
-über die Origin-Allow-List.
+**Was die Werte hinter den Kulissen bewirken** (nur zur Info — du
+musst sie nicht selbst setzen):
 
 | Schlüssel | Wirkung |
 |---|---|
-| `METERS_BIND_HOST` | `0.0.0.0` = im LAN erreichbar, `127.0.0.1` = nur lokal |
-| `METERS_COOKIE_SECURE` | `True` = Cookie nur über HTTPS, `False` = auch HTTP-Login OK |
-| `METERS_TRUST_PROXY` | `True` = X-Forwarded-For-Header vom Proxy wird gewertet (richtige Client-IP im Audit-Log) |
-| `METERS_ALLOWED_ORIGINS` | Komma-getrennte Liste der erlaubten Origins für POST/PATCH/DELETE |
+| `METERS_BIND_HOST` | `0.0.0.0` = im LAN erreichbar, `127.0.0.1` = nur lokal hinter Proxy |
+| `METERS_COOKIE_SECURE` | `True` = Cookie nur über HTTPS (= reines HTTPS-Setup), `False` = auch HTTP-Login OK |
+| `METERS_TRUST_PROXY` | `True` = X-Forwarded-For-Header vom Proxy wird gewertet (echte Client-IP im Audit-Log) |
+| `METERS_ALLOWED_ORIGINS` | Komma-getrennte Liste der erlaubten Origins für POST/PATCH/DELETE — verhindert CSRF |
 
-Service neu starten:
-
-```bash
-sudo systemctl restart zaehler.service
-```
-
-> Tipp: Beim `install`-Wizard kannst du im Schritt "Netzwerk-Topologie"
-> direkt zwischen den beiden Varianten wählen — dann werden diese Werte
-> automatisch korrekt eingetragen.
+Wenn du die Topologie ändern willst (z. B. später doch nur HTTPS),
+ruf einfach erneut `configure-network` auf — der Wizard ist
+idempotent und überschreibt die Werte sauber.
 
 ### 5.4 Verifizieren
 

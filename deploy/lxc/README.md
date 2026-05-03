@@ -88,6 +88,29 @@ mit deinem Admin-User → Force-Change-Dialog → neues Passwort setzen → fert
 
 ## 4. (Optional) Reverse-Proxy mit HTTPS
 
+Zur Erinnerung: nach dem Install ist die App **immer** per
+`http://<container-ip>:8000` im LAN erreichbar. Der nachfolgende
+Abschnitt beschreibt nur die optionale HTTPS-Härtung.
+
+**Im Container** stellst du die Topologie geführt um — kein manuelles
+Editieren von `meters.env`:
+
+```bash
+sudo bash /opt/zaehler/repo/deploy/lxc/zaehler.sh configure-network
+```
+
+Drei Optionen im Menü:
+
+- **Nur direkt im LAN per IP** (HTTP, Standard)
+- **Plus HTTPS via Proxy auf anderem Host** (NPM in eigenem Container,
+  separates nginx etc. — App bleibt parallel per IP erreichbar)
+- **Strikt HTTPS via Proxy auf gleichem Host** (Caddy/nginx neben der
+  App, keine HTTP-IP-Erreichbarkeit)
+
+Der Wizard fragt bei den Proxy-Optionen nach der Domain, schreibt
+`meters.env`, startet den Service neu und verifiziert die
+Erreichbarkeit.
+
 Solange die App nur im Heimnetz läuft, ist Schritt 4 ausreichend. Sobald du
 sie per Domainname und HTTPS bereitstellen willst, schalte einen Reverse-Proxy
 auf dem Host davor (Caddy ist am einfachsten):

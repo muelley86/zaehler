@@ -84,10 +84,17 @@ sudo bash /opt/zaehler/repo/deploy/lxc/zaehler.sh upgrade-all
 ```
 
 Granulare Kommandos: `upgrade-system`, `upgrade-tools`, `upgrade-app`,
-`backup`, `restore`, `rollback`, `reset-password`, `audit`, `status`,
-`help`. App-Updates legen automatisch ein DB-Backup an.
-`data/meters.db` wird durch das Skript **niemals** verändert oder
+`backup`, `restore`, `rollback`, `reset-password`, `configure-network`,
+`audit`, `status`, `help`. App-Updates legen automatisch ein DB-Backup
+an. `data/meters.db` wird durch das Skript **niemals** verändert oder
 überschrieben.
+
+Nach dem Install ist die App **immer** per `http://<container-ip>:8000`
+direkt im LAN erreichbar — kein manuelles Editieren von `meters.env`
+nötig. Wer HTTPS via Reverse-Proxy nachschalten will, ruft danach
+`zaehler.sh configure-network` auf — geführter Wizard, drei Topologien
+(LAN-only / Proxy auf anderem Host / Proxy auf gleichem Host), schreibt
+alle nötigen Werte automatisch.
 
 ## Backup & Wiederherstellen
 
