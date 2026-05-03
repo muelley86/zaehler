@@ -167,14 +167,153 @@ sudo bash /opt/zaehler/repo/deploy/lxc/zaehler.sh help
 
 ---
 
-## Backup wiederherstellen
+## Backups verstehen und einspielen
+
+Die App produziert in `/opt/zaehler/data/meters.db` ihre einzige
+relevante Datei. Sie enthält **alles**: Messstellen, Erfassungen,
+Lieferungen, Benutzer, Sessions, 2FA-Secrets, Audit-Log.
+
+### Was wird gesichert (und was nicht)
+
+- **Gesichert** (automatisch): nur `meters.db`. Snapshots werden mit
+  SQLites Online-`.backup` erzeugt — der Service läuft währenddessen
+  weiter, kein Lock.
+- **Nicht** gesichert: `meters.env` mit dem Server-Secret-Key. Den
+  einmalig nach dem `install` separat sichern. Bei Verlust generiert
+  ein neuer Wizard zwar einen neuen Secret-Key, aber dann sind alle
+  bestehenden Sessions ungültig (User müssen neu anmelden) und
+  TOTP-Hashes funktionieren nicht mehr — User müssen 2FA neu einrichten.
+- **Nicht** gesichert: das Repo selbst (liegt in Git auf GitHub) und
+  das gebaute Frontend (wird beim `upgrade-app` neu erzeugt).
+
+### Wann läuft ein Backup
+
+| Auslöser | Wann |
+|---|---|
+| systemd-Timer `zaehler-backup.timer` | täglich, Default 03:30 (Wizard fragt beim Erstinstall) |
+| Vor jedem `upgrade-app` | automatisch im Skript-Schritt 1/6 |
+| Vor jedem `rollback` | automatisch im Skript-Schritt 1/6 |
+| Manuell jederzeit | `sudo bash zaehler.sh backup` |
+
+Wann die täglichen Snapshots wirklich liefen:
 
 ```bash
-sudo bash /opt/zaehler/repo/deploy/lxc/zaehler.sh restore /opt/zaehler/backups/meters-YYYYMMDD-HHMMSS.db.gz
+sudo systemctl status zaehler-backup.timer
+sudo systemctl list-timers --all | grep zaehler
 ```
 
-Das Skript stoppt den Service, sichert die aktuelle DB beiseite, spielt das
-Backup ein und startet den Service neu.
+### Wo liegen sie
+
+```
+/opt/zaehler/backups/
+├── meters-20260501-033000.db.gz
+├── meters-20260502-033000.db.gz
+└── meters-20260503-033000.db.gz
+```
+
+Permissions `0700` (nur User `zaehler` liest mit). Retention: die
+**30 jüngsten** werden behalten, ältere werden im nächsten Backup-Lauf
+gelöscht. Anders: `KEEP=14 sudo bash zaehler.sh backup` z. B.
+
+### Backup manuell ziehen
+
+```bash
+sudo bash /opt/zaehler/repo/deploy/lxc/zaehler.sh backup
+```
+
+Ausgabe nennt den Pfad: `Backup erstellt: /opt/zaehler/backups/meters-….db.gz`.
+
+### Inhalt eines Backups inspizieren (ohne zu ersetzen)
+
+```bash
+gunzip -c /opt/zaehler/backups/meters-20260502-033000.db.gz > /tmp/check.db
+sqlite3 /tmp/check.db 'SELECT COUNT(*) FROM reading;'
+sqlite3 /tmp/check.db 'SELECT version_num FROM alembic_version;'
+rm /tmp/check.db
+```
+
+Die zweite Zeile ist wichtig vor einem `rollback`: Ist die Migration im
+Backup älter als der Code, auf den du rollen willst, dann kommt es
+nicht hin — entweder ein anderes Backup wählen oder die App auf eine
+ältere Code-Version mitnehmen.
+
+### Backup auf andere Maschine ziehen
+
+Vom Proxmox-**Host** aus, ohne den Container zu betreten:
+
+```bash
+pct pull <ct-id> /opt/zaehler/backups/meters-20260503-033000.db.gz \
+  ~/Downloads/meters-snapshot.db.gz
+```
+
+Per SSH/SCP, falls du SSH im Container hast:
+
+```bash
+scp root@<container-ip>:/opt/zaehler/backups/meters-20260503-033000.db.gz \
+  ~/Downloads/
+```
+
+### Backups einspielen (Restore)
+
+```bash
+sudo bash /opt/zaehler/repo/deploy/lxc/zaehler.sh restore \
+  /opt/zaehler/backups/meters-YYYYMMDD-HHMMSS.db.gz
+```
+
+Was passiert:
+
+1. Service wird gestoppt (`systemctl stop zaehler.service`).
+2. Die aktuelle DB wird **nicht überschrieben**, sondern zur Seite
+   gelegt als `meters.db.broken-<datum>`. WAL-Hilfsdateien werden
+   entfernt.
+3. Das Backup wird mit `gunzip` entpackt, Owner auf `zaehler:zaehler`
+   gesetzt.
+4. Service wird gestartet, 2 Sekunden später geprüft, ob er läuft.
+
+Schlägt der Start fehl, blockt das Skript — du kannst die alte DB
+zurückschieben:
+
+```bash
+sudo systemctl stop zaehler.service
+sudo mv /opt/zaehler/data/meters.db.broken-<datum> /opt/zaehler/data/meters.db
+sudo systemctl start zaehler.service
+```
+
+### Empfehlung: zusätzliche Off-Site-Sicherung
+
+Lokale Backups schützen vor Software-Fehlern, **nicht** vor
+Hardware-Defekt am Container-Storage oder versehentlichem
+`pct destroy`. Cron-Job auf dem Proxmox-**Host**, der täglich das
+jüngste Backup auf eine separate Platte/NAS zieht:
+
+```bash
+# /etc/cron.daily/zaehler-offsite (chmod +x)
+#!/bin/bash
+set -e
+CT_ID=200                          # ← deine Container-ID
+DEST=/var/backups/zaehler          # ← Pfad auf NAS / externer Disk
+mkdir -p "$DEST"
+LATEST=$(pct exec "$CT_ID" -- ls -1t /opt/zaehler/backups | head -1)
+pct pull "$CT_ID" "/opt/zaehler/backups/$LATEST" \
+  "$DEST/$(date +%Y%m%d)-$LATEST"
+find "$DEST" -name '*.db.gz' -mtime +90 -delete
+```
+
+Damit hast du täglich eine Kopie außerhalb des Containers, mit
+90 Tagen Retention.
+
+### Komplette Recovery (Container weg)
+
+1. Backup-Datei (`*.db.gz`) und `meters.env` extern verfügbar haben.
+2. Neuen Container anlegen (Bootstrap-Einzeiler), Wizard durchklicken.
+3. Service stoppen: `sudo systemctl stop zaehler.service`.
+4. `meters.env` zurückkopieren nach `/opt/zaehler/data/meters.env`
+   (Owner `zaehler:zaehler`, Permissions `0600`).
+5. `sudo bash zaehler.sh restore <pfad>/meters-<datum>.db.gz`.
+
+App-User können sich mit ihren bisherigen Passwörtern und 2FA-Codes
+anmelden, weil der Secret-Key in `meters.env` und die User-Daten in
+`meters.db` zueinander passen.
 
 ---
 

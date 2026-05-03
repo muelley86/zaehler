@@ -84,9 +84,56 @@ sudo bash /opt/zaehler/repo/deploy/lxc/zaehler.sh upgrade-all
 ```
 
 Granulare Kommandos: `upgrade-system`, `upgrade-tools`, `upgrade-app`,
-`backup`, `restore`, `status`, `help`. App-Updates legen automatisch ein
-DB-Backup an. `data/meters.db` wird durch das Skript **niemals** verändert
-oder überschrieben.
+`backup`, `restore`, `rollback`, `reset-password`, `audit`, `status`,
+`help`. App-Updates legen automatisch ein DB-Backup an.
+`data/meters.db` wird durch das Skript **niemals** verändert oder
+überschrieben.
+
+## Backup & Wiederherstellen
+
+Gesichert wird die SQLite-Datenbank `/opt/zaehler/data/meters.db` —
+sie enthält Messstellen, Erfassungen, Lieferungen, Benutzer, Sessions,
+2FA-Secrets und Audit-Log. Die Konfigurationsdatei `meters.env` mit
+dem Server-Secret-Key musst du **separat einmalig** sichern (z. B. nach
+dem `install`-Wizard).
+
+**Wann ein Backup entsteht:**
+
+| Auslöser | Wann |
+|---|---|
+| systemd-Timer `zaehler-backup.timer` | täglich um die im Wizard gewählte Uhrzeit (Default 03:30) |
+| Vor jedem `upgrade-app` / `rollback` | automatisch — Sicherheitsnetz vor Code-Änderungen |
+| Manuell | `sudo bash /opt/zaehler/repo/deploy/lxc/zaehler.sh backup` |
+
+Snapshots laufen über SQLites Online-`.backup`-Befehl — kein
+Service-Stopp, kein Lock. Anschließend `gzip`. Ablage in
+`/opt/zaehler/backups/` mit `0700`-Permissions; Retention: die jüngsten
+30, ältere werden automatisch gelöscht (`KEEP=30`-ENV im
+`backup.sh` änderbar).
+
+**Wiederherstellen:**
+
+```sh
+sudo bash /opt/zaehler/repo/deploy/lxc/zaehler.sh restore \
+  /opt/zaehler/backups/meters-YYYYMMDD-HHMMSS.db.gz
+```
+
+Das Skript stoppt den Service, schiebt die aktuelle DB als
+`meters.db.broken-<datum>` beiseite (geht nicht verloren), entpackt
+das Backup, startet den Service. Hängt der nach 2 Sekunden noch nicht
+oder crasht, blockt das Skript — die alte DB liegt unangetastet daneben
+und kann zurückgeschoben werden.
+
+**Externe Sicherung** (lokale Backups schützen nicht vor
+Storage-Defekt). Auf dem Proxmox-Host:
+
+```sh
+pct pull <id> /opt/zaehler/backups/<datei>.db.gz \
+  /var/backups/zaehler/<datei>.db.gz
+```
+
+Cron-Beispiel und vollständige Anleitung: `docs/anleitung.md` Teil 4
+und `deploy/lxc/README.md` "Backups verstehen und einspielen".
 
 ## Tests, Lint, Typcheck
 
