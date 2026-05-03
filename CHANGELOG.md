@@ -10,6 +10,32 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.0.0](https://github.com/muelley86/zaehler/compare/v1.0.0...v2.0.0) (2026-05-03)
+
+
+### ⚠ BREAKING CHANGES
+
+* **install:** Bestehende Installs mit METERS_BIND_HOST=127.0.0.1 laufen unverändert (configure-network ist opt-in). Wer das aktuelle Wizard-Verhalten "Proxy automatisch konfigurieren" wollte, ruft jetzt nach 'install' einmal 'configure-network' auf.
+
+### Funktionen
+
+* **install:** Reverse-Proxy-Domain optional im Wizard, IP-Zugriff garantiert ([db36842](https://github.com/muelley86/zaehler/commit/db3684219493ebc75a6c4ce6e4ec641cf311ad73))
+
+
+### Fehlerbehebungen
+
+* **config:** METERS_ALLOWED_ORIGINS akzeptiert comma-separierte Strings ([ab26bbb](https://github.com/muelley86/zaehler/commit/ab26bbb8a2a2a876eebcc2e8403635fde8a1782f))
+* **frontend:** Auth-Hook in eigene Datei + flächige prettier-Formatierung ([de06ef2](https://github.com/muelley86/zaehler/commit/de06ef2dd9789801d9f928e1717e5cdbe4c61f97))
+* **install:** UTF-8 erzwingen vor Locale-Setup ([4af2f60](https://github.com/muelley86/zaehler/commit/4af2f607ea47ec8dd030706526ab91db5da70035))
+* **install:** Wizard immer LAN-default + neues 'configure-network'-Kommando ([e34d8a7](https://github.com/muelley86/zaehler/commit/e34d8a79e852546ab37714e8c209ab994bfdfaa0))
+* **install:** Wizard mit drei Topologien + Repo-URL-Default + NGINX/NPM-Doku ([e8dad47](https://github.com/muelley86/zaehler/commit/e8dad47e3818eb130ba7edc108810d4ac43a8ec9))
+
+
+### Dokumentation
+
+* Backup-Dokumentation in beiden README-Dateien ausgebaut ([b28c0d5](https://github.com/muelley86/zaehler/commit/b28c0d58ae4294489b3a4f8c7f82235dba7599c5))
+* MFA-Querverweise — Wizard-Hinweis, Login-Trouble, Recovery, Backup-Schutz ([91e3fad](https://github.com/muelley86/zaehler/commit/91e3fadfe7ecb0ef890ee7266d63f3ba888c3c69))
+
 ## [1.0.0] – 2026-05-03
 
 ### Funktionen
