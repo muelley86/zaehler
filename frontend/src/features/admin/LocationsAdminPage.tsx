@@ -339,18 +339,15 @@ function MapPicker({
   const [lat, setLat] = useState(initialLatitude);
   const [lng, setLng] = useState(initialLongitude);
 
-  // Karten-Höhe ist viewport-abhängig, damit Übernehmen-Button auch auf
-  // iPhone (Sheet ≤ 90vh) immer sichtbar bleibt. Buttons sind sticky am
-  // Sheet-Boden, damit sie nicht aus der Scroll-Area fallen.
+  // Kompakter Layout — alles passt auf einen iPhone-Viewport ≤ 90vh ohne
+  // Scrollen, Buttons sind unten nach der Karte normal sichtbar.
   return (
-    <div className="flex flex-col gap-3">
-      <div className="text-caption text-tertiary">
-        Klicke auf die Karte oder ziehe den Pin, um die Position zu setzen.
-      </div>
+    <div className="space-y-3">
+      <div className="text-caption text-tertiary">Klicke auf die Karte oder ziehe den Pin.</div>
       <LocationMap
         latitude={lat}
         longitude={lng}
-        height={280}
+        height={220}
         interactive
         onChange={(la, ln) => {
           setLat(la);
@@ -362,12 +359,12 @@ function MapPicker({
         <span>·</span>
         <span>{lng.toFixed(6)}</span>
       </div>
-      <div className="sticky bottom-0 -mx-5 -mb-5 flex gap-2 border-t-hairline border-border bg-surface-high px-5 py-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)]">
+      <div className="flex gap-2 pt-2">
         <Button type="button" variant="bordered" onClick={onCancel} fullWidth>
           Abbrechen
         </Button>
         <Button type="button" variant="filled" onClick={() => onConfirm(lat, lng)} fullWidth>
-          Übernehmen
+          Position übernehmen
         </Button>
       </div>
     </div>
