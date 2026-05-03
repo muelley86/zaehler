@@ -12,11 +12,31 @@ from __future__ import annotations
 import argparse
 import sys
 
-from sqlalchemy import select
+from sqlalchemy import inspect, select
 
 from meters.core.security import hash_password
-from meters.db import Base, SessionLocal, engine
+from meters.db import SessionLocal, engine
 from meters.models import User, UserRole
+
+
+def _ensure_schema_initialized() -> None:
+    """Bricht ab, wenn die Datenbank nicht via alembic initialisiert wurde.
+
+    Früher rief diese CLI ``Base.metadata.create_all(engine)`` auf — das
+    erzeugt aber Tabellen am Migrations-Tracking vorbei und führt langfristig
+    zu einer inkonsistenten DB (kein ``alembic_version``, fehlende Spalten
+    aus späteren Migrationen). Stattdessen verlangen wir jetzt einen
+    sauberen ``alembic upgrade head``-Lauf vor dem ersten Admin-Anlegen.
+    """
+    inspector = inspect(engine)
+    tables = set(inspector.get_table_names())
+    if "user" not in tables or "alembic_version" not in tables:
+        print(
+            "Datenbank ist nicht migriert. Bitte zuerst ausführen:\n"
+            "  cd backend && uv run alembic upgrade head\n",
+            file=sys.stderr,
+        )
+        raise SystemExit(3)
 
 
 def _cmd_create_admin(args: argparse.Namespace) -> int:
@@ -24,7 +44,7 @@ def _cmd_create_admin(args: argparse.Namespace) -> int:
         print("Passwort muss mindestens 12 Zeichen haben.", file=sys.stderr)
         return 2
 
-    Base.metadata.create_all(engine)
+    _ensure_schema_initialized()
     with SessionLocal() as db:
         existing = db.scalar(select(User).where(User.username == args.username))
         if existing is not None:
@@ -50,6 +70,7 @@ def _cmd_reset_password(args: argparse.Namespace) -> int:
         print("Passwort muss mindestens 12 Zeichen haben.", file=sys.stderr)
         return 2
 
+    _ensure_schema_initialized()
     with SessionLocal() as db:
         user = db.scalar(select(User).where(User.username == args.username))
         if user is None:
