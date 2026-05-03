@@ -23,6 +23,12 @@
 
 set -euo pipefail
 
+# UTF-8 erzwingen, damit Box-Banner, Em-Dashes und whiptail-Bullets korrekt
+# angezeigt werden — auch im frischen Container vor Locale-Setup. C.UTF-8
+# ist auf Debian/Ubuntu immer verfügbar (kein 'locales'-Paket nötig).
+export LANG=C.UTF-8
+export LC_ALL=C.UTF-8
+
 # -----------------------------------------------------------------------------
 # Konfiguration (per Umgebungsvariable überschreibbar)
 # -----------------------------------------------------------------------------

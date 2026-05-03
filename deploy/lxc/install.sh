@@ -20,6 +20,12 @@
 
 set -euo pipefail
 
+# UTF-8 erzwingen, bevor die de_DE.UTF-8-Locale (Schritt 2/10 von install)
+# installiert ist — sonst werden Box-Drawing-Chars im Banner als `<80><94>`
+# angezeigt. C.UTF-8 ist auf Debian/Ubuntu immer verfügbar.
+export LANG=C.UTF-8
+export LC_ALL=C.UTF-8
+
 REPO_URL="${REPO_URL:-https://github.com/muelley86/zaehler.git}"
 APP_USER="${APP_USER:-zaehler}"
 APP_DIR="${APP_DIR:-/opt/zaehler}"
