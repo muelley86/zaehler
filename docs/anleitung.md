@@ -557,37 +557,66 @@ Ein **Tag** ist ein menschen-lesbarer Name für einen Commit, den du als
 "funktionierende Version" markierst. Im Notfall kannst du jederzeit auf
 einen alten Tag zurückkehren.
 
-### 7.1 Eine Version markieren (Tag)
+### 7.1 Wie das Repo automatisch versioniert (release-please)
 
-Auf deinem **PC** im Projektordner:
+Du musst Tags **nicht mehr selbst** setzen. Bei jedem Push auf `main`
+läuft die GitHub-Action `release-please` und liest deine
+Commit-Nachrichten:
+
+| Commit-Präfix | Wirkung |
+|---|---|
+| `feat:` | Minor-Bump (z. B. 1.0.0 → 1.1.0) |
+| `fix:` | Patch-Bump (z. B. 1.0.0 → 1.0.1) |
+| `feat!:` oder Footer `BREAKING CHANGE:` | Major-Bump (1.0.0 → 2.0.0) |
+| `chore:` / `docs:` / `refactor:` | kein Bump, aber im Changelog gelistet |
+
+Der Workflow läuft so ab:
+
+1. Du pushst Commits mit Conventional-Commits-Präfixen.
+2. release-please öffnet auf GitHub einen **Release-PR** mit Titel
+   `chore(main): release x.y.z` und aktualisiertem `CHANGELOG.md` +
+   `.release-please-manifest.json`.
+3. Der PR sammelt weitere Commits automatisch — solange du ihn nicht
+   mergst, wächst er mit.
+4. Wenn du released-bereit bist: PR auf GitHub mergen.
+5. release-please pusht den Tag (`v1.1.0`), legt das **GitHub-Release**
+   mit Changelog-Auszug und ZIP-Download an, fertig.
+
+So bekommst du **keinen Tag pro Push**, sondern ein sauber gebündeltes
+Release wenn du es willst — und das `CHANGELOG.md` schreibt sich selbst.
+
+### 7.2 Manuell taggen (Notfall-Bypass)
+
+Wenn release-please mal hängt (Action down, Token-Problem) oder du
+einen Hotfix-Tag außer der Reihe brauchst:
 
 ```bash
-git pull --tags                          # alle existierenden Tags holen
-git tag -a v1.0.0 -m "Erste stabile Version: 2FA + HTTPS-Setup komplett"
-git push origin v1.0.0                   # Tag auf GitHub hochladen
+git pull --tags
+git tag -a v1.0.1 -m "hotfix: …"
+git push origin v1.0.1
 ```
 
-`-a` macht einen "annotated tag" — mit Autor, Datum und Nachricht. Auf
-GitHub erscheint der Tag unter
-`https://github.com/muelley86/zaehler/tags` und kann auch als **Release**
-mit Changelog/ZIP-Download veröffentlicht werden:
+`-a` macht einen "annotated tag" — mit Autor, Datum und Nachricht.
+Anschließend manuell `CHANGELOG.md` ergänzen (oben unter dem
+`## [Unreleased]`-Block).
 
-GitHub → dein Repo → **Releases** → **Draft a new release** → Tag wählen
-→ Beschreibung schreiben → **Publish release**.
-
-### 7.2 Versionsschema (Empfehlung)
+### 7.3 Versionsschema
 
 [Semantic Versioning](https://semver.org/):
 
 | Beispiel | Wann erhöhen |
 |---|---|
-| `v1.0.0` → `v1.0.1` | Bugfix, kein Verhaltensunterschied |
-| `v1.0.1` → `v1.1.0` | Neue Funktion, abwärtskompatibel |
-| `v1.1.0` → `v2.0.0` | Inkompatible Änderung (DB-Migration mit Datenverlust, geänderte API) |
+| `v1.0.0` → `v1.0.1` | Bugfix (`fix:`-Commits seit letztem Release) |
+| `v1.0.1` → `v1.1.0` | Neue Funktion (`feat:`-Commits, abwärtskompatibel) |
+| `v1.1.0` → `v2.0.0` | Inkompatible Änderung (`feat!:` oder `BREAKING CHANGE`-Footer) |
 
 Vor 1.0.0 darf alles "Beta" sein — Tags wie `v0.1.0`, `v0.2.0`, etc.
 
-### 7.3 Welche Tags gibt es?
+> **Wichtig**: damit release-please korrekt funktioniert, **müssen** alle
+> Commit-Messages dem Conventional-Commits-Format folgen. Das war ohnehin
+> die Konvention im Projekt (siehe Teil 2.4).
+
+### 7.4 Welche Tags / Releases gibt es?
 
 ```bash
 git tag                          # lokal
@@ -596,7 +625,7 @@ git ls-remote --tags origin      # auf GitHub
 
 Auf GitHub: **Code → Branches/Tags-Dropdown → Tags-Tab**.
 
-### 7.4 Im Notfall zurück: Container auf alte Version
+### 7.5 Im Notfall zurück: Container auf alte Version
 
 Im **Container**:
 
@@ -630,7 +659,7 @@ Was passiert:
 > `<revision>` ist die ID der gewünschten älteren Migration (siehe
 > `backend/alembic/versions/`-Verzeichnis im Repo).
 
-### 7.5 Zurück zum aktuellen Stand
+### 7.6 Zurück zum aktuellen Stand
 
 Nach erfolgreichem Test der alten Version oder nach behobenem Problem:
 
@@ -640,7 +669,7 @@ sudo bash /opt/zaehler/repo/deploy/lxc/zaehler.sh upgrade-app
 
 bringt den Container wieder auf den Stand von `main`.
 
-### 7.6 Lokal auf einen alten Tag schauen
+### 7.7 Lokal auf einen alten Tag schauen
 
 Auf deinem **PC**, ohne den main-Branch zu verlieren:
 
@@ -654,16 +683,24 @@ git checkout main        # zurück auf den aktuellen Branch
 > normal und nicht gefährlich, solange du danach wieder auf einen Branch
 > wechselst.
 
-### 7.7 Wann taggen?
+### 7.8 Wann release-please mergen?
 
+Der Release-PR aktualisiert sich bei jedem weiteren Push automatisch —
+du musst ihn nur dann mergen, wenn du **wirklich** ein Release willst.
 Sinnvolle Trigger:
 
-- **Vor jeder größeren Änderung**: `v0.4.0` als "Stand vor Refactor X".
-- **Nach jeder erfolgreich getesteten Version**: `v1.0.0`.
-- **Vor einer Migration**, die Datenmodell-Felder verändert.
-- **Vor dem Update auf eine neue Major-Library** (FastAPI, React, …).
+- **Nach einem in sich geschlossenen Feature** (mehrere `feat:`-Commits,
+  alle getestet).
+- **Nach einem Bündel Bugfixes**, die zusammen ausgespielt werden sollen.
+- **Vor einer riskanten Änderung** — eine letzte stabile Version, auf
+  die du via `rollback` zurückkannst.
 
-So hast du in der Not immer einen Punkt, auf den du zurückkannst.
+Nicht so dringend mergen bei reinen `chore:`/`docs:`/`refactor:`-
+Commits — die ändern keine Versionsnummer, sondern nur den Changelog.
+
+Solange der Release-PR offen ist, kannst du dir den Diff anschauen
+(GitHub → Pull-Requests → "chore(main): release …") — und siehst auf
+einen Blick alles, was seit dem letzten Release passiert ist.
 
 ---
 

@@ -1,0 +1,27 @@
+name: release-please
+
+# Sammelt Conventional-Commits seit dem letzten Release und legt einen
+# Release-PR an. Wird der gemerged, schreibt release-please den Tag und
+# das GitHub-Release. Versionen werden automatisch nach Semantic
+# Versioning bestimmt:
+#   feat:           → Minor-Bump (1.0.0 → 1.1.0)
+#   fix:            → Patch-Bump (1.0.0 → 1.0.1)
+#   feat!: / BREAKING CHANGE → Major-Bump (1.0.0 → 2.0.0)
+#   chore: / docs: / refactor: → kein Bump, aber im Changelog gelistet
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: googleapis/release-please-action@v4
+        with:
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
