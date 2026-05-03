@@ -11,7 +11,9 @@ def test_login_sets_cookie(client: TestClient, admin_user: User) -> None:
         json={"username": "admin", "password": "admin-pass-12345"},
     )
     assert resp.status_code == 200
-    assert resp.json()["username"] == "admin"
+    body = resp.json()
+    assert body["requires_2fa"] is False
+    assert body["me"]["username"] == "admin"
     assert "meters_session" in resp.cookies
 
 
@@ -66,3 +68,104 @@ def test_change_password(admin_client: TestClient) -> None:
         json={"username": "admin", "password": "neues-passwort-1234"},
     )
     assert relogin.status_code == 200
+
+
+def test_2fa_setup_activate_and_login_flow(admin_client: TestClient) -> None:
+    import pyotp
+
+    setup = admin_client.post("/api/v1/auth/2fa/setup")
+    assert setup.status_code == 200
+    secret = setup.json()["secret"]
+    assert len(secret) >= 16
+
+    bad = admin_client.post("/api/v1/auth/2fa/activate", json={"code": "000000"})
+    assert bad.status_code == 400
+
+    valid_code = pyotp.TOTP(secret).now()
+    activated = admin_client.post("/api/v1/auth/2fa/activate", json={"code": valid_code})
+    assert activated.status_code == 200
+    backup_codes = activated.json()["backup_codes"]
+    assert len(backup_codes) == 10
+
+    status = admin_client.get("/api/v1/auth/2fa/status")
+    assert status.status_code == 200
+    assert status.json()["enabled"] is True
+    assert status.json()["backup_codes_remaining"] == 10
+
+    # Login Step 1: Username/Passwort → fordert 2FA
+    fresh = TestClient(admin_client.app)
+    step1 = fresh.post(
+        "/api/v1/auth/login",
+        json={"username": "admin", "password": "admin-pass-12345"},
+    )
+    assert step1.status_code == 200
+    body = step1.json()
+    assert body["requires_2fa"] is True
+    assert body["me"] is None
+    challenge = body["challenge_token"]
+    assert "meters_session" not in fresh.cookies
+
+    # Login Step 2: TOTP-Code
+    step2 = fresh.post(
+        "/api/v1/auth/2fa/verify",
+        json={"challenge_token": challenge, "code": pyotp.TOTP(secret).now()},
+    )
+    assert step2.status_code == 200
+    assert step2.json()["username"] == "admin"
+    assert "meters_session" in fresh.cookies
+
+    # Backup-Code-Login funktioniert
+    fresh2 = TestClient(admin_client.app)
+    s1 = fresh2.post(
+        "/api/v1/auth/login",
+        json={"username": "admin", "password": "admin-pass-12345"},
+    )
+    s2 = fresh2.post(
+        "/api/v1/auth/2fa/verify",
+        json={"challenge_token": s1.json()["challenge_token"], "code": backup_codes[0]},
+    )
+    assert s2.status_code == 200
+    # Verbrauchter Code geht nicht zweimal
+    fresh3 = TestClient(admin_client.app)
+    s3 = fresh3.post(
+        "/api/v1/auth/login",
+        json={"username": "admin", "password": "admin-pass-12345"},
+    )
+    s4 = fresh3.post(
+        "/api/v1/auth/2fa/verify",
+        json={"challenge_token": s3.json()["challenge_token"], "code": backup_codes[0]},
+    )
+    assert s4.status_code == 401
+
+
+def test_2fa_disable_requires_password_and_code(admin_client: TestClient) -> None:
+    import pyotp
+
+    setup = admin_client.post("/api/v1/auth/2fa/setup")
+    secret = setup.json()["secret"]
+    admin_client.post(
+        "/api/v1/auth/2fa/activate",
+        json={"code": pyotp.TOTP(secret).now()},
+    )
+
+    bad_pw = admin_client.post(
+        "/api/v1/auth/2fa/disable",
+        json={"current_password": "wrong-pw-1234", "code": pyotp.TOTP(secret).now()},
+    )
+    assert bad_pw.status_code == 400
+
+    no_code = admin_client.post(
+        "/api/v1/auth/2fa/disable",
+        json={"current_password": "admin-pass-12345"},
+    )
+    assert no_code.status_code == 400
+
+    ok = admin_client.post(
+        "/api/v1/auth/2fa/disable",
+        json={
+            "current_password": "admin-pass-12345",
+            "code": pyotp.TOTP(secret).now(),
+        },
+    )
+    assert ok.status_code == 200
+    assert ok.json()["totp_enabled"] is False

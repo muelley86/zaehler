@@ -8,7 +8,29 @@ export interface Me {
   role: UserRole;
   is_active: boolean;
   force_password_change: boolean;
+  totp_enabled: boolean;
   last_login_at: string | null;
+}
+
+export interface LoginResponse {
+  requires_2fa: boolean;
+  me: Me | null;
+  challenge_token: string | null;
+}
+
+export interface TotpSetupResponse {
+  secret: string;
+  provisioning_uri: string;
+  qr_png_base64: string;
+}
+
+export interface TotpStatusResponse {
+  enabled: boolean;
+  backup_codes_remaining: number;
+}
+
+export interface BackupCodesResponse {
+  backup_codes: string[];
 }
 
 export interface UserRead extends Me {

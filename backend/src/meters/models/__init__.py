@@ -7,6 +7,7 @@ from meters.models._enums import (
     UserRole,
 )
 from meters.models.audit_log import AuditLog
+from meters.models.backup_code import BackupCode, PendingTotpChallenge
 from meters.models.delivery import Delivery
 from meters.models.location import Location
 from meters.models.measuring_point import MeasuringPoint
@@ -20,10 +21,12 @@ __all__ = [
     "AuditAction",
     "AuditEntityType",
     "AuditLog",
+    "BackupCode",
     "Delivery",
     "Location",
     "MeasuringPoint",
     "MeterType",
+    "PendingTotpChallenge",
     "PhysicalMeter",
     "Reading",
     "Register",

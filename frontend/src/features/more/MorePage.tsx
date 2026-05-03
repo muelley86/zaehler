@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { useAuth } from '@/features/auth/AuthProvider';
+import { TwoFactorSection } from '@/features/auth/TwoFactorSection';
 import { Card, LargeTitle, Row, RowGroup, Section } from '@/components/ui';
 import { PageGlows } from '@/components/PageGlows';
 import { cx } from '@/components/ui/cx';
@@ -118,6 +119,9 @@ export function MorePage() {
             />
           </RowGroup>
         </Section>
+
+        {/* 2FA */}
+        <TwoFactorSection />
 
         <div className="px-4 text-center text-caption text-tertiary">
           Zählerstand · self-hosted

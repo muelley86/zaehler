@@ -17,6 +17,8 @@ dependencies = [
     "bcrypt>=4.2",
     "python-multipart>=0.0.12",
     "itsdangerous>=2.2",
+    "pyotp>=2.9",
+    "qrcode[pil]>=7.4",
 ]
 
 [dependency-groups]

@@ -2,9 +2,17 @@ from __future__ import annotations
 
 from meters.schemas.audit_log import AuditLogRead
 from meters.schemas.auth import (
+    BackupCodesResponse,
     ChangePasswordRequest,
     LoginRequest,
+    LoginResponse,
     MeResponse,
+    TotpActivateRequest,
+    TotpActivateResponse,
+    TotpDisableRequest,
+    TotpSetupResponse,
+    TotpStatusResponse,
+    TotpVerifyRequest,
 )
 from meters.schemas.common import APIModel, DecimalStr, ProblemDetails
 from meters.schemas.delivery import DeliveryCreate, DeliveryRead, DeliveryUpdate
@@ -39,6 +47,7 @@ from meters.schemas.user import (
 __all__ = [
     "APIModel",
     "AuditLogRead",
+    "BackupCodesResponse",
     "ChangePasswordRequest",
     "ConsumptionPoint",
     "DecimalStr",
@@ -49,6 +58,7 @@ __all__ = [
     "LocationRead",
     "LocationUpdate",
     "LoginRequest",
+    "LoginResponse",
     "MeResponse",
     "MeasuringPointCreate",
     "MeasuringPointRead",
@@ -65,6 +75,12 @@ __all__ = [
     "RegisterStateRead",
     "RegisterUpdate",
     "ReplaceMeterRequest",
+    "TotpActivateRequest",
+    "TotpActivateResponse",
+    "TotpDisableRequest",
+    "TotpSetupResponse",
+    "TotpStatusResponse",
+    "TotpVerifyRequest",
     "UserCreate",
     "UserRead",
     "UserUpdate",

@@ -18,6 +18,7 @@ from meters.db import Base, TimestampMixin
 from meters.models._enums import UserRole
 
 if TYPE_CHECKING:
+    from meters.models.backup_code import BackupCode
     from meters.models.session import Session
 
 
@@ -36,8 +37,21 @@ class User(Base, TimestampMixin):
     force_password_change: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     last_login_at: Mapped[datetime | None] = mapped_column()
 
+    # TOTP-2FA — wenn ``totp_enabled``, gilt der Login-Zwei-Schritt-Flow.
+    # ``totp_secret`` ist die Base32-kodierte Quelle für RFC 6238; wir
+    # speichern sie aktuell im Klartext (DB ist nur lokal lesbar; das Cookie
+    # wäre der eigentliche Schadensschritt). Verschlüsselung at-rest wäre
+    # eine Erweiterung für später.
+    totp_enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    totp_secret: Mapped[str | None] = mapped_column(String(64))
+
     sessions: Mapped[list[Session]] = relationship(
         "Session",
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
+    backup_codes: Mapped[list[BackupCode]] = relationship(
+        "BackupCode",
         back_populates="user",
         cascade="all, delete-orphan",
     )

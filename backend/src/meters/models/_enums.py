@@ -24,6 +24,10 @@ class AuditAction(enum.StrEnum):
     LOGOUT = "logout"
     PASSWORD_RESET = "password_reset"
     METER_REPLACED = "meter_replaced"
+    TOTP_ENABLED = "totp_enabled"
+    TOTP_DISABLED = "totp_disabled"
+    TOTP_FAILED = "totp_failed"
+    BACKUP_CODE_USED = "backup_code_used"
 
 
 class AuditEntityType(enum.StrEnum):
