@@ -819,6 +819,13 @@ einen Blick alles, was seit dem letzten Release passiert ist.
 - **HTTPS-Reverse-Proxy** dringend empfohlen, sobald die App von außen
   erreichbar ist (Teil 5). Im Wizard fragt `install` nach einem Proxy und
   setzt bei Ja automatisch `cookie_secure`, `trust_proxy` und HSTS ein.
+- **Karten-Tiles für Standorte** kommen direkt vom Browser von
+  `tile.openstreetmap.org` (Pflicht-Attribution laut ODbL ist auf der
+  Karte sichtbar, kostenfrei). Der OSM-Server sieht IP der Browser-
+  Clients beim Tile-Abruf. Die App selbst sendet keine Geo-Koordinaten
+  oder andere Daten an Dritte. **Geolocation (GPS)** funktioniert nur
+  über HTTPS oder localhost — bei reinem HTTP-IP-Zugriff bleibt der
+  Karten-Picker das einzige Eingabe-Tool.
 - **Zwei-Faktor-Authentisierung (2FA / TOTP)** pro User aktivierbar in
   **Mehr → Zwei-Faktor-Authentisierung** (Teil 6). Bei externer
   Erreichbarkeit Pflicht; im reinen Heimnetz dringend empfohlen für

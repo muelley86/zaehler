@@ -1,11 +1,18 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
-import { MapPin, Pencil, Trash2 } from 'lucide-react';
+import { Crosshair, Map as MapIcon, MapPin, Pencil, Trash2 } from 'lucide-react';
 
 import { Button, Card, EmptyState, LargeTitle, Section, Sheet, TextField } from '@/components/ui';
 import { PageGlows } from '@/components/PageGlows';
+import { LocationMap } from '@/components/LocationMap';
+import { LocationMapSheet } from '@/components/LocationMapSheet';
 import { ApiError, api } from '@/lib/api';
 import type { LocationRead, MeasuringPointRead } from '@/lib/types';
+
+// Default-Karten-Zentrum (Kassel, Mitte Deutschland) wenn der User noch
+// keine Koordinaten hat und auf "Auf Karte wählen" klickt.
+const DEFAULT_LAT = 51.16;
+const DEFAULT_LNG = 10.45;
 
 export function LocationsAdminPage() {
   const [locations, setLocations] = useState<LocationRead[] | null>(null);
@@ -13,6 +20,7 @@ export function LocationsAdminPage() {
   const [error, setError] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
   const [editing, setEditing] = useState<LocationRead | null>(null);
+  const [mapTarget, setMapTarget] = useState<LocationRead | null>(null);
 
   useEffect(() => {
     api
@@ -64,6 +72,7 @@ export function LocationsAdminPage() {
               loc={loc}
               mpCount={mpCountByLocation.get(loc.id) ?? 0}
               onEdit={() => setEditing(loc)}
+              onShowMap={() => setMapTarget(loc)}
               onChanged={refresh}
             />
           ))}
@@ -82,6 +91,16 @@ export function LocationsAdminPage() {
           />
         ) : null}
       </Sheet>
+
+      {mapTarget && mapTarget.latitude !== null && mapTarget.longitude !== null ? (
+        <LocationMapSheet
+          open
+          onClose={() => setMapTarget(null)}
+          latitude={mapTarget.latitude}
+          longitude={mapTarget.longitude}
+          name={mapTarget.name}
+        />
+      ) : null}
     </PageContainer>
   );
 }
@@ -99,11 +118,13 @@ function LocationCard({
   loc,
   mpCount,
   onEdit,
+  onShowMap,
   onChanged,
 }: {
   loc: LocationRead;
   mpCount: number;
   onEdit: () => void;
+  onShowMap: () => void;
   onChanged: () => void;
 }) {
   const [busy, setBusy] = useState(false);
@@ -122,6 +143,8 @@ function LocationCard({
       setBusy(false);
     }
   }
+
+  const hasGeo = loc.latitude !== null && loc.longitude !== null;
 
   return (
     <Card>
@@ -163,6 +186,21 @@ function LocationCard({
         {loc.note ? loc.note : <em className="text-tertiary">Keine Notiz</em>}
       </div>
 
+      {hasGeo && loc.latitude !== null && loc.longitude !== null ? (
+        <button
+          type="button"
+          onClick={onShowMap}
+          className="mt-2 flex w-full items-center gap-2 rounded-pill border-hairline border-border bg-fill px-3 py-2 text-left text-caption transition-colors hover:bg-fill-strong"
+          aria-label={`${loc.name} auf Karte zeigen`}
+        >
+          <MapIcon size={14} className="shrink-0 text-primary-deep" />
+          <span className="num text-secondary">
+            {loc.latitude.toFixed(6)}, {loc.longitude.toFixed(6)}
+          </span>
+          <span className="ml-auto text-caption font-semibold text-primary-deep">Karte ↗</span>
+        </button>
+      ) : null}
+
       {error ? (
         <div className="border-danger/40 bg-danger/10 mt-3 rounded-pill border-hairline p-2 text-caption text-danger">
           {error}
@@ -171,6 +209,200 @@ function LocationCard({
     </Card>
   );
 }
+
+// ---------------------------------------------------------------------------
+// Geo-Picker — gemeinsame Komponente für Create und Edit
+// ---------------------------------------------------------------------------
+
+interface GeoPickerProps {
+  latitude: string;
+  longitude: string;
+  onLatitudeChange: (v: string) => void;
+  onLongitudeChange: (v: string) => void;
+}
+
+function GeoPicker({ latitude, longitude, onLatitudeChange, onLongitudeChange }: GeoPickerProps) {
+  const [gpsBusy, setGpsBusy] = useState(false);
+  const [gpsError, setGpsError] = useState<string | null>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
+
+  function fetchGps() {
+    setGpsError(null);
+    if (!('geolocation' in navigator)) {
+      setGpsError('Geolocation-API in diesem Browser nicht verfügbar.');
+      return;
+    }
+    if (!window.isSecureContext) {
+      setGpsError('GPS nur über HTTPS oder localhost — bitte „Auf Karte wählen" nutzen.');
+      return;
+    }
+    setGpsBusy(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        onLatitudeChange(pos.coords.latitude.toFixed(6));
+        onLongitudeChange(pos.coords.longitude.toFixed(6));
+        setGpsBusy(false);
+      },
+      (err) => {
+        const detail =
+          err.code === err.PERMISSION_DENIED
+            ? 'Berechtigung verweigert.'
+            : err.code === err.POSITION_UNAVAILABLE
+              ? 'Position nicht verfügbar.'
+              : err.code === err.TIMEOUT
+                ? 'Zeitüberschreitung.'
+                : err.message;
+        setGpsError(`GPS-Fehler: ${detail}`);
+        setGpsBusy(false);
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
+    );
+  }
+
+  const parsedLat = Number.parseFloat(latitude);
+  const parsedLng = Number.parseFloat(longitude);
+  const initialLat = Number.isFinite(parsedLat) ? parsedLat : DEFAULT_LAT;
+  const initialLng = Number.isFinite(parsedLng) ? parsedLng : DEFAULT_LNG;
+
+  return (
+    <div className="space-y-2">
+      <div className="grid grid-cols-2 gap-2">
+        <TextField
+          label="Latitude"
+          numeric
+          inputMode="decimal"
+          placeholder="z. B. 48.137154"
+          value={latitude}
+          onChange={(e) => onLatitudeChange(e.target.value)}
+        />
+        <TextField
+          label="Longitude"
+          numeric
+          inputMode="decimal"
+          placeholder="z. B. 11.575492"
+          value={longitude}
+          onChange={(e) => onLongitudeChange(e.target.value)}
+        />
+      </div>
+      <div className="flex gap-2">
+        <Button
+          type="button"
+          variant="bordered"
+          size="sm"
+          leftIcon={<Crosshair size={14} />}
+          onClick={fetchGps}
+          disabled={gpsBusy}
+          fullWidth
+        >
+          {gpsBusy ? 'GPS …' : 'Aktuelle Position'}
+        </Button>
+        <Button
+          type="button"
+          variant="bordered"
+          size="sm"
+          leftIcon={<MapIcon size={14} />}
+          onClick={() => setPickerOpen(true)}
+          fullWidth
+        >
+          Auf Karte wählen
+        </Button>
+      </div>
+      {gpsError ? <div className="text-caption text-danger">{gpsError}</div> : null}
+
+      <Sheet open={pickerOpen} onClose={() => setPickerOpen(false)} title="Position wählen">
+        <MapPicker
+          initialLatitude={initialLat}
+          initialLongitude={initialLng}
+          onConfirm={(lat, lng) => {
+            onLatitudeChange(lat.toFixed(6));
+            onLongitudeChange(lng.toFixed(6));
+            setPickerOpen(false);
+          }}
+          onCancel={() => setPickerOpen(false)}
+        />
+      </Sheet>
+    </div>
+  );
+}
+
+function MapPicker({
+  initialLatitude,
+  initialLongitude,
+  onConfirm,
+  onCancel,
+}: {
+  initialLatitude: number;
+  initialLongitude: number;
+  onConfirm: (lat: number, lng: number) => void;
+  onCancel: () => void;
+}) {
+  const [lat, setLat] = useState(initialLatitude);
+  const [lng, setLng] = useState(initialLongitude);
+
+  return (
+    <div className="space-y-3">
+      <div className="text-caption text-tertiary">
+        Klicke auf die Karte oder ziehe den Pin, um die Position zu setzen.
+      </div>
+      <LocationMap
+        latitude={lat}
+        longitude={lng}
+        height={360}
+        interactive
+        onChange={(la, ln) => {
+          setLat(la);
+          setLng(ln);
+        }}
+      />
+      <div className="num flex items-center justify-center gap-2 text-caption text-tertiary">
+        <span>{lat.toFixed(6)}</span>
+        <span>·</span>
+        <span>{lng.toFixed(6)}</span>
+      </div>
+      <div className="flex gap-2">
+        <Button type="button" variant="bordered" onClick={onCancel} fullWidth>
+          Abbrechen
+        </Button>
+        <Button type="button" variant="filled" onClick={() => onConfirm(lat, lng)} fullWidth>
+          Übernehmen
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Validation-Helper
+// ---------------------------------------------------------------------------
+
+function parseGeo(
+  latitudeStr: string,
+  longitudeStr: string,
+): { lat: number | null; lng: number | null; error: string | null } {
+  const latTrim = latitudeStr.trim();
+  const lngTrim = longitudeStr.trim();
+  if (!latTrim && !lngTrim) return { lat: null, lng: null, error: null };
+  if (!latTrim || !lngTrim) {
+    return {
+      lat: null,
+      lng: null,
+      error: 'Latitude und Longitude beide angeben oder beide leer lassen.',
+    };
+  }
+  const lat = Number.parseFloat(latTrim.replace(',', '.'));
+  const lng = Number.parseFloat(lngTrim.replace(',', '.'));
+  if (!Number.isFinite(lat) || lat < -90 || lat > 90) {
+    return { lat: null, lng: null, error: 'Latitude muss zwischen -90 und 90 liegen.' };
+  }
+  if (!Number.isFinite(lng) || lng < -180 || lng > 180) {
+    return { lat: null, lng: null, error: 'Longitude muss zwischen -180 und 180 liegen.' };
+  }
+  return { lat, lng, error: null };
+}
+
+// ---------------------------------------------------------------------------
+// Edit-Form
+// ---------------------------------------------------------------------------
 
 function EditForm({
   loc,
@@ -183,18 +415,37 @@ function EditForm({
 }) {
   const [name, setName] = useState(loc.name);
   const [note, setNote] = useState(loc.note ?? '');
+  const [latitude, setLatitude] = useState(loc.latitude !== null ? String(loc.latitude) : '');
+  const [longitude, setLongitude] = useState(loc.longitude !== null ? String(loc.longitude) : '');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function save(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    setBusy(true);
     setError(null);
+    const geo = parseGeo(latitude, longitude);
+    if (geo.error) {
+      setError(geo.error);
+      return;
+    }
+    setBusy(true);
     try {
-      await api.patch(`/locations/${loc.id}`, { name, note: note || null });
+      const body: Record<string, unknown> = { name, note: note || null };
+      if (geo.lat === null && geo.lng === null) {
+        // Nur senden wenn vorher Koordinaten gesetzt waren — Backend
+        // unterscheidet PATCH-leer (= unverändert) von clear_coordinates.
+        if (loc.latitude !== null || loc.longitude !== null) {
+          body['clear_coordinates'] = true;
+        }
+      } else {
+        body['latitude'] = geo.lat;
+        body['longitude'] = geo.lng;
+      }
+      await api.patch(`/locations/${loc.id}`, body);
       onSaved();
     } catch (err) {
       if (err instanceof ApiError) setError(err.problem.detail ?? err.problem.title);
+      else setError('Speichern fehlgeschlagen.');
     } finally {
       setBusy(false);
     }
@@ -203,12 +454,14 @@ function EditForm({
   return (
     <form onSubmit={(e) => void save(e)} className="space-y-3">
       <TextField label="Name" value={name} onChange={(e) => setName(e.target.value)} required />
-      <TextField
-        label="Notiz"
-        value={note}
-        onChange={(e) => setNote(e.target.value)}
-        error={error}
+      <TextField label="Notiz" value={note} onChange={(e) => setNote(e.target.value)} />
+      <GeoPicker
+        latitude={latitude}
+        longitude={longitude}
+        onLatitudeChange={setLatitude}
+        onLongitudeChange={setLongitude}
       />
+      {error ? <div className="text-caption text-danger">{error}</div> : null}
       <div className="flex gap-2">
         <Button type="submit" variant="filled" disabled={busy} fullWidth>
           {busy ? 'Speichere…' : 'Speichern'}
@@ -221,23 +474,42 @@ function EditForm({
   );
 }
 
+// ---------------------------------------------------------------------------
+// Create-Form
+// ---------------------------------------------------------------------------
+
 function CreateForm({ onCreated }: { onCreated: () => void }) {
   const [name, setName] = useState('');
   const [note, setNote] = useState('');
+  const [latitude, setLatitude] = useState('');
+  const [longitude, setLongitude] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    setBusy(true);
     setError(null);
+    const geo = parseGeo(latitude, longitude);
+    if (geo.error) {
+      setError(geo.error);
+      return;
+    }
+    setBusy(true);
     try {
-      await api.post('/locations', { name, note: note || null });
+      const body: Record<string, unknown> = { name, note: note || null };
+      if (geo.lat !== null && geo.lng !== null) {
+        body['latitude'] = geo.lat;
+        body['longitude'] = geo.lng;
+      }
+      await api.post('/locations', body);
       setName('');
       setNote('');
+      setLatitude('');
+      setLongitude('');
       onCreated();
     } catch (err) {
       if (err instanceof ApiError) setError(err.problem.detail ?? err.problem.title);
+      else setError('Anlegen fehlgeschlagen.');
     } finally {
       setBusy(false);
     }
@@ -257,8 +529,14 @@ function CreateForm({ onCreated }: { onCreated: () => void }) {
           label="Notiz (optional)"
           value={note}
           onChange={(e) => setNote(e.target.value)}
-          error={error}
         />
+        <GeoPicker
+          latitude={latitude}
+          longitude={longitude}
+          onLatitudeChange={setLatitude}
+          onLongitudeChange={setLongitude}
+        />
+        {error ? <div className="text-caption text-danger">{error}</div> : null}
         <Button type="submit" variant="filled" disabled={busy} fullWidth>
           {busy ? 'Speichere…' : 'Anlegen'}
         </Button>

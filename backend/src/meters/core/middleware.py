@@ -38,9 +38,11 @@ def _csp() -> str:
         "default-src 'self'",
         "script-src 'self' 'unsafe-inline'",
         "style-src 'self' 'unsafe-inline'",
-        "img-src 'self' data:",
+        # OSM-Tiles für die Standort-Karte (LocationMap). Browser lädt
+        # Tile-PNGs direkt von tile.openstreetmap.org, keine API von uns.
+        "img-src 'self' data: https://*.tile.openstreetmap.org",
         "font-src 'self' data:",
-        "connect-src 'self'",
+        "connect-src 'self' https://*.tile.openstreetmap.org",
         "object-src 'none'",
         "base-uri 'self'",
         "frame-ancestors 'none'",

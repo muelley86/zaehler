@@ -34,7 +34,12 @@ def create_location(
     db: DbDep,
     admin: AdminUser,
 ) -> LocationRead:
-    location = Location(name=payload.name, note=payload.note)
+    location = Location(
+        name=payload.name,
+        note=payload.note,
+        latitude=payload.latitude,
+        longitude=payload.longitude,
+    )
     db.add(location)
     try:
         db.flush()
@@ -73,6 +78,21 @@ def update_location(
     if payload.note is not None and payload.note != location.note:
         diff["note"] = {"from": location.note, "to": payload.note}
         location.note = payload.note
+    if payload.clear_coordinates:
+        if location.latitude is not None or location.longitude is not None:
+            diff["coordinates"] = {
+                "from": [location.latitude, location.longitude],
+                "to": None,
+            }
+        location.latitude = None
+        location.longitude = None
+    else:
+        if payload.latitude is not None and payload.latitude != location.latitude:
+            diff["latitude"] = {"from": location.latitude, "to": payload.latitude}
+            location.latitude = payload.latitude
+        if payload.longitude is not None and payload.longitude != location.longitude:
+            diff["longitude"] = {"from": location.longitude, "to": payload.longitude}
+            location.longitude = payload.longitude
     if diff:
         record(
             db,

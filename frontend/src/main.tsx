@@ -12,6 +12,9 @@ import '@fontsource/jetbrains-mono/500.css';
 import '@fontsource/jetbrains-mono/600.css';
 import '@fontsource/jetbrains-mono/700.css';
 
+// Leaflet-Stylesheet für die Standort-Karte (LocationMap).
+import 'leaflet/dist/leaflet.css';
+
 import { App } from './App';
 import { AuthProvider } from './features/auth/AuthProvider';
 import './styles/index.css';

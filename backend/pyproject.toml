@@ -108,4 +108,10 @@ init_typed = true
 testpaths = ["tests"]
 asyncio_mode = "auto"
 addopts = "-ra --strict-markers"
-filterwarnings = ["error"]
+filterwarnings = [
+    "error",
+    # Starlette wirft seit 0.49 eine DeprecationWarning für
+    # HTTP_422_UNPROCESSABLE_ENTITY (FastAPI nutzt das intern).
+    # Library-interna, kein eigener Code-Smell.
+    "ignore:.*HTTP_422_UNPROCESSABLE_ENTITY.*:DeprecationWarning",
+]

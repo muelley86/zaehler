@@ -84,6 +84,8 @@ export interface LocationRead {
   id: number;
   name: string;
   note: string | null;
+  latitude: number | null;
+  longitude: number | null;
 }
 
 export interface MeasuringPointRead {

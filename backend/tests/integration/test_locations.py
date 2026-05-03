@@ -13,7 +13,54 @@ def test_create_and_list_locations(admin_client: TestClient) -> None:
     listing = admin_client.get("/api/v1/locations")
     assert listing.status_code == 200
     rows: list[dict[str, Any]] = listing.json()
-    assert any(r["name"] == "Keller" for r in rows)
+    keller = next(r for r in rows if r["name"] == "Keller")
+    assert keller["latitude"] is None
+    assert keller["longitude"] is None
+
+
+def test_create_location_with_coordinates(admin_client: TestClient) -> None:
+    resp = admin_client.post(
+        "/api/v1/locations",
+        json={"name": "Zaehlerschrank", "latitude": 48.137154, "longitude": 11.575492},
+    )
+    assert resp.status_code == 201, resp.text
+    body = resp.json()
+    assert body["latitude"] == 48.137154
+    assert body["longitude"] == 11.575492
+
+
+def test_reject_out_of_range_coordinates(admin_client: TestClient) -> None:
+    resp = admin_client.post(
+        "/api/v1/locations",
+        json={"name": "Mond", "latitude": 91.0, "longitude": 0.0},
+    )
+    assert resp.status_code == 422
+    resp = admin_client.post(
+        "/api/v1/locations",
+        json={"name": "AmRandDerErde", "latitude": 0.0, "longitude": 181.0},
+    )
+    assert resp.status_code == 422
+
+
+def test_update_and_clear_coordinates(admin_client: TestClient) -> None:
+    created = admin_client.post(
+        "/api/v1/locations",
+        json={"name": "Garten", "latitude": 50.0, "longitude": 10.0},
+    ).json()
+    loc_id = created["id"]
+    moved = admin_client.patch(
+        f"/api/v1/locations/{loc_id}",
+        json={"latitude": 50.5, "longitude": 10.5},
+    )
+    assert moved.status_code == 200
+    assert moved.json()["latitude"] == 50.5
+    cleared = admin_client.patch(
+        f"/api/v1/locations/{loc_id}",
+        json={"clear_coordinates": True},
+    )
+    assert cleared.status_code == 200
+    assert cleared.json()["latitude"] is None
+    assert cleared.json()["longitude"] is None
 
 
 def test_duplicate_location_name_409(admin_client: TestClient) -> None:
