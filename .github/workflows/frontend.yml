@@ -27,7 +27,8 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          # Node 22 (LTS bis 2027) — Node 20 läuft auf GitHub-Runnern aus.
+          node-version: 22
           cache: pnpm
           cache-dependency-path: frontend/pnpm-lock.yaml
 
@@ -44,7 +45,9 @@ jobs:
         run: pnpm type-check
 
       - name: Vitest
-        run: pnpm test --run
+        # `--` trennt pnpm-Flags von vitest-Argumenten. Ohne den Separator
+        # frisst pnpm v9 das `--run` selbst und meldet "Unknown option".
+        run: pnpm exec vitest run
 
       - name: Build
         run: pnpm build
