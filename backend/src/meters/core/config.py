@@ -8,9 +8,10 @@ werden, z. B. ``METERS_SECRET_KEY=...``. Im LXC-Setup landet die Konfig in
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Annotated, Any
 
-from pydantic import Field
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import Field, field_validator
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 DATA_DIR = REPO_ROOT.parent / "data"
@@ -54,9 +55,23 @@ class Settings(BaseSettings):
 
     # Erlaubte Origins für mutating-Requests (CSRF-Schutz als Defense-in-Depth
     # zu SameSite=strict). Komma-getrennt in der ENV setzen, z. B.
-    # METERS_ALLOWED_ORIGINS="https://zaehler.example.com".
+    # METERS_ALLOWED_ORIGINS="https://zaehler.example.com,https://alt.example.com".
     # Same-Origin-Requests sind unabhängig davon immer erlaubt.
-    allowed_origins: list[str] = []
+    # NoDecode + field_validator: pydantic-settings würde sonst versuchen,
+    # den ENV-Wert als JSON zu parsen — wir wollen ein simples comma-Format.
+    allowed_origins: Annotated[list[str], NoDecode] = []
+
+    @field_validator("allowed_origins", mode="before")
+    @classmethod
+    def _split_origins(cls, v: Any) -> Any:
+        if v is None:
+            return []
+        if isinstance(v, str):
+            stripped = v.strip()
+            if not stripped:
+                return []
+            return [item.strip() for item in stripped.split(",") if item.strip()]
+        return v
 
     static_dir: Path = Path(__file__).resolve().parent.parent / "static"
 
