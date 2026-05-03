@@ -90,13 +90,25 @@ Auswahl und „OK"/„Cancel", mit **Enter** bestätigst du.
 | Admin-Username | Deinen gewünschten Benutzernamen eingeben (z. B. `kmueller`) |
 | Admin-Passwort | Mindestens 12 Zeichen — wird beim ersten Login wieder geändert |
 | Passwort bestätigen | Gleiches Passwort nochmal |
+| HTTPS-Reverse-Proxy | „Nein" für reines Heimnetz, „Ja" sobald du eine Domain via Caddy/HTTPS bereitstellst (siehe Teil 5) |
 | Bereit zur Installation | Werte prüfen — „Ja" |
+
+> Hinweis zur Zwei-Faktor-Authentisierung: 2FA wird **nicht** im Wizard
+> aktiviert. Sie ist optional und kann später pro Benutzer in **Mehr →
+> Zwei-Faktor-Authentisierung** eingeschaltet werden. Genaue Anleitung in
+> Teil 6 dieser Doku.
 
 Dann läuft die eigentliche Installation 3–8 Minuten durch. Du siehst farbige
 `✓`- und `▸`-Zeilen für jeden der 10 Schritte. Am Ende ein Dialog mit der
 **App-URL**.
 
 ### 1.4 Im Browser öffnen
+
+Beim allerersten Login (frisch nach `install`) reichen Username und
+Passwort — die App leitet dich auf den Force-Change-Dialog, du setzt ein
+eigenes Passwort, fertig. **Wenn du später 2FA aktivierst** (Teil 6),
+kommt nach Username/Passwort ein zusätzlicher Schritt mit einem
+6-stelligen Code aus deiner Authenticator-App.
 
 Falls du die URL aus dem Dialog nicht mehr hast, im Container die IP
 ermitteln:
@@ -272,6 +284,63 @@ sudo bash /opt/zaehler/repo/deploy/lxc/zaehler.sh reset-password
 Username eingeben, neues Passwort zweimal eingeben — beim nächsten Login
 musst du es nochmal ändern.
 
+### Login zu oft falsch — "Login gesperrt" (HTTP 429)
+
+Schutz vor Brute-Force greift:
+
+- **5 Fehlversuche** in 1 Minute pro IP → 15 min Sperre
+- **10 Fehlversuche** in 10 Minuten pro Username → 30 min Sperre
+
+Einfach abwarten, oder als root den Service neu starten — dann ist der
+In-Memory-Lockout weg:
+
+```bash
+sudo systemctl restart zaehler.service
+```
+
+(DB-Stand bleibt unangetastet, nur die Lockout-Zähler werden geleert.)
+
+### 2FA-Code wird nicht akzeptiert
+
+Mögliche Ursachen, in dieser Reihenfolge prüfen:
+
+1. **Uhrzeit driftet**. TOTP funktioniert nur, wenn Server- und
+   Smartphone-Uhr maximal 30 Sekunden auseinanderliegen. Container-Uhr
+   prüfen:
+
+   ```bash
+   date
+   sudo systemctl restart systemd-timesyncd
+   ```
+
+   Auf dem Smartphone unter *Einstellungen → Datum & Uhrzeit →
+   Automatisch* aktivieren.
+
+2. **Falscher Account in der App**. Manche Authenticator-Apps zeigen
+   mehrere Einträge — kontrolliere, dass du den Code von "Zählerstand
+   · `<dein-username>`" verwendest.
+
+3. **Code abgelaufen**. Der Code wechselt alle 30 Sekunden — nimm den
+   nächsten.
+
+4. **Kein Authenticator zur Hand**: einen 16-stelligen Backup-Code
+   eingeben (mit oder ohne Bindestrich, Klein-/Großschreibung egal).
+
+### Smartphone UND Backup-Codes verloren
+
+Notausstieg über die Datenbank (siehe auch Teil 6.6) — du brauchst
+root-Zugang zum Container:
+
+```bash
+sudo sqlite3 /opt/zaehler/data/meters.db \
+  "UPDATE user SET totp_enabled = 0, totp_secret = NULL WHERE username = 'kmueller';"
+sudo systemctl restart zaehler.service
+```
+
+Anschließend ohne 2FA einloggen, in **Mehr → 2FA** neu einrichten,
+neue Backup-Codes ausdrucken. Der Vorgang wird automatisch im Audit-Log
+mit deiner IP vermerkt.
+
 ### Backup einspielen
 
 Wenn die DB beschädigt wurde:
@@ -430,6 +499,12 @@ Phishing in falsche Hände gerät.
 Jeder Code funktioniert genau einmal. Sind alle 10 verbraucht oder
 kompromittiert: in **Mehr → 2FA → Backup-Codes neu generieren** klicken,
 alte werden sofort ungültig.
+
+> **Backup-Schutz:** Das TOTP-Geheimnis liegt in `meters.db` als
+> Klartext-Base32 — wer Zugriff auf eine ungeschützte DB-Datei oder
+> einen `*.db.gz`-Snapshot bekommt, kann damit deine Codes generieren.
+> Behandle DB-Backups deshalb wie Passwörter (verschlüsselte externe
+> Sicherung empfohlen, nicht in unverschlüsselter Cloud).
 
 ### 6.4 Login mit 2FA
 
@@ -621,9 +696,13 @@ So hast du in der Not immer einen Punkt, auf den du zurückkannst.
 ### Sicherheit
 
 - **HTTPS-Reverse-Proxy** dringend empfohlen, sobald die App von außen
-  erreichbar ist. Im Wizard fragt `install` nach einem Proxy und setzt
-  bei Ja automatisch `cookie_secure`, `trust_proxy` und HSTS ein. Caddy-
-  Beispiel siehe `deploy/lxc/README.md` §4.
+  erreichbar ist (Teil 5). Im Wizard fragt `install` nach einem Proxy und
+  setzt bei Ja automatisch `cookie_secure`, `trust_proxy` und HSTS ein.
+- **Zwei-Faktor-Authentisierung (2FA / TOTP)** pro User aktivierbar in
+  **Mehr → Zwei-Faktor-Authentisierung** (Teil 6). Bei externer
+  Erreichbarkeit Pflicht; im reinen Heimnetz dringend empfohlen für
+  Admin-Accounts. Backup-Codes immer drucken oder in den
+  Passwort-Manager packen — das Smartphone kann ausfallen.
 - **Regelmäßiger Audit-Lauf**: `sudo bash zaehler.sh audit` listet
   bekannte Schwachstellen in JavaScript- und Python-Abhängigkeiten auf.
   Empfehlung: monatlich oder bei jeder größeren Änderung.
@@ -633,6 +712,11 @@ So hast du in der Not immer einen Punkt, auf den du zurückkannst.
 - **Login-Lockout**: pro IP nach 5 Fehlversuchen 15 min Sperre, pro
   Username nach 10 Fehlversuchen 30 min Sperre — schützt vor Brute-
   Force auch bei wechselnden IPs.
+- **Audit-Log** (für Admins unter *Audit-Log*) zeichnet Logins, fehlende
+  TOTP-Codes (`totp_failed`), Aktivierung/Deaktivierung von 2FA
+  (`totp_enabled` / `totp_disabled`) und Backup-Code-Verwendung
+  (`backup_code_used`) auf — auch der Notausstieg via SQL ist hier
+  sichtbar (über das anschließende Login-Event).
 
 ### git-Mini-Spickzettel
 

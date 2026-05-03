@@ -96,7 +96,10 @@ auf dem Host davor (Caddy ist am einfachsten):
 
 ```caddyfile
 zaehler.example.com {
-    reverse_proxy <container-ip>:8000
+    reverse_proxy <container-ip>:8000 {
+        header_up X-Forwarded-For {remote_host}
+        header_up X-Forwarded-Proto {scheme}
+    }
 }
 ```
 
@@ -105,10 +108,27 @@ Im Container danach in `/opt/zaehler/data/meters.env`:
 ```
 METERS_BIND_HOST=127.0.0.1
 METERS_COOKIE_SECURE=True
+METERS_TRUST_PROXY=True
+METERS_ALLOWED_ORIGINS=https://zaehler.example.com
 ```
 
 und `systemctl restart zaehler.service`. Damit ist die App nur noch über den
-HTTPS-Proxy erreichbar, nicht mehr direkt im Klartext im LAN.
+HTTPS-Proxy erreichbar, nicht mehr direkt im Klartext im LAN. Wenn du den
+Wizard mit der HTTPS-Frage durchgeklickt hast, ist all das schon
+automatisch eingetragen.
+
+## 5. (Empfohlen) Zwei-Faktor-Authentisierung
+
+Sobald die App von außen erreichbar ist, **2FA pro Account aktivieren**:
+
+1. Im Browser einloggen → unten rechts **Mehr**.
+2. **Zwei-Faktor-Authentisierung → 2FA jetzt einrichten**.
+3. QR-Code mit einer Authenticator-App scannen (Google Authenticator,
+   Authy, 1Password, Bitwarden, KeePassXC), 6-stelligen Code eingeben.
+4. **10 Backup-Codes** ausdrucken oder im Passwort-Manager ablegen.
+
+Ausführliche Anleitung inkl. Notausstieg bei verlorenem Smartphone +
+Codes: `docs/anleitung.md` Teil 6.
 
 ---
 

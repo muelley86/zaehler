@@ -22,11 +22,16 @@ Die fachliche Spezifikation steht in [`CLAUDE.md`](./CLAUDE.md).
   Tankvolumen + Prozent-Anzeige.
 - **Standorte** zentral verwalten, **Benutzerverwaltung** (admin / recorder)
   mit erzwungenem Passwortwechsel beim ersten Login.
-- **Audit-Log** über alle Änderungen.
+- **Zwei-Faktor-Authentisierung (TOTP)** pro Benutzer in den Einstellungen
+  aktivierbar — kompatibel mit Google Authenticator / Authy / 1Password /
+  Bitwarden, plus 10 single-use Backup-Codes.
+- **Audit-Log** über alle Änderungen, inkl. 2FA-Events.
 - **Dashboard** mit Verbrauchs- und Stand-Diagrammen, Filter nach Standort,
   Zählerart, Messstelle und Zeitraum, plus aggregierter Verbrauchs-Übersicht.
 - **CSV-Export** auf Dashboard- und Erfassungs-Seite.
-- **iOS-/SwiftUI-inspirierte UI** mit Dark-Mode-Folge und Responsive-Layout
+- **Liquid-Glass-UI** in OKLCH-Farben mit warmem Orange-Akzent,
+  Light/Dark-Modus erst- und gleichrangig (System-Setting + manueller
+  Toggle), JetBrains Mono mit `tabular-nums` für alle Zahlen, responsive
   (Mobile: Bottom-Tab-Bar, Desktop: Sidebar).
 
 ## Repo-Struktur
