@@ -325,6 +325,13 @@ function GeoPicker({ latitude, longitude, onLatitudeChange, onLongitudeChange }:
   );
 }
 
+interface NominatimHit {
+  place_id: number;
+  display_name: string;
+  lat: string;
+  lon: string;
+}
+
 function MapPicker({
   initialLatitude,
   initialLongitude,
@@ -338,34 +345,118 @@ function MapPicker({
 }) {
   const [lat, setLat] = useState(initialLatitude);
   const [lng, setLng] = useState(initialLongitude);
+  const [query, setQuery] = useState('');
+  const [hits, setHits] = useState<NominatimHit[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
 
-  // Kompakter Layout — alles passt auf einen iPhone-Viewport ≤ 90vh ohne
-  // Scrollen, Buttons sind unten nach der Karte normal sichtbar.
+  async function search(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const q = query.trim();
+    if (!q) return;
+    setSearching(true);
+    setSearchError(null);
+    try {
+      const url =
+        'https://nominatim.openstreetmap.org/search' +
+        `?format=jsonv2&limit=5&addressdetails=0&q=${encodeURIComponent(q)}`;
+      const r = await fetch(url, { headers: { 'Accept-Language': 'de' } });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const data = (await r.json()) as NominatimHit[];
+      setHits(data);
+      if (data.length === 0) setSearchError('Keine Treffer.');
+    } catch (err) {
+      setSearchError(err instanceof Error ? err.message : 'Suche fehlgeschlagen.');
+      setHits([]);
+    } finally {
+      setSearching(false);
+    }
+  }
+
+  function pickHit(hit: NominatimHit) {
+    const la = Number.parseFloat(hit.lat);
+    const ln = Number.parseFloat(hit.lon);
+    if (Number.isFinite(la) && Number.isFinite(ln)) {
+      setLat(la);
+      setLng(ln);
+      setHits([]);
+      setQuery(hit.display_name.split(',')[0] ?? '');
+    }
+  }
+
+  // Suchfeld → optional Trefferliste → Karte → Koord-Zeile → Buttons.
+  // Höhen sind so dimensioniert, dass alles in 90vh-Sheet auf iPhone-SE
+  // ohne Scrollen Platz findet.
   return (
-    <div className="space-y-3">
-      <div className="text-caption text-tertiary">Klicke auf die Karte oder ziehe den Pin.</div>
+    <div className="space-y-2">
+      <form onSubmit={(e) => void search(e)} className="flex gap-2">
+        <TextField
+          type="text"
+          placeholder="Adresse oder Ortsname suchen"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          className="flex-1"
+        />
+        <Button type="submit" variant="bordered" disabled={searching}>
+          {searching ? '…' : 'Suchen'}
+        </Button>
+      </form>
+
+      {hits.length > 0 ? (
+        <ul className="max-h-[140px] overflow-y-auto rounded-card border-hairline border-border bg-surface-solid">
+          {hits.map((hit) => (
+            <li key={hit.place_id} className="border-b-hairline border-separator last:border-b-0">
+              <button
+                type="button"
+                onClick={() => pickHit(hit)}
+                className="w-full px-3 py-2 text-left transition-colors hover:bg-fill"
+              >
+                <div className="truncate text-body-sm text-label">{hit.display_name}</div>
+                <div className="num truncate text-caption text-tertiary">
+                  {Number.parseFloat(hit.lat).toFixed(4)}, {Number.parseFloat(hit.lon).toFixed(4)}
+                </div>
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+
+      {searchError ? <div className="text-caption text-tertiary">{searchError}</div> : null}
+
       <LocationMap
         latitude={lat}
         longitude={lng}
-        height={220}
+        height={200}
         interactive
         onChange={(la, ln) => {
           setLat(la);
           setLng(ln);
         }}
       />
-      <div className="num flex items-center justify-center gap-2 text-caption text-tertiary">
-        <span>{lat.toFixed(6)}</span>
-        <span>·</span>
-        <span>{lng.toFixed(6)}</span>
+
+      <div className="num text-center text-caption text-tertiary">
+        {lat.toFixed(6)}, {lng.toFixed(6)}
       </div>
-      <div className="flex gap-2 pt-2">
+
+      <div className="flex gap-2 pt-1">
         <Button type="button" variant="bordered" onClick={onCancel} fullWidth>
           Abbrechen
         </Button>
         <Button type="button" variant="filled" onClick={() => onConfirm(lat, lng)} fullWidth>
           Position übernehmen
         </Button>
+      </div>
+
+      <div className="text-center text-[10px] text-quaternary">
+        Suche via{' '}
+        <a
+          href="https://nominatim.openstreetmap.org/"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="underline"
+        >
+          OpenStreetMap Nominatim
+        </a>
       </div>
     </div>
   );

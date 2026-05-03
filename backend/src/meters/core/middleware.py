@@ -42,7 +42,9 @@ def _csp() -> str:
         # Tile-PNGs direkt von tile.openstreetmap.org, keine API von uns.
         "img-src 'self' data: https://*.tile.openstreetmap.org",
         "font-src 'self' data:",
-        "connect-src 'self' https://*.tile.openstreetmap.org",
+        # Nominatim für Geocoding-Suche im MapPicker (Adresse → Koordinaten),
+        # kostenlos, fair-use 1 req/s. Pflicht-Attribution im UI.
+        "connect-src 'self' https://*.tile.openstreetmap.org https://nominatim.openstreetmap.org",
         "object-src 'none'",
         "base-uri 'self'",
         "frame-ancestors 'none'",
