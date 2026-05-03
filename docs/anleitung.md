@@ -385,24 +385,26 @@ Auf dem Router Port 80 und 443 an den Proxmox-Host weiterleiten (TCP).
 80 braucht Caddy für die Let's-Encrypt-HTTP-Challenge, 443 ist der
 HTTPS-Listener.
 
-### 5.2 Caddy auf dem Proxmox-Host installieren
+### 5.2 Reverse-Proxy einrichten — drei Wege
+
+Such dir den Pfad, der zu deinem Setup passt. Inhaltlich macht jeder
+dasselbe: Port 443 mit Let's-Encrypt-Zertifikat → 8000 in deinen
+Container.
+
+#### Option A — Caddy
+
+Installation:
 
 ```bash
 sudo apt update
 sudo apt install -y caddy
 ```
 
-(Bei Debian/Ubuntu liefert das System-Paket Caddy 2.x; alternativ
-`https://caddyserver.com/download`.)
-
-### 5.3 Caddyfile schreiben
-
-Datei `/etc/caddy/Caddyfile` editieren:
+`/etc/caddy/Caddyfile`:
 
 ```caddyfile
 zaehler.example.com {
     reverse_proxy <container-ip>:8000 {
-        # Container-IP herausfinden im Container per `hostname -I`.
         header_up X-Forwarded-For {remote_host}
         header_up X-Forwarded-Proto {scheme}
     }
@@ -414,10 +416,84 @@ sudo systemctl reload caddy
 ```
 
 Caddy holt sich beim ersten Aufruf automatisch ein Let's-Encrypt-
-Zertifikat. Im Browser `https://zaehler.example.com` testen — Schloss-Symbol
-muss erscheinen.
+Zertifikat — kein manueller Cert-Renewal-Cron nötig.
 
-### 5.4 App im Container auf Reverse-Proxy umstellen
+#### Option B — Nginx Proxy Manager (NPM)
+
+NPM ist die GUI-Variante (Web-Interface), läuft typisch in einem
+eigenen Container/VM. Im NPM-Web-UI:
+
+1. **Proxy Hosts → Add Proxy Host**.
+2. **Details**:
+   - Domain Names: `zaehler.example.com`
+   - Scheme: `http`
+   - Forward Hostname/IP: `<container-ip>`
+   - Forward Port: `8000`
+   - Block Common Exploits: ✓
+   - Websockets Support: ✓
+3. **SSL**:
+   - SSL Certificate → Request a new SSL Certificate (Let's Encrypt)
+   - Force SSL: ✓
+   - HTTP/2 Support: ✓
+   - HSTS Enabled: ✓
+4. **Advanced** (optional, aber empfohlen — leitet die echte Client-IP
+   weiter):
+
+   ```nginx
+   proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+   proxy_set_header X-Forwarded-Proto $scheme;
+   proxy_set_header Host $host;
+   ```
+
+5. Speichern → NPM holt das Zertifikat selbst.
+
+> Wichtig: Wenn NPM auf einem **anderen Host** läuft als die App,
+> muss der Container die App auf `0.0.0.0` lauschen lassen (sonst
+> kann NPM nicht hin), und im Wizard die Topologie-Option
+> "Reverse-Proxy auf anderem Host + IP-Zugriff" wählen.
+
+#### Option C — Vanilla Nginx (selbst gepflegt)
+
+`/etc/nginx/sites-available/zaehler.conf`:
+
+```nginx
+server {
+    listen 443 ssl http2;
+    server_name zaehler.example.com;
+
+    ssl_certificate     /etc/letsencrypt/live/zaehler.example.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/zaehler.example.com/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers HIGH:!aNULL:!MD5;
+
+    location / {
+        proxy_pass http://<container-ip>:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+    }
+}
+
+server {
+    listen 80;
+    server_name zaehler.example.com;
+    return 301 https://$server_name$request_uri;
+}
+```
+
+Aktivieren + Cert holen:
+
+```bash
+sudo ln -s /etc/nginx/sites-available/zaehler.conf /etc/nginx/sites-enabled/
+sudo certbot --nginx -d zaehler.example.com
+sudo systemctl reload nginx
+```
+
+### 5.3 App im Container auf Reverse-Proxy umstellen
 
 Im **Container** (per `pct enter <id>`):
 
@@ -425,7 +501,11 @@ Im **Container** (per `pct enter <id>`):
 sudo nano /opt/zaehler/data/meters.env
 ```
 
-Diese vier Zeilen setzen (oder ergänzen, falls fehlend):
+**Zwei Topologien**, jeweils mit anderen Werten:
+
+#### Variante 1 — Reverse-Proxy auf demselben Host
+
+Strikt HTTPS, App ist nur lokal erreichbar:
 
 ```ini
 METERS_BIND_HOST=127.0.0.1
@@ -434,14 +514,29 @@ METERS_TRUST_PROXY=True
 METERS_ALLOWED_ORIGINS=https://zaehler.example.com
 ```
 
-Was bedeuten die Werte?
+#### Variante 2 — Reverse-Proxy auf anderem Host (z. B. NPM-Container)
+
+NPM muss die App über die LAN-IP erreichen können, gleichzeitig willst
+du im Heimnetz weiter direkt per `http://<container-ip>:8000` zugreifen
+können:
+
+```ini
+METERS_BIND_HOST=0.0.0.0
+METERS_COOKIE_SECURE=False
+METERS_TRUST_PROXY=True
+METERS_ALLOWED_ORIGINS=https://zaehler.example.com,http://<container-ip>:8000
+```
+
+`COOKIE_SECURE=False` ist hier zwingend — sonst würde der HTTP-IP-Login
+keine Cookies mehr setzen können. Der CSRF-Schutz bleibt trotzdem aktiv
+über die Origin-Allow-List.
 
 | Schlüssel | Wirkung |
 |---|---|
-| `METERS_BIND_HOST=127.0.0.1` | App lauscht nur lokal, Caddy ist der einzige Weg rein |
-| `METERS_COOKIE_SECURE=True` | Session-Cookie wird nur über HTTPS gesendet |
-| `METERS_TRUST_PROXY=True` | Backend wertet `X-Forwarded-For` aus (sonst würden Audit-Log und Rate-Limiter immer Caddys IP sehen) |
-| `METERS_ALLOWED_ORIGINS=https://…` | CSRF-Schutz: Origin-Check für POST/PATCH/DELETE |
+| `METERS_BIND_HOST` | `0.0.0.0` = im LAN erreichbar, `127.0.0.1` = nur lokal |
+| `METERS_COOKIE_SECURE` | `True` = Cookie nur über HTTPS, `False` = auch HTTP-Login OK |
+| `METERS_TRUST_PROXY` | `True` = X-Forwarded-For-Header vom Proxy wird gewertet (richtige Client-IP im Audit-Log) |
+| `METERS_ALLOWED_ORIGINS` | Komma-getrennte Liste der erlaubten Origins für POST/PATCH/DELETE |
 
 Service neu starten:
 
@@ -449,11 +544,11 @@ Service neu starten:
 sudo systemctl restart zaehler.service
 ```
 
-> Tipp: Bei einem **frischen** Install kannst du dir den manuellen Schritt
-> sparen — der Wizard fragt aktiv nach dem Reverse-Proxy und füllt diese
-> Werte automatisch ein.
+> Tipp: Beim `install`-Wizard kannst du im Schritt "Netzwerk-Topologie"
+> direkt zwischen den beiden Varianten wählen — dann werden diese Werte
+> automatisch korrekt eingetragen.
 
-### 5.5 Verifizieren
+### 5.4 Verifizieren
 
 ```bash
 curl -fsSI https://zaehler.example.com/api/v1/health

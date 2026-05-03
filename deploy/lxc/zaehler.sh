@@ -188,12 +188,13 @@ install_wizard() {
         "abort"     "Abbrechen") || die "Abgebrochen."
     [ "$mode" = "abort" ] && die "Abgebrochen."
 
-    # REPO_URL — immer pflichtig falls noch kein Repo da
+    # REPO_URL — immer pflichtig falls noch kein Repo da. Default zeigt auf
+    # das Upstream-Repo, weil 99 % der Installationen kein Fork sind.
     if [ -z "$WIZ_REPO_URL" ]; then
         while :; do
             WIZ_REPO_URL=$(wt_input "Git-Repository" \
-                "URL des Git-Repos, das die App enthält.\n\nBeispiele:\n  https://github.com/user/zaehler.git\n  git@github.com:user/zaehler.git" \
-                "https://github.com/user/zaehler.git") || die "Abgebrochen."
+                "URL des Git-Repos, das die App enthält.\n\nDefault zeigt auf das Upstream-Repo. Wenn du einen eigenen Fork verwendest, hier deine Fork-URL einsetzen." \
+                "https://github.com/muelley86/zaehler.git") || die "Abgebrochen."
             [[ "$WIZ_REPO_URL" =~ ^(https://|git@) ]] && break
             wt_msgbox "Ungültige URL" "Die URL muss mit 'https://' oder 'git@' beginnen.\n\nVerwendet wurde: $WIZ_REPO_URL"
         done
@@ -221,18 +222,43 @@ install_wizard() {
         done
     fi
 
-    # Sicherheits-Frage zum HTTPS-Reverse-Proxy — beeinflusst Cookie-Secure,
-    # Trust-Proxy und ggf. Bind-Host. Auch im Standard-Modus stellen wir
-    # diese eine Frage, weil sie sicherheitsrelevant ist.
-    if wt_yesno "HTTPS-Reverse-Proxy" "Steht ein HTTPS-Reverse-Proxy (Caddy / Traefik / nginx) vor der App?\n\n• Ja  → Cookies werden auf 'Secure' gesetzt, X-Forwarded-For wird vertraut, HSTS-Header wird gesendet, Bind-Host wird auf 127.0.0.1 gestellt.\n• Nein → App lauscht direkt im LAN auf $WIZ_BIND_HOST:$WIZ_BIND_PORT (Klartext-HTTP, nur fürs Heimnetz akzeptabel).\n\nIst ein HTTPS-Proxy vorhanden?"; then
-        WIZ_HTTPS_PROXY="yes"
-        WIZ_BIND_HOST="127.0.0.1"
-        WIZ_REVERSE_PROXY_HOST=$(wt_input "Hostname des Reverse-Proxy" \
-            "Unter welchem Hostname / welcher Domain soll die App erreichbar sein?\n\nWird in METERS_ALLOWED_ORIGINS eingetragen (CSRF-Schutz). Beispiel: zaehler.example.com" \
-            "$WIZ_REVERSE_PROXY_HOST") || die "Abgebrochen."
-    else
-        WIZ_HTTPS_PROXY="no"
-    fi
+    # Sicherheits-Setup — beeinflusst Cookie-Secure, Trust-Proxy und Bind-Host.
+    # Drei realistische Topologien, weil "Reverse-Proxy ja/nein" zu grob war
+    # (NPM/Caddy auf eigenem Host braucht andere Werte als auf demselben Host).
+    local proxy_mode
+    proxy_mode=$(wt_menu "Netzwerk-Topologie" \
+        "Wie greifst du auf die App zu?" \
+        "lan-only"  "Nur direkt im Heimnetz (HTTP)" \
+        "proxy-same"  "Reverse-Proxy auf gleichem Host (nur HTTPS)" \
+        "proxy-other" "Reverse-Proxy auf anderem Host + IP-Zugriff" \
+        "abort"     "Abbrechen") || die "Abgebrochen."
+    [ "$proxy_mode" = "abort" ] && die "Abgebrochen."
+
+    case "$proxy_mode" in
+        lan-only)
+            WIZ_HTTPS_PROXY="no"
+            # Bind 0.0.0.0, kein Trust-Proxy, kein Cookie-Secure.
+            ;;
+        proxy-same)
+            # Reverse-Proxy auf demselben Host — App lauscht NUR auf
+            # 127.0.0.1, alles HTTPS-Only.
+            WIZ_HTTPS_PROXY="yes"
+            WIZ_BIND_HOST="127.0.0.1"
+            WIZ_REVERSE_PROXY_HOST=$(wt_input "Hostname des Reverse-Proxy" \
+                "Unter welchem Hostname / welcher Domain ist die App erreichbar?\nWird in METERS_ALLOWED_ORIGINS eingetragen (CSRF-Schutz)." \
+                "${WIZ_REVERSE_PROXY_HOST:-zaehler.example.com}") || die "Abgebrochen."
+            ;;
+        proxy-other)
+            # Reverse-Proxy auf anderem Host (NPM, separates Caddy etc.) UND
+            # paralleler IP-Zugriff im LAN. Bind bleibt 0.0.0.0; Trust-Proxy
+            # damit X-Forwarded-For vom NPM korrekt gewertet wird; Cookie
+            # bleibt aber NICHT secure, weil sonst HTTP-IP-Login bricht.
+            WIZ_HTTPS_PROXY="proxy-other"
+            WIZ_REVERSE_PROXY_HOST=$(wt_input "Hostname des Reverse-Proxy" \
+                "Unter welchem Hostname ist die App via Proxy erreichbar?\nWird in METERS_ALLOWED_ORIGINS eingetragen (CSRF-Schutz)." \
+                "${WIZ_REVERSE_PROXY_HOST:-zaehler.example.com}") || die "Abgebrochen."
+            ;;
+    esac
 
     # Admin-Daten — auch im Standard-Modus immer abfragen
     while :; do
@@ -264,10 +290,12 @@ install_wizard() {
     fi
 
     # Zusammenfassung + finale Bestätigung
-    local proxy_line="Reverse-Proxy : nein (HTTP, nur LAN)"
-    if [ "$WIZ_HTTPS_PROXY" = "yes" ]; then
-        proxy_line="Reverse-Proxy : ja  (HTTPS via $WIZ_REVERSE_PROXY_HOST)"
-    fi
+    local proxy_line
+    case "$WIZ_HTTPS_PROXY" in
+        yes)         proxy_line="Reverse-Proxy : gleicher Host, HTTPS via $WIZ_REVERSE_PROXY_HOST" ;;
+        proxy-other) proxy_line="Reverse-Proxy : anderer Host, HTTPS via $WIZ_REVERSE_PROXY_HOST, HTTP-IP-Zugriff bleibt erlaubt" ;;
+        *)           proxy_line="Reverse-Proxy : nein (HTTP, nur LAN)" ;;
+    esac
     if ! wt_yesno "Bereit zur Installation" "Folgende Konfiguration wird verwendet:
 
   Repository    : $WIZ_REPO_URL
@@ -329,13 +357,34 @@ cmd_install() {
     local cookie_secure_value="False"
     local trust_proxy_value="False"
     local allowed_origins_value=""
-    if [ "$WIZ_HTTPS_PROXY" = "yes" ]; then
-        cookie_secure_value="True"
-        trust_proxy_value="True"
-        if [ -n "$WIZ_REVERSE_PROXY_HOST" ]; then
-            allowed_origins_value="https://$WIZ_REVERSE_PROXY_HOST"
-        fi
-    fi
+    case "$WIZ_HTTPS_PROXY" in
+        yes)
+            # Proxy auf gleichem Host → nur HTTPS-Pfad → Cookies secure.
+            cookie_secure_value="True"
+            trust_proxy_value="True"
+            [ -n "$WIZ_REVERSE_PROXY_HOST" ] && \
+                allowed_origins_value="https://$WIZ_REVERSE_PROXY_HOST"
+            ;;
+        proxy-other)
+            # Proxy auf anderem Host plus paralleler HTTP-LAN-Zugriff.
+            # Cookie KANN nicht secure sein, sonst bricht der HTTP-Login.
+            # Trust-Proxy ist sicher, weil unsere Origin-Check-Middleware
+            # zusätzlich den Origin gegen die Allow-List prüft.
+            cookie_secure_value="False"
+            trust_proxy_value="True"
+            if [ -n "$WIZ_REVERSE_PROXY_HOST" ]; then
+                # Beide Origins erlauben: HTTPS via Proxy + HTTP per Container-IP.
+                local container_ip
+                container_ip=$(hostname -I 2>/dev/null | awk '{print $1}')
+                allowed_origins_value="https://$WIZ_REVERSE_PROXY_HOST"
+                [ -n "$container_ip" ] && \
+                    allowed_origins_value="$allowed_origins_value,http://$container_ip:$WIZ_BIND_PORT"
+            fi
+            ;;
+        no|"")
+            # LAN-Only — schon initialisiert.
+            ;;
+    esac
     if [ ! -f "$env_file" ]; then
         install -m 0600 -o "$APP_USER" -g "$APP_USER" /dev/null "$env_file"
         local secret_key
