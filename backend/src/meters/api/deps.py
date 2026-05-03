@@ -2,8 +2,9 @@
 
 ``get_current_user`` wertet das Session-Cookie aus und schlägt nach dem User
 in der DB. ``require_admin`` setzt obendrauf die Rollenprüfung. ``client_ip``
-ermittelt die echte Client-IP unter Berücksichtigung von X-Forwarded-For
-(wichtig hinter dem Reverse-Proxy).
+liest ``X-Forwarded-For`` **nur**, wenn ``settings.trust_proxy=True`` —
+sonst kann jeder Client den Header fälschen und damit den Rate-Limiter
+umgehen sowie das Audit-Log mit beliebigen IPs füttern.
 """
 
 from __future__ import annotations
@@ -13,6 +14,7 @@ from typing import Annotated
 from fastapi import Cookie, Depends, Request
 from sqlalchemy.orm import Session as DbSession
 
+from meters.core.config import settings
 from meters.core.problem import ProblemError
 from meters.core.security import SESSION_COOKIE_NAME
 from meters.db import get_session
@@ -54,7 +56,8 @@ AdminUser = Annotated[User, Depends(require_admin)]
 
 
 def client_ip(request: Request) -> str | None:
-    forwarded = request.headers.get("x-forwarded-for")
-    if forwarded:
-        return forwarded.split(",")[0].strip()
+    if settings.trust_proxy:
+        forwarded = request.headers.get("x-forwarded-for")
+        if forwarded:
+            return forwarded.split(",")[0].strip()
     return request.client.host if request.client else None

@@ -46,7 +46,40 @@ class Settings(BaseSettings):
     bind_host: str = "0.0.0.0"
     bind_port: int = 8000
 
+    # Wenn True, wird ``X-Forwarded-For`` als Client-IP gewertet — nur
+    # einschalten, wenn ein vertrauenswürdiger Reverse-Proxy davor steht.
+    # Sonst kann jeder Client den Header fälschen und damit Rate-Limiter
+    # umgehen / Audit-Log vergiften.
+    trust_proxy: bool = False
+
+    # Erlaubte Origins für mutating-Requests (CSRF-Schutz als Defense-in-Depth
+    # zu SameSite=strict). Komma-getrennt in der ENV setzen, z. B.
+    # METERS_ALLOWED_ORIGINS="https://zaehler.example.com".
+    # Same-Origin-Requests sind unabhängig davon immer erlaubt.
+    allowed_origins: list[str] = []
+
     static_dir: Path = Path(__file__).resolve().parent.parent / "static"
 
 
 settings = Settings()
+
+
+def assert_secure_secret_key() -> None:
+    """Bricht den Boot ab, wenn der Default-SECRET_KEY in einer Produktions-
+    Konfig (debug=False) noch verwendet wird. Im Dev-Modus nur Warnung.
+    """
+    import warnings
+
+    if settings.secret_key == "change-me-in-production":
+        if settings.debug:
+            warnings.warn(
+                "METERS_SECRET_KEY ist auf den Default 'change-me-in-production' gesetzt — "
+                "im Dev-Modus geduldet, aber für Produktion Pflicht-Override.",
+                stacklevel=2,
+            )
+        else:
+            raise RuntimeError(
+                "METERS_SECRET_KEY ist nicht gesetzt (Default: 'change-me-in-production'). "
+                "Setze einen zufälligen Wert in /opt/zaehler/data/meters.env, z. B. "
+                "`python -c 'import secrets; print(secrets.token_urlsafe(48))'`."
+            )

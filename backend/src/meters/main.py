@@ -16,12 +16,16 @@ from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from meters.api import router as api_router
-from meters.core.config import settings
+from meters.core.config import assert_secure_secret_key, settings
+from meters.core.middleware import install_origin_check, install_security_headers
 from meters.core.problem import install_problem_handlers
 
 
 def create_app() -> FastAPI:
+    assert_secure_secret_key()
     app = FastAPI(title=settings.app_name, debug=settings.debug)
+    install_security_headers(app)
+    install_origin_check(app)
     install_problem_handlers(app)
     app.include_router(api_router)
 

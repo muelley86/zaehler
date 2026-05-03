@@ -74,3 +74,14 @@ class LoginRateLimiter:
 
 
 login_limiter = LoginRateLimiter()
+
+# Zweiter Limiter pro Username — schützt gegen IP-Hopping (Mobilfunk, IPv6
+# Privacy Extensions, Tor). Etwas großzügiger als der IP-Limiter, weil ein
+# legitimer User mal das Passwort tippt; bei dauerhaft falschen Eingaben
+# greift eine längere Sperre. Username wird vor Verwendung lowergecast,
+# damit ``Admin``/``admin`` denselben Bucket teilen.
+username_limiter = LoginRateLimiter(
+    max_attempts=10,
+    window_seconds=10 * 60,
+    lockout_seconds=30 * 60,
+)

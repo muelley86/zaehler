@@ -21,7 +21,7 @@ from meters.models import AuditAction, AuditEntityType
 from meters.schemas import ChangePasswordRequest, LoginRequest, MeResponse
 from meters.services import auth as auth_service
 from meters.services.audit import record
-from meters.services.rate_limit import login_limiter
+from meters.services.rate_limit import login_limiter, username_limiter
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -34,7 +34,10 @@ def login(
     db: DbDep,
 ) -> MeResponse:
     ip = client_ip(request) or "unknown"
+    username_key = payload.username.strip().lower()
     locked_for = login_limiter.check(ip)
+    if locked_for is None:
+        locked_for = username_limiter.check(username_key)
     if locked_for is not None:
         raise ProblemError(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
@@ -45,6 +48,7 @@ def login(
     user = auth_service.authenticate(db, username=payload.username, password=payload.password)
     if user is None:
         login_limiter.record_failure(ip)
+        username_limiter.record_failure(username_key)
         record(
             db,
             user_id=None,
@@ -58,6 +62,7 @@ def login(
         raise ProblemError(status_code=401, title="Invalid credentials")
 
     login_limiter.record_success(ip)
+    username_limiter.record_success(username_key)
     user_agent = request.headers.get("user-agent")
     _session, token = auth_service.issue_session(
         db, user=user, user_agent=user_agent, ip_address=ip
