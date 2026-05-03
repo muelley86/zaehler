@@ -23,7 +23,10 @@ export default defineConfig({
   build: {
     outDir: '../backend/src/meters/static',
     emptyOutDir: true,
-    sourcemap: true,
+    // Source-Maps in Produktion AUS — exposiert sonst die unminifizierte
+    // Komponentenstruktur im public Repo. Für Dev (`pnpm dev`) erzeugt Vite
+    // ohnehin transparente Maps zur Laufzeit.
+    sourcemap: false,
   },
   test: {
     environment: 'jsdom',

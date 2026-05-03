@@ -1,3 +1,6 @@
+# --- Build-Source-Maps (im public Repo nicht erwünscht) ---
+backend/src/meters/static/assets/*.map
+
 # --- Python ---
 __pycache__/
 *.py[cod]
