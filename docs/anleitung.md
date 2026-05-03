@@ -308,8 +308,25 @@ neuen Container anlegen, Bootstrap-Einzeiler laufen lassen, alte
 | `backup` | Sofort einen DB-Snapshot erzeugen |
 | `restore <datei.gz>` | Backup einspielen |
 | `reset-password` | Passwort eines Users (z. B. Admin) neu setzen |
+| `audit` | Dependency-Audit für Frontend (pnpm) und Backend (pip-audit) |
 | `status` | Übersicht: Service, Versionen, DB, Backups, Repo |
 | `help` | Komplette Befehlsreferenz |
+
+### Sicherheit
+
+- **HTTPS-Reverse-Proxy** dringend empfohlen, sobald die App von außen
+  erreichbar ist. Im Wizard fragt `install` nach einem Proxy und setzt
+  bei Ja automatisch `cookie_secure`, `trust_proxy` und HSTS ein. Caddy-
+  Beispiel siehe `deploy/lxc/README.md` §4.
+- **Regelmäßiger Audit-Lauf**: `sudo bash zaehler.sh audit` listet
+  bekannte Schwachstellen in JavaScript- und Python-Abhängigkeiten auf.
+  Empfehlung: monatlich oder bei jeder größeren Änderung.
+- **Backup-Verzeichnis** liegt unter `0700`-Permissions — nur der App-
+  User darf lesen. Zusätzliche Sicherung auf externen Speicher
+  empfehlenswert (Hardware-Defekt-Schutz).
+- **Login-Lockout**: pro IP nach 5 Fehlversuchen 15 min Sperre, pro
+  Username nach 10 Fehlversuchen 30 min Sperre — schützt vor Brute-
+  Force auch bei wechselnden IPs.
 
 ### git-Mini-Spickzettel
 

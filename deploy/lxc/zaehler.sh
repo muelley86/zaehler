@@ -142,6 +142,8 @@ WIZ_BIND_PORT="8000"
 WIZ_ADMIN_USER="admin"
 WIZ_ADMIN_PASSWORD=""
 WIZ_BACKUP_TIME="03:30"
+WIZ_HTTPS_PROXY="no"
+WIZ_REVERSE_PROXY_HOST=""
 
 # Heuristik: kann der Wizard interaktive Dialoge zeigen?
 is_interactive() { [ -t 0 ] && [ -t 1 ] && have_whiptail; }
@@ -219,6 +221,19 @@ install_wizard() {
         done
     fi
 
+    # Sicherheits-Frage zum HTTPS-Reverse-Proxy — beeinflusst Cookie-Secure,
+    # Trust-Proxy und ggf. Bind-Host. Auch im Standard-Modus stellen wir
+    # diese eine Frage, weil sie sicherheitsrelevant ist.
+    if wt_yesno "HTTPS-Reverse-Proxy" "Steht ein HTTPS-Reverse-Proxy (Caddy / Traefik / nginx) vor der App?\n\n• Ja  → Cookies werden auf 'Secure' gesetzt, X-Forwarded-For wird vertraut, HSTS-Header wird gesendet, Bind-Host wird auf 127.0.0.1 gestellt.\n• Nein → App lauscht direkt im LAN auf $WIZ_BIND_HOST:$WIZ_BIND_PORT (Klartext-HTTP, nur fürs Heimnetz akzeptabel).\n\nIst ein HTTPS-Proxy vorhanden?"; then
+        WIZ_HTTPS_PROXY="yes"
+        WIZ_BIND_HOST="127.0.0.1"
+        WIZ_REVERSE_PROXY_HOST=$(wt_input "Hostname des Reverse-Proxy" \
+            "Unter welchem Hostname / welcher Domain soll die App erreichbar sein?\n\nWird in METERS_ALLOWED_ORIGINS eingetragen (CSRF-Schutz). Beispiel: zaehler.example.com" \
+            "$WIZ_REVERSE_PROXY_HOST") || die "Abgebrochen."
+    else
+        WIZ_HTTPS_PROXY="no"
+    fi
+
     # Admin-Daten — auch im Standard-Modus immer abfragen
     while :; do
         WIZ_ADMIN_USER=$(wt_input "Admin-Username" \
@@ -249,6 +264,10 @@ install_wizard() {
     fi
 
     # Zusammenfassung + finale Bestätigung
+    local proxy_line="Reverse-Proxy : nein (HTTP, nur LAN)"
+    if [ "$WIZ_HTTPS_PROXY" = "yes" ]; then
+        proxy_line="Reverse-Proxy : ja  (HTTPS via $WIZ_REVERSE_PROXY_HOST)"
+    fi
     if ! wt_yesno "Bereit zur Installation" "Folgende Konfiguration wird verwendet:
 
   Repository    : $WIZ_REPO_URL
@@ -256,6 +275,7 @@ install_wizard() {
   Bind-Port     : $WIZ_BIND_PORT
   Admin-User    : $WIZ_ADMIN_USER
   Backup-Zeit   : $WIZ_BACKUP_TIME (täglich)
+  $proxy_line
 
 App-Verzeichnis : $APP_DIR
 Daten-Verzeichnis: $DATA_DIR
@@ -299,12 +319,23 @@ cmd_install() {
     else
         ok "User '$APP_USER' existiert bereits"
     fi
-    install -d -o "$APP_USER" -g "$APP_USER" "$DATA_DIR"
-    install -d -o "$APP_USER" -g "$APP_USER" "$BACKUP_DIR"
-    ok "Verzeichnisse angelegt: $DATA_DIR, $BACKUP_DIR"
+    # Backups nicht world-readable: nur User+Group lesen Backup-Snapshots.
+    install -d -m 0750 -o "$APP_USER" -g "$APP_USER" "$DATA_DIR"
+    install -d -m 0700 -o "$APP_USER" -g "$APP_USER" "$BACKUP_DIR"
+    ok "Verzeichnisse angelegt: $DATA_DIR (0750), $BACKUP_DIR (0700)"
 
     step "4/10  Konfiguration ($DATA_DIR/meters.env)"
     local env_file="$DATA_DIR/meters.env"
+    local cookie_secure_value="False"
+    local trust_proxy_value="False"
+    local allowed_origins_value=""
+    if [ "$WIZ_HTTPS_PROXY" = "yes" ]; then
+        cookie_secure_value="True"
+        trust_proxy_value="True"
+        if [ -n "$WIZ_REVERSE_PROXY_HOST" ]; then
+            allowed_origins_value="https://$WIZ_REVERSE_PROXY_HOST"
+        fi
+    fi
     if [ ! -f "$env_file" ]; then
         install -m 0600 -o "$APP_USER" -g "$APP_USER" /dev/null "$env_file"
         local secret_key
@@ -314,14 +345,28 @@ METERS_SECRET_KEY=$secret_key
 METERS_DATABASE_URL=sqlite:///$DATA_DIR/meters.db
 METERS_BIND_HOST=$WIZ_BIND_HOST
 METERS_BIND_PORT=$WIZ_BIND_PORT
-METERS_COOKIE_SECURE=False
+METERS_COOKIE_SECURE=$cookie_secure_value
+METERS_TRUST_PROXY=$trust_proxy_value
+METERS_ALLOWED_ORIGINS=$allowed_origins_value
 EOF
-        ok "Konfiguration mit zufälligem SECRET_KEY angelegt"
+        ok "Konfiguration mit zufälligem SECRET_KEY angelegt (cookie_secure=$cookie_secure_value, trust_proxy=$trust_proxy_value)"
     else
         # Bestehende meters.env idempotent ergänzen, falls Schlüssel fehlen
+        local appended=0
         if ! grep -q '^METERS_DATABASE_URL=' "$env_file"; then
             echo "METERS_DATABASE_URL=sqlite:///$DATA_DIR/meters.db" >> "$env_file"
-            ok "DATABASE_URL in bestehender meters.env ergänzt"
+            appended=1
+        fi
+        if ! grep -q '^METERS_TRUST_PROXY=' "$env_file"; then
+            echo "METERS_TRUST_PROXY=$trust_proxy_value" >> "$env_file"
+            appended=1
+        fi
+        if ! grep -q '^METERS_ALLOWED_ORIGINS=' "$env_file"; then
+            echo "METERS_ALLOWED_ORIGINS=$allowed_origins_value" >> "$env_file"
+            appended=1
+        fi
+        if [ "$appended" = "1" ]; then
+            ok "fehlende Schlüssel in bestehender meters.env ergänzt"
         else
             ok "Konfiguration existiert bereits — unverändert"
         fi
@@ -713,6 +758,24 @@ cmd_status() {
 }
 
 # -----------------------------------------------------------------------------
+# audit — Dependency-Audit fürs Frontend (pnpm) und Backend (pip-audit)
+# -----------------------------------------------------------------------------
+
+cmd_audit() {
+    [ -d "$REPO_DIR/.git" ] || die "Kein Repository unter $REPO_DIR — bitte erst 'install' ausführen."
+
+    step "Frontend (pnpm audit --prod)"
+    as_user "cd '$REPO_DIR/frontend' && pnpm audit --prod --audit-level=moderate" \
+        || warn "pnpm meldet bekannte Schwachstellen — siehe Output oben"
+
+    step "Backend (uv tool run pip-audit)"
+    as_user "cd '$REPO_DIR/backend' && uv tool run pip-audit --strict" \
+        || warn "pip-audit meldet Schwachstellen oder ist nicht erreichbar"
+
+    ok "Audit abgeschlossen — bei kritischen Funden umgehend 'upgrade-app' / Dependencies aktualisieren."
+}
+
+# -----------------------------------------------------------------------------
 # reset-password — Passwort eines Users (z. B. Admin) neu setzen
 # -----------------------------------------------------------------------------
 
@@ -794,6 +857,11 @@ ${C_BOLD}zaehler.sh — Verwaltungsskript für die Zählerstand-App${C_RESET}
     reset-password       Passwort eines Users neu setzen (z. B. Admin
                          vergessen) — fragt User+Passwort interaktiv
 
+  ${C_BOLD}Sicherheit:${C_RESET}
+    audit                Dependency-Audit (pnpm audit + pip-audit) —
+                         meldet bekannte Schwachstellen in Front- und
+                         Backend-Abhängigkeiten
+
   ${C_BOLD}Diagnose:${C_RESET}
     status               Übersicht: Service, Versionen, DB, Backups, Repo
 
@@ -836,6 +904,7 @@ case "${1:-help}" in
     backup)          cmd_backup ;;
     restore)         cmd_restore "${2:-}" ;;
     reset-password)  cmd_reset_password ;;
+    audit)           cmd_audit ;;
     status)          cmd_status ;;
     help|-h|--help)  cmd_help ;;
     *)
