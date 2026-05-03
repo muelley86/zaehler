@@ -889,6 +889,108 @@ cmd_configure_network() {
 }
 
 # -----------------------------------------------------------------------------
+# fix-database — DB aus inkonsistentem Zustand sauber zurücksetzen
+# -----------------------------------------------------------------------------
+#
+# Repariert das klassische "alembic_version fehlt"-Problem (z. B. wenn ein
+# alter create-admin-Aufruf via Base.metadata.create_all Tabellen ohne
+# Migrations-Tracking erzeugt hat, und spätere Upgrades dann mit
+# OperationalError: no such column abbrechen).
+#
+# Ablauf (interaktiv bestätigt, weil destruktiv):
+#   1. Service stoppen
+#   2. Aktuelle DB als meters.db.broken-<timestamp> beiseite legen
+#   3. alembic upgrade head — erzeugt frische Tabellen mit allen Migrationen
+#   4. Admin-Anlage geführt (gleicher Wizard wie install)
+#   5. Service starten
+
+cmd_fix_database() {
+    require_root
+    [ -d "$REPO_DIR/.git" ] || die "Kein Repository unter $REPO_DIR — bitte erst 'install' ausführen."
+
+    ensure_whiptail
+    ensure_env_file
+
+    local db_file="$DATA_DIR/meters.db"
+    local current_version="(keine alembic-Tabelle)"
+    if [ -f "$db_file" ]; then
+        current_version=$(sqlite3 "$db_file" 'SELECT version_num FROM alembic_version' 2>/dev/null || echo "(keine alembic-Tabelle)")
+    fi
+
+    if is_interactive; then
+        if ! wt_yesno "Datenbank zurücksetzen" "Dieses Kommando setzt die Datenbank auf einen sauberen, frisch migrierten Zustand zurück.\n\nAktueller Stand:\n  Datei      : $db_file\n  Migration  : $current_version\n\nWAS PASSIERT:\n  • Aktuelle DB wird als meters.db.broken-<datum> beiseite gelegt (nicht gelöscht)\n  • Frische DB mit allen Migrationen wird angelegt\n  • Admin-User wird neu angelegt (du kannst danach einloggen und alles neu eintragen)\n\nALLE BISHERIGEN ERFASSUNGEN, MESSSTELLEN, STANDORTE GEHEN VERLOREN.\n\nWenn du sie behalten willst: jetzt ABBRECHEN und vorher ein zaehler.sh backup machen.\n\nFortfahren?"; then
+            die "Abgebrochen."
+        fi
+    else
+        die "fix-database braucht einen interaktiven TTY — bitte direkt im Container aufrufen."
+    fi
+
+    # Admin-Daten vorab abfragen (wie im install-Wizard)
+    local admin_user="admin"
+    [ -n "${ADMIN_USER:-}" ] && admin_user="$ADMIN_USER"
+    while :; do
+        admin_user=$(wt_input "Admin-Username" \
+            "Username für den neuen Admin-Account." \
+            "$admin_user") || die "Abgebrochen."
+        valid_user "$admin_user" && break
+        wt_msgbox "Ungültiger Username" "2-32 Zeichen, beginnt mit Buchstabe."
+    done
+
+    local admin_pw=""
+    while :; do
+        admin_pw=$(wt_password "Admin-Passwort" \
+            "Initiales Passwort für '$admin_user' (mind. 12 Zeichen).\nMuss beim ersten Login geändert werden.") || die "Abgebrochen."
+        if [ "${#admin_pw}" -lt 12 ]; then
+            wt_msgbox "Zu kurz" "Mindestens 12 Zeichen."
+            continue
+        fi
+        local pw_confirm
+        pw_confirm=$(wt_password "Passwort bestätigen" "Bitte erneut eingeben.") || die "Abgebrochen."
+        if [ "$admin_pw" != "$pw_confirm" ]; then
+            wt_msgbox "Stimmt nicht überein" "Bitte nochmal."
+            continue
+        fi
+        break
+    done
+
+    step "1/5  Service stoppen"
+    systemctl stop "$SERVICE_NAME"
+
+    step "2/5  Aktuelle DB beiseite legen"
+    if [ -f "$db_file" ]; then
+        local broken="$DATA_DIR/meters.db.broken-$(date +%Y%m%d-%H%M%S)"
+        mv "$db_file" "$broken"
+        rm -f "$DATA_DIR/meters.db-shm" "$DATA_DIR/meters.db-wal" || true
+        ok "DB nach $broken verschoben (kann manuell wiederhergestellt werden)"
+    else
+        ok "Keine bestehende DB — direkt frisch anlegen"
+    fi
+
+    step "3/5  Frische Migration durchziehen (alembic upgrade head)"
+    as_user "cd '$REPO_DIR/backend' && uv run alembic upgrade head"
+    ok "Schema auf aktuellem Stand"
+
+    step "4/5  Admin-Benutzer anlegen"
+    as_user "cd '$REPO_DIR/backend' && uv run python -m meters.cli create-admin --username '$admin_user' --password '$admin_pw' --force-change"
+    ok "Admin '$admin_user' angelegt — Passwort beim ersten Login zu ändern"
+
+    step "5/5  Service starten"
+    systemctl start "$SERVICE_NAME"
+    sleep 2
+    if systemctl is-active --quiet "$SERVICE_NAME"; then
+        local container_ip
+        container_ip=$(hostname -I 2>/dev/null | awk '{print $1}')
+        container_ip="${container_ip:-<container-ip>}"
+        local port
+        port=$(grep -E '^METERS_BIND_PORT=' "$DATA_DIR/meters.env" | cut -d= -f2 | tr -d ' ')
+        port="${port:-8000}"
+        ok "Datenbank repariert. App läuft unter http://$container_ip:$port"
+    else
+        die "Service startet nicht — prüfe 'journalctl -u $SERVICE_NAME -n 40'"
+    fi
+}
+
+# -----------------------------------------------------------------------------
 # rollback — App auf einen früheren Tag/Commit umschalten und neu bauen
 # -----------------------------------------------------------------------------
 
@@ -1034,6 +1136,9 @@ ${C_BOLD}zaehler.sh — Verwaltungsskript für die Zählerstand-App${C_RESET}
     backup               Sofort einen DB-Snapshot erzeugen
     restore <datei.gz>   Backup einspielen (stoppt Service, ersetzt DB,
                          startet Service neu)
+    fix-database         DB komplett zurücksetzen, wenn alembic-Migrations-
+                         Tracking kaputt ist (alte DB wird beiseite gelegt,
+                         Admin neu anlegen, alles andere neu eintragen)
     rollback <ref>       Auf eine frühere Tag/Commit-Version zurückgehen
                          (Backup → checkout → build → restart)
 
@@ -1091,6 +1196,7 @@ case "${1:-help}" in
     upgrade-all)     cmd_upgrade_all ;;
     backup)              cmd_backup ;;
     restore)             cmd_restore "${2:-}" ;;
+    fix-database)        cmd_fix_database ;;
     rollback)            cmd_rollback "${2:-}" ;;
     reset-password)      cmd_reset_password ;;
     configure-network)   cmd_configure_network ;;
