@@ -1,35 +1,20 @@
 /**
- * React-Context, der den aktuell angemeldeten User bereitstellt.
+ * AuthProvider — füllt den AuthContext bei React-Mount mit dem
+ * aktuell angemeldeten User (`/auth/me`-Roundtrip) und stellt
+ * login/verifyTotp/logout/refresh bereit.
  *
- * Beim ersten Render wird `/auth/me` aufgerufen, um eine bestehende Session
- * zu erkennen (HTTP-Cookie ist httpOnly, das Frontend kann ihn nicht lesen).
- * Liefert `me`, `loading`, plus `login`/`verifyTotp`/`logout`/`refresh`.
- *
- * Login ist zweistufig: `login()` liefert entweder `{ kind: 'ok', me }` oder
- * `{ kind: 'totp', challengeToken }`. Im zweiten Fall muss der Caller
- * `verifyTotp(challengeToken, code)` aufrufen.
+ * Hook + Context-Definition liegen in `auth-context.ts`, damit Vites
+ * Fast-Refresh nicht durch zusätzliche Nicht-Component-Exports
+ * gestört wird.
  */
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 
 import { ApiError, api } from '@/lib/api';
 import type { LoginResponse, Me } from '@/lib/types';
-
-export type LoginResult =
-  | { kind: 'ok'; me: Me }
-  | { kind: 'totp'; challengeToken: string };
-
-interface AuthState {
-  me: Me | null;
-  loading: boolean;
-  login: (username: string, password: string) => Promise<LoginResult>;
-  verifyTotp: (challengeToken: string, code: string) => Promise<Me>;
-  logout: () => Promise<void>;
-  refresh: () => Promise<void>;
-}
-
-const AuthContext = createContext<AuthState | null>(null);
+import { AuthContext } from './auth-context';
+import type { AuthState, LoginResult } from './auth-context';
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [me, setMe] = useState<Me | null>(null);
@@ -88,12 +73,4 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [me, loading, login, verifyTotp, logout, refresh],
   );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
-}
-
-export function useAuth(): AuthState {
-  const ctx = useContext(AuthContext);
-  if (!ctx) {
-    throw new Error('useAuth must be used within AuthProvider');
-  }
-  return ctx;
 }

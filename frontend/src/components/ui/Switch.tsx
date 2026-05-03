@@ -21,7 +21,7 @@ export function Switch({
       onClick={() => onChange(!checked)}
       className={cx(
         'relative inline-flex h-[31px] w-[51px] shrink-0 cursor-pointer items-center rounded-full border-hairline transition-colors',
-        checked ? 'border-transparent bg-gradient-primary' : 'border-border bg-fill',
+        checked ? 'bg-gradient-primary border-transparent' : 'border-border bg-fill',
         disabled && 'cursor-not-allowed opacity-40',
       )}
     >

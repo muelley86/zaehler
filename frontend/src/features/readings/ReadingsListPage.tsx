@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
 import { Download, Pencil, Search, Trash2 } from 'lucide-react';
 
-import { useAuth } from '@/features/auth/AuthProvider';
+import { useAuth } from '@/features/auth/auth-context';
 import {
   Button,
   EmptyState,
@@ -15,13 +15,7 @@ import {
 } from '@/components/ui';
 import { PageGlows } from '@/components/PageGlows';
 import { ApiError, api } from '@/lib/api';
-import {
-  formatDateDe,
-  formatDateTimeDe,
-  formatDe,
-  parseDe,
-  toInputDateTime,
-} from '@/lib/format';
+import { formatDateDe, formatDateTimeDe, formatDe, parseDe, toInputDateTime } from '@/lib/format';
 import type { DeliveryRead, Me, MeasuringPointRead, MeterType, ReadingRead } from '@/lib/types';
 import { cx } from '@/components/ui/cx';
 
@@ -337,7 +331,7 @@ export function ReadingsListPage() {
     return (
       <PageContainer>
         <LargeTitle title="Erfassungen" />
-        <div className="rounded-card border-hairline border-danger/40 bg-danger/10 p-3 text-danger">
+        <div className="border-danger/40 bg-danger/10 rounded-card border-hairline p-3 text-danger">
           {error}
         </div>
       </PageContainer>
@@ -694,7 +688,7 @@ function ReadingItem({
           leftIcon={<Trash2 size={14} />}
           disabled={!editable || busy}
           onClick={() => void remove()}
-          className="text-danger hover:bg-danger/10"
+          className="hover:bg-danger/10 text-danger"
         >
           Löschen
         </Button>
@@ -782,7 +776,7 @@ function DeliveryItem({
           leftIcon={<Trash2 size={14} />}
           disabled={!editable || busy}
           onClick={() => void remove()}
-          className="text-danger hover:bg-danger/10"
+          className="hover:bg-danger/10 text-danger"
         >
           Löschen
         </Button>

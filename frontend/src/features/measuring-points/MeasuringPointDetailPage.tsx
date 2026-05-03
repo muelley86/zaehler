@@ -71,7 +71,7 @@ export function MeasuringPointDetailPage() {
     return (
       <PageContainer>
         <BackLink />
-        <div className="rounded-card border-hairline border-danger/40 bg-danger/10 p-3 text-danger">
+        <div className="border-danger/40 bg-danger/10 rounded-card border-hairline p-3 text-danger">
           {error}
         </div>
       </PageContainer>
@@ -139,7 +139,7 @@ export function MeasuringPointDetailPage() {
               )}
             </div>
             {activeMeter ? (
-              <span className="rounded-full bg-success/15 px-2 py-0.5 text-caption font-semibold text-success">
+              <span className="bg-success/15 rounded-full px-2 py-0.5 text-caption font-semibold text-success">
                 aktiv
               </span>
             ) : null}
@@ -275,11 +275,7 @@ function ConsumptionChart({
                 ))}
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke={theme.grid} />
-              <XAxis
-                dataKey="date"
-                tick={{ fontSize: 11, fill: theme.axis }}
-                stroke={theme.axis}
-              />
+              <XAxis dataKey="date" tick={{ fontSize: 11, fill: theme.axis }} stroke={theme.axis} />
               <YAxis
                 tick={{ fontSize: 11, fill: theme.axis }}
                 stroke={theme.axis}
@@ -322,13 +318,7 @@ function ConsumptionChart({
   );
 }
 
-function RegisterTable({
-  mp,
-  states,
-}: {
-  mp: MeasuringPointRead;
-  states: RegisterStateRead[];
-}) {
+function RegisterTable({ mp, states }: { mp: MeasuringPointRead; states: RegisterStateRead[] }) {
   const stateByRegister = new Map(states.map((s) => [s.register_id, s]));
   const allRegisters = mp.physical_meters
     .flatMap((meter) =>

@@ -18,7 +18,7 @@ export function Section({
       {header ? (
         <div className="px-1 text-caption-bold uppercase text-tertiary">{header}</div>
       ) : null}
-      <div className="overflow-hidden rounded-card border-hairline border-border bg-surface glass shadow-glass dark:shadow-glass-dark">
+      <div className="glass overflow-hidden rounded-card border-hairline border-border bg-surface shadow-glass dark:shadow-glass-dark">
         {children}
       </div>
       {footer ? <div className="px-1 text-caption text-tertiary">{footer}</div> : null}

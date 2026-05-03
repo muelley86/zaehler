@@ -2,7 +2,7 @@ import { Gauge, KeyRound, LogOut, MapPin, Moon, ScrollText, Sun, Users } from 'l
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-import { useAuth } from '@/features/auth/AuthProvider';
+import { useAuth } from '@/features/auth/auth-context';
 import { TwoFactorSection } from '@/features/auth/TwoFactorSection';
 import { Card, LargeTitle, Row, RowGroup, Section } from '@/components/ui';
 import { PageGlows } from '@/components/PageGlows';
@@ -60,7 +60,7 @@ export function MorePage() {
         {/* Profil-Card oben */}
         <Card>
           <div className="flex items-center gap-4">
-            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-gradient-primary text-title-3 font-bold text-white shadow-glow-primary">
+            <div className="bg-gradient-primary shadow-glow-primary flex h-14 w-14 shrink-0 items-center justify-center rounded-full text-title-3 font-bold text-white">
               {initial}
             </div>
             <div className="min-w-0 flex-1">
@@ -88,9 +88,7 @@ export function MorePage() {
                     ? 'Hell'
                     : 'Dunkel'
               }
-              trailing={
-                <ThemeToggle value={themeChoice} onChange={setThemeChoice} />
-              }
+              trailing={<ThemeToggle value={themeChoice} onChange={setThemeChoice} />}
             />
           </RowGroup>
         </Section>
@@ -123,9 +121,7 @@ export function MorePage() {
         {/* 2FA */}
         <TwoFactorSection />
 
-        <div className="px-4 text-center text-caption text-tertiary">
-          Zählerstand · self-hosted
-        </div>
+        <div className="px-4 text-center text-caption text-tertiary">Zählerstand · self-hosted</div>
       </div>
     </div>
   );

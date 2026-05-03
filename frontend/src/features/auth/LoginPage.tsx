@@ -6,7 +6,7 @@ import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { Button, Card, TextField } from '@/components/ui';
 import { PageGlows } from '@/components/PageGlows';
 import { ApiError } from '@/lib/api';
-import { useAuth } from './AuthProvider';
+import { useAuth } from './auth-context';
 
 type Step = 'credentials' | 'totp';
 
@@ -80,7 +80,7 @@ export function LoginPage() {
       <PageGlows accent="electricity" />
       <Card className="relative z-10 w-full max-w-sm" padded={false}>
         <div className="flex flex-col items-center gap-3 px-6 pb-2 pt-8 text-center">
-          <div className="flex h-14 w-14 items-center justify-center rounded-card bg-gradient-primary text-white shadow-glow-primary">
+          <div className="bg-gradient-primary shadow-glow-primary flex h-14 w-14 items-center justify-center rounded-card text-white">
             {step === 'credentials' ? (
               <Gauge size={28} strokeWidth={2.5} />
             ) : (
@@ -122,10 +122,7 @@ export function LoginPage() {
             </Button>
           </form>
         ) : (
-          <form
-            onSubmit={(e) => void handleSubmitTotp(e)}
-            className="space-y-4 px-6 pb-6 pt-4"
-          >
+          <form onSubmit={(e) => void handleSubmitTotp(e)} className="space-y-4 px-6 pb-6 pt-4">
             <div className="text-body-sm text-secondary">
               Gib den 6-stelligen Code aus deiner Authenticator-App ein. Alternativ funktioniert
               auch ein 16-stelliger Backup-Code.
@@ -143,12 +140,7 @@ export function LoginPage() {
               autoFocus
             />
             <div className="flex gap-2">
-              <Button
-                type="button"
-                variant="bordered"
-                onClick={backToCredentials}
-                disabled={busy}
-              >
+              <Button type="button" variant="bordered" onClick={backToCredentials} disabled={busy}>
                 Zurück
               </Button>
               <Button type="submit" variant="filled" size="lg" fullWidth disabled={busy}>

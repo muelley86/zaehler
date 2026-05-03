@@ -57,9 +57,7 @@ export function Row(props: RowProps) {
       ) : null}
       <div className="min-w-0 flex-1">
         <div className="truncate text-body font-medium text-label">{label}</div>
-        {sublabel ? (
-          <div className="truncate text-caption text-tertiary">{sublabel}</div>
-        ) : null}
+        {sublabel ? <div className="truncate text-caption text-tertiary">{sublabel}</div> : null}
       </div>
       {value !== undefined && value !== null ? (
         <div className="num shrink-0 text-body text-secondary">{value}</div>

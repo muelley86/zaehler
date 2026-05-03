@@ -16,13 +16,8 @@ import { Copy, Printer, ShieldAlert, ShieldCheck } from 'lucide-react';
 
 import { Button, Row, RowGroup, Section, Sheet, TextField } from '@/components/ui';
 import { ApiError, api } from '@/lib/api';
-import { useAuth } from '@/features/auth/AuthProvider';
-import type {
-  BackupCodesResponse,
-  Me,
-  TotpSetupResponse,
-  TotpStatusResponse,
-} from '@/lib/types';
+import { useAuth } from '@/features/auth/auth-context';
+import type { BackupCodesResponse, Me, TotpSetupResponse, TotpStatusResponse } from '@/lib/types';
 
 type SheetMode =
   | { kind: 'closed' }
@@ -76,30 +71,20 @@ export function TwoFactorSection() {
 
   return (
     <Section header="Zwei-Faktor-Authentisierung">
-      {error ? (
-        <div className="px-5 py-3 text-caption text-danger">{error}</div>
-      ) : null}
+      {error ? <div className="px-5 py-3 text-caption text-danger">{error}</div> : null}
       {me?.totp_enabled ? (
         <RowGroup>
           <Row
             icon={<ShieldCheck size={20} />}
             label="Aktiviert"
-            sublabel={
-              status
-                ? `${status.backup_codes_remaining} Backup-Codes übrig`
-                : '—'
-            }
+            sublabel={status ? `${status.backup_codes_remaining} Backup-Codes übrig` : '—'}
           />
           <Row
             onClick={() => void regenerateCodes()}
             label="Backup-Codes neu generieren"
             sublabel="Alte werden sofort ungültig"
           />
-          <Row
-            onClick={startDisable}
-            label="2FA deaktivieren"
-            destructive
-          />
+          <Row onClick={startDisable} label="2FA deaktivieren" destructive />
         </RowGroup>
       ) : (
         <RowGroup>
@@ -124,10 +109,7 @@ export function TwoFactorSection() {
       ) : null}
 
       {sheet.kind === 'codes' ? (
-        <BackupCodesSheet
-          codes={sheet.codes}
-          onClose={() => setSheet({ kind: 'closed' })}
-        />
+        <BackupCodesSheet codes={sheet.codes} onClose={() => setSheet({ kind: 'closed' })} />
       ) : null}
 
       {sheet.kind === 'disable' && me ? (
@@ -233,13 +215,7 @@ function SetupSheet({
   );
 }
 
-function BackupCodesSheet({
-  codes,
-  onClose,
-}: {
-  codes: string[];
-  onClose: () => void;
-}) {
+function BackupCodesSheet({ codes, onClose }: { codes: string[]; onClose: () => void }) {
   const text = codes.join('\n');
   function copy() {
     void navigator.clipboard?.writeText(text);
@@ -258,10 +234,13 @@ function BackupCodesSheet({
   return (
     <Sheet open onClose={onClose} title="Backup-Codes">
       <div className="space-y-4">
-        <div className="rounded-card border-hairline border-warning bg-fill p-3 text-caption text-secondary" style={{ borderColor: 'var(--gas)' }}>
-          <strong className="text-label">Diese Codes werden nur jetzt angezeigt.</strong>{' '}
-          Drucke sie aus oder lege sie an einem sicheren Ort ab. Jeder Code funktioniert nur
-          einmal als Ersatz für einen Authenticator-Code.
+        <div
+          className="border-warning rounded-card border-hairline bg-fill p-3 text-caption text-secondary"
+          style={{ borderColor: 'var(--gas)' }}
+        >
+          <strong className="text-label">Diese Codes werden nur jetzt angezeigt.</strong> Drucke sie
+          aus oder lege sie an einem sicheren Ort ab. Jeder Code funktioniert nur einmal als Ersatz
+          für einen Authenticator-Code.
         </div>
         <ul className="grid grid-cols-2 gap-2">
           {codes.map((c) => (

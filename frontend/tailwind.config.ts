@@ -60,8 +60,7 @@ const config: Config = {
       boxShadow: {
         glass:
           '0 1px 0 rgba(255,255,255,0.6) inset, 0 1px 2px rgba(60,40,20,0.04), 0 8px 24px rgba(60,40,20,0.06)',
-        'glass-dark':
-          '0 1px 0 rgba(255,255,255,0.04) inset, 0 8px 24px rgba(0,0,0,0.3)',
+        'glass-dark': '0 1px 0 rgba(255,255,255,0.04) inset, 0 8px 24px rgba(0,0,0,0.3)',
       },
       backdropBlur: {
         glass: '40px',
@@ -93,10 +92,7 @@ const config: Config = {
           '1.125rem',
           { lineHeight: '1.5rem', fontWeight: '700', letterSpacing: '-0.02em' },
         ],
-        body: [
-          '0.875rem',
-          { lineHeight: '1.25rem', fontWeight: '500', letterSpacing: '-0.005em' },
-        ],
+        body: ['0.875rem', { lineHeight: '1.25rem', fontWeight: '500', letterSpacing: '-0.005em' }],
         'body-sm': ['0.8125rem', { lineHeight: '1.125rem', fontWeight: '500' }],
         caption: ['0.75rem', { lineHeight: '1rem', fontWeight: '500' }],
         'caption-bold': [

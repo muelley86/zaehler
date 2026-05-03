@@ -21,7 +21,7 @@ export function Pill({
         'whitespace-nowrap rounded-full border-hairline font-medium tracking-tight transition-[background,color,border-color]',
         size === 'sm' ? 'px-2.5 py-1 text-caption' : 'px-3 py-1.5 text-body-sm',
         active
-          ? 'border-transparent bg-gradient-primary text-white shadow-glow-primary'
+          ? 'bg-gradient-primary shadow-glow-primary border-transparent text-white'
           : 'border-border bg-fill text-secondary hover:bg-fill-strong',
       )}
     >

@@ -25,7 +25,7 @@ import {
 } from 'lucide-react';
 import { NavLink, useNavigate } from 'react-router-dom';
 
-import { useAuth } from '@/features/auth/AuthProvider';
+import { useAuth } from '@/features/auth/auth-context';
 import { cx } from './ui/cx';
 
 interface NavItem {
@@ -55,7 +55,7 @@ function LogoLockup({ size = 'md' }: { size?: 'sm' | 'md' }) {
     <div className="flex items-center gap-2.5" data-testid="logo-lockup">
       <div
         className={cx(
-          'flex items-center justify-center rounded-[9px] bg-gradient-primary text-white shadow-glow-primary',
+          'bg-gradient-primary shadow-glow-primary flex items-center justify-center rounded-[9px] text-white',
           square,
         )}
       >
@@ -70,7 +70,7 @@ function Avatar({ name, role }: { name: string; role: string }) {
   const initial = (name[0] ?? '?').toUpperCase();
   return (
     <div className="flex min-w-0 items-center gap-2.5">
-      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-primary text-body-sm font-bold text-white">
+      <div className="bg-gradient-primary flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-body-sm font-bold text-white">
         {initial}
       </div>
       <div className="min-w-0 flex-1">
@@ -103,7 +103,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     isActive ? (
       <span
         aria-hidden
-        className="absolute -left-1.5 top-2 bottom-2 w-[3px] rounded-full bg-primary"
+        className="absolute -left-1.5 bottom-2 top-2 w-[3px] rounded-full bg-primary"
       />
     ) : null;
 
@@ -120,8 +120,8 @@ export function AppShell({ children }: { children: ReactNode }) {
         data-testid="app-sidebar"
         className={cx(
           'hidden md:flex md:w-60 md:shrink-0 md:flex-col',
-          'md:border-r-hairline md:border-border md:bg-surface md:glass',
-          'md:pt-safe-top md:px-3 md:pb-3 md:pt-5',
+          'md:glass md:border-r-hairline md:border-border md:bg-surface',
+          'md:px-3 md:pb-3 md:pt-5 md:pt-safe-top',
         )}
       >
         <div className="px-2 pb-4">
@@ -188,7 +188,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         {/* Mobile-Header */}
         <header
           data-testid="app-mobile-header"
-          className="sticky top-0 z-20 flex items-center justify-between gap-2 border-b-hairline border-border bg-surface glass px-4 pb-2.5 pt-safe-top md:hidden"
+          className="glass sticky top-0 z-20 flex items-center justify-between gap-2 border-b-hairline border-border bg-surface px-4 pb-2.5 pt-safe-top md:hidden"
         >
           <div className="pt-3">
             <LogoLockup size="sm" />
@@ -203,7 +203,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           data-testid="app-tabbar"
           className={cx(
             'fixed bottom-0 left-0 right-0 z-20 grid grid-cols-4',
-            'border-t-hairline border-border bg-surface-high glass',
+            'glass border-t-hairline border-border bg-surface-high',
             'pb-safe-bottom md:hidden',
           )}
         >
@@ -213,13 +213,13 @@ export function AppShell({ children }: { children: ReactNode }) {
           </NavLink>
 
           {/* Erfassen-CTA — prominenter Plus-Button im Primary-Gradient */}
-          <NavLink to="/erfassen" className="flex flex-col items-center gap-1 pt-1.5 pb-1.5">
+          <NavLink to="/erfassen" className="flex flex-col items-center gap-1 pb-1.5 pt-1.5">
             {({ isActive }) => (
               <>
                 <span
                   className={cx(
                     'flex h-9 w-9 items-center justify-center rounded-[12px]',
-                    'bg-gradient-primary text-white shadow-glow-primary',
+                    'bg-gradient-primary shadow-glow-primary text-white',
                     isActive && 'ring-2 ring-primary ring-offset-2 ring-offset-surface-high',
                   )}
                 >

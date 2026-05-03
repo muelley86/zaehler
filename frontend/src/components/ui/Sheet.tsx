@@ -36,7 +36,7 @@ export function Sheet({
       />
       <div
         className={cx(
-          'relative z-10 w-full max-w-lg border-hairline border-border bg-surface-high glass',
+          'glass relative z-10 w-full max-w-lg border-hairline border-border bg-surface-high',
           'shadow-glass dark:shadow-glass-dark',
           'rounded-t-sheet md:rounded-card',
           'md:max-h-[80vh]',
@@ -44,7 +44,7 @@ export function Sheet({
         )}
       >
         {/* Handle-Bar nur auf Mobile sichtbar */}
-        <div className="sticky top-0 z-10 bg-surface-high/95 glass">
+        <div className="bg-surface-high/95 glass sticky top-0 z-10">
           <div className="flex justify-center pt-2 md:hidden">
             <div className="h-1 w-9 rounded-full bg-fill-strong" />
           </div>

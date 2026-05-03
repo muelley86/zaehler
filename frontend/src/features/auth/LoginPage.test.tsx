@@ -4,11 +4,12 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { LoginPage } from './LoginPage';
 
-vi.mock('./AuthProvider', () => ({
+vi.mock('./auth-context', () => ({
   useAuth: () => ({
     me: null,
     loading: false,
     login: vi.fn(),
+    verifyTotp: vi.fn(),
     logout: vi.fn(),
     refresh: vi.fn(),
   }),

@@ -122,7 +122,7 @@ export function RecordReadingPage() {
     [filteredRegisters, registerId],
   );
 
-  const lastState = registerId !== null ? stateByRegister.get(registerId) ?? null : null;
+  const lastState = registerId !== null ? (stateByRegister.get(registerId) ?? null) : null;
   const parsedValue = (() => {
     try {
       return value.trim() === '' ? null : Number(parseDe(value));
@@ -132,7 +132,9 @@ export function RecordReadingPage() {
   })();
   const lastValue = lastState?.last_reading_value ? Number(lastState.last_reading_value) : null;
   const delta =
-    parsedValue !== null && lastValue !== null && mode === 'reading' ? parsedValue - lastValue : null;
+    parsedValue !== null && lastValue !== null && mode === 'reading'
+      ? parsedValue - lastValue
+      : null;
   const deltaIsNegative = delta !== null && delta < 0 && !selected?.register.accepts_deliveries;
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
@@ -273,9 +275,7 @@ export function RecordReadingPage() {
                   >
                     {parsedValue === null ? '—' : formatDe(parsedValue)}
                   </span>
-                  {unit ? (
-                    <span className="text-headline text-secondary">{unit}</span>
-                  ) : null}
+                  {unit ? <span className="text-headline text-secondary">{unit}</span> : null}
                 </div>
 
                 {/* Plausibilitätscheck-Delta */}
@@ -284,9 +284,7 @@ export function RecordReadingPage() {
                     data-testid="reading-delta"
                     className={cx(
                       'mx-auto w-fit rounded-full px-3 py-1 text-caption font-semibold',
-                      deltaIsNegative
-                        ? 'bg-danger/15 text-danger'
-                        : 'bg-success/15 text-success',
+                      deltaIsNegative ? 'bg-danger/15 text-danger' : 'bg-success/15 text-success',
                     )}
                   >
                     {deltaIsNegative ? '⚠ ' : '+'}
@@ -332,7 +330,7 @@ export function RecordReadingPage() {
         {error ? (
           <div
             data-testid="record-error"
-            className="rounded-card border-hairline border-danger/40 bg-danger/10 p-3 text-caption text-danger"
+            className="border-danger/40 bg-danger/10 rounded-card border-hairline p-3 text-caption text-danger"
           >
             {error}
           </div>
@@ -340,14 +338,14 @@ export function RecordReadingPage() {
         {success ? (
           <div
             data-testid="record-success"
-            className="rounded-card border-hairline border-success/40 bg-success/10 p-3 text-caption text-success"
+            className="border-success/40 bg-success/10 rounded-card border-hairline p-3 text-caption text-success"
           >
             {success}
           </div>
         ) : null}
 
         {/* Sticky save bar */}
-        <div className="fixed bottom-0 left-0 right-0 z-10 border-t-hairline border-border bg-surface-high glass px-4 py-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] md:static md:border-0 md:bg-transparent md:p-0 md:pt-2">
+        <div className="glass fixed bottom-0 left-0 right-0 z-10 border-t-hairline border-border bg-surface-high px-4 py-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] md:static md:border-0 md:bg-transparent md:p-0 md:pt-2">
           <Button
             type="submit"
             variant="filled"

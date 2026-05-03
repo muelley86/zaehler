@@ -302,10 +302,7 @@ export function DashboardPage() {
       <ConsumptionSummary points={filteredPoints} consumption={filteredConsumption} />
 
       {filteredPoints.length === 0 ? (
-        <EmptyState
-          icon={<Filter size={32} />}
-          title="Keine Messstellen entsprechen dem Filter"
-        />
+        <EmptyState icon={<Filter size={32} />} title="Keine Messstellen entsprechen dem Filter" />
       ) : (
         filteredPoints.map((mp) => (
           <MeasuringPointCard
@@ -487,15 +484,14 @@ function MeasuringPointCard({
       ) : null}
 
       {consumptionTotals.size > 0 ? (
-        <div className="mb-4 rounded-card border-hairline border-border bg-fill/60 p-4">
+        <div className="bg-fill/60 mb-4 rounded-card border-hairline border-border p-4">
           <div className="text-caption-bold uppercase text-tertiary">Verbrauch im Zeitraum</div>
           <ul className="mt-2 space-y-1">
             {Array.from(consumptionTotals.entries()).map(([code, t]) => (
               <li key={code} className="flex items-baseline justify-between gap-3 text-body">
                 <span className="truncate text-label">{labelByObis.get(code) ?? code}</span>
                 <span className="num text-headline text-label">
-                  {formatDe(t.sum)}{' '}
-                  <span className="text-caption text-tertiary">{t.unit}</span>
+                  {formatDe(t.sum)} <span className="text-caption text-tertiary">{t.unit}</span>
                 </span>
               </li>
             ))}
@@ -612,7 +608,7 @@ function TankTile({
       : null;
 
   return (
-    <div className="rounded-card border-hairline border-border bg-fill/60 p-4">
+    <div className="bg-fill/60 rounded-card border-hairline border-border p-4">
       <div className="flex items-start justify-between gap-3">
         <div className="text-caption-bold uppercase text-tertiary">{state.label}</div>
         {percent !== null ? (
@@ -719,7 +715,7 @@ function CorrectionForm({
         {mp.name} · {state.label} ({state.unit})
       </div>
       {state.last_reading_at ? (
-        <div className="rounded-card border-hairline border-border bg-fill/60 p-3 text-caption">
+        <div className="bg-fill/60 rounded-card border-hairline border-border p-3 text-caption">
           <div className="text-tertiary">Bisheriger Stand:</div>
           <div className="num text-headline text-label">
             {formatDe(state.last_reading_value ?? '0')} {state.unit}
@@ -750,7 +746,12 @@ function CorrectionForm({
         onChange={(e) => setReadingAt(e.target.value)}
         required
       />
-      <TextField label="Notiz" value={note} onChange={(e) => setNote(e.target.value)} error={error} />
+      <TextField
+        label="Notiz"
+        value={note}
+        onChange={(e) => setNote(e.target.value)}
+        error={error}
+      />
       <div className="flex gap-2">
         <Button type="submit" variant="filled" disabled={busy} fullWidth>
           {busy ? 'Speichere…' : 'Korrektur speichern'}
@@ -812,8 +813,7 @@ function ConsumptionSummary({
             <li key={b.label} className="flex items-baseline justify-between gap-3 px-5 py-3">
               <div className="min-w-0 flex-1 truncate text-body text-label">{b.label}</div>
               <div className="num text-headline text-label">
-                {formatDe(b.sum)}{' '}
-                <span className="text-caption text-tertiary">{b.unit}</span>
+                {formatDe(b.sum)} <span className="text-caption text-tertiary">{b.unit}</span>
               </div>
             </li>
           ))}
@@ -827,7 +827,7 @@ const TYPE_ORDER: MeterType[] = ['electricity', 'gas', 'water', 'oil'];
 
 function CurrentStateTile({ state }: { state: RegisterStateRead }) {
   return (
-    <div className="rounded-card border-hairline border-border bg-fill/60 p-4">
+    <div className="bg-fill/60 rounded-card border-hairline border-border p-4">
       <div className="text-caption-bold uppercase text-tertiary">{state.label}</div>
       <div className="mt-1.5 flex items-baseline gap-1.5">
         <span className="num text-title-1 leading-none tracking-tighter text-label">

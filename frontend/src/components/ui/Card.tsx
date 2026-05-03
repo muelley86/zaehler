@@ -22,7 +22,7 @@ export function Card({
     <div
       className={cx(
         'rounded-card border-hairline border-border shadow-glass dark:shadow-glass-dark',
-        solid ? 'bg-surface-solid' : 'bg-surface glass',
+        solid ? 'bg-surface-solid' : 'glass bg-surface',
         padded && 'p-5',
         className,
       )}

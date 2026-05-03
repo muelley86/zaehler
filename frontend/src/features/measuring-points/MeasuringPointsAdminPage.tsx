@@ -60,7 +60,7 @@ export function MeasuringPointsAdminPage() {
     <PageContainer>
       <LargeTitle title="Messstellen" />
       {error ? (
-        <div className="rounded-card border-hairline border-danger/40 bg-danger/10 p-3 text-danger">
+        <div className="border-danger/40 bg-danger/10 rounded-card border-hairline p-3 text-danger">
           {error}
         </div>
       ) : null}
@@ -149,10 +149,7 @@ function MPCard({
       </div>
 
       {open ? (
-        <div
-          id={`mp-${mp.id}-body`}
-          className="space-y-3 border-t-hairline border-separator p-5"
-        >
+        <div id={`mp-${mp.id}-body`} className="space-y-3 border-t-hairline border-separator p-5">
           <div className="flex flex-wrap gap-2">
             <Button variant="bordered" size="sm" onClick={() => setEditing((v) => !v)}>
               {editing ? 'Schließen' : 'Stammdaten'}
@@ -163,13 +160,13 @@ function MPCard({
               leftIcon={<Trash2 size={14} />}
               onClick={() => void deleteMp()}
               disabled={busy}
-              className="text-danger hover:bg-danger/10"
+              className="hover:bg-danger/10 text-danger"
             >
               Löschen
             </Button>
           </div>
           {deleteError ? (
-            <div className="rounded-card border-hairline border-danger/40 bg-danger/10 p-3 text-caption text-danger">
+            <div className="border-danger/40 bg-danger/10 rounded-card border-hairline p-3 text-caption text-danger">
               {deleteError}
             </div>
           ) : null}
@@ -281,7 +278,7 @@ function MPEditForm({
         />
       ) : null}
       {error ? (
-        <div className="rounded-card border-hairline border-danger/40 bg-danger/10 p-3 text-caption text-danger">
+        <div className="border-danger/40 bg-danger/10 rounded-card border-hairline p-3 text-caption text-danger">
           {error}
         </div>
       ) : null}
@@ -323,7 +320,7 @@ function MeterPanel({
   const [deliveriesFor, setDeliveriesFor] = useState<RegisterRead | null>(null);
 
   return (
-    <div className="rounded-card border-hairline border-border bg-fill/60 p-4">
+    <div className="bg-fill/60 rounded-card border-hairline border-border p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="num text-headline text-label">SN {meter.serial_number}</div>
         <div className="num text-caption text-tertiary">
@@ -509,7 +506,7 @@ function CreateForm({
           type="button"
           onClick={() => setOpen(true)}
           className={cx(
-            'flex w-full items-center gap-2 px-5 py-3.5 text-left text-body font-semibold text-primary-deep transition-colors hover:bg-fill/40',
+            'hover:bg-fill/40 flex w-full items-center gap-2 px-5 py-3.5 text-left text-body font-semibold text-primary-deep transition-colors',
           )}
         >
           <Plus size={16} strokeWidth={2.5} />
@@ -584,7 +581,7 @@ function CreateForm({
             </>
           ) : null}
           {error ? (
-            <div className="rounded-card border-hairline border-danger/40 bg-danger/10 p-3 text-caption text-danger">
+            <div className="border-danger/40 bg-danger/10 rounded-card border-hairline p-3 text-caption text-danger">
               {error}
             </div>
           ) : null}
@@ -708,7 +705,7 @@ function ReplaceMeterForm({
         </div>
       </div>
       {error ? (
-        <div className="rounded-card border-hairline border-danger/40 bg-danger/10 p-3 text-caption text-danger">
+        <div className="border-danger/40 bg-danger/10 rounded-card border-hairline p-3 text-caption text-danger">
           {error}
         </div>
       ) : null}

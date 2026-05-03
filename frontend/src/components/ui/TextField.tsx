@@ -27,7 +27,7 @@ export const TextField = forwardRef<HTMLInputElement, TextFieldProps>(function T
         className={cx(
           'flex items-center gap-2 rounded-pill border-hairline px-3.5 transition-colors',
           error
-            ? 'border-danger bg-fill ring-1 ring-danger/40'
+            ? 'ring-danger/40 border-danger bg-fill ring-1'
             : 'border-border bg-fill focus-within:border-primary focus-within:bg-surface-solid',
         )}
       >

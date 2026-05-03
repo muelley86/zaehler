@@ -52,7 +52,7 @@ export function AuditLogPage() {
     return (
       <PageContainer>
         <LargeTitle title="Audit-Log" />
-        <div className="rounded-card border-hairline border-danger/40 bg-danger/10 p-3 text-danger">
+        <div className="border-danger/40 bg-danger/10 rounded-card border-hairline p-3 text-danger">
           {error}
         </div>
       </PageContainer>
@@ -102,7 +102,7 @@ export function AuditLogPage() {
                       ) : null}
                     </div>
                     {r.diff ? (
-                      <pre className="num mt-2 overflow-x-auto whitespace-pre-wrap break-words rounded-card border-hairline border-border bg-fill/60 p-3 text-caption text-secondary">
+                      <pre className="num bg-fill/60 mt-2 overflow-x-auto whitespace-pre-wrap break-words rounded-card border-hairline border-border p-3 text-caption text-secondary">
                         {JSON.stringify(r.diff, null, 2)}
                       </pre>
                     ) : null}

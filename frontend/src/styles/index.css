@@ -33,19 +33,19 @@
    =========================================================== */
 .dark {
   --bg: oklch(0.16 0.012 55);
-  --bg-wash: oklch(0.20 0.014 55);
+  --bg-wash: oklch(0.2 0.014 55);
   --surface: rgba(38, 32, 28, 0.55);
   --surface-solid: oklch(0.22 0.013 55);
   --surface-high: rgba(48, 40, 35, 0.72);
   --border: oklch(0.32 0.01 60 / 0.45);
-  --border-strong: oklch(0.40 0.012 60 / 0.6);
+  --border-strong: oklch(0.4 0.012 60 / 0.6);
 
   --label: oklch(0.97 0.005 70);
   --secondary: oklch(0.78 0.012 60);
   --tertiary: oklch(0.58 0.012 60);
   --quaternary: oklch(0.42 0.012 60);
 
-  --fill: oklch(0.30 0.014 60 / 0.5);
+  --fill: oklch(0.3 0.014 60 / 0.5);
   --fill-strong: oklch(0.38 0.016 60 / 0.7);
   --separator: oklch(0.32 0.01 60 / 0.5);
 
@@ -59,19 +59,19 @@
 @media (prefers-color-scheme: dark) {
   :root:not(.light) {
     --bg: oklch(0.16 0.012 55);
-    --bg-wash: oklch(0.20 0.014 55);
+    --bg-wash: oklch(0.2 0.014 55);
     --surface: rgba(38, 32, 28, 0.55);
     --surface-solid: oklch(0.22 0.013 55);
     --surface-high: rgba(48, 40, 35, 0.72);
     --border: oklch(0.32 0.01 60 / 0.45);
-    --border-strong: oklch(0.40 0.012 60 / 0.6);
+    --border-strong: oklch(0.4 0.012 60 / 0.6);
 
     --label: oklch(0.97 0.005 70);
     --secondary: oklch(0.78 0.012 60);
     --tertiary: oklch(0.58 0.012 60);
     --quaternary: oklch(0.42 0.012 60);
 
-    --fill: oklch(0.30 0.014 60 / 0.5);
+    --fill: oklch(0.3 0.014 60 / 0.5);
     --fill-strong: oklch(0.38 0.016 60 / 0.7);
     --separator: oklch(0.32 0.01 60 / 0.5);
 
@@ -89,11 +89,11 @@
 
   --electricity: oklch(0.78 0.16 80);
   --gas: oklch(0.72 0.14 35);
-  --water: oklch(0.70 0.13 220);
-  --oil: oklch(0.55 0.10 40);
+  --water: oklch(0.7 0.13 220);
+  --oil: oklch(0.55 0.1 40);
 
   --green: oklch(0.72 0.15 150);
-  --red: oklch(0.65 0.20 25);
+  --red: oklch(0.65 0.2 25);
 }
 
 /* ===========================================================
@@ -108,8 +108,13 @@ body,
 body {
   background-color: var(--bg);
   color: var(--label);
-  font-family: 'Inter Tight', system-ui, -apple-system, BlinkMacSystemFont,
-    'Segoe UI', sans-serif;
+  font-family:
+    'Inter Tight',
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    sans-serif;
   -webkit-tap-highlight-color: transparent;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -134,10 +139,11 @@ input[type='date'] {
    laut HANDOFF.md.
    =========================================================== */
 .num {
-  font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco,
-    Consolas, monospace;
+  font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-variant-numeric: tabular-nums;
-  font-feature-settings: 'tnum' 1, 'lnum' 1;
+  font-feature-settings:
+    'tnum' 1,
+    'lnum' 1;
 }
 
 /* ===========================================================

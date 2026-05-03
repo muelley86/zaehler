@@ -43,7 +43,7 @@ export function LocationsAdminPage() {
     <PageContainer>
       <LargeTitle title="Standorte" />
       {error ? (
-        <div className="rounded-card border-hairline border-danger/40 bg-danger/10 p-3 text-danger">
+        <div className="border-danger/40 bg-danger/10 rounded-card border-hairline p-3 text-danger">
           {error}
         </div>
       ) : null}
@@ -127,7 +127,7 @@ function LocationCard({
     <Card>
       <div className="flex items-start justify-between gap-3">
         <div className="flex min-w-0 items-start gap-3">
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-card bg-gradient-primary text-white shadow-glow-primary">
+          <div className="bg-gradient-primary shadow-glow-primary flex h-11 w-11 shrink-0 items-center justify-center rounded-card text-white">
             <MapPin size={20} strokeWidth={2} />
           </div>
           <div className="min-w-0">
@@ -149,7 +149,7 @@ function LocationCard({
             leftIcon={<Trash2 size={14} />}
             onClick={() => void remove()}
             disabled={busy}
-            className="text-danger hover:bg-danger/10"
+            className="hover:bg-danger/10 text-danger"
           >
             Löschen
           </Button>
@@ -164,7 +164,7 @@ function LocationCard({
       </div>
 
       {error ? (
-        <div className="mt-3 rounded-pill border-hairline border-danger/40 bg-danger/10 p-2 text-caption text-danger">
+        <div className="border-danger/40 bg-danger/10 mt-3 rounded-pill border-hairline p-2 text-caption text-danger">
           {error}
         </div>
       ) : null}

@@ -11,7 +11,7 @@ import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import type { ReactNode } from 'react';
 
 import { AppShell } from '@/components/AppShell';
-import { useAuth } from '@/features/auth/AuthProvider';
+import { useAuth } from '@/features/auth/auth-context';
 import { ChangePasswordPage } from '@/features/auth/ChangePasswordPage';
 import { LoginPage } from '@/features/auth/LoginPage';
 import { DashboardPage } from '@/features/dashboard/DashboardPage';

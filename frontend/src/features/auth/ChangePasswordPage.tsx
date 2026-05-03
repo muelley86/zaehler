@@ -7,7 +7,7 @@ import { Button, Card, LargeTitle, TextField } from '@/components/ui';
 import { PageGlows } from '@/components/PageGlows';
 import { ApiError, api } from '@/lib/api';
 import type { Me } from '@/lib/types';
-import { useAuth } from './AuthProvider';
+import { useAuth } from './auth-context';
 
 export function ChangePasswordPage() {
   const { me, refresh } = useAuth();
@@ -48,7 +48,7 @@ export function ChangePasswordPage() {
         <PageGlows accent="electricity" />
         <Card className="relative z-10 w-full max-w-sm" padded={false}>
           <div className="flex flex-col items-center gap-3 px-6 pb-2 pt-8 text-center">
-            <div className="flex h-14 w-14 items-center justify-center rounded-card bg-gradient-primary text-white shadow-glow-primary">
+            <div className="bg-gradient-primary shadow-glow-primary flex h-14 w-14 items-center justify-center rounded-card text-white">
               <KeyRound size={26} strokeWidth={2.5} />
             </div>
             <div>

@@ -118,19 +118,15 @@ export function DeliveriesSheet({
               Noch keine Lieferungen erfasst.
             </div>
           ) : (
-            <ul className="divide-y divide-separator overflow-hidden rounded-card border-hairline border-border bg-fill/60">
+            <ul className="bg-fill/60 divide-y divide-separator overflow-hidden rounded-card border-hairline border-border">
               {items.map((d) => (
                 <li key={d.id} className="flex items-center gap-3 px-4 py-3">
                   <div className="min-w-0 flex-1">
                     <div className="num text-body text-label">{formatDateDe(d.delivery_date)}</div>
-                    {d.note ? (
-                      <div className="text-caption text-tertiary">{d.note}</div>
-                    ) : null}
+                    {d.note ? <div className="text-caption text-tertiary">{d.note}</div> : null}
                     <div className="text-caption text-tertiary">
                       {d.created_by_username ?? '—'} ·{' '}
-                      <span className="num">
-                        {d.created_at.replace('T', ' ').slice(0, 16)}
-                      </span>
+                      <span className="num">{d.created_at.replace('T', ' ').slice(0, 16)}</span>
                     </div>
                   </div>
                   <div className="text-right">
@@ -141,7 +137,7 @@ export function DeliveriesSheet({
                     type="button"
                     onClick={() => void remove(d.id)}
                     aria-label="Löschen"
-                    className="flex h-8 w-8 items-center justify-center rounded-full text-danger transition-colors hover:bg-danger/10"
+                    className="hover:bg-danger/10 flex h-8 w-8 items-center justify-center rounded-full text-danger transition-colors"
                   >
                     <Trash2 size={14} />
                   </button>
