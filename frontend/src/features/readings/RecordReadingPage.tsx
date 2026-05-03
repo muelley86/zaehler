@@ -215,7 +215,7 @@ export function RecordReadingPage() {
 
   return (
     <PageContainer>
-      <form onSubmit={(e) => void handleSubmit(e)} className="space-y-5 pb-28 md:pb-8">
+      <form onSubmit={(e) => void handleSubmit(e)} className="space-y-5 pb-44 md:pb-8">
         <LargeTitle title="Erfassen" />
 
         {hasDeliveryTargets ? (
@@ -344,8 +344,10 @@ export function RecordReadingPage() {
           </div>
         ) : null}
 
-        {/* Sticky save bar */}
-        <div className="glass fixed bottom-0 left-0 right-0 z-10 border-t-hairline border-border bg-surface-high px-4 py-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] md:static md:border-0 md:bg-transparent md:p-0 md:pt-2">
+        {/* Sticky save bar — Mobile: schwebt ÜBER der Tab-Bar (z-30 schlägt
+            deren z-20, bottom-Offset = Tab-Bar-Höhe). Desktop: statisch
+            unter dem letzten Form-Feld. */}
+        <div className="glass fixed bottom-[calc(env(safe-area-inset-bottom)+72px)] left-0 right-0 z-30 border-t-hairline border-border bg-surface-high px-4 py-3 md:static md:bottom-auto md:border-0 md:bg-transparent md:p-0 md:pt-2">
           <Button
             type="submit"
             variant="filled"
