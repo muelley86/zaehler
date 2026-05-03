@@ -1,8 +1,11 @@
 """Alembic-Umgebung.
 
-Dieser Stub enthält bewusst noch keine Modell-Imports — Modelle und
-``target_metadata`` werden im Implementierungs-Schritt ergänzt, sobald
-``meters.db.Base`` existiert.
+DB-URL kommt aus ``meters.core.config.settings.database_url`` (entweder aus
+``meters.env`` via ``METERS_DATABASE_URL`` oder Default). Die URL in
+``alembic.ini`` (relativer Pfad ``sqlite:///../data/meters.db``) wird
+**überschrieben** — sonst würde alembic vom CWD abhängig in eine andere
+Datei schreiben als der laufende Service, was zu zwei parallel
+existierenden DBs führt (zaehler/repo/data/ vs zaehler/data/).
 """
 
 from __future__ import annotations
@@ -18,7 +21,12 @@ if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
 from meters import models  # noqa: E402, F401
+from meters.core.config import settings  # noqa: E402
 from meters.db import Base  # noqa: E402
+
+# URL aus den Settings nehmen — überschreibt den hardcoded relativen
+# Pfad aus alembic.ini.
+config.set_main_option("sqlalchemy.url", settings.database_url)
 
 target_metadata = Base.metadata
 
