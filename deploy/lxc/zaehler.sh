@@ -142,6 +142,7 @@ WIZ_BIND_PORT="8000"
 WIZ_ADMIN_USER="admin"
 WIZ_ADMIN_PASSWORD=""
 WIZ_BACKUP_TIME="03:30"
+WIZ_REVERSE_PROXY_HOST=""
 
 # Heuristik: kann der Wizard interaktive Dialoge zeigen?
 is_interactive() { [ -t 0 ] && [ -t 1 ] && have_whiptail; }
@@ -220,10 +221,14 @@ install_wizard() {
         done
     fi
 
-    # Netzwerk-Setup wird im install-Wizard NICHT abgefragt. Default ist
-    # immer das maximal-funktionierende Setup (App per IP im LAN sofort
-    # erreichbar). Wer HTTPS-Härtung will, ruft nach dem Install
-    # `zaehler.sh configure-network` auf — interaktiv, fehlerfrei.
+    # Netzwerk-Defaults sind immer "App per IP im LAN sofort erreichbar"
+    # (BIND_HOST=0.0.0.0). Optional fragen wir nach einer Reverse-Proxy-
+    # Domain — wird nur in ALLOWED_ORIGINS für den CSRF-Origin-Check
+    # eingetragen, ändert NICHT den Bind-Host oder Cookie-Modus. Damit
+    # bleibt der direkte IP-Zugriff in jedem Fall garantiert.
+    WIZ_REVERSE_PROXY_HOST=$(wt_input "Reverse-Proxy-Domain (optional)" \
+        "Wenn die App zusätzlich über einen HTTPS-Reverse-Proxy (NPM, Caddy, nginx) erreichbar sein soll, hier die Domain eintragen — z. B. zaehler.example.com.\n\nDie App ist unabhängig davon IMMER per http://<container-ip>:$WIZ_BIND_PORT direkt im LAN erreichbar.\n\nLeer lassen, wenn (noch) kein Reverse-Proxy geplant ist." \
+        "") || die "Abgebrochen."
 
     # Admin-Daten — auch im Standard-Modus immer abfragen
     while :; do
@@ -255,11 +260,14 @@ install_wizard() {
     fi
 
     # Zusammenfassung + finale Bestätigung
-    local proxy_line="Netzwerk      : App per IP im LAN (HTTP). HTTPS-Härtung mit 'zaehler.sh configure-network' nachträglich."
+    local proxy_line="Reverse-Proxy : (keine) — App nur per IP im LAN"
+    if [ -n "$WIZ_REVERSE_PROXY_HOST" ]; then
+        proxy_line="Reverse-Proxy : https://$WIZ_REVERSE_PROXY_HOST (zusätzlich zur direkten IP)"
+    fi
     if ! wt_yesno "Bereit zur Installation" "Folgende Konfiguration wird verwendet:
 
   Repository    : $WIZ_REPO_URL
-  Bind-Host     : $WIZ_BIND_HOST
+  Bind-Host     : $WIZ_BIND_HOST  (App immer per IP im LAN erreichbar)
   Bind-Port     : $WIZ_BIND_PORT
   Admin-User    : $WIZ_ADMIN_USER
   Backup-Zeit   : $WIZ_BACKUP_TIME (täglich)
@@ -314,11 +322,19 @@ cmd_install() {
 
     step "4/10  Konfiguration ($DATA_DIR/meters.env)"
     local env_file="$DATA_DIR/meters.env"
-    # Defaults: App per IP im LAN sofort erreichbar. Härtung via
-    # `zaehler.sh configure-network` (interaktiv) nach dem Install.
+    # Defaults: App per IP im LAN sofort erreichbar (BIND_HOST=0.0.0.0).
+    # Spätere HTTPS-only-Härtung via `zaehler.sh configure-network`.
     local cookie_secure_value="False"
     local trust_proxy_value="True"
     local allowed_origins_value=""
+    if [ -n "$WIZ_REVERSE_PROXY_HOST" ]; then
+        # Beide Origins erlauben: Direkt-IP + Reverse-Proxy-Domain.
+        local container_ip
+        container_ip=$(hostname -I 2>/dev/null | awk '{print $1}')
+        allowed_origins_value="https://$WIZ_REVERSE_PROXY_HOST"
+        [ -n "$container_ip" ] && \
+            allowed_origins_value="$allowed_origins_value,http://$container_ip:$WIZ_BIND_PORT"
+    fi
     if [ ! -f "$env_file" ]; then
         install -m 0600 -o "$APP_USER" -g "$APP_USER" /dev/null "$env_file"
         local secret_key
@@ -470,30 +486,43 @@ install_summary() {
     local container_ip
     container_ip=$(hostname -I 2>/dev/null | awk '{print $1}')
     container_ip="${container_ip:-<container-ip>}"
-    local url="http://$container_ip:$WIZ_BIND_PORT"
+    local direct_url="http://$container_ip:$WIZ_BIND_PORT"
+    local proxy_url=""
+    [ -n "$WIZ_REVERSE_PROXY_HOST" ] && proxy_url="https://$WIZ_REVERSE_PROXY_HOST"
 
     printf '\n%s%s═══════════════════════════════════════════════════════════════%s\n' "$C_GRN" "$C_BOLD" "$C_RESET"
     printf '%s%s   Installation abgeschlossen.%s\n' "$C_GRN" "$C_BOLD" "$C_RESET"
     printf '%s%s═══════════════════════════════════════════════════════════════%s\n\n' "$C_GRN" "$C_BOLD" "$C_RESET"
 
-    printf '  %sApp-URL:%s    %s\n' "$C_BOLD" "$C_RESET" "$url"
-    printf '  %sAdmin:%s      %s  (Passwort wird beim ersten Login geändert)\n' "$C_BOLD" "$C_RESET" "$WIZ_ADMIN_USER"
-    printf '  %sService:%s    systemctl status %s\n'  "$C_BOLD" "$C_RESET" "$SERVICE_NAME"
-    printf '  %sLogs:%s       journalctl -u %s -f\n' "$C_BOLD" "$C_RESET" "$SERVICE_NAME"
-    printf '  %sBackup:%s     täglich %s → %s\n'    "$C_BOLD" "$C_RESET" "$WIZ_BACKUP_TIME" "$BACKUP_DIR"
-    printf '  %sUpdate:%s     sudo bash %s/deploy/lxc/zaehler.sh upgrade-all\n\n' "$C_BOLD" "$C_RESET" "$REPO_DIR"
+    printf '  %sDirekt-IP:%s     %s\n' "$C_BOLD" "$C_RESET" "$direct_url"
+    if [ -n "$proxy_url" ]; then
+        printf '  %sReverse-Proxy:%s %s\n' "$C_BOLD" "$C_RESET" "$proxy_url"
+        printf '  %s              %s%s(Proxy muss separat eingerichtet sein und auf %s zeigen)%s\n' \
+            "$C_DIM" "" "" "$direct_url" "$C_RESET"
+    fi
+    printf '  %sAdmin:%s         %s  (Passwort beim ersten Login ändern)\n' "$C_BOLD" "$C_RESET" "$WIZ_ADMIN_USER"
+    printf '  %sService:%s       systemctl status %s\n'  "$C_BOLD" "$C_RESET" "$SERVICE_NAME"
+    printf '  %sLogs:%s          journalctl -u %s -f\n' "$C_BOLD" "$C_RESET" "$SERVICE_NAME"
+    printf '  %sBackup:%s        täglich %s → %s\n'    "$C_BOLD" "$C_RESET" "$WIZ_BACKUP_TIME" "$BACKUP_DIR"
+    printf '  %sUpdate:%s        sudo bash %s/deploy/lxc/zaehler.sh upgrade-all\n\n' "$C_BOLD" "$C_RESET" "$REPO_DIR"
 
     if is_interactive; then
+        local proxy_box=""
+        [ -n "$proxy_url" ] && proxy_box="\nReverse-Proxy:  $proxy_url\n  ↳ Proxy muss auf $direct_url zeigen"
         wt_msgbox "Fertig" "Installation abgeschlossen.
 
-App-URL    :  $url
-Admin-User :  $WIZ_ADMIN_USER
-Backup     :  täglich $WIZ_BACKUP_TIME
+Direkt-IP   :  $direct_url$proxy_box
+
+Admin-User  :  $WIZ_ADMIN_USER
+Backup      :  täglich $WIZ_BACKUP_TIME
 
 Nächste Schritte:
-  1) URL im Browser öffnen
+  1) Direkt-URL im Browser öffnen
   2) Mit Admin-Daten einloggen
   3) Beim Force-Change-Dialog neues Passwort setzen
+
+Topologie später ändern (z. B. strikt HTTPS):
+  sudo bash $REPO_DIR/deploy/lxc/zaehler.sh configure-network
 
 Spätere Updates:
   sudo bash $REPO_DIR/deploy/lxc/zaehler.sh upgrade-all" || true

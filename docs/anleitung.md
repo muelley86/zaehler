@@ -90,8 +90,16 @@ Auswahl und „OK"/„Cancel", mit **Enter** bestätigst du.
 | Admin-Username | Deinen gewünschten Benutzernamen eingeben (z. B. `kmueller`) |
 | Admin-Passwort | Mindestens 12 Zeichen — wird beim ersten Login wieder geändert |
 | Passwort bestätigen | Gleiches Passwort nochmal |
-| HTTPS-Reverse-Proxy | „Nein" für reines Heimnetz, „Ja" sobald du eine Domain via Caddy/HTTPS bereitstellst (siehe Teil 5) |
+| Reverse-Proxy-Domain *(optional)* | Domain eintragen, wenn die App **zusätzlich** über einen HTTPS-Proxy (NPM/Caddy/nginx) erreichbar sein soll — sonst leer lassen. **Die App ist unabhängig davon immer per `http://<container-ip>:8000` direkt im LAN erreichbar.** |
 | Bereit zur Installation | Werte prüfen — „Ja" |
+
+> **Garantie zum IP-Zugriff**: Egal was du im Wizard wählst — der
+> `BIND_HOST` ist nach der Installation immer `0.0.0.0`. Die App
+> antwortet immer auf `http://<container-ip>:8000`. Die optionale
+> Reverse-Proxy-Domain trägt nur einen zusätzlichen erlaubten Origin
+> in `META_ALLOWED_ORIGINS` ein (CSRF-Whitelist), ändert aber nichts
+> am Bind. Wenn du später auf strikt HTTPS-only umstellen willst,
+> dafür gibt es das `configure-network`-Kommando (siehe Teil 5.3).
 
 > Hinweis zur Zwei-Faktor-Authentisierung: 2FA wird **nicht** im Wizard
 > aktiviert. Sie ist optional und kann später pro Benutzer in **Mehr →
