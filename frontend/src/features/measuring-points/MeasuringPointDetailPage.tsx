@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ArrowLeft, ChevronRight } from 'lucide-react';
+import { ArrowLeft, ChevronRight, Map as MapIcon } from 'lucide-react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
   Area,
@@ -14,11 +14,13 @@ import {
 
 import { Card, EmptyState, LargeTitle, Section, TypeBadge } from '@/components/ui';
 import { PageGlows } from '@/components/PageGlows';
+import { LocationMapSheet } from '@/components/LocationMapSheet';
 import { ApiError, api } from '@/lib/api';
 import { formatDateTimeDe, formatDe } from '@/lib/format';
 import { useChartTheme } from '@/lib/useChartTheme';
 import type {
   ConsumptionPoint,
+  LocationRead,
   MeasuringPointRead,
   MeterType,
   RegisterStateRead,
@@ -37,9 +39,11 @@ export function MeasuringPointDetailPage() {
   const mpId = id ? Number(id) : NaN;
 
   const [mp, setMp] = useState<MeasuringPointRead | null>(null);
+  const [location, setLocation] = useState<LocationRead | null>(null);
   const [consumption, setConsumption] = useState<ConsumptionPoint[]>([]);
   const [states, setStates] = useState<RegisterStateRead[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [mapOpen, setMapOpen] = useState(false);
 
   useEffect(() => {
     if (!Number.isFinite(mpId)) {
@@ -48,7 +52,17 @@ export function MeasuringPointDetailPage() {
     }
     api
       .get<MeasuringPointRead>(`/measuring-points/${mpId}`)
-      .then(setMp)
+      .then((data) => {
+        setMp(data);
+        if (data.location_id !== null) {
+          api
+            .get<LocationRead>(`/locations/${data.location_id}`)
+            .then(setLocation)
+            .catch(() => {
+              /* nicht kritisch — Standort-Detail optional */
+            });
+        }
+      })
       .catch((err: unknown) => {
         if (err instanceof ApiError) setError(err.problem.detail ?? err.problem.title);
         else setError('Konnte Messstelle nicht laden.');
@@ -104,7 +118,32 @@ export function MeasuringPointDetailPage() {
           <div className="text-caption-bold uppercase text-tertiary">Stammdaten</div>
           <div className="mt-3 grid grid-cols-2 gap-4">
             <FieldRow k="Typ" v={TYPE_LABELS[mp.type]} />
-            <FieldRow k="Standort" v={mp.location_name ?? '—'} />
+            <FieldRow
+              k="Standort"
+              v={
+                mp.location_name ? (
+                  location && location.latitude !== null && location.longitude !== null ? (
+                    <button
+                      type="button"
+                      onClick={() => setMapOpen(true)}
+                      className="hover:bg-primary/20 inline-flex items-center gap-1.5 rounded-pill bg-primary-soft px-2 py-0.5 font-semibold text-primary-deep transition-colors"
+                    >
+                      <MapIcon size={14} />
+                      {mp.location_name}
+                    </button>
+                  ) : (
+                    <Link
+                      to="/standorte"
+                      className="font-semibold text-primary-deep underline-offset-2 hover:underline"
+                    >
+                      {mp.location_name}
+                    </Link>
+                  )
+                ) : (
+                  '—'
+                )
+              }
+            />
             {mp.type === 'electricity' ? (
               <>
                 <FieldRow k="Doppeltarif" v={mp.has_dual_tariff ? 'Ja' : 'Nein'} />
@@ -159,6 +198,16 @@ export function MeasuringPointDetailPage() {
       <ConsumptionChart consumption={consumption} mp={mp} />
 
       <RegisterTable mp={mp} states={states} />
+
+      {location && location.latitude !== null && location.longitude !== null ? (
+        <LocationMapSheet
+          open={mapOpen}
+          onClose={() => setMapOpen(false)}
+          latitude={location.latitude}
+          longitude={location.longitude}
+          name={location.name}
+        />
+      ) : null}
     </PageContainer>
   );
 }

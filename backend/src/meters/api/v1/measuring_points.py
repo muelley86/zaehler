@@ -80,6 +80,21 @@ def list_measuring_points(db: DbDep, _user: CurrentUser) -> list[MeasuringPointR
     return [_to_read(m) for m in items]
 
 
+@router.get("/{mp_id}", response_model=MeasuringPointRead)
+def get_measuring_point(mp_id: int, db: DbDep, _user: CurrentUser) -> MeasuringPointRead:
+    mp = db.scalar(
+        select(MeasuringPoint)
+        .where(MeasuringPoint.id == mp_id)
+        .options(
+            selectinload(MeasuringPoint.location),
+            selectinload(MeasuringPoint.physical_meters).selectinload(PhysicalMeter.registers),
+        )
+    )
+    if mp is None:
+        raise ProblemError(status_code=404, title="Measuring point not found")
+    return _to_read(mp)
+
+
 @router.post("", response_model=MeasuringPointRead, status_code=status.HTTP_201_CREATED)
 def create_measuring_point(
     payload: MeasuringPointCreate,

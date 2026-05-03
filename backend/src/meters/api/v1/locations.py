@@ -27,6 +27,14 @@ def list_locations(db: DbDep, _user: CurrentUser) -> list[LocationRead]:
     return [LocationRead.model_validate(r) for r in rows]
 
 
+@router.get("/{location_id}", response_model=LocationRead)
+def get_location(location_id: int, db: DbDep, _user: CurrentUser) -> LocationRead:
+    loc = db.get(Location, location_id)
+    if loc is None:
+        raise ProblemError(status_code=404, title="Location not found")
+    return LocationRead.model_validate(loc)
+
+
 @router.post("", response_model=LocationRead, status_code=status.HTTP_201_CREATED)
 def create_location(
     payload: LocationCreate,

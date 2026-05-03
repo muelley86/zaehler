@@ -350,8 +350,7 @@ function MapPicker({
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
 
-  async function search(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
+  async function search() {
     const q = query.trim();
     if (!q) return;
     setSearching(true);
@@ -389,18 +388,28 @@ function MapPicker({
   // ohne Scrollen Platz findet.
   return (
     <div className="space-y-2">
-      <form onSubmit={(e) => void search(e)} className="flex gap-2">
+      {/* KEIN <form> hier — wir sind innerhalb der Edit-/Create-Form, und
+          nested forms sind HTML-invalide (Browser flacht sie ab → der Submit
+          würde die äußere Form abschicken und das Sheet schließen). Stattdessen
+          Suche per Button-Click + Enter-Listener am Eingabefeld. */}
+      <div className="flex gap-2">
         <TextField
           type="text"
           placeholder="Adresse oder Ortsname suchen"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              void search();
+            }
+          }}
           className="flex-1"
         />
-        <Button type="submit" variant="bordered" disabled={searching}>
+        <Button type="button" variant="bordered" disabled={searching} onClick={() => void search()}>
           {searching ? '…' : 'Suchen'}
         </Button>
-      </form>
+      </div>
 
       {hits.length > 0 ? (
         <ul className="max-h-[140px] overflow-y-auto rounded-card border-hairline border-border bg-surface-solid">
