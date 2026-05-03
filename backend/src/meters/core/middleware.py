@@ -68,10 +68,7 @@ def install_security_headers(app: FastAPI) -> None:
 def install_origin_check(app: FastAPI) -> None:
     @app.middleware("http")
     async def origin_check(request: Request, call_next: CallNext) -> Response:
-        if (
-            request.method in _MUTATING_METHODS
-            and request.url.path.startswith("/api/")
-        ):
+        if request.method in _MUTATING_METHODS and request.url.path.startswith("/api/"):
             origin = request.headers.get("origin")
             if origin and not _origin_allowed(origin, request):
                 return JSONResponse(

@@ -119,9 +119,11 @@ def consume_backup_code(db: DbSession, *, user: User, code: str) -> bool:
 
 
 def remaining_backup_codes(db: DbSession, *, user: User) -> int:
-    return db.query(BackupCode).filter(
-        BackupCode.user_id == user.id, BackupCode.used_at.is_(None)
-    ).count()
+    return (
+        db.query(BackupCode)
+        .filter(BackupCode.user_id == user.id, BackupCode.used_at.is_(None))
+        .count()
+    )
 
 
 # ---------------------------------------------------------------------------
