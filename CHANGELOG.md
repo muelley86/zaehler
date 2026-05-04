@@ -10,6 +10,16 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.1.1](https://github.com/muelley86/zaehler/compare/v2.1.0...v2.1.1) (2026-05-04)
+
+
+### Fehlerbehebungen
+
+* **install:** Node.js 20 statt apt-Default — behebt pnpm-Engine-Warning ([a5a50dc](https://github.com/muelley86/zaehler/commit/a5a50dcabf471f1d77c7d34e07127da267d31b14))
+* **install:** Node.js 20 statt apt-Default — behebt pnpm-Engine-Warning ([ebb2807](https://github.com/muelley86/zaehler/commit/ebb2807cafb16ebc01645627c078ce0aa93b02e9))
+* **ui:** Einstellungen (inkl. 2FA) auch in Desktop-Sidebar erreichbar ([a313f82](https://github.com/muelley86/zaehler/commit/a313f8220e7e005b8045ec54fbf1fe6eb7b07afc))
+* **ui:** Sheet via Portal rendern — behebt 2FA-Modal "kleines graues Fenster" auf iOS ([4ef23eb](https://github.com/muelley86/zaehler/commit/4ef23eb90efe8b808684b67f4b7e96b38ced35c1))
+
 ## [2.1.0](https://github.com/muelley86/zaehler/compare/v2.0.0...v2.1.0) (2026-05-04)
 
 
