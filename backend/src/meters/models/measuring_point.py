@@ -11,7 +11,7 @@ from __future__ import annotations
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Boolean, ForeignKey, String
+from sqlalchemy import Boolean, ForeignKey, Integer, String
 from sqlalchemy import Enum as SAEnum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -39,6 +39,7 @@ class MeasuringPoint(Base, TimestampMixin):
     is_bidirectional: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     has_dual_tariff: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     tank_capacity: Mapped[Decimal | None] = mapped_column(DecimalText(32))
+    transformer_factor: Mapped[int | None] = mapped_column(Integer)
 
     location: Mapped[Location | None] = relationship("Location")
     physical_meters: Mapped[list[PhysicalMeter]] = relationship(

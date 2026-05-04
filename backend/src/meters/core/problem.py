@@ -11,6 +11,7 @@ from __future__ import annotations
 from typing import Any
 
 from fastapi import FastAPI, Request, status
+from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
@@ -88,5 +89,5 @@ def install_problem_handlers(app: FastAPI) -> None:
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             title="Validation failed",
             detail="Request body or parameters did not satisfy the schema.",
-            extra={"errors": exc.errors()},
+            extra={"errors": jsonable_encoder(exc.errors())},
         )

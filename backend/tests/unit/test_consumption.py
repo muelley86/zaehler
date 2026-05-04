@@ -283,6 +283,83 @@ def test_consumption_tank_register_skips_rollover_path(db: Session) -> None:
     assert points[0].consumption == Decimal("500")
 
 
+def test_consumption_with_transformer_factor(db: Session) -> None:
+    """Strom-Wandlerzähler: Differenzen werden mit dem Faktor multipliziert."""
+    mp = _make_point(db)
+    register = mp.physical_meters[0].registers[0]
+    db.add(
+        Reading(register_id=register.id, value=Decimal("110.0"), reading_at=datetime(2024, 2, 1))
+    )
+    db.add(
+        Reading(register_id=register.id, value=Decimal("125.0"), reading_at=datetime(2024, 3, 1))
+    )
+    db.commit()
+    db.refresh(register)
+
+    points = consumption_for_register(register, transformer_factor=20)
+    # 100→110 = 10 * 20 = 200; 110→125 = 15 * 20 = 300
+    assert [p.consumption for p in points] == [Decimal("200.0"), Decimal("300.0")]
+
+
+def test_consumption_without_transformer_factor_unchanged(db: Session) -> None:
+    """Regression: ohne Faktor (None) verhält sich die Berechnung wie bisher."""
+    mp = _make_point(db)
+    register = mp.physical_meters[0].registers[0]
+    db.add(
+        Reading(register_id=register.id, value=Decimal("110.0"), reading_at=datetime(2024, 2, 1))
+    )
+    db.commit()
+    db.refresh(register)
+
+    points = consumption_for_register(register, transformer_factor=None)
+    assert points[0].consumption == Decimal("10.0")
+
+
+def test_consumption_with_transformer_factor_and_rollover(db: Session) -> None:
+    """Rollover wird ZUERST aufgelöst, danach mit dem Faktor multipliziert."""
+    mp = _make_point(db)
+    register = mp.physical_meters[0].registers[0]
+    register.max_value = Decimal("200")
+    db.add(
+        Reading(register_id=register.id, value=Decimal("190.0"), reading_at=datetime(2024, 2, 1))
+    )
+    db.add(Reading(register_id=register.id, value=Decimal("10.0"), reading_at=datetime(2024, 3, 1)))
+    db.commit()
+    db.refresh(register)
+
+    points = consumption_for_register(register, transformer_factor=10)
+    # Rollover: (200 - 190) + 10 = 20; * 10 = 200
+    assert points[1].consumption == Decimal("200")
+
+
+def test_consumption_for_measuring_point_applies_transformer_factor(db: Session) -> None:
+    """consumption_for_measuring_point liest den Faktor aus dem MP und reicht ihn durch."""
+    mp = MeasuringPoint(name="Strom mit Wandler", type=MeterType.ELECTRICITY, transformer_factor=50)
+    db.add(mp)
+    db.flush()
+    install_first_meter(
+        db,
+        measuring_point=mp,
+        serial_number="E-1",
+        installed_at=date(2024, 1, 1),
+        initial_values={"1.8.0": Decimal("100.0")},
+        user_id=None,
+        ip_address=None,
+    )
+    db.commit()
+    db.refresh(mp)
+    register = mp.physical_meters[0].registers[0]
+    db.add(
+        Reading(register_id=register.id, value=Decimal("105.0"), reading_at=datetime(2024, 2, 1))
+    )
+    db.commit()
+
+    points = consumption_for_measuring_point(db, measuring_point_id=mp.id)
+    consumptions = [p.consumption for p in points]
+    # 100 → 105 = 5 * 50 = 250
+    assert Decimal("250") in consumptions
+
+
 def test_oil_consumption_with_multiple_deliveries_in_period(db: Session) -> None:
     """Audit 5.7: Mehrere Lieferungen zwischen zwei Readings — alle werden summiert."""
     mp = MeasuringPoint(name="Tank2", type=MeterType.OIL)

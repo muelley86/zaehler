@@ -18,11 +18,20 @@ class MeasuringPointBase(BaseModel):
     is_bidirectional: bool = False
     has_dual_tariff: bool = False
     tank_capacity: Decimal | None = Field(default=None, gt=Decimal("0"))
+    transformer_factor: int | None = Field(default=None, gt=0)
 
     @model_validator(mode="after")
     def _tank_capacity_only_oil(self) -> Self:
         if self.tank_capacity is not None and self.type is not MeterType.OIL:
             raise ValueError("tank_capacity ist nur für Messstellen vom Typ 'oil' zulässig")
+        return self
+
+    @model_validator(mode="after")
+    def _transformer_factor_only_electricity(self) -> Self:
+        if self.transformer_factor is not None and self.type is not MeterType.ELECTRICITY:
+            raise ValueError(
+                "transformer_factor ist nur für Messstellen vom Typ 'electricity' zulässig"
+            )
         return self
 
 
@@ -40,6 +49,8 @@ class MeasuringPointUpdate(BaseModel):
     has_dual_tariff: bool | None = None
     tank_capacity: Decimal | None = Field(default=None, gt=Decimal("0"))
     clear_tank_capacity: bool = False
+    transformer_factor: int | None = Field(default=None, gt=0)
+    clear_transformer_factor: bool = False
 
 
 class MeasuringPointRead(APIModel):
@@ -51,6 +62,7 @@ class MeasuringPointRead(APIModel):
     is_bidirectional: bool
     has_dual_tariff: bool
     tank_capacity: DecimalStr | None
+    transformer_factor: int | None
     physical_meters: list[PhysicalMeterRead]
 
 

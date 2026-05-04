@@ -148,6 +148,10 @@ export function MeasuringPointDetailPage() {
               <>
                 <FieldRow k="Doppeltarif" v={mp.has_dual_tariff ? 'Ja' : 'Nein'} />
                 <FieldRow k="Bidirektional" v={mp.is_bidirectional ? 'Ja' : 'Nein'} />
+                <FieldRow
+                  k="Wandlerfaktor"
+                  v={mp.transformer_factor !== null ? `×${mp.transformer_factor}` : '—'}
+                />
               </>
             ) : null}
             {mp.type === 'oil' && mp.tank_capacity ? (
