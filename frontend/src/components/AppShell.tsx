@@ -21,6 +21,7 @@ import {
   PencilLine,
   Plus,
   ScrollText,
+  Settings,
   Users,
 } from 'lucide-react';
 import { NavLink, useNavigate } from 'react-router-dom';
@@ -40,6 +41,13 @@ const PRIMARY_NAV: NavItem[] = [
   { to: '/', label: 'Dashboard', icon: <LayoutDashboard size={18} />, end: true },
   { to: '/erfassen', label: 'Erfassen', icon: <PencilLine size={18} /> },
   { to: '/erfassungen', label: 'Erfassungen', icon: <ClipboardList size={18} /> },
+];
+
+// Sekundäre Navigation: enthält /mehr (Profil, 2FA, Theme, Logout). Auf
+// Mobile in der Tab-Bar als "Mehr"-Tab; auf Desktop separat unten in der
+// Sidebar gerendert (klar von Hauptnav abgesetzt).
+const SECONDARY_NAV: NavItem[] = [
+  { to: '/mehr', label: 'Einstellungen', icon: <Settings size={18} /> },
 ];
 
 const ADMIN_NAV: NavItem[] = [
@@ -165,11 +173,33 @@ export function AppShell({ children }: { children: ReactNode }) {
               ))}
             </>
           )}
+
+          <div className="px-2.5 pb-1.5 pt-4 text-caption-bold uppercase text-tertiary">Profil</div>
+          {SECONDARY_NAV.map((n) => (
+            <NavLink key={n.to} to={n.to} className={sidebarLink}>
+              {(state) => (
+                <>
+                  {renderActiveRail(state)}
+                  <span className={cx('shrink-0', state.isActive ? 'opacity-100' : 'opacity-70')}>
+                    {n.icon}
+                  </span>
+                  {n.label}
+                </>
+              )}
+            </NavLink>
+          ))}
         </nav>
 
         <div className="mt-auto border-t-hairline border-separator px-1 pt-3">
           <div className="flex items-center gap-2 px-1">
-            <Avatar name={me?.username ?? '–'} role={me?.role ?? ''} />
+            <NavLink
+              to="/mehr"
+              aria-label="Profil & Einstellungen"
+              data-testid="sidebar-profile"
+              className="flex min-w-0 flex-1 items-center gap-2.5 rounded-pill px-1 py-1 transition-colors hover:bg-fill"
+            >
+              <Avatar name={me?.username ?? '–'} role={me?.role ?? ''} />
+            </NavLink>
             <button
               type="button"
               onClick={() => void handleLogout()}

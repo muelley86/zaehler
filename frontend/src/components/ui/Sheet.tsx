@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import type { ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 
 import { cx } from './cx';
@@ -24,9 +25,26 @@ export function Sheet({
     return () => document.removeEventListener('keydown', onKey);
   }, [open, onClose]);
 
-  if (!open) return null;
+  // Body-Scroll während offenem Sheet sperren — sonst kann auf iOS der
+  // Hintergrund unter dem Backdrop weiter mitscrollen.
+  useEffect(() => {
+    if (!open) return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = previous;
+    };
+  }, [open]);
 
-  return (
+  if (!open) return null;
+  if (typeof document === 'undefined') return null;
+
+  // Render via Portal direkt auf document.body. Kritisch für iOS Safari:
+  // Ein Ancestor mit ``backdrop-filter`` (.glass) oder ``transform`` macht
+  // das Element zum containing block für ``position: fixed``, wodurch das
+  // Sheet auf die Container-Größe schrumpft — sichtbar als "kleines
+  // graues Fenster" statt eines viewport-füllenden Modals.
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-end justify-center md:items-center">
       <button
         type="button"
@@ -62,6 +80,7 @@ export function Sheet({
         </div>
         <div className="p-5">{children}</div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
