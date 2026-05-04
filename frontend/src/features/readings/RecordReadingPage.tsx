@@ -13,7 +13,7 @@ import {
   TypeBadge,
 } from '@/components/ui';
 import { PageGlows } from '@/components/PageGlows';
-import { ApiError, api } from '@/lib/api';
+import { ApiError, api, isPlausibilityWarning } from '@/lib/api';
 import { formatDateTimeDe, formatDe, nowForInput, parseDe } from '@/lib/format';
 import type {
   DeliveryRead,
@@ -137,6 +137,45 @@ export function RecordReadingPage() {
       : null;
   const deltaIsNegative = delta !== null && delta < 0 && !selected?.register.accepts_deliveries;
 
+  async function submitReading(acknowledge: boolean) {
+    if (registerId === null) return;
+    const numeric = parseDe(value);
+    if (mode === 'reading') {
+      const created = await api.post<ReadingRead>('/readings', {
+        register_id: registerId,
+        value: numeric,
+        reading_at: readingAt,
+        note: note || null,
+        acknowledge_warnings: acknowledge,
+      });
+      setSuccess(
+        `Stand gespeichert: ${formatDe(created.value)} (${formatDateTimeDe(created.reading_at)}).`,
+      );
+    } else {
+      const created = await api.post<DeliveryRead>(`/registers/${registerId}/deliveries`, {
+        amount: numeric,
+        delivery_date: readingAt.slice(0, 10),
+        note: note || null,
+      });
+      setSuccess(`Lieferung erfasst: ${formatDe(created.amount)} (${created.delivery_date}).`);
+    }
+    setValue('');
+    setNote('');
+    if (points) {
+      void Promise.all(
+        points.map((mp) =>
+          api
+            .get<RegisterStateRead[]>(`/measuring-points/${mp.id}/state`)
+            .catch(() => [] as RegisterStateRead[]),
+        ),
+      ).then((results) => {
+        const next = new Map<number, RegisterStateRead>();
+        for (const list of results) for (const s of list) next.set(s.register_id, s);
+        setStateByRegister(next);
+      });
+    }
+  }
+
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (registerId === null) return;
@@ -144,45 +183,28 @@ export function RecordReadingPage() {
     setError(null);
     setSuccess(null);
     try {
-      const numeric = parseDe(value);
-      if (mode === 'reading') {
-        const created = await api.post<ReadingRead>('/readings', {
-          register_id: registerId,
-          value: numeric,
-          reading_at: readingAt,
-          note: note || null,
-        });
-        setSuccess(
-          `Stand gespeichert: ${formatDe(created.value)} (${formatDateTimeDe(created.reading_at)}).`,
-        );
-      } else {
-        const created = await api.post<DeliveryRead>(`/registers/${registerId}/deliveries`, {
-          amount: numeric,
-          delivery_date: readingAt.slice(0, 10),
-          note: note || null,
-        });
-        setSuccess(`Lieferung erfasst: ${formatDe(created.amount)} (${created.delivery_date}).`);
-      }
-      setValue('');
-      setNote('');
-      // State neu laden für aktuellen Plausibilitätscheck
-      if (points) {
-        void Promise.all(
-          points.map((mp) =>
-            api
-              .get<RegisterStateRead[]>(`/measuring-points/${mp.id}/state`)
-              .catch(() => [] as RegisterStateRead[]),
-          ),
-        ).then((results) => {
-          const next = new Map<number, RegisterStateRead>();
-          for (const list of results) for (const s of list) next.set(s.register_id, s);
-          setStateByRegister(next);
-        });
-      }
+      await submitReading(false);
     } catch (err) {
-      if (err instanceof ApiError) setError(err.problem.detail ?? err.problem.title);
-      else if (err instanceof RangeError) setError(err.message);
-      else setError('Konnte Eintrag nicht speichern.');
+      if (err instanceof ApiError && isPlausibilityWarning(err)) {
+        const detail = err.problem.detail ?? err.problem.title;
+        if (window.confirm(`${detail}\n\nTrotzdem speichern?`)) {
+          try {
+            await submitReading(true);
+          } catch (retryErr) {
+            if (retryErr instanceof ApiError) {
+              setError(retryErr.problem.detail ?? retryErr.problem.title);
+            } else {
+              setError('Konnte Eintrag nicht speichern.');
+            }
+          }
+        }
+      } else if (err instanceof ApiError) {
+        setError(err.problem.detail ?? err.problem.title);
+      } else if (err instanceof RangeError) {
+        setError(err.message);
+      } else {
+        setError('Konnte Eintrag nicht speichern.');
+      }
     } finally {
       setBusy(false);
     }

@@ -62,3 +62,15 @@ export const api = {
   patch: <T>(path: string, body?: unknown) => request<T>(path, { method: 'PATCH', body }),
   delete: <T>(path: string) => request<T>(path, { method: 'DELETE' }),
 };
+
+/**
+ * Erkennt einen Plausibilitäts-Warning-Fehler des Backends:
+ * Status 400 mit ``acknowledge_field === 'acknowledge_warnings'``. CLAUDE.md
+ * verlangt eine Warnung statt eines harten Blocks — der Aufrufer zeigt einen
+ * Confirm-Dialog und sendet die zweite Anfrage mit ``acknowledge_warnings: true``.
+ */
+export function isPlausibilityWarning(err: ApiError): boolean {
+  if (err.status !== 400) return false;
+  const problem = err.problem as unknown as Record<string, unknown>;
+  return problem['acknowledge_field'] === 'acknowledge_warnings';
+}
