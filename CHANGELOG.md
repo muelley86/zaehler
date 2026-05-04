@@ -10,6 +10,13 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.3.1](https://github.com/muelley86/zaehler/compare/v2.3.0...v2.3.1) (2026-05-04)
+
+
+### Fehlerbehebungen
+
+* **csp:** Esri-Tile-Server in img-src/connect-src whitelisten ([#14](https://github.com/muelley86/zaehler/issues/14)) ([a33d224](https://github.com/muelley86/zaehler/commit/a33d224a342b90de1d684228a3953f779a158eb5))
+
 ## [2.3.0](https://github.com/muelley86/zaehler/compare/v2.2.0...v2.3.0) (2026-05-04)
 
 
