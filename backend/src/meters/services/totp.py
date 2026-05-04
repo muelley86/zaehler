@@ -138,6 +138,10 @@ def create_pending_challenge(
     user_agent: str | None,
     ip_address: str | None,
 ) -> tuple[PendingTotpChallenge, str]:
+    # Lazy-Cleanup: bei jedem neuen Challenge-Insert die abgelaufenen
+    # entfernen. Verhindert unbegrenztes Wachstum der Tabelle bei
+    # Login-Abbrüchen, ohne externen Scheduler zu benötigen.
+    cleanup_expired_challenges(db)
     token = secrets.token_urlsafe(32)
     challenge = PendingTotpChallenge(
         user_id=user.id,
