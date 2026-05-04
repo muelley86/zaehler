@@ -38,13 +38,14 @@ def _csp() -> str:
         "default-src 'self'",
         "script-src 'self' 'unsafe-inline'",
         "style-src 'self' 'unsafe-inline'",
-        # OSM-Tiles für die Standort-Karte (LocationMap). Browser lädt
-        # Tile-PNGs direkt von tile.openstreetmap.org, keine API von uns.
-        "img-src 'self' data: https://*.tile.openstreetmap.org",
+        # Tile-PNGs für die Standort-Karte (LocationMap). Browser lädt
+        # die Tiles direkt vom jeweiligen CDN, keine API von uns.
+        # OSM = Default-Layer; Esri = Satellit/Hybrid-Layer.
+        "img-src 'self' data: https://*.tile.openstreetmap.org https://server.arcgisonline.com",
         "font-src 'self' data:",
         # Nominatim für Geocoding-Suche im MapPicker (Adresse → Koordinaten),
         # kostenlos, fair-use 1 req/s. Pflicht-Attribution im UI.
-        "connect-src 'self' https://*.tile.openstreetmap.org https://nominatim.openstreetmap.org",
+        "connect-src 'self' https://*.tile.openstreetmap.org https://server.arcgisonline.com https://nominatim.openstreetmap.org",
         "object-src 'none'",
         "base-uri 'self'",
         "frame-ancestors 'none'",
