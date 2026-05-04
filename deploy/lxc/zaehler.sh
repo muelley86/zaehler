@@ -128,6 +128,36 @@ ensure_env_file() {
     fi
 }
 
+# Stellt sicher, dass Node.js >= NODE_MAJOR_REQUIRED installiert ist. Auf
+# Debian 12 liefert apt nur Node 18, das frontend/package.json setzt aber
+# `engines.node >=20` voraus (Vite 5 + neueres Toolchain). Ohne diesen
+# Helper warnt pnpm bei jedem install, neuere Pakete brechen ggf. ganz
+# ab. Wir ziehen Node 20 aus dem offiziellen NodeSource-Repo nach —
+# idempotent: läuft nur, wenn die installierte Version zu alt ist.
+NODE_MAJOR_REQUIRED="${NODE_MAJOR_REQUIRED:-20}"
+
+ensure_node_lts() {
+    local current_major=0
+    if command -v node >/dev/null 2>&1; then
+        current_major=$(node -v 2>/dev/null | sed -E 's/^v([0-9]+).*/\1/')
+        # falls sed nichts liefert (zerfetzte Ausgabe) → 0
+        case "$current_major" in ''|*[!0-9]*) current_major=0 ;; esac
+    fi
+    if [ "$current_major" -ge "$NODE_MAJOR_REQUIRED" ] 2>/dev/null; then
+        ok "Node $(node -v) erfüllt Anforderung (>= ${NODE_MAJOR_REQUIRED})"
+        return 0
+    fi
+    msg_run "NodeSource-Repository für Node ${NODE_MAJOR_REQUIRED}.x einbinden"
+    DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends \
+        ca-certificates curl gnupg >/dev/null
+    local tmp_setup=/tmp/nodesource_setup.sh
+    curl -fsSL "https://deb.nodesource.com/setup_${NODE_MAJOR_REQUIRED}.x" -o "$tmp_setup"
+    bash "$tmp_setup" >/dev/null
+    rm -f "$tmp_setup"
+    DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends nodejs >/dev/null
+    ok "Node $(node -v) installiert"
+}
+
 # Erzeugt /etc/sudoers.d/zaehler-restart (idempotent), damit der App-User den
 # Service ohne Passwort neu starten kann — wird vom upgrade-app gebraucht.
 ensure_sudo_rule() {
@@ -303,13 +333,15 @@ cmd_install() {
     msg_run "apt update"
     apt-get update -qq
     ok "Paketlisten aktualisiert"
-    msg_run "Pakete installieren (git, python3, nodejs, sqlite3, …)"
+    msg_run "Pakete installieren (git, python3, sqlite3, …)"
     DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends \
         ca-certificates curl git build-essential pkg-config sudo \
         sqlite3 locales \
-        python3 python3-venv python3-dev \
-        nodejs npm >/dev/null
+        python3 python3-venv python3-dev >/dev/null
     ok "System-Pakete installiert"
+
+    msg_run "Node.js ${NODE_MAJOR_REQUIRED}.x sicherstellen"
+    ensure_node_lts
 
     step "2/10  Locale auf de_DE.UTF-8 setzen"
     sed -i 's/^# *de_DE.UTF-8/de_DE.UTF-8/' /etc/locale.gen
@@ -572,7 +604,9 @@ cmd_upgrade_system() {
 
 cmd_upgrade_tools() {
     require_root
-    step "Tool-Chain aktualisieren (uv, pnpm)"
+    step "Tool-Chain aktualisieren (Node.js, uv, pnpm)"
+
+    ensure_node_lts
 
     as_user '
         export PATH="$HOME/.local/bin:$PATH"
@@ -605,6 +639,20 @@ cmd_upgrade_app() {
 
     ensure_sudo_rule
     ensure_env_file
+
+    # Frühe Vorbedingung: pnpm und vite verlangen Node >= 20. Wenn das
+    # System noch auf einer älteren Version steht, würde der Build mit
+    # Engine-Warning durchrasseln und teils kryptisch fehlschlagen.
+    local node_major=0
+    if command -v node >/dev/null 2>&1; then
+        node_major=$(node -v 2>/dev/null | sed -E 's/^v([0-9]+).*/\1/')
+        case "$node_major" in ''|*[!0-9]*) node_major=0 ;; esac
+    fi
+    if [ "$node_major" -lt "$NODE_MAJOR_REQUIRED" ] 2>/dev/null; then
+        warn "Installierte Node-Version (v${node_major}) ist älter als ${NODE_MAJOR_REQUIRED}."
+        warn "Bitte zuerst 'sudo $0 upgrade-tools' ausführen, dann 'upgrade-app' erneut."
+        die "Abgebrochen — Frontend-Build würde sonst inkonsistent sein."
+    fi
 
     step "1/6  Backup der Datenbank"
     "$REPO_DIR/deploy/lxc/backup.sh" || warn "Backup fehlgeschlagen — Update wird trotzdem fortgesetzt."
