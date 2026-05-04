@@ -79,7 +79,7 @@ def resolve_session(db: DbSession, *, token: str) -> tuple[User, Session] | None
         db.delete(session)
         return None
     user = session.user
-    if not user.is_active:
+    if user is None or not user.is_active:
         db.delete(session)
         return None
     # Sliding expiration

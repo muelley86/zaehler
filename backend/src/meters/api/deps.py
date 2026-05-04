@@ -24,6 +24,16 @@ from meters.services import auth as auth_service
 DbDep = Annotated[DbSession, Depends(get_session)]
 
 
+# Endpoints, die ein User mit ``force_password_change=True`` aufrufen darf,
+# bevor er sein Passwort gewechselt hat. Alles andere wird mit 403 abgelehnt
+# (CLAUDE.md: "beim ersten Login geändert werden muss").
+_ALLOWED_PATHS_DURING_FORCE_PW_CHANGE = (
+    "/api/v1/auth/me",
+    "/api/v1/auth/change-password",
+    "/api/v1/auth/logout",
+)
+
+
 def get_current_user(
     request: Request,
     db: DbDep,
@@ -36,6 +46,13 @@ def get_current_user(
         raise ProblemError(status_code=401, title="Unauthorized")
     user, _session = resolved
     request.state.session = _session
+    if user.force_password_change and request.url.path not in _ALLOWED_PATHS_DURING_FORCE_PW_CHANGE:
+        raise ProblemError(
+            status_code=403,
+            title="Password change required",
+            detail="Bitte ändere zuerst dein Passwort unter /auth/change-password.",
+            extra={"force_password_change": True},
+        )
     return user
 
 
