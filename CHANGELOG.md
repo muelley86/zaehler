@@ -10,6 +10,14 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.2.0](https://github.com/muelley86/zaehler/compare/v2.1.1...v2.2.0) (2026-05-04)
+
+
+### Funktionen
+
+* **measuring-points:** Wandlerfaktor für Strom-Messstellen ([04ee377](https://github.com/muelley86/zaehler/commit/04ee3779f4bb923b078aa5f92e49148112099552))
+* Wandlerfaktor für Strom-Messstellen + UI-Fixes ([c75238e](https://github.com/muelley86/zaehler/commit/c75238e5f0dfba69de39855a0450a5dacd34e454))
+
 ## [2.1.1](https://github.com/muelley86/zaehler/compare/v2.1.0...v2.1.1) (2026-05-04)
 
 
