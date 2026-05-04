@@ -10,6 +10,15 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.3.0](https://github.com/muelley86/zaehler/compare/v2.2.0...v2.3.0) (2026-05-04)
+
+
+### Funktionen
+
+* **dashboard:** Wandlerfaktor in MP-Card sichtbar machen ([#10](https://github.com/muelley86/zaehler/issues/10)) ([bc40330](https://github.com/muelley86/zaehler/commit/bc40330f81e185bc8583e7ba22a3d8db0be9026f))
+* **locations:** Kartendienst beim Öffnen auswählbar ([#12](https://github.com/muelley86/zaehler/issues/12)) ([8f22e83](https://github.com/muelley86/zaehler/commit/8f22e83c346fd2976e4c91e84bed58f425c60aae))
+* **map:** Layer-Switcher Karte / Satellit / Hybrid ([#13](https://github.com/muelley86/zaehler/issues/13)) ([ed9eae8](https://github.com/muelley86/zaehler/commit/ed9eae85d709e7fd02e48e233b42e272eb25b0b2))
+
 ## [2.2.0](https://github.com/muelley86/zaehler/compare/v2.1.1...v2.2.0) (2026-05-04)
 
 
