@@ -657,8 +657,17 @@ cmd_upgrade_app() {
     step "1/6  Backup der Datenbank"
     "$REPO_DIR/deploy/lxc/backup.sh" || warn "Backup fehlgeschlagen — Update wird trotzdem fortgesetzt."
 
-    step "2/6  Code aktualisieren (git pull)"
-    as_user "cd '$REPO_DIR' && git fetch --tags && git pull --ff-only"
+    step "2/6  Code aktualisieren (git fetch + reset)"
+    # Idempotent: fetch + hard reset auf den gewünschten Branch (Default main).
+    # Damit ist der Update-Pfad robust gegen lokal modifizierte Build-Artefakte
+    # (z. B. backend/src/meters/static/ aus früheren Versionen, als das Bundle
+    # noch im Repo lag). Persistente Daten liegen unter $DATA_DIR, nicht im Repo.
+    local update_branch
+    update_branch="$(as_user "git -C '$REPO_DIR' symbolic-ref --short -q HEAD" 2>/dev/null || echo main)"
+    [ -n "$update_branch" ] || update_branch="main"
+    as_user "cd '$REPO_DIR' && git fetch --tags --prune origin"
+    as_user "cd '$REPO_DIR' && git reset --hard 'origin/$update_branch'"
+    as_user "cd '$REPO_DIR' && git clean -fd -- backend/src/meters/static"
 
     step "3/6  Backend-Abhängigkeiten"
     as_user "cd '$REPO_DIR/backend' && uv sync --frozen"

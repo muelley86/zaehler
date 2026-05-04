@@ -1,5 +1,8 @@
-# --- Build-Source-Maps (im public Repo nicht erwünscht) ---
-backend/src/meters/static/assets/*.map
+# --- Frontend-Build-Output ---
+# Vite schreibt das gebaute Bundle nach backend/src/meters/static/.
+# Source-of-truth ist frontend/. Auf Production-Hosts (LXC) wird beim
+# Update neu gebaut; nichts hier wird per git übertragen.
+backend/src/meters/static/
 
 # --- Python ---
 __pycache__/
