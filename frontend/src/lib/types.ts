@@ -97,6 +97,7 @@ export interface MeasuringPointRead {
   is_bidirectional: boolean;
   has_dual_tariff: boolean;
   tank_capacity: string | null;
+  transformer_factor: number | null;
   physical_meters: PhysicalMeterRead[];
 }
 

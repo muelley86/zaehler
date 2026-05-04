@@ -281,6 +281,12 @@ export function RecordReadingPage() {
                     ) : null}
                   </div>
                 ) : null}
+                {selected && selected.measuringPoint.transformer_factor !== null ? (
+                  <div className="mt-3 rounded-card border-hairline border-primary/40 bg-primary-soft p-3 text-caption text-primary-deep">
+                    Wandlerfaktor ×{selected.measuringPoint.transformer_factor} — gib hier den
+                    Sekundärwert vom Zähler ein. Verbräuche werden mit diesem Faktor multipliziert.
+                  </div>
+                ) : null}
               </div>
             </Section>
 

@@ -23,6 +23,7 @@ from meters.models import (
     AuditEntityType,
     Location,
     MeasuringPoint,
+    MeterType,
     PhysicalMeter,
     Reading,
     Register,
@@ -110,6 +111,7 @@ def create_measuring_point(
         is_bidirectional=payload.is_bidirectional,
         has_dual_tariff=payload.has_dual_tariff,
         tank_capacity=payload.tank_capacity,
+        transformer_factor=payload.transformer_factor,
     )
     db.add(mp)
     db.flush()
@@ -178,6 +180,25 @@ def update_measuring_point(
             "to": format(payload.tank_capacity, "f"),
         }
         mp.tank_capacity = payload.tank_capacity
+    if payload.transformer_factor is not None and mp.type is not MeterType.ELECTRICITY:
+        raise ProblemError(
+            status_code=422,
+            title="Invalid field",
+            detail="transformer_factor ist nur für Messstellen vom Typ 'electricity' zulässig",
+        )
+    if payload.clear_transformer_factor:
+        if mp.transformer_factor is not None:
+            diff["transformer_factor"] = {"from": mp.transformer_factor, "to": None}
+            mp.transformer_factor = None
+    elif (
+        payload.transformer_factor is not None
+        and payload.transformer_factor != mp.transformer_factor
+    ):
+        diff["transformer_factor"] = {
+            "from": mp.transformer_factor,
+            "to": payload.transformer_factor,
+        }
+        mp.transformer_factor = payload.transformer_factor
 
     if diff:
         record(

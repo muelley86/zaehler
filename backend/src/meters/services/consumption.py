@@ -37,8 +37,15 @@ def consumption_for_register(
     register: Register,
     *,
     rollover_max: Decimal | None = None,
+    transformer_factor: int | None = None,
 ) -> list[ConsumptionPoint]:
-    """Berechnet Verbrauch zwischen aufeinanderfolgenden Readings eines Registers."""
+    """Berechnet Verbrauch zwischen aufeinanderfolgenden Readings eines Registers.
+
+    ``transformer_factor`` (nur Strom) multipliziert die berechnete Differenz, weil
+    Wandlerzähler nur den Sekundärwert anzeigen. Mathematisch identisch zu
+    "Stände multiplizieren, dann Differenz". Auf Deliveries-Pfaden (Heizöl-Tank)
+    nicht anwendbar — der Validator schließt das oben aus.
+    """
     out: list[ConsumptionPoint] = []
     sorted_readings = sorted(register.readings, key=lambda r: (r.reading_at, r.id))
 
@@ -71,6 +78,8 @@ def consumption_for_register(
         delta = cur.value - prev.value
         if delta < 0 and rollover > 0:
             delta = (rollover - prev.value) + cur.value
+        if transformer_factor is not None:
+            delta = delta * transformer_factor
         out.append(
             ConsumptionPoint(
                 period_start=prev.reading_at.date(),
@@ -105,8 +114,9 @@ def consumption_for_measuring_point(
     if mp is None:
         return []
     out: list[ConsumptionPoint] = []
+    factor = mp.transformer_factor
     for meter in mp.physical_meters:
         for register in meter.registers:
-            out.extend(consumption_for_register(register))
+            out.extend(consumption_for_register(register, transformer_factor=factor))
     out.sort(key=lambda p: (p.period_end, p.obis_code))
     return out

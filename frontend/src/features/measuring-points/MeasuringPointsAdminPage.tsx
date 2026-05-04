@@ -209,6 +209,9 @@ function MPEditForm({
   const [tankCapacity, setTankCapacity] = useState(
     mp.tank_capacity ? String(mp.tank_capacity).replace('.', ',') : '',
   );
+  const [transformerFactor, setTransformerFactor] = useState(
+    mp.transformer_factor !== null ? String(mp.transformer_factor) : '',
+  );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -229,6 +232,18 @@ function MPEditForm({
           body['clear_tank_capacity'] = true;
         } else {
           body['tank_capacity'] = parseDe(tankCapacity);
+        }
+      }
+      if (mp.type === 'electricity') {
+        const trimmed = transformerFactor.trim();
+        if (trimmed === '') {
+          body['clear_transformer_factor'] = true;
+        } else {
+          const parsed = Number(trimmed);
+          if (!Number.isInteger(parsed) || parsed <= 0) {
+            throw new RangeError('Wandlerfaktor muss eine positive Ganzzahl sein.');
+          }
+          body['transformer_factor'] = parsed;
         }
       }
       await api.patch(`/measuring-points/${mp.id}`, body);
@@ -261,6 +276,15 @@ function MPEditForm({
         <>
           <ToggleRow label="Bidirektional (Einspeisung)" checked={bidi} onChange={setBidi} />
           <ToggleRow label="Doppeltarif (HT/NT)" checked={dual} onChange={setDual} />
+          <TextField
+            label="Wandlerfaktor (optional)"
+            inputMode="numeric"
+            pattern="[0-9]*"
+            value={transformerFactor}
+            onChange={(e) => setTransformerFactor(e.target.value)}
+            hint="leer = kein Wandler; ganzzahlig (z. B. 20, 50, 100). Verbräuche werden mit dem Faktor multipliziert."
+            numeric
+          />
           <div className="text-caption text-tertiary">
             Hinweis: Register werden nicht automatisch angepasst — beim nächsten Zählerwechsel
             wirken sich die Flags auf den neuen Zähler aus.
@@ -454,6 +478,7 @@ function CreateForm({
   const [oilHours, setOilHours] = useState('0');
   const [oilTank, setOilTank] = useState('');
   const [tankCapacity, setTankCapacity] = useState('');
+  const [transformerFactor, setTransformerFactor] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -482,12 +507,20 @@ function CreateForm({
       if (type === 'oil' && tankCapacity.trim()) {
         body['tank_capacity'] = parseDe(tankCapacity);
       }
+      if (type === 'electricity' && transformerFactor.trim()) {
+        const parsed = Number(transformerFactor.trim());
+        if (!Number.isInteger(parsed) || parsed <= 0) {
+          throw new RangeError('Wandlerfaktor muss eine positive Ganzzahl sein.');
+        }
+        body['transformer_factor'] = parsed;
+      }
       await api.post('/measuring-points', body);
       setName('');
       setSerial('');
       setOilHours('0');
       setOilTank('');
       setTankCapacity('');
+      setTransformerFactor('');
       setOpen(false);
       onCreated();
     } catch (err) {
@@ -550,6 +583,15 @@ function CreateForm({
             <>
               <ToggleRow label="Bidirektional (Einspeisung)" checked={bidi} onChange={setBidi} />
               <ToggleRow label="Doppeltarif (HT/NT)" checked={dual} onChange={setDual} />
+              <TextField
+                label="Wandlerfaktor (optional)"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                value={transformerFactor}
+                onChange={(e) => setTransformerFactor(e.target.value)}
+                hint="leer = kein Wandler; ganzzahlig (z. B. 20, 50, 100). Verbräuche werden mit dem Faktor multipliziert."
+                numeric
+              />
             </>
           ) : null}
           {type === 'oil' ? (

@@ -81,6 +81,105 @@ def test_delete_measuring_point_with_readings_409(admin_client: TestClient) -> N
     assert body["reading_count"] >= 1
 
 
+def test_create_electricity_with_transformer_factor(admin_client: TestClient) -> None:
+    payload = {
+        "name": "PV-Hauptzähler",
+        "type": "electricity",
+        "is_bidirectional": True,
+        "has_dual_tariff": False,
+        "transformer_factor": 50,
+        "serial_number": "WANDLER-1",
+        "installed_at": "2024-01-01",
+        "initial_values": {"1.8.0": "0", "2.8.0": "0"},
+    }
+    resp = admin_client.post("/api/v1/measuring-points", json=payload)
+    assert resp.status_code == 201, resp.text
+    body = resp.json()
+    assert body["transformer_factor"] == 50
+
+    get = admin_client.get(f"/api/v1/measuring-points/{body['id']}")
+    assert get.json()["transformer_factor"] == 50
+
+
+def test_transformer_factor_rejected_for_gas(admin_client: TestClient) -> None:
+    resp = admin_client.post(
+        "/api/v1/measuring-points",
+        json={
+            "name": "Gas mit Faktor",
+            "type": "gas",
+            "is_bidirectional": False,
+            "has_dual_tariff": False,
+            "transformer_factor": 10,
+            "serial_number": "G-1",
+            "installed_at": "2024-01-01",
+            "initial_values": {},
+        },
+    )
+    assert resp.status_code == 422
+
+
+def test_transformer_factor_must_be_positive(admin_client: TestClient) -> None:
+    for invalid in (0, -5):
+        resp = admin_client.post(
+            "/api/v1/measuring-points",
+            json={
+                "name": f"Strom {invalid}",
+                "type": "electricity",
+                "is_bidirectional": False,
+                "has_dual_tariff": False,
+                "transformer_factor": invalid,
+                "serial_number": f"E-{invalid}",
+                "installed_at": "2024-01-01",
+                "initial_values": {"1.8.0": "0"},
+            },
+        )
+        assert resp.status_code == 422, resp.text
+
+
+def test_patch_transformer_factor_updates_value(admin_client: TestClient) -> None:
+    mp = _create_electricity(admin_client)
+    mp_id = mp["id"]
+    resp = admin_client.patch(
+        f"/api/v1/measuring-points/{mp_id}",
+        json={"transformer_factor": 100},
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["transformer_factor"] == 100
+
+
+def test_patch_clear_transformer_factor_sets_null(admin_client: TestClient) -> None:
+    mp = _create_electricity(admin_client)
+    mp_id = mp["id"]
+    admin_client.patch(f"/api/v1/measuring-points/{mp_id}", json={"transformer_factor": 40})
+    resp = admin_client.patch(
+        f"/api/v1/measuring-points/{mp_id}",
+        json={"clear_transformer_factor": True},
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["transformer_factor"] is None
+
+
+def test_patch_transformer_factor_rejected_for_non_electricity(admin_client: TestClient) -> None:
+    create = admin_client.post(
+        "/api/v1/measuring-points",
+        json={
+            "name": "Wasserzähler",
+            "type": "water",
+            "is_bidirectional": False,
+            "has_dual_tariff": False,
+            "serial_number": "W-FAC",
+            "installed_at": "2024-01-01",
+            "initial_values": {},
+        },
+    )
+    mp_id = create.json()["id"]
+    resp = admin_client.patch(
+        f"/api/v1/measuring-points/{mp_id}",
+        json={"transformer_factor": 20},
+    )
+    assert resp.status_code == 422
+
+
 def test_replace_meter_marks_old_inactive_and_creates_new(admin_client: TestClient) -> None:
     mp = _create_electricity(admin_client)
     mp_id = mp["id"]

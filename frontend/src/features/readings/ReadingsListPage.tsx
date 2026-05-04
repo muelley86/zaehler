@@ -41,6 +41,7 @@ interface RegisterIndex {
   mpType: MeterType;
   locationId: number | null;
   locationName: string | null;
+  transformerFactor: number | null;
 }
 
 type EditTarget =
@@ -141,6 +142,7 @@ export function ReadingsListPage() {
             mpType: mp.type,
             locationId: mp.location_id,
             locationName: mp.location_name,
+            transformerFactor: mp.transformer_factor,
           });
         }
       }
@@ -611,7 +613,11 @@ function ReadingItem({
   const [busy, setBusy] = useState(false);
 
   const current = Number(reading.value);
-  const delta = !correction && previous !== null ? current - previous : null;
+  const rawDelta = !correction && previous !== null ? current - previous : null;
+  const delta =
+    rawDelta !== null && info.transformerFactor !== null
+      ? rawDelta * info.transformerFactor
+      : rawDelta;
 
   async function remove() {
     if (
