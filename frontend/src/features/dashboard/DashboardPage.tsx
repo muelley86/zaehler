@@ -454,6 +454,7 @@ function MeasuringPointCard({
           <div className="text-caption text-tertiary">
             {TYPE_LABELS[mp.type]}
             {mp.location_name ? ` · ${mp.location_name}` : ''}
+            {mp.transformer_factor !== null ? ` · Wandlerfaktor ×${mp.transformer_factor}` : ''}
           </div>
         </div>
         {unit ? <span className="text-caption text-tertiary">in {unit}</span> : null}
@@ -485,7 +486,14 @@ function MeasuringPointCard({
 
       {consumptionTotals.size > 0 ? (
         <div className="bg-fill/60 mb-4 rounded-card border-hairline border-border p-4">
-          <div className="text-caption-bold uppercase text-tertiary">Verbrauch im Zeitraum</div>
+          <div className="text-caption-bold uppercase text-tertiary">
+            Verbrauch im Zeitraum
+            {mp.transformer_factor !== null ? (
+              <span className="ml-1.5 normal-case text-tertiary">
+                (Differenzen × Wandlerfaktor {mp.transformer_factor})
+              </span>
+            ) : null}
+          </div>
           <ul className="mt-2 space-y-1">
             {Array.from(consumptionTotals.entries()).map(([code, t]) => (
               <li key={code} className="flex items-baseline justify-between gap-3 text-body">
