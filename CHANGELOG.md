@@ -10,6 +10,33 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.1.0](https://github.com/muelley86/zaehler/compare/v2.0.0...v2.1.0) (2026-05-04)
+
+
+### Funktionen
+
+* **locations:** Geo-Koordinaten mit Karten-Picker und Read-Sheet ([1391b7e](https://github.com/muelley86/zaehler/commit/1391b7e6f337716c385c6de1dd095b92c2c1fa88))
+* **locations:** MapPicker mit Adress-Suche (Nominatim) + kompakteres Layout ([b86feca](https://github.com/muelley86/zaehler/commit/b86fecadffa61cea066e7f4f1263e66cf20faf32))
+* **lxc:** neues 'fix-database'-Kommando für DB-Recovery in einem Schritt ([808aefa](https://github.com/muelley86/zaehler/commit/808aefa81b5538c13f8d0a8ef9551679e9ba74a4))
+* **readings:** Plausi-Warnung statt harter Block + selectinload + UI-Fixes ([d968e7e](https://github.com/muelley86/zaehler/commit/d968e7e83ca13ab771d64921d53549b7929806f6))
+
+
+### Fehlerbehebungen
+
+* **alembic:** DB-URL aus settings.database_url statt alembic.ini ([7b30d77](https://github.com/muelley86/zaehler/commit/7b30d77a9016291a3a741b908b6f6b18b37774fe))
+* **auth:** force_password_change erzwingen + Username-Limiter-Reset + resolve_session-Härtung ([bba5504](https://github.com/muelley86/zaehler/commit/bba5504372aa3cea54c5fa36175ddd3ffff347f8))
+* **cli:** create-admin verlangt alembic-Migration statt Base.metadata.create_all ([4f61c4c](https://github.com/muelley86/zaehler/commit/4f61c4c186996eabb51074dfccb569dda525114d))
+* **lxc:** as_user wechselt ins $HOME, sonst scheitert pnpm self-update ([1cf708f](https://github.com/muelley86/zaehler/commit/1cf708fd9798835db5b9bf70a8c3b37e52569698))
+* Suche-Form schloss Sheet, MP-Detail-API fehlte, Standort-Link in Detail ([0f97662](https://github.com/muelley86/zaehler/commit/0f976629ea1c7616a653aa567d5d9a7b0d37e61d))
+* **ui:** aria-Labels auf Erfassen-CTA, aria-hidden auf dekorative Icons ([6fb4e09](https://github.com/muelley86/zaehler/commit/6fb4e09d0d4d3c384f6696447f30355caeb19bbb))
+* **ui:** MapPicker-Layout — Buttons garantiert sichtbar im iPhone-Sheet ([340c836](https://github.com/muelley86/zaehler/commit/340c8360eddfeac0eabc8dbf9ba8298484adfae9))
+* **ui:** Save-Bar über Tab-Bar, MapPicker passt auf iPhone-Sheet ([5f527d8](https://github.com/muelley86/zaehler/commit/5f527d80cd8464201ec352f1c82857902642a6b4))
+
+
+### Refactoring
+
+* **schemas:** Location.name strip + tank_capacity nur bei type=oil ([d73a479](https://github.com/muelley86/zaehler/commit/d73a479362c69db723af8dd38ff16a4cc48aa5cf))
+
 ## [2.0.0](https://github.com/muelley86/zaehler/compare/v1.0.0...v2.0.0) (2026-05-03)
 
 
