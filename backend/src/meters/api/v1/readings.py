@@ -17,6 +17,7 @@ from decimal import Decimal
 from fastapi import APIRouter, Query, Request, status
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import selectinload
 
 from meters.api.deps import CurrentUser, DbDep, client_ip
 from meters.core.problem import ProblemError
@@ -69,12 +70,20 @@ def _check_value_in_series(
     reading_at: datetime,
     value: Decimal,
     exclude_id: int | None = None,
+    acknowledge_warnings: bool = False,
 ) -> None:
-    """Stellt sicher, dass der Wert für ein kumulatives Register monoton in die
-    bestehende Zeitreihe passt. Tank-Register (accepts_deliveries) sind ausgenommen,
-    weil ihr Stand zwischen Erfassungen sinken oder durch Lieferungen springen kann.
+    """Plausibilitätsprüfung für kumulative Register.
+
+    CLAUDE.md verlangt eine Warnung, keinen harten Block. Im ersten POST/PATCH
+    ohne ``acknowledge_warnings`` wirft die Funktion 400 mit ``previous``/``next``
+    in ``extra`` — das Frontend zeigt darauf einen Confirm-Dialog und sendet
+    die zweite Anfrage mit ``acknowledge_warnings=True``, wodurch der Block
+    übersprungen wird. Tank-Register (accepts_deliveries) sind grundsätzlich
+    ausgenommen.
     """
     if register.accepts_deliveries:
+        return
+    if acknowledge_warnings:
         return
 
     before_stmt = (
@@ -105,14 +114,17 @@ def _check_value_in_series(
             detail=(
                 f"Vorheriger Stand am {before.reading_at.isoformat(sep=' ', timespec='minutes')}: "
                 f"{format(before.value, 'f')}. Bei Strom-, Gas-, Wasserzählern und "
-                "Betriebsstunden darf der Wert nicht zurückgehen."
+                "Betriebsstunden darf der Wert normalerweise nicht zurückgehen. "
+                "Wenn das beabsichtigt ist (Rollover, Korrektur), bestätige die Warnung."
             ),
             extra={
+                "warning": "value_below_previous",
+                "acknowledge_field": "acknowledge_warnings",
                 "previous": {
                     "id": before.id,
                     "reading_at": before.reading_at.isoformat(),
                     "value": format(before.value, "f"),
-                }
+                },
             },
         )
     if after is not None and value > after.value:
@@ -122,14 +134,17 @@ def _check_value_in_series(
             title="Wert größer als nachfolgender Stand",
             detail=(
                 f"Nachfolgender Stand am {after_str}: {format(after.value, 'f')}. "
-                "Der nachgetragene Wert würde die Zeitreihe brechen."
+                "Der nachgetragene Wert würde die Zeitreihe brechen. "
+                "Wenn das beabsichtigt ist, bestätige die Warnung."
             ),
             extra={
+                "warning": "value_above_next",
+                "acknowledge_field": "acknowledge_warnings",
                 "next": {
                     "id": after.id,
                     "reading_at": after.reading_at.isoformat(),
                     "value": format(after.value, "f"),
-                }
+                },
             },
         )
 
@@ -144,7 +159,11 @@ def list_readings(
     to_at: datetime | None = Query(None),
     limit: int = Query(500, ge=1, le=5000),
 ) -> list[ReadingRead]:
-    stmt = select(Reading).order_by(Reading.reading_at.desc(), Reading.id.desc())
+    stmt = (
+        select(Reading)
+        .options(selectinload(Reading.created_by))
+        .order_by(Reading.reading_at.desc(), Reading.id.desc())
+    )
     if register_id is not None:
         stmt = stmt.where(Reading.register_id == register_id)
     if measuring_point_id is not None:
@@ -174,7 +193,11 @@ def create_reading(
         raise ProblemError(status_code=404, title="Register not found or inactive")
 
     _check_value_in_series(
-        db, register=register, reading_at=payload.reading_at, value=payload.value
+        db,
+        register=register,
+        reading_at=payload.reading_at,
+        value=payload.value,
+        acknowledge_warnings=payload.acknowledge_warnings,
     )
 
     reading = Reading(
@@ -252,6 +275,7 @@ def update_reading(
             reading_at=new_at,
             value=new_value,
             exclude_id=reading.id,
+            acknowledge_warnings=payload.acknowledge_warnings,
         )
 
     diff: dict[str, object] = {}

@@ -1,11 +1,9 @@
 """Alembic-Umgebung.
 
 DB-URL kommt aus ``meters.core.config.settings.database_url`` (entweder aus
-``meters.env`` via ``METERS_DATABASE_URL`` oder Default). Die URL in
-``alembic.ini`` (relativer Pfad ``sqlite:///../data/meters.db``) wird
-**überschrieben** — sonst würde alembic vom CWD abhängig in eine andere
-Datei schreiben als der laufende Service, was zu zwei parallel
-existierenden DBs führt (zaehler/repo/data/ vs zaehler/data/).
+``meters.env`` via ``METERS_DATABASE_URL`` oder Default). ``alembic.ini``
+hat ``sqlalchemy.url =`` (leer) — der Wert wird hier gesetzt, damit
+alembic immer dieselbe Datei verwendet wie der laufende App-Prozess.
 """
 
 from __future__ import annotations
@@ -24,8 +22,8 @@ from meters import models  # noqa: E402, F401
 from meters.core.config import settings  # noqa: E402
 from meters.db import Base  # noqa: E402
 
-# URL aus den Settings nehmen — überschreibt den hardcoded relativen
-# Pfad aus alembic.ini.
+# URL aus den Settings nehmen — alembic.ini lässt den Wert leer, hier wird
+# er befüllt. So gibt es keine Stolperfalle mit relativen Default-Pfaden.
 config.set_main_option("sqlalchemy.url", settings.database_url)
 
 target_metadata = Base.metadata

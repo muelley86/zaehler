@@ -169,3 +169,114 @@ def test_2fa_disable_requires_password_and_code(admin_client: TestClient) -> Non
     )
     assert ok.status_code == 200
     assert ok.json()["totp_enabled"] is False
+
+
+def test_2fa_challenge_expires_after_ttl(admin_client: TestClient) -> None:
+    """Audit 5.4: Pending-Challenge wird nach 5 Min abgelehnt.
+
+    Der Datenbank-Zeitstempel wird künstlich in die Vergangenheit gesetzt;
+    danach muss ``/2fa/verify`` mit 401 ablehnen, auch wenn der TOTP-Code
+    formal gültig wäre.
+    """
+    from datetime import UTC, datetime, timedelta
+
+    import pyotp
+
+    from meters.db import SessionLocal
+    from meters.models import PendingTotpChallenge
+
+    setup = admin_client.post("/api/v1/auth/2fa/setup")
+    secret = setup.json()["secret"]
+    admin_client.post(
+        "/api/v1/auth/2fa/activate",
+        json={"code": pyotp.TOTP(secret).now()},
+    )
+
+    fresh = TestClient(admin_client.app)
+    step1 = fresh.post(
+        "/api/v1/auth/login",
+        json={"username": "admin", "password": "admin-pass-12345"},
+    )
+    challenge_token = step1.json()["challenge_token"]
+    assert challenge_token
+
+    # Künstlich altern lassen: setze expires_at 1 Sekunde in die Vergangenheit
+    with SessionLocal() as db:
+        ch = db.query(PendingTotpChallenge).first()
+        assert ch is not None
+        ch.expires_at = datetime.now(UTC) - timedelta(seconds=1)
+        db.commit()
+
+    expired = fresh.post(
+        "/api/v1/auth/2fa/verify",
+        json={"challenge_token": challenge_token, "code": pyotp.TOTP(secret).now()},
+    )
+    assert expired.status_code == 401
+
+
+def test_2fa_drift_tolerance(admin_client: TestClient) -> None:
+    """Audit 5.4: pyotp.verify mit ``valid_window=1`` toleriert ±30 s Drift."""
+    import pyotp
+
+    setup = admin_client.post("/api/v1/auth/2fa/setup")
+    secret = setup.json()["secret"]
+    admin_client.post(
+        "/api/v1/auth/2fa/activate",
+        json={"code": pyotp.TOTP(secret).now()},
+    )
+
+    fresh = TestClient(admin_client.app)
+    step1 = fresh.post(
+        "/api/v1/auth/login",
+        json={"username": "admin", "password": "admin-pass-12345"},
+    )
+    challenge = step1.json()["challenge_token"]
+
+    # Code aus dem vorherigen 30-Sekunden-Fenster (-1 Step) sollte akzeptiert sein
+    totp = pyotp.TOTP(secret)
+    now_t = int(__import__("time").time())
+    prev_code = totp.at(now_t - 30)
+    resp = fresh.post(
+        "/api/v1/auth/2fa/verify",
+        json={"challenge_token": challenge, "code": prev_code},
+    )
+    assert resp.status_code == 200, resp.text
+
+
+def test_force_password_change_blocks_other_endpoints(client: TestClient, admin_user: User) -> None:
+    """Audit 5.10: User mit ``force_password_change=true`` darf keine anderen
+    Endpoints aufrufen — er muss erst ``/auth/change-password`` durchlaufen."""
+    from meters.db import SessionLocal
+
+    # Flag setzen
+    with SessionLocal() as db:
+        u = db.query(User).filter(User.username == "admin").first()
+        assert u is not None
+        u.force_password_change = True
+        db.commit()
+
+    login = client.post(
+        "/api/v1/auth/login",
+        json={"username": "admin", "password": "admin-pass-12345"},
+    )
+    assert login.status_code == 200
+    assert login.json()["me"]["force_password_change"] is True
+
+    # Aufruf eines normalen Endpoints sollte abgewiesen werden
+    blocked = client.get("/api/v1/measuring-points")
+    assert blocked.status_code in (401, 403)
+
+    # /auth/change-password muss durchgehen
+    change = client.post(
+        "/api/v1/auth/change-password",
+        json={
+            "current_password": "admin-pass-12345",
+            "new_password": "neues-passwort-1234",
+        },
+    )
+    assert change.status_code == 200
+    assert change.json()["force_password_change"] is False
+
+    # Jetzt funktioniert auch der Listen-Endpoint
+    after = client.get("/api/v1/measuring-points")
+    assert after.status_code == 200

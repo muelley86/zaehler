@@ -213,7 +213,11 @@ export function AppShell({ children }: { children: ReactNode }) {
           </NavLink>
 
           {/* Erfassen-CTA — prominenter Plus-Button im Primary-Gradient */}
-          <NavLink to="/erfassen" className="flex flex-col items-center gap-1 pb-1.5 pt-1.5">
+          <NavLink
+            to="/erfassen"
+            aria-label="Neue Erfassung"
+            className="flex flex-col items-center gap-1 pb-1.5 pt-1.5"
+          >
             {({ isActive }) => (
               <>
                 <span
@@ -223,7 +227,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                     isActive && 'ring-2 ring-primary ring-offset-2 ring-offset-surface-high',
                   )}
                 >
-                  <Plus size={20} strokeWidth={2.5} />
+                  <Plus size={20} strokeWidth={2.5} aria-hidden />
                 </span>
                 <span
                   className={cx(

@@ -14,7 +14,7 @@ import {
   TypeBadge,
 } from '@/components/ui';
 import { PageGlows } from '@/components/PageGlows';
-import { ApiError, api } from '@/lib/api';
+import { ApiError, api, isPlausibilityWarning } from '@/lib/api';
 import { formatDateDe, formatDateTimeDe, formatDe, parseDe, toInputDateTime } from '@/lib/format';
 import type { DeliveryRead, Me, MeasuringPointRead, MeterType, ReadingRead } from '@/lib/types';
 import { cx } from '@/components/ui/cx';
@@ -94,14 +94,16 @@ export function ReadingsListPage() {
   }, []);
 
   useEffect(() => {
+    const controller = new AbortController();
     const readingParams = new URLSearchParams();
     readingParams.set('limit', '5000');
     if (from) readingParams.set('from_at', `${from}T00:00:00`);
     if (to) readingParams.set('to_at', `${to}T23:59:59`);
     api
-      .get<ReadingRead[]>(`/readings?${readingParams}`)
+      .get<ReadingRead[]>(`/readings?${readingParams}`, controller.signal)
       .then(setReadings)
       .catch((err: unknown) => {
+        if (err instanceof DOMException && err.name === 'AbortError') return;
         if (err instanceof ApiError) setError(err.problem.detail ?? err.problem.title);
       });
     const deliveryParams = new URLSearchParams();
@@ -109,11 +111,13 @@ export function ReadingsListPage() {
     if (from) deliveryParams.set('from_date', from);
     if (to) deliveryParams.set('to_date', to);
     api
-      .get<DeliveryRead[]>(`/deliveries?${deliveryParams}`)
+      .get<DeliveryRead[]>(`/deliveries?${deliveryParams}`, controller.signal)
       .then(setDeliveries)
       .catch((err: unknown) => {
+        if (err instanceof DOMException && err.name === 'AbortError') return;
         if (err instanceof ApiError) setError(err.problem.detail ?? err.problem.title);
       });
+    return () => controller.abort();
   }, [from, to, tick]);
 
   const refresh = () => setTick((t) => t + 1);
@@ -802,21 +806,47 @@ function EditForm({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  async function patchOnce(acknowledge: boolean) {
+    const body: Record<string, unknown> = {
+      reading_at: readingAt,
+      note: note || null,
+      acknowledge_warnings: acknowledge,
+    };
+    if (value !== reading.value.replace('.', ',')) {
+      body['value'] = parseDe(value);
+    }
+    await api.patch(`/readings/${reading.id}`, body);
+  }
+
   async function save(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setBusy(true);
     setError(null);
     try {
-      const body: Record<string, unknown> = { reading_at: readingAt, note: note || null };
-      if (value !== reading.value.replace('.', ',')) {
-        body['value'] = parseDe(value);
-      }
-      await api.patch(`/readings/${reading.id}`, body);
+      await patchOnce(false);
       onSaved();
     } catch (err) {
-      if (err instanceof ApiError) setError(err.problem.detail ?? err.problem.title);
-      else if (err instanceof RangeError) setError(err.message);
-      else setError('Speichern fehlgeschlagen.');
+      if (err instanceof ApiError && isPlausibilityWarning(err)) {
+        const detail = err.problem.detail ?? err.problem.title;
+        if (window.confirm(`${detail}\n\nTrotzdem speichern?`)) {
+          try {
+            await patchOnce(true);
+            onSaved();
+          } catch (retryErr) {
+            if (retryErr instanceof ApiError) {
+              setError(retryErr.problem.detail ?? retryErr.problem.title);
+            } else {
+              setError('Speichern fehlgeschlagen.');
+            }
+          }
+        }
+      } else if (err instanceof ApiError) {
+        setError(err.problem.detail ?? err.problem.title);
+      } else if (err instanceof RangeError) {
+        setError(err.message);
+      } else {
+        setError('Speichern fehlgeschlagen.');
+      }
     } finally {
       setBusy(false);
     }
@@ -983,8 +1013,15 @@ function canEdit(me: Me, reading: ReadingRead): boolean {
 }
 
 function csvField(value: string): string {
-  if (/[;"\n\r]/.test(value)) {
-    return `"${value.replace(/"/g, '""')}"`;
+  // Schutz gegen CSV-Formel-Injection in Excel/Calc: Werte, die mit
+  // ``=``, ``+``, ``-`` oder ``@`` beginnen, werden mit einem Apostroph
+  // prefixed, damit Tabellen sie nicht als Formel ausführen.
+  let safe = value;
+  if (/^[=+\-@]/.test(safe)) {
+    safe = `'${safe}`;
   }
-  return value;
+  if (/[;"\n\r]/.test(safe)) {
+    return `"${safe.replace(/"/g, '""')}"`;
+  }
+  return safe;
 }

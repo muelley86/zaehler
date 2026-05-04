@@ -2,8 +2,9 @@ from __future__ import annotations
 
 from datetime import date
 from decimal import Decimal
+from typing import Self
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from meters.models import MeterType
 from meters.schemas.common import APIModel, DecimalStr
@@ -17,6 +18,12 @@ class MeasuringPointBase(BaseModel):
     is_bidirectional: bool = False
     has_dual_tariff: bool = False
     tank_capacity: Decimal | None = Field(default=None, gt=Decimal("0"))
+
+    @model_validator(mode="after")
+    def _tank_capacity_only_oil(self) -> Self:
+        if self.tank_capacity is not None and self.type is not MeterType.OIL:
+            raise ValueError("tank_capacity ist nur für Messstellen vom Typ 'oil' zulässig")
+        return self
 
 
 class MeasuringPointCreate(MeasuringPointBase):

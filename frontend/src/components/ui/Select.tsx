@@ -27,7 +27,11 @@ export function Select({ label, hint, className, children, ...rest }: SelectProp
         >
           {children}
         </select>
-        <ChevronDown size={16} className="pointer-events-none -ml-5 shrink-0 text-tertiary" />
+        <ChevronDown
+          size={16}
+          aria-hidden
+          className="pointer-events-none -ml-5 shrink-0 text-tertiary"
+        />
       </span>
       {hint ? <span className="mt-1 block text-caption text-tertiary">{hint}</span> : null}
     </label>

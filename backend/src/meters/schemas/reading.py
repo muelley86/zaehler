@@ -13,12 +13,21 @@ class ReadingCreate(BaseModel):
     value: Decimal
     reading_at: datetime
     note: str | None = Field(default=None, max_length=500)
+    acknowledge_warnings: bool = Field(
+        default=False,
+        description=(
+            "Wenn true, wird ein vorhandener Plausibilitätsverstoß "
+            "(Wert kleiner als Vorgänger / größer als Nachfolger) akzeptiert. "
+            "Der Frontend-Confirm-Dialog setzt das Flag bei der zweiten Übermittlung."
+        ),
+    )
 
 
 class ReadingUpdate(BaseModel):
     value: Decimal | None = None
     reading_at: datetime | None = None
     note: str | None = Field(default=None, max_length=500)
+    acknowledge_warnings: bool = False
 
 
 class ReadingRead(APIModel):

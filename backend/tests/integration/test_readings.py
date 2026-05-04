@@ -189,3 +189,129 @@ def test_filter_by_measuring_point(admin_client: TestClient) -> None:
     resp = admin_client.get("/api/v1/readings", params={"measuring_point_id": mp_id})
     assert resp.status_code == 200
     assert len(resp.json()) >= 1
+
+
+def test_409_includes_existing_creator(
+    admin_client: TestClient, recorder_client: TestClient
+) -> None:
+    """Audit 5.3: 409 Conflict bei doppeltem (register_id, reading_at) liefert
+    den Ersteller-Hinweis (Vergleichsdialog im Frontend)."""
+    register_id = _setup_water_mp(admin_client)
+    first = admin_client.post(
+        "/api/v1/readings",
+        json={"register_id": register_id, "value": "300", "reading_at": "2025-07-01T12:00:00"},
+    )
+    assert first.status_code == 201
+    # Recorder versucht denselben Slot — bekommt 409 mit existing.created_by_user_id
+    conflict = recorder_client.post(
+        "/api/v1/readings",
+        json={"register_id": register_id, "value": "301", "reading_at": "2025-07-01T12:00:00"},
+    )
+    assert conflict.status_code == 409
+    body = conflict.json()
+    assert body["existing"]["value"] == "300"
+    assert body["existing"]["created_by_user_id"] is not None
+
+
+def test_acknowledge_warnings_overrides_plausibility_block(admin_client: TestClient) -> None:
+    """Audit 5.8: Plausibilitäts-Verstoß ist Warnung, kein harter Block.
+
+    CLAUDE.md fordert: ``Warnung, nicht harter Block``. Das Backend wirft im
+    ersten Aufruf 400, akzeptiert aber bei ``acknowledge_warnings=true`` den
+    Wert — das Frontend zeigt dazwischen einen Confirm-Dialog.
+    """
+    register_id = _setup_water_mp(admin_client)
+    admin_client.post(
+        "/api/v1/readings",
+        json={"register_id": register_id, "value": "300", "reading_at": "2025-07-01T12:00:00"},
+    )
+
+    # Erster Versuch: Wert kleiner als Vorgänger → 400 mit acknowledge_field
+    blocked = admin_client.post(
+        "/api/v1/readings",
+        json={
+            "register_id": register_id,
+            "value": "250",
+            "reading_at": "2025-08-01T12:00:00",
+        },
+    )
+    assert blocked.status_code == 400
+    body = blocked.json()
+    assert body.get("acknowledge_field") == "acknowledge_warnings"
+    assert "previous" in body
+
+    # Zweiter Versuch mit acknowledge_warnings=true → 201 (Frontend hat
+    # Bestätigung eingeholt, Backend speichert ohne weitere Prüfung).
+    confirmed = admin_client.post(
+        "/api/v1/readings",
+        json={
+            "register_id": register_id,
+            "value": "250",
+            "reading_at": "2025-08-01T12:00:00",
+            "acknowledge_warnings": True,
+        },
+    )
+    assert confirmed.status_code == 201, confirmed.text
+
+
+def test_acknowledge_warnings_on_update(admin_client: TestClient) -> None:
+    """Audit 5.8: Auch beim PATCH wirkt ``acknowledge_warnings``."""
+    register_id = _setup_water_mp(admin_client)
+    a = admin_client.post(
+        "/api/v1/readings",
+        json={"register_id": register_id, "value": "300", "reading_at": "2025-09-01T12:00:00"},
+    ).json()
+    admin_client.post(
+        "/api/v1/readings",
+        json={"register_id": register_id, "value": "320", "reading_at": "2025-10-01T12:00:00"},
+    )
+
+    # Versuche, den 09-01-Reading auf 350 zu erhöhen → würde Nachfolger 320 brechen
+    blocked = admin_client.patch(
+        f"/api/v1/readings/{a['id']}",
+        json={"value": "350"},
+    )
+    assert blocked.status_code == 400
+    assert blocked.json().get("acknowledge_field") == "acknowledge_warnings"
+
+    # Mit Bestätigung → durchgelassen
+    ok = admin_client.patch(
+        f"/api/v1/readings/{a['id']}",
+        json={"value": "350", "acknowledge_warnings": True},
+    )
+    assert ok.status_code == 200
+
+
+def test_recorder_24h_boundary(admin_client: TestClient, recorder_user: object, db: object) -> None:
+    """Audit 5.6: nach Ablauf des 24h-Fensters ist PATCH/DELETE für recorder verboten."""
+    from datetime import UTC, datetime, timedelta
+
+    from sqlalchemy.orm import Session
+
+    from meters.models import Reading
+
+    register_id = _setup_water_mp(admin_client)
+    # Reading direkt in der DB anlegen mit künstlich altem created_at
+    assert isinstance(db, Session)
+    reading = Reading(
+        register_id=register_id,
+        value=__import__("decimal").Decimal("250"),
+        reading_at=datetime(2025, 6, 1, 12, 0, 0),
+        created_by_user_id=getattr(recorder_user, "id"),
+    )
+    db.add(reading)
+    db.flush()
+    # Created_at künstlich auf vor 25 Stunden zurückdrehen
+    reading.created_at = datetime.now(UTC) - timedelta(hours=25)
+    db.commit()
+    rid = reading.id
+
+    # Recorder-Login + Edit-Versuch
+    with TestClient(__import__("meters.main", fromlist=["app"]).app) as recorder:
+        login = recorder.post(
+            "/api/v1/auth/login",
+            json={"username": "recorder", "password": "recorder-pass-1234"},
+        )
+        assert login.status_code == 200
+        edit = recorder.patch(f"/api/v1/readings/{rid}", json={"note": "spät"})
+        assert edit.status_code == 403

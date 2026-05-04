@@ -162,6 +162,9 @@ def verify_2fa(
         raise ProblemError(status_code=401, title="Invalid TOTP code")
 
     totp_service.consume_pending_challenge(db, challenge=challenge)
+    # Login final erfolgreich: Username-Bucket leeren, sodass die Failure-Counter
+    # vom 1FA-Step nicht in eine spätere Sperre umschlagen.
+    username_limiter.record_success(user.username.lower())
     user_agent = request.headers.get("user-agent")
     _session, token = auth_service.issue_session(
         db, user=user, user_agent=user_agent, ip_address=ip
