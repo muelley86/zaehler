@@ -10,6 +10,13 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.6.0](https://github.com/muelley86/zaehler/compare/v2.5.1...v2.6.0) (2026-05-05)
+
+
+### Funktionen
+
+* **lxc:** CLI-Symlink + READMEs Anfänger-tauglich machen ([#24](https://github.com/muelley86/zaehler/issues/24)) ([a294608](https://github.com/muelley86/zaehler/commit/a294608bce64a6a4e1b6dfbd7326fa569b5d16a6))
+
 ## [2.5.1](https://github.com/muelley86/zaehler/compare/v2.5.0...v2.5.1) (2026-05-05)
 
 
