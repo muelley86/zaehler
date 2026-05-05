@@ -90,7 +90,10 @@ def login(
             action=AuditAction.LOGIN_FAILED,
             entity_type=AuditEntityType.USER,
             entity_id=None,
-            diff={"username": payload.username},
+            # Sanitiert: nur lowercased + auf 32 Zeichen begrenzt. Schützt
+            # vor versehentlich ins Username-Feld getippten Passwörtern,
+            # die sonst im Klartext im Audit-Log landen würden.
+            diff={"username": username_key[:32]},
             ip_address=ip,
         )
         db.commit()
@@ -127,7 +130,23 @@ def verify_2fa(
     db: DbDep,
 ) -> MeResponse:
     ip = client_ip(request) or "unknown"
-    resolved = totp_service.resolve_pending_challenge(db, token=payload.challenge_token)
+    # IP-basierte Sperre (gleiche wie beim 1FA-Login). Schützt gegen
+    # 2FA-Code-Brute-Force, wenn ein Angreifer einen Pending-Challenge-
+    # Token hat und schnell durch die 6-stelligen Codes iteriert.
+    locked_for = login_limiter.check(ip)
+    if locked_for is not None:
+        raise ProblemError(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            title="Too many attempts",
+            detail=f"2FA-Versuche gesperrt. Erneut versuchen in ~{int(locked_for)}s.",
+        )
+    user_agent = request.headers.get("user-agent")
+    resolved = totp_service.resolve_pending_challenge(
+        db,
+        token=payload.challenge_token,
+        user_agent=user_agent,
+        ip_address=ip,
+    )
     if resolved is None:
         raise ProblemError(status_code=401, title="Challenge expired or unknown")
     user, challenge = resolved
@@ -149,6 +168,7 @@ def verify_2fa(
         diff = {"remaining": totp_service.remaining_backup_codes(db, user=user)}
 
     if not success:
+        login_limiter.record_failure(ip)
         username_limiter.record_failure(user.username.lower())
         record(
             db,
@@ -162,10 +182,10 @@ def verify_2fa(
         raise ProblemError(status_code=401, title="Invalid TOTP code")
 
     totp_service.consume_pending_challenge(db, challenge=challenge)
-    # Login final erfolgreich: Username-Bucket leeren, sodass die Failure-Counter
+    # Login final erfolgreich: beide Buckets leeren, sodass die Failure-Counter
     # vom 1FA-Step nicht in eine spätere Sperre umschlagen.
+    login_limiter.record_success(ip)
     username_limiter.record_success(user.username.lower())
-    user_agent = request.headers.get("user-agent")
     _session, token = auth_service.issue_session(
         db, user=user, user_agent=user_agent, ip_address=ip
     )

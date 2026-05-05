@@ -280,3 +280,40 @@ def test_force_password_change_blocks_other_endpoints(client: TestClient, admin_
     # Jetzt funktioniert auch der Listen-Endpoint
     after = client.get("/api/v1/measuring-points")
     assert after.status_code == 200
+
+
+def test_2fa_challenge_bound_to_user_agent(admin_client: TestClient) -> None:
+    """Pending-Challenge wird beim Erzeugen mit UA gespeichert; eine
+    Verify-Request mit anderer UA muss abgelehnt werden, sonst wäre der
+    abgegriffene Challenge-Token wiederverwendbar."""
+    import pyotp
+
+    # Setup: 2FA aktivieren
+    setup = admin_client.post("/api/v1/auth/2fa/setup")
+    secret = setup.json()["secret"]
+    admin_client.post(
+        "/api/v1/auth/2fa/activate",
+        json={"code": pyotp.TOTP(secret).now()},
+    )
+
+    # Login Step 1 in einem neuen Client (UA = "test-agent-A")
+    a = TestClient(admin_client.app, headers={"user-agent": "test-agent-A"})
+    step1 = a.post(
+        "/api/v1/auth/login",
+        json={"username": "admin", "password": "admin-pass-12345"},
+    )
+    assert step1.status_code == 200
+    challenge_token = step1.json()["challenge_token"]
+    assert challenge_token
+
+    # Step 2 in einem anderen Client (UA = "test-agent-B") — gleicher
+    # Challenge-Token, aber andere UA → muss 401 sein.
+    import time
+
+    time.sleep(1)  # neuer TOTP-Counter, damit Code nicht aus Step 1 wirkt
+    b = TestClient(admin_client.app, headers={"user-agent": "test-agent-B"})
+    bad = b.post(
+        "/api/v1/auth/2fa/verify",
+        json={"challenge_token": challenge_token, "code": pyotp.TOTP(secret).now()},
+    )
+    assert bad.status_code == 401, bad.text

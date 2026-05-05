@@ -12,6 +12,11 @@
 
 set -euo pipefail
 
+# Backup-Files dürfen nur vom Owner gelesen werden — sie enthalten
+# bcrypt-Hashes und (Klartext-)TOTP-Secrets. Default-umask 022 würde
+# 0644 erzeugen → world-readable.
+umask 0077
+
 DB_FILE="${DB_FILE:-/opt/zaehler/data/meters.db}"
 BACKUP_DIR="${BACKUP_DIR:-/opt/zaehler/backups}"
 KEEP="${KEEP:-30}"
@@ -31,6 +36,8 @@ sqlite3 "$DB_FILE" ".backup '$target'"
 
 # Direkt komprimieren — spart auf Dauer einiges an Plattenplatz
 gzip "$target"
+# umask greift bei `gzip` nicht in allen Setups; explizit absichern.
+chmod 0600 "${target}.gz"
 echo "Backup erstellt: ${target}.gz"
 
 # Aufräumen: alte Backups nach Anzahl behalten
