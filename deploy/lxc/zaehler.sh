@@ -152,7 +152,12 @@ ensure_node_lts() {
         ca-certificates curl gnupg >/dev/null
     local tmp_setup=/tmp/nodesource_setup.sh
     curl -fsSL "https://deb.nodesource.com/setup_${NODE_MAJOR_REQUIRED}.x" -o "$tmp_setup"
-    bash "$tmp_setup" >/dev/null
+    # Das NodeSource-Setup-Skript ruft intern ``apt`` auf, was eine
+    # ``WARNING: apt does not have a stable CLI interface``-Zeile auf
+    # stderr produziert. Die Warnung ist hier kosmetisch — wir filtern
+    # sie weg, damit der Install-Output sauber bleibt. Echte Fehler
+    # bleiben sichtbar (alles, was nicht exakt diese Zeile ist).
+    bash "$tmp_setup" 2> >(grep -v "apt does not have a stable CLI interface" >&2) >/dev/null
     rm -f "$tmp_setup"
     DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends nodejs >/dev/null
     ok "Node $(node -v) installiert"
