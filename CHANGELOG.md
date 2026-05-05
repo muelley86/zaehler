@@ -10,6 +10,13 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.6.1](https://github.com/muelley86/zaehler/compare/v2.6.0...v2.6.1) (2026-05-05)
+
+
+### Fehlerbehebungen
+
+* **heating:** Migration 0011 hat Uppercase-Werte nicht migriert ([#26](https://github.com/muelley86/zaehler/issues/26)) ([0ff70cb](https://github.com/muelley86/zaehler/commit/0ff70cb557e667265e4cf9291fc165d9834899a9))
+
 ## [2.6.0](https://github.com/muelley86/zaehler/compare/v2.5.1...v2.6.0) (2026-05-05)
 
 
