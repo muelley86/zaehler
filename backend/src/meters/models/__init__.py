@@ -3,6 +3,7 @@ from __future__ import annotations
 from meters.models._enums import (
     AuditAction,
     AuditEntityType,
+    HeatingSource,
     MeterType,
     UserRole,
 )
@@ -23,6 +24,7 @@ __all__ = [
     "AuditLog",
     "BackupCode",
     "Delivery",
+    "HeatingSource",
     "Location",
     "MeasuringPoint",
     "MeterType",

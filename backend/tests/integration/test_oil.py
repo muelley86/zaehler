@@ -6,41 +6,63 @@ from fastapi.testclient import TestClient
 
 
 def _create_oil(client: TestClient) -> dict[str, Any]:
+    """Heizöl-Messstelle (heating + heating_source=oil) mit zwei Registern:
+    Betriebsstunden (h) und Tankstand (L, mit Lieferungen)."""
     payload = {
         "name": "Ölheizung Keller",
-        "type": "oil",
+        "type": "heating",
+        "heating_source": "oil",
         "is_bidirectional": False,
         "has_dual_tariff": False,
         "serial_number": "OIL-1",
         "installed_at": "2024-01-01",
-        "initial_values": {"oil.hours": "0", "oil.tank": "2500"},
+        "initial_values": {},
+        "registers": [
+            {"label": "Betriebsstunden", "unit": "h", "initial_value": "0"},
+            {
+                "label": "Tankstand",
+                "unit": "L",
+                "accepts_deliveries": True,
+                "initial_value": "2500",
+            },
+        ],
     }
     resp = client.post("/api/v1/measuring-points", json=payload)
     assert resp.status_code == 201, resp.text
     return cast(dict[str, Any], resp.json())
 
 
-def _registers(mp: dict[str, Any]) -> dict[str, dict[str, Any]]:
-    out: dict[str, dict[str, Any]] = {}
+def _hours_register(mp: dict[str, Any]) -> dict[str, Any]:
     for meter in mp["physical_meters"]:
         for r in meter["registers"]:
-            out[r["obis_code"]] = r
-    return out
+            if not r["accepts_deliveries"] and r["unit"] == "h":
+                return cast(dict[str, Any], r)
+    raise AssertionError("Hours-Register not found")
+
+
+def _tank_register(mp: dict[str, Any]) -> dict[str, Any]:
+    for meter in mp["physical_meters"]:
+        for r in meter["registers"]:
+            if r["accepts_deliveries"]:
+                return cast(dict[str, Any], r)
+    raise AssertionError("Tank-Register not found")
 
 
 def test_oil_measuring_point_creates_two_registers(admin_client: TestClient) -> None:
     mp = _create_oil(admin_client)
-    regs = _registers(mp)
-    assert set(regs.keys()) == {"oil.hours", "oil.tank"}
-    assert regs["oil.hours"]["unit"] == "h"
-    assert regs["oil.tank"]["unit"] == "L"
-    assert regs["oil.hours"]["accepts_deliveries"] is False
-    assert regs["oil.tank"]["accepts_deliveries"] is True
+    hours = _hours_register(mp)
+    tank = _tank_register(mp)
+    assert hours["label"] == "Betriebsstunden"
+    assert hours["unit"] == "h"
+    assert hours["accepts_deliveries"] is False
+    assert tank["label"] == "Tankstand"
+    assert tank["unit"] == "L"
+    assert tank["accepts_deliveries"] is True
 
 
 def test_create_delivery_and_listing(admin_client: TestClient) -> None:
     mp = _create_oil(admin_client)
-    tank_id: int = _registers(mp)["oil.tank"]["id"]
+    tank_id = _tank_register(mp)["id"]
 
     create = admin_client.post(
         f"/api/v1/registers/{tank_id}/deliveries",
@@ -61,7 +83,7 @@ def test_create_delivery_and_listing(admin_client: TestClient) -> None:
 
 def test_delivery_only_on_accepting_register(admin_client: TestClient) -> None:
     mp = _create_oil(admin_client)
-    hours_id: int = _registers(mp)["oil.hours"]["id"]
+    hours_id = _hours_register(mp)["id"]
     resp = admin_client.post(
         f"/api/v1/registers/{hours_id}/deliveries",
         json={"delivery_at": "2024-03-10T12:00:00", "amount": "1000"},
@@ -71,7 +93,7 @@ def test_delivery_only_on_accepting_register(admin_client: TestClient) -> None:
 
 def test_delete_delivery(admin_client: TestClient) -> None:
     mp = _create_oil(admin_client)
-    tank_id: int = _registers(mp)["oil.tank"]["id"]
+    tank_id = _tank_register(mp)["id"]
     created = admin_client.post(
         f"/api/v1/registers/{tank_id}/deliveries",
         json={"delivery_at": "2024-03-10T12:00:00", "amount": "1000"},
@@ -83,8 +105,10 @@ def test_delete_delivery(admin_client: TestClient) -> None:
 
 def test_oil_consumption_with_deliveries(admin_client: TestClient) -> None:
     mp = _create_oil(admin_client)
-    tank_id: int = _registers(mp)["oil.tank"]["id"]
-    hours_id: int = _registers(mp)["oil.hours"]["id"]
+    tank_id = _tank_register(mp)["id"]
+    hours_id = _hours_register(mp)["id"]
+    tank_obis = _tank_register(mp)["obis_code"]
+    hours_obis = _hours_register(mp)["obis_code"]
 
     # Tankstand erfassen, dann Lieferung, dann wieder Tankstand
     admin_client.post(
@@ -114,14 +138,14 @@ def test_oil_consumption_with_deliveries(admin_client: TestClient) -> None:
     assert resp.status_code == 200
     points = resp.json()
     tank_consumption = next(
-        p for p in points if p["obis_code"] == "oil.tank" and p["period_end"] == "2024-03-01"
+        p for p in points if p["obis_code"] == tank_obis and p["period_end"] == "2024-03-01"
     )
     # Initial 2500 → 2000 (Verbrauch 500); 2000 + 1500 Lieferung → 2800 (Verbrauch 700).
     # Im Antwort-Endpunkt für period_end=2024-03-01 erwarten wir den 2. Schritt: 700.
     assert tank_consumption["consumption"] == "700"
 
     hours_consumption = next(
-        p for p in points if p["obis_code"] == "oil.hours" and p["period_end"] == "2024-03-01"
+        p for p in points if p["obis_code"] == hours_obis and p["period_end"] == "2024-03-01"
     )
     assert hours_consumption["consumption"] == "230"
 
@@ -130,7 +154,7 @@ def test_recorder_can_record_delivery(
     admin_client: TestClient, recorder_client: TestClient
 ) -> None:
     mp = _create_oil(admin_client)
-    tank_id: int = _registers(mp)["oil.tank"]["id"]
+    tank_id = _tank_register(mp)["id"]
     resp = recorder_client.post(
         f"/api/v1/registers/{tank_id}/deliveries",
         json={"delivery_at": "2024-04-01T12:00:00", "amount": "500"},
@@ -140,7 +164,7 @@ def test_recorder_can_record_delivery(
 
 def test_global_deliveries_listing_with_filters(admin_client: TestClient) -> None:
     mp = _create_oil(admin_client)
-    tank_id: int = _registers(mp)["oil.tank"]["id"]
+    tank_id = _tank_register(mp)["id"]
 
     for d, amt in [("2024-02-15T12:00:00", "1500"), ("2024-04-15T12:00:00", "1200")]:
         admin_client.post(
@@ -161,7 +185,9 @@ def test_global_deliveries_listing_with_filters(admin_client: TestClient) -> Non
 
 def test_state_includes_deliveries_after_last_reading(admin_client: TestClient) -> None:
     mp = _create_oil(admin_client)
-    tank_id: int = _registers(mp)["oil.tank"]["id"]
+    tank = _tank_register(mp)
+    tank_id = tank["id"]
+    tank_obis = tank["obis_code"]
 
     admin_client.post(
         "/api/v1/readings",
@@ -175,15 +201,17 @@ def test_state_includes_deliveries_after_last_reading(admin_client: TestClient) 
     resp = admin_client.get(f"/api/v1/measuring-points/{mp['id']}/state")
     assert resp.status_code == 200, resp.text
     states = resp.json()
-    tank = next(s for s in states if s["obis_code"] == "oil.tank")
-    assert tank["last_reading_value"] == "2000"
-    assert tank["refilled_since"] == "1500"
-    assert tank["current_value"] == "3500"
+    state = next(s for s in states if s["obis_code"] == tank_obis)
+    assert state["last_reading_value"] == "2000"
+    assert state["refilled_since"] == "1500"
+    assert state["current_value"] == "3500"
 
 
 def test_state_after_new_reading_resets_refilled_since(admin_client: TestClient) -> None:
     mp = _create_oil(admin_client)
-    tank_id: int = _registers(mp)["oil.tank"]["id"]
+    tank = _tank_register(mp)
+    tank_id = tank["id"]
+    tank_obis = tank["obis_code"]
 
     admin_client.post(
         "/api/v1/readings",
@@ -200,7 +228,91 @@ def test_state_after_new_reading_resets_refilled_since(admin_client: TestClient)
 
     resp = admin_client.get(f"/api/v1/measuring-points/{mp['id']}/state")
     states = resp.json()
-    tank = next(s for s in states if s["obis_code"] == "oil.tank")
-    assert tank["last_reading_value"] == "3200"
-    assert tank["refilled_since"] == "0"
-    assert tank["current_value"] == "3200"
+    state = next(s for s in states if s["obis_code"] == tank_obis)
+    assert state["last_reading_value"] == "3200"
+    assert state["refilled_since"] == "0"
+    assert state["current_value"] == "3200"
+
+
+def test_register_crud_add_then_remove(admin_client: TestClient) -> None:
+    """Live-Editing: Register an aktivem Wärme-Zähler hinzufügen und löschen."""
+    mp = _create_oil(admin_client)
+    meter_id = mp["physical_meters"][0]["id"]
+
+    add = admin_client.post(
+        f"/api/v1/physical-meters/{meter_id}/registers",
+        json={"label": "Wärmemengenzähler", "unit": "kWh", "initial_value": "0"},
+    )
+    assert add.status_code == 201, add.text
+    new_id = add.json()["id"]
+    assert add.json()["label"] == "Wärmemengenzähler"
+    assert add.json()["unit"] == "kWh"
+
+    delete = admin_client.delete(f"/api/v1/registers/{new_id}")
+    assert delete.status_code == 204
+
+
+def test_register_delete_blocked_by_readings(admin_client: TestClient) -> None:
+    mp = _create_oil(admin_client)
+    tank_id = _tank_register(mp)["id"]
+
+    # Reading drauf, dann Delete versuchen → 409
+    admin_client.post(
+        "/api/v1/readings",
+        json={"register_id": tank_id, "value": "2000", "reading_at": "2024-02-01T12:00:00"},
+    )
+    resp = admin_client.delete(f"/api/v1/registers/{tank_id}")
+    assert resp.status_code == 409
+
+
+def test_heating_requires_registers(admin_client: TestClient) -> None:
+    resp = admin_client.post(
+        "/api/v1/measuring-points",
+        json={
+            "name": "Leer",
+            "type": "heating",
+            "heating_source": "oil",
+            "is_bidirectional": False,
+            "has_dual_tariff": False,
+            "serial_number": "OIL-X",
+            "installed_at": "2024-01-01",
+            "initial_values": {},
+            "registers": [],
+        },
+    )
+    assert resp.status_code == 422
+
+
+def test_heating_source_required_for_heating(admin_client: TestClient) -> None:
+    resp = admin_client.post(
+        "/api/v1/measuring-points",
+        json={
+            "name": "Leer",
+            "type": "heating",
+            "is_bidirectional": False,
+            "has_dual_tariff": False,
+            "serial_number": "X",
+            "installed_at": "2024-01-01",
+            "initial_values": {},
+            "registers": [{"label": "X", "unit": "kWh"}],
+        },
+    )
+    assert resp.status_code == 422
+
+
+def test_invalid_heating_unit_rejected(admin_client: TestClient) -> None:
+    resp = admin_client.post(
+        "/api/v1/measuring-points",
+        json={
+            "name": "Bad",
+            "type": "heating",
+            "heating_source": "wood",
+            "is_bidirectional": False,
+            "has_dual_tariff": False,
+            "serial_number": "W-1",
+            "installed_at": "2024-01-01",
+            "initial_values": {},
+            "registers": [{"label": "Foo", "unit": "Liter"}],
+        },
+    )
+    assert resp.status_code == 422

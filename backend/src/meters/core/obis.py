@@ -1,8 +1,10 @@
-"""OBIS-Register-Konfiguration pro Messstellentyp.
+"""OBIS-/Default-Register-Konfiguration pro Messstellentyp.
 
 Die Register werden bei der Anlage einer ``MeasuringPoint`` (bzw. ihres
 ersten ``PhysicalMeter``) und bei jedem Zählerwechsel auf Basis dieser
-Tabelle abgeleitet.
+Tabelle abgeleitet — ausgenommen ``MeterType.HEATING``: hier ist die
+Register-Liste vollständig user-konfigurierbar und wird vom Caller (API)
+direkt gesetzt.
 """
 
 from __future__ import annotations
@@ -22,8 +24,6 @@ class RegisterDef:
 
 _KWH = "kWh"
 _M3 = "m³"
-_HOURS = "h"
-_LITER = "L"
 
 
 def registers_for(
@@ -32,18 +32,16 @@ def registers_for(
     is_bidirectional: bool = False,
     has_dual_tariff: bool = False,
 ) -> list[RegisterDef]:
+    """Default-Register für Strom und Wasser.
+
+    ``MeterType.HEATING`` hat keine Defaults — die Register werden vom
+    User über ``MeasuringPointCreate.registers`` zusammengestellt.
+    """
     if meter_type is MeterType.ELECTRICITY:
         return _electricity(is_bidirectional=is_bidirectional, has_dual_tariff=has_dual_tariff)
-    if meter_type is MeterType.GAS:
-        return [RegisterDef("7.8.0", "Verbrauch", _M3)]
     if meter_type is MeterType.WATER:
         return [RegisterDef("water", "Verbrauch", _M3)]
-    if meter_type is MeterType.OIL:
-        return [
-            RegisterDef("oil.hours", "Betriebsstunden", _HOURS),
-            RegisterDef("oil.tank", "Tankstand", _LITER, accepts_deliveries=True),
-        ]
-    raise ValueError(f"Unbekannter MeterType: {meter_type!r}")
+    raise ValueError(f"Kein Default-Register-Set für {meter_type!r}")
 
 
 def _electricity(*, is_bidirectional: bool, has_dual_tariff: bool) -> list[RegisterDef]:

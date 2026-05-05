@@ -5,9 +5,16 @@ import enum
 
 class MeterType(enum.StrEnum):
     ELECTRICITY = "electricity"
-    GAS = "gas"
     WATER = "water"
+    HEATING = "heating"
+
+
+class HeatingSource(enum.StrEnum):
     OIL = "oil"
+    GAS = "gas"
+    WOOD_CHIPS = "wood_chips"
+    WOOD = "wood"
+    DISTRICT_HEAT = "district_heat"
 
 
 class UserRole(enum.StrEnum):
