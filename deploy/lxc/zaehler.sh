@@ -170,6 +170,19 @@ ensure_sudo_rule() {
     fi
 }
 
+# Legt einen Wrapper unter /usr/local/bin/zaehler an, damit der User auf
+# einem installierten Container mit `sudo zaehler upgrade-all` auskommt
+# (statt dem Pfad zum Skript). Idempotent — bei jedem upgrade-app neu
+# gesetzt, falls REPO_DIR sich geändert hat.
+ensure_cli_link() {
+    local dest=/usr/local/bin/zaehler
+    local target="$REPO_DIR/deploy/lxc/zaehler.sh"
+    if [ ! -L "$dest" ] || [ "$(readlink "$dest")" != "$target" ]; then
+        ln -sfn "$target" "$dest"
+        ok "CLI-Wrapper angelegt: 'sudo zaehler <kommando>' funktioniert ab jetzt überall"
+    fi
+}
+
 # -----------------------------------------------------------------------------
 # install — Erstinstallation
 # -----------------------------------------------------------------------------
@@ -454,12 +467,13 @@ EOF
     as_user "cd '$REPO_DIR/backend' && uv run alembic upgrade head"
     ok "Datenbank auf aktuellem Stand"
 
-    step "8/10  systemd-Unit + sudo-Regel"
+    step "8/10  systemd-Unit + sudo-Regel + CLI-Wrapper"
     install -m 0644 "$REPO_DIR/deploy/systemd/$SERVICE_NAME" \
         "/etc/systemd/system/$SERVICE_NAME"
     systemctl daemon-reload
     systemctl enable --now "$SERVICE_NAME" >/dev/null 2>&1
     ensure_sudo_rule
+    ensure_cli_link
     ok "Service '$SERVICE_NAME' aktiv und beim Boot gestartet"
 
     step "9/10  Admin-Benutzer anlegen"
@@ -678,7 +692,7 @@ cmd_upgrade_app() {
     step "5/7  Datenbank-Migrationen"
     as_user "cd '$REPO_DIR/backend' && uv run alembic upgrade head"
 
-    step "6/7  systemd-Unit synchronisieren (falls geändert)"
+    step "6/7  systemd-Unit synchronisieren (falls geändert) + CLI-Wrapper"
     local unit_src="$REPO_DIR/deploy/systemd/$SERVICE_NAME"
     local unit_dst="/etc/systemd/system/$SERVICE_NAME"
     if [ -f "$unit_src" ] && ! cmp -s "$unit_src" "$unit_dst" 2>/dev/null; then
@@ -694,6 +708,9 @@ cmd_upgrade_app() {
         fi
     else
         log "systemd-Unit unverändert"
+    fi
+    if [ "$(id -u)" -eq 0 ]; then
+        ensure_cli_link
     fi
 
     step "7/7  Service neu starten"

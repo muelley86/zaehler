@@ -77,10 +77,10 @@ Der Bootstrap zieht das Repo, danach läuft der whiptail-Wizard durch alle
 Eingaben (Admin-Username + Passwort, optional Bind-Host/Port, Backup-Zeit).
 Am Ende zeigt der Wizard die App-URL.
 
-Spätere Komplett-Updates (System, Tools, App):
+Spätere Komplett-Updates (System, Tools, App) — **ein Befehl**:
 
 ```sh
-sudo bash /opt/zaehler/repo/deploy/lxc/zaehler.sh upgrade-all
+sudo zaehler upgrade-all
 ```
 
 Granulare Kommandos: `upgrade-system`, `upgrade-tools`, `upgrade-app`,
@@ -89,9 +89,10 @@ Granulare Kommandos: `upgrade-system`, `upgrade-tools`, `upgrade-app`,
 an. `data/meters.db` wird durch das Skript **niemals** verändert oder
 überschrieben.
 
-> **Container vor v2.3.0?** Erstes Update braucht einen einmaligen
+> **Container vor v2.4.0?** Erstes Update braucht einen einmaligen
 > Bootstrap aus GitHub — Anleitung in
-> [`deploy/lxc/README.md`](./deploy/lxc/README.md#erst-update-für-alte-container-vor-v230).
+> [`deploy/lxc/README.md`](./deploy/lxc/README.md#erstes-update-auf-einem-alten-container-vor-v240).
+> Danach reicht `sudo zaehler upgrade-all` für alle weiteren Updates.
 
 Nach dem Install ist die App **immer** per `http://<container-ip>:8000`
 direkt im LAN erreichbar — kein manuelles Editieren von `meters.env`
