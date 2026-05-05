@@ -34,12 +34,8 @@ depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
-    op.execute(
-        "UPDATE measuring_point SET type='HEATING', heating_source='OIL' WHERE type='OIL'"
-    )
-    op.execute(
-        "UPDATE measuring_point SET type='HEATING', heating_source='GAS' WHERE type='GAS'"
-    )
+    op.execute("UPDATE measuring_point SET type='HEATING', heating_source='OIL' WHERE type='OIL'")
+    op.execute("UPDATE measuring_point SET type='HEATING', heating_source='GAS' WHERE type='GAS'")
 
 
 def downgrade() -> None:
