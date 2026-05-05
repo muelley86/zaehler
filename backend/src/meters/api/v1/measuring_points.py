@@ -11,12 +11,15 @@ Eine Messstelle kann nur gelöscht werden, wenn keine Erfassungen daran hängen
 
 from __future__ import annotations
 
+from decimal import Decimal
+
 from fastapi import APIRouter, Request, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session as DbSession
 from sqlalchemy.orm import selectinload
 
 from meters.api.deps import AdminUser, CurrentUser, DbDep, client_ip
+from meters.core.obis import RegisterDef
 from meters.core.problem import ProblemError
 from meters.models import (
     AuditAction,
@@ -112,19 +115,50 @@ def create_measuring_point(
         has_dual_tariff=payload.has_dual_tariff,
         tank_capacity=payload.tank_capacity,
         transformer_factor=payload.transformer_factor,
+        heating_source=payload.heating_source,
     )
     db.add(mp)
     db.flush()
+
+    # Heating: User-konfigurierte Register werden 1:1 als RegisterDef
+    # an install_first_meter gereicht. Anfangsstände stammen aus
+    # ``HeatingRegisterCreate.initial_value``; der OBIS-Code wird
+    # synthetisch aus dem Index gebildet, da Wärme keine Standard-OBIS hat.
+    register_defs: list[RegisterDef] | None = None
+    initial_values: dict[str, Decimal | str] = dict(payload.initial_values)
+    if payload.type is MeterType.HEATING:
+        register_defs = []
+        for idx, r in enumerate(payload.registers):
+            obis_code = f"heat.{idx}"
+            register_defs.append(
+                RegisterDef(
+                    obis_code=obis_code,
+                    label=r.label,
+                    unit=r.unit,
+                    accepts_deliveries=r.accepts_deliveries,
+                )
+            )
+            if r.initial_value is not None:
+                initial_values[obis_code] = r.initial_value
 
     install_first_meter(
         db,
         measuring_point=mp,
         serial_number=payload.serial_number,
         installed_at=payload.installed_at,
-        initial_values=dict(payload.initial_values),
+        initial_values=initial_values,
         user_id=admin.id,
         ip_address=client_ip(request),
+        register_defs=register_defs,
     )
+
+    if payload.type is MeterType.HEATING and register_defs is not None:
+        # max_value pro Heating-Register nachträglich setzen, weil
+        # RegisterDef das Feld nicht trägt (es ist nur Default-Schema).
+        active_meter = mp.physical_meters[0]
+        for r_payload, register in zip(payload.registers, active_meter.registers, strict=True):
+            if r_payload.max_value is not None:
+                register.max_value = r_payload.max_value
     record(
         db,
         user_id=admin.id,

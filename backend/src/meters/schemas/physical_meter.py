@@ -20,8 +20,10 @@ class RegisterRead(APIModel):
 
 class RegisterUpdate(BaseModel):
     label: str | None = Field(default=None, min_length=1, max_length=64)
+    unit: str | None = Field(default=None, min_length=1, max_length=16)
     is_active: bool | None = None
     max_value: Decimal | None = None
+    accepts_deliveries: bool | None = None
 
 
 class PhysicalMeterRead(APIModel):

@@ -14,12 +14,13 @@ from decimal import Decimal
 
 from sqlalchemy.orm import Session as DbSession
 
-from meters.core.obis import registers_for
+from meters.core.obis import RegisterDef, registers_for
 from meters.core.problem import ProblemError
 from meters.models import (
     AuditAction,
     AuditEntityType,
     MeasuringPoint,
+    MeterType,
     PhysicalMeter,
     Reading,
     Register,
@@ -40,13 +41,23 @@ def install_first_meter(
     initial_values: dict[str, Decimal | str],
     user_id: int | None,
     ip_address: str | None,
+    register_defs: list[RegisterDef] | None = None,
 ) -> PhysicalMeter:
+    """Legt den ersten PhysicalMeter einer MeasuringPoint an.
+
+    ``register_defs`` ist nur für ``MeterType.HEATING`` Pflicht (User-
+    konfigurierte Liste); für andere Typen werden OBIS-Defaults aus
+    ``registers_for`` benutzt, sofern ``register_defs`` nicht gesetzt ist.
+    """
     initial = _coerce_decimal_map(initial_values)
-    defs = registers_for(
-        measuring_point.type,
-        is_bidirectional=measuring_point.is_bidirectional,
-        has_dual_tariff=measuring_point.has_dual_tariff,
-    )
+    if register_defs is not None:
+        defs = list(register_defs)
+    else:
+        defs = registers_for(
+            measuring_point.type,
+            is_bidirectional=measuring_point.is_bidirectional,
+            has_dual_tariff=measuring_point.has_dual_tariff,
+        )
     meter = PhysicalMeter(
         serial_number=serial_number,
         installed_at=installed_at,
@@ -142,6 +153,19 @@ def replace_meter(
         register.is_active = False
     active_meter.removed_at = removed_at
 
+    # Heating: die User-konfigurierte Register-Liste wandert 1:1 vom alten
+    # Meter zum neuen mit (Strom/Wasser nehmen weiter die OBIS-Defaults).
+    inherited_defs: list[RegisterDef] | None = None
+    if measuring_point.type is MeterType.HEATING:
+        inherited_defs = [
+            RegisterDef(
+                obis_code=r.obis_code,
+                label=r.label,
+                unit=r.unit,
+                accepts_deliveries=r.accepts_deliveries,
+            )
+            for r in active_meter.registers
+        ]
     new_meter = install_first_meter(
         db,
         measuring_point=measuring_point,
@@ -150,6 +174,7 @@ def replace_meter(
         initial_values=initial_readings,
         user_id=user_id,
         ip_address=ip_address,
+        register_defs=inherited_defs,
     )
 
     record(

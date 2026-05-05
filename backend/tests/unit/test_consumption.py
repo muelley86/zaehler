@@ -5,12 +5,24 @@ from decimal import Decimal
 
 from sqlalchemy.orm import Session
 
-from meters.models import Delivery, MeasuringPoint, MeterType, Reading
+from meters.core.obis import RegisterDef
+from meters.models import (
+    Delivery,
+    HeatingSource,
+    MeasuringPoint,
+    MeterType,
+    Reading,
+)
 from meters.services.consumption import (
     consumption_for_measuring_point,
     consumption_for_register,
 )
 from meters.services.meter_replacement import install_first_meter, replace_meter
+
+_HEATING_OIL_REGISTERS = [
+    RegisterDef("heat.0", "Betriebsstunden", "h"),
+    RegisterDef("heat.1", "Tankstand", "L", accepts_deliveries=True),
+]
 
 
 def _make_point(db: Session) -> MeasuringPoint:
@@ -249,8 +261,7 @@ def test_consumption_no_rollover_when_max_value_zero(db: Session) -> None:
 
 def test_consumption_tank_register_skips_rollover_path(db: Session) -> None:
     """Audit 5.2: Heizöl-Tank (accepts_deliveries) folgt eigener Logik, nie Rollover."""
-    # Oil-MP anlegen — Tank-Register hat accepts_deliveries=True
-    mp = MeasuringPoint(name="Tank", type=MeterType.OIL)
+    mp = MeasuringPoint(name="Tank", type=MeterType.HEATING, heating_source=HeatingSource.OIL)
     db.add(mp)
     db.flush()
     install_first_meter(
@@ -258,14 +269,15 @@ def test_consumption_tank_register_skips_rollover_path(db: Session) -> None:
         measuring_point=mp,
         serial_number="OIL-1",
         installed_at=date(2024, 1, 1),
-        initial_values={"oil.hours": Decimal("0"), "oil.tank": Decimal("2000")},
+        initial_values={"heat.0": Decimal("0"), "heat.1": Decimal("2000")},
         user_id=None,
         ip_address=None,
+        register_defs=_HEATING_OIL_REGISTERS,
     )
     db.commit()
     db.refresh(mp)
 
-    tank_register = next(r for r in mp.physical_meters[0].registers if r.obis_code == "oil.tank")
+    tank_register = next(r for r in mp.physical_meters[0].registers if r.accepts_deliveries)
     # Stand sinkt von 2000 auf 1500 — bei normalem Register wäre das Rollover.
     db.add(
         Reading(
@@ -362,7 +374,7 @@ def test_consumption_for_measuring_point_applies_transformer_factor(db: Session)
 
 def test_oil_consumption_with_multiple_deliveries_in_period(db: Session) -> None:
     """Audit 5.7: Mehrere Lieferungen zwischen zwei Readings — alle werden summiert."""
-    mp = MeasuringPoint(name="Tank2", type=MeterType.OIL)
+    mp = MeasuringPoint(name="Tank2", type=MeterType.HEATING, heating_source=HeatingSource.OIL)
     db.add(mp)
     db.flush()
     install_first_meter(
@@ -370,14 +382,15 @@ def test_oil_consumption_with_multiple_deliveries_in_period(db: Session) -> None
         measuring_point=mp,
         serial_number="OIL-2",
         installed_at=date(2024, 1, 1),
-        initial_values={"oil.hours": Decimal("0"), "oil.tank": Decimal("1000")},
+        initial_values={"heat.0": Decimal("0"), "heat.1": Decimal("1000")},
         user_id=None,
         ip_address=None,
+        register_defs=_HEATING_OIL_REGISTERS,
     )
     db.commit()
     db.refresh(mp)
 
-    tank = next(r for r in mp.physical_meters[0].registers if r.obis_code == "oil.tank")
+    tank = next(r for r in mp.physical_meters[0].registers if r.accepts_deliveries)
     # Zwei Lieferungen zwischen den beiden Readings
     db.add(
         Delivery(
@@ -410,7 +423,7 @@ def test_oil_consumption_same_day_reading_then_delivery_then_reading(db: Session
     abgelesen. Mit nur Datum (ohne Zeit) wäre die Lieferung weder dem ersten
     noch dem zweiten Reading-Intervall zuzuordnen → falsche Bilanz.
     """
-    mp = MeasuringPoint(name="Tank3", type=MeterType.OIL)
+    mp = MeasuringPoint(name="Tank3", type=MeterType.HEATING, heating_source=HeatingSource.OIL)
     db.add(mp)
     db.flush()
     install_first_meter(
@@ -418,14 +431,15 @@ def test_oil_consumption_same_day_reading_then_delivery_then_reading(db: Session
         measuring_point=mp,
         serial_number="OIL-3",
         installed_at=date(2024, 1, 1),
-        initial_values={"oil.hours": Decimal("0"), "oil.tank": Decimal("800")},
+        initial_values={"heat.0": Decimal("0"), "heat.1": Decimal("800")},
         user_id=None,
         ip_address=None,
+        register_defs=_HEATING_OIL_REGISTERS,
     )
     db.commit()
     db.refresh(mp)
 
-    tank = next(r for r in mp.physical_meters[0].registers if r.obis_code == "oil.tank")
+    tank = next(r for r in mp.physical_meters[0].registers if r.accepts_deliveries)
     # Initial = 800 am 2024-01-01 (Default-Zeit aus install_first_meter)
     # Tag 2024-02-15: morgens 700, mittags Lieferung 1500, abends 2050
     db.add(

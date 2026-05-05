@@ -148,12 +148,14 @@ def test_update_physical_meter_serial(admin_client: TestClient) -> None:
         "/api/v1/measuring-points",
         json={
             "name": "G",
-            "type": "gas",
+            "type": "heating",
+            "heating_source": "gas",
             "is_bidirectional": False,
             "has_dual_tariff": False,
             "serial_number": "TYPO-1",
             "installed_at": "2024-01-01",
-            "initial_values": {"7.8.0": "0"},
+            "initial_values": {},
+            "registers": [{"label": "Verbrauch", "unit": "m³", "initial_value": 0}],
         },
     ).json()
     meter_id = mp["physical_meters"][0]["id"]
@@ -170,12 +172,14 @@ def test_update_register_label(admin_client: TestClient) -> None:
         "/api/v1/measuring-points",
         json={
             "name": "G2",
-            "type": "gas",
+            "type": "heating",
+            "heating_source": "gas",
             "is_bidirectional": False,
             "has_dual_tariff": False,
             "serial_number": "G-2",
             "installed_at": "2024-01-01",
-            "initial_values": {"7.8.0": "0"},
+            "initial_values": {},
+            "registers": [{"label": "Verbrauch", "unit": "m³", "initial_value": 0}],
         },
     ).json()
     register_id = mp["physical_meters"][0]["registers"][0]["id"]

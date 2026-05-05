@@ -17,7 +17,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from meters.db import Base, TimestampMixin
 from meters.db.types import DecimalText
-from meters.models._enums import MeterType
+from meters.models._enums import HeatingSource, MeterType
 
 if TYPE_CHECKING:
     from meters.models.location import Location
@@ -40,6 +40,10 @@ class MeasuringPoint(Base, TimestampMixin):
     has_dual_tariff: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     tank_capacity: Mapped[Decimal | None] = mapped_column(DecimalText(32))
     transformer_factor: Mapped[int | None] = mapped_column(Integer)
+    heating_source: Mapped[HeatingSource | None] = mapped_column(
+        SAEnum(HeatingSource, name="heating_source", native_enum=False, length=20),
+        nullable=True,
+    )
 
     location: Mapped[Location | None] = relationship("Location")
     physical_meters: Mapped[list[PhysicalMeter]] = relationship(
