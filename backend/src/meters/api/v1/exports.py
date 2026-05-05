@@ -10,7 +10,7 @@ from __future__ import annotations
 import csv
 import io
 import json
-from datetime import datetime
+from datetime import UTC, datetime
 from decimal import Decimal
 
 from fastapi import APIRouter
@@ -109,7 +109,7 @@ def full_dump(db: DbDep, _user: CurrentUser) -> Response:
     )
 
     payload = {
-        "exported_at": datetime.utcnow().isoformat(),
+        "exported_at": datetime.now(UTC).isoformat(),
         "measuring_points": [
             {
                 "id": mp.id,

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Iterator
 from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
@@ -22,7 +22,7 @@ class ConsumptionPoint:
     unit: str
 
 
-def _pairwise(readings: list[Reading]) -> Iterable[tuple[Reading, Reading]]:
+def _pairwise(readings: list[Reading]) -> Iterator[tuple[Reading, Reading]]:
     it = iter(readings)
     try:
         prev = next(it)

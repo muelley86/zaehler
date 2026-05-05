@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from fastapi.testclient import TestClient
+from sqlalchemy.orm import Session
 
 from meters.models import User
 
@@ -317,3 +318,28 @@ def test_2fa_challenge_bound_to_user_agent(admin_client: TestClient) -> None:
         json={"challenge_token": challenge_token, "code": pyotp.TOTP(secret).now()},
     )
     assert bad.status_code == 401, bad.text
+
+
+def test_login_blocked_for_inactive_user(client: TestClient, db: Session) -> None:
+    """Deaktivierter User (is_active=False) darf nicht einloggen — auch nicht
+    mit korrektem Passwort."""
+    from meters.core.security import hash_password
+    from meters.models import User, UserRole
+
+    db.add(
+        User(
+            username="deactivated",
+            email=None,
+            password_hash=hash_password("ungelogen-1234"),
+            role=UserRole.RECORDER,
+            is_active=False,
+            force_password_change=False,
+        )
+    )
+    db.commit()
+
+    resp = client.post(
+        "/api/v1/auth/login",
+        json={"username": "deactivated", "password": "ungelogen-1234"},
+    )
+    assert resp.status_code == 401, resp.text

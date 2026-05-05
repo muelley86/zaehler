@@ -38,6 +38,12 @@ router = APIRouter(tags=["readings"])
 
 EDIT_WINDOW = timedelta(hours=24)
 
+# Plausibilitätswarnung: 400 mit ``extra.acknowledge_field``. Pragmatischer
+# Pattern, in dem das Frontend die Warnung dem User zeigt und mit
+# ``acknowledge_warnings=True`` erneut postet. 422 wäre semantisch
+# ebenso, aber 400 ist hier konsistent mit der Frontend-Logik.
+STATUS_PLAUSIBILITY_WARNING = 400
+
 
 def _to_read(reading: Reading) -> ReadingRead:
     return ReadingRead(
@@ -109,7 +115,7 @@ def _check_value_in_series(
 
     if before is not None and value < before.value:
         raise ProblemError(
-            status_code=400,
+            status_code=STATUS_PLAUSIBILITY_WARNING,
             title="Wert kleiner als vorheriger Stand",
             detail=(
                 f"Vorheriger Stand am {before.reading_at.isoformat(sep=' ', timespec='minutes')}: "
@@ -130,7 +136,7 @@ def _check_value_in_series(
     if after is not None and value > after.value:
         after_str = after.reading_at.isoformat(sep=" ", timespec="minutes")
         raise ProblemError(
-            status_code=400,
+            status_code=STATUS_PLAUSIBILITY_WARNING,
             title="Wert größer als nachfolgender Stand",
             detail=(
                 f"Nachfolgender Stand am {after_str}: {format(after.value, 'f')}. "
