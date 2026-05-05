@@ -377,32 +377,42 @@ function MeasuringPointCard({
   const [correctTarget, setCorrectTarget] = useState<RegisterStateRead | null>(null);
 
   // Verbrauchs-Serie (period_end → values pro OBIS)
-  const consumptionMerged = new Map<string, Record<string, number | string>>();
-  for (const p of consumption) {
-    const row = consumptionMerged.get(p.period_end) ?? { date: p.period_end };
-    row[p.obis_code] = Number(p.consumption);
-    consumptionMerged.set(p.period_end, row);
-  }
-  const consumptionSeries = Array.from(consumptionMerged.values()).sort((a, b) =>
-    String(a['date']).localeCompare(String(b['date'])),
-  );
+  const consumptionSeries = useMemo(() => {
+    const merged = new Map<string, Record<string, number | string>>();
+    for (const p of consumption) {
+      const row = merged.get(p.period_end) ?? { date: p.period_end };
+      row[p.obis_code] = Number(p.consumption);
+      merged.set(p.period_end, row);
+    }
+    return Array.from(merged.values()).sort((a, b) =>
+      String(a['date']).localeCompare(String(b['date'])),
+    );
+  }, [consumption]);
 
-  // Stand-Serie (reading_date → value pro OBIS)
-  const obisByRegister = new Map<number, string>();
-  for (const meter of mp.physical_meters) {
-    for (const r of meter.registers) obisByRegister.set(r.id, r.obis_code);
-  }
-  const levelMerged = new Map<string, Record<string, number | string>>();
-  for (const r of readings) {
-    const code = obisByRegister.get(r.register_id);
-    if (!code) continue;
-    const row = levelMerged.get(r.reading_at) ?? { date: r.reading_at };
-    row[code] = Number(r.value);
-    levelMerged.set(r.reading_at, row);
-  }
-  const levelSeries = Array.from(levelMerged.values()).sort((a, b) =>
-    String(a['date']).localeCompare(String(b['date'])),
-  );
+  // OBIS-Lookup: einmalig pro mp.physical_meters (stabile Referenz, solange
+  // sich die MP nicht ändert).
+  const obisByRegister = useMemo(() => {
+    const m = new Map<number, string>();
+    for (const meter of mp.physical_meters) {
+      for (const r of meter.registers) m.set(r.id, r.obis_code);
+    }
+    return m;
+  }, [mp.physical_meters]);
+
+  // Stand-Serie (reading_at → value pro OBIS)
+  const levelSeries = useMemo(() => {
+    const merged = new Map<string, Record<string, number | string>>();
+    for (const r of readings) {
+      const code = obisByRegister.get(r.register_id);
+      if (!code) continue;
+      const row = merged.get(r.reading_at) ?? { date: r.reading_at };
+      row[code] = Number(r.value);
+      merged.set(r.reading_at, row);
+    }
+    return Array.from(merged.values()).sort((a, b) =>
+      String(a['date']).localeCompare(String(b['date'])),
+    );
+  }, [readings, obisByRegister]);
 
   const series = mode === 'consumption' ? consumptionSeries : levelSeries;
 

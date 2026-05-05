@@ -11,6 +11,7 @@ from datetime import date, datetime, time
 
 from fastapi import APIRouter, Query, Request, status
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 
 from meters.api.deps import AdminUser, CurrentUser, DbDep, client_ip
 from meters.core.problem import ProblemError
@@ -52,6 +53,7 @@ def list_deliveries(
     rows = list(
         db.scalars(
             select(Delivery)
+            .options(selectinload(Delivery.created_by))
             .where(Delivery.register_id == register_id)
             .order_by(Delivery.delivery_at.desc(), Delivery.id.desc())
         )
@@ -68,8 +70,13 @@ def list_all_deliveries(
     from_date: date | None = Query(None),
     to_date: date | None = Query(None),
     limit: int = Query(500, ge=1, le=5000),
+    offset: int = Query(0, ge=0),
 ) -> list[DeliveryRead]:
-    stmt = select(Delivery).order_by(Delivery.delivery_at.desc(), Delivery.id.desc())
+    stmt = (
+        select(Delivery)
+        .options(selectinload(Delivery.created_by))
+        .order_by(Delivery.delivery_at.desc(), Delivery.id.desc())
+    )
     if register_id is not None:
         stmt = stmt.where(Delivery.register_id == register_id)
     if measuring_point_id is not None:
@@ -82,7 +89,7 @@ def list_all_deliveries(
         stmt = stmt.where(Delivery.delivery_at >= datetime.combine(from_date, time.min))
     if to_date is not None:
         stmt = stmt.where(Delivery.delivery_at <= datetime.combine(to_date, time.max))
-    stmt = stmt.limit(limit)
+    stmt = stmt.limit(limit).offset(offset)
     rows = list(db.scalars(stmt))
     return [_to_read(d) for d in rows]
 
