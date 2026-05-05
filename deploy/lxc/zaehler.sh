@@ -432,10 +432,15 @@ EOF
 
     step "5/10  uv und pnpm installieren / aktualisieren"
     msg_run "uv und pnpm bereitstellen"
+    # uv install.sh und pnpm self-update produzieren beim primären
+    # Mirror gelegentlich 404-Output (Fallback-URL fängt das ab); das
+    # ist kosmetisches Geräusch. Hier komplett still — Install-Erfolg
+    # wird im nachfolgenden ok()-Output über `uv --version` /
+    # `pnpm --version` verifiziert.
     as_user '
         export PATH="$HOME/.local/bin:$PATH"
         if ! command -v uv >/dev/null; then
-            curl -LsSf https://astral.sh/uv/install.sh | sh >/dev/null
+            curl -LsSf https://astral.sh/uv/install.sh | sh >/dev/null 2>&1
         else
             uv self update >/dev/null 2>&1 || true
         fi
