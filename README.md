@@ -89,6 +89,10 @@ Granulare Kommandos: `upgrade-system`, `upgrade-tools`, `upgrade-app`,
 an. `data/meters.db` wird durch das Skript **niemals** verändert oder
 überschrieben.
 
+> **Container vor v2.3.0?** Erstes Update braucht einen einmaligen
+> Bootstrap aus GitHub — Anleitung in
+> [`deploy/lxc/README.md`](./deploy/lxc/README.md#erst-update-für-alte-container-vor-v230).
+
 Nach dem Install ist die App **immer** per `http://<container-ip>:8000`
 direkt im LAN erreichbar — kein manuelles Editieren von `meters.env`
 nötig. Wer HTTPS via Reverse-Proxy nachschalten will, ruft danach
