@@ -316,3 +316,51 @@ def test_invalid_heating_unit_rejected(admin_client: TestClient) -> None:
         },
     )
     assert resp.status_code == 422
+
+
+def test_replace_meter_inherits_custom_heating_registers(admin_client: TestClient) -> None:
+    """Beim Tausch eines Heating-Meters muss der neue Meter die User-
+    konfigurierte Register-Liste exakt übernehmen — auch nachträglich
+    hinzugefügte Custom-Register."""
+    mp = _create_oil(admin_client)
+    mp_id = mp["id"]
+    meter_id = mp["physical_meters"][0]["id"]
+
+    # Drittes Custom-Register nachträglich anhängen
+    add = admin_client.post(
+        f"/api/v1/physical-meters/{meter_id}/registers",
+        json={"label": "Wärmemenge", "unit": "kWh", "initial_value": "0"},
+    )
+    assert add.status_code == 201, add.text
+
+    # Tausch
+    obis_codes_before = sorted(
+        r["obis_code"]
+        for r in admin_client.get(f"/api/v1/measuring-points/{mp_id}").json()["physical_meters"][0][
+            "registers"
+        ]
+    )
+    final_readings = {code: "100" for code in obis_codes_before}
+    initial_readings = {code: "0" for code in obis_codes_before}
+
+    swap = admin_client.post(
+        f"/api/v1/measuring-points/{mp_id}/replace-meter",
+        json={
+            "final_readings": final_readings,
+            "removed_at": "2024-12-01",
+            "new_serial_number": "OIL-NEU",
+            "installed_at": "2024-12-01",
+            "initial_readings": initial_readings,
+        },
+    )
+    assert swap.status_code == 200, swap.text
+
+    body = admin_client.get(f"/api/v1/measuring-points/{mp_id}").json()
+    new_meter = next(m for m in body["physical_meters"] if m["serial_number"] == "OIL-NEU")
+    new_labels = sorted(r["label"] for r in new_meter["registers"])
+    assert new_labels == sorted(["Betriebsstunden", "Tankstand", "Wärmemenge"])
+    new_units = {r["label"]: r["unit"] for r in new_meter["registers"]}
+    assert new_units["Wärmemenge"] == "kWh"
+    # accepts_deliveries muss am Tank-Register erhalten bleiben
+    tank = next(r for r in new_meter["registers"] if r["label"] == "Tankstand")
+    assert tank["accepts_deliveries"] is True

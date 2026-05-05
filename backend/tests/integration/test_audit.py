@@ -161,3 +161,62 @@ def test_totp_enable_audited(admin_client: TestClient) -> None:
     log = _last_log(AuditAction.TOTP_ENABLED, AuditEntityType.USER)
     assert log is not None
     assert log.user_id is not None
+
+
+def test_password_change_audited(admin_client: TestClient) -> None:
+    """Self-Service-Passwortwechsel muss als PASSWORD_CHANGED geloggt werden
+    (nicht als PASSWORD_RESET — das ist Admin-Reset)."""
+    resp = admin_client.post(
+        "/api/v1/auth/change-password",
+        json={
+            "current_password": "admin-pass-12345",
+            "new_password": "neues-langes-passwort-1",
+        },
+    )
+    assert resp.status_code == 200, resp.text
+    log = _last_log(AuditAction.PASSWORD_CHANGED, AuditEntityType.USER)
+    assert log is not None
+    assert log.user_id is not None
+
+
+def test_totp_disable_audited(admin_client: TestClient) -> None:
+    """TOTP-Deaktivierung muss als TOTP_DISABLED auftauchen."""
+    import pyotp
+
+    # 2FA zuerst aktivieren
+    setup = admin_client.post("/api/v1/auth/2fa/setup")
+    secret = setup.json()["secret"]
+    admin_client.post("/api/v1/auth/2fa/activate", json={"code": pyotp.TOTP(secret).now()})
+
+    # Disable
+    disable = admin_client.post(
+        "/api/v1/auth/2fa/disable",
+        json={"current_password": "admin-pass-12345", "code": pyotp.TOTP(secret).now()},
+    )
+    assert disable.status_code == 200, disable.text
+    log = _last_log(AuditAction.TOTP_DISABLED, AuditEntityType.USER)
+    assert log is not None
+
+
+def test_user_create_and_deactivate_audited(admin_client: TestClient) -> None:
+    """Admin legt User an + deaktiviert ihn — beides muss im Audit auftauchen."""
+    create = admin_client.post(
+        "/api/v1/users",
+        json={
+            "username": "audit-user",
+            "email": None,
+            "initial_password": "audit-pw-12345",
+            "role": "recorder",
+        },
+    )
+    assert create.status_code == 201, create.text
+    new_id = create.json()["id"]
+    create_log = _last_log(AuditAction.CREATE, AuditEntityType.USER)
+    assert create_log is not None
+    assert create_log.entity_id == new_id
+
+    deactivate = admin_client.patch(f"/api/v1/users/{new_id}", json={"is_active": False})
+    assert deactivate.status_code == 200, deactivate.text
+    update_log = _last_log(AuditAction.UPDATE, AuditEntityType.USER)
+    assert update_log is not None
+    assert update_log.entity_id == new_id
