@@ -10,6 +10,17 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.6.2](https://github.com/muelley86/zaehler/compare/v2.6.1...v2.6.2) (2026-05-05)
+
+
+### Fehlerbehebungen
+
+* **audit-1:** hohe Befunde aus AUDIT.md beheben (5/42) ([#28](https://github.com/muelley86/zaehler/issues/28)) ([65dd710](https://github.com/muelley86/zaehler/commit/65dd710846ea95ce386ed3ea21f8cad15da30f97))
+* **audit-2:** mittlere Sicherheitsbefunde aus AUDIT.md beheben ([#30](https://github.com/muelley86/zaehler/issues/30)) ([df62fcf](https://github.com/muelley86/zaehler/commit/df62fcf1edc9f52b0c9d6666711794a61346601e))
+* **audit-3:** Datenmodell-Befunde aus AUDIT.md beheben ([#31](https://github.com/muelley86/zaehler/issues/31)) ([d862c26](https://github.com/muelley86/zaehler/commit/d862c26814258cdea2d501b74cd21723f35f8ffb))
+* **audit-4:** Performance-Befunde aus AUDIT.md beheben ([#32](https://github.com/muelley86/zaehler/issues/32)) ([e383781](https://github.com/muelley86/zaehler/commit/e38378195a596d7b9db28f52dca12424d7057a6b))
+* **audit-5:** Polish-Befunde + Tests-Ausbau aus AUDIT.md ([#33](https://github.com/muelley86/zaehler/issues/33)) ([256dfe3](https://github.com/muelley86/zaehler/commit/256dfe337584e85960710fbc90228cc61194f72d))
+
 ## [2.6.1](https://github.com/muelley86/zaehler/compare/v2.6.0...v2.6.1) (2026-05-05)
 
 
