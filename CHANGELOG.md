@@ -10,6 +10,15 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.5.0](https://github.com/muelley86/zaehler/compare/v2.4.0...v2.5.0) (2026-05-05)
+
+
+### Funktionen
+
+* **heating:** modulare Wärme-Messstellen mit Energieträger und freier Register-Liste ([#18](https://github.com/muelley86/zaehler/issues/18)) ([e4e1eb3](https://github.com/muelley86/zaehler/commit/e4e1eb3de2fdf8fe9f5fdb7b314a8dbd99de5bd4))
+* **heating:** TypePicker-Wizard und Register-Editor für Wärme-Messstellen ([#20](https://github.com/muelley86/zaehler/issues/20)) ([2548c63](https://github.com/muelley86/zaehler/commit/2548c63023cbf7917acba74eff0323e33c208c64))
+* **record:** Erfassen-Page MP-zentriert mit allen Registern gleichzeitig ([#21](https://github.com/muelley86/zaehler/issues/21)) ([9fc56d9](https://github.com/muelley86/zaehler/commit/9fc56d97e05c2467d9aca7b2bdf917c0fb86a36f))
+
 ## [2.4.0](https://github.com/muelley86/zaehler/compare/v2.3.1...v2.4.0) (2026-05-05)
 
 
