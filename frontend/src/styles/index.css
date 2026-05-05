@@ -196,6 +196,13 @@ input[type='date'] {
       color-mix(in oklch, var(--oil), transparent 30%)
     );
   }
+  .bg-type-heating {
+    background: linear-gradient(
+      135deg,
+      var(--oil),
+      color-mix(in oklch, var(--oil), transparent 30%)
+    );
+  }
   .bg-gradient-primary {
     background: linear-gradient(135deg, var(--primary), var(--primary-deep));
   }
@@ -222,6 +229,11 @@ input[type='date'] {
       0 1px 0 rgba(255, 255, 255, 0.3) inset;
   }
   .shadow-glow-oil {
+    box-shadow:
+      0 4px 12px oklch(0.55 0.1 40 / 0.4),
+      0 1px 0 rgba(255, 255, 255, 0.3) inset;
+  }
+  .shadow-glow-heating {
     box-shadow:
       0 4px 12px oklch(0.55 0.1 40 / 0.4),
       0 1px 0 rgba(255, 255, 255, 0.3) inset;

@@ -22,16 +22,9 @@ import type {
   ConsumptionPoint,
   LocationRead,
   MeasuringPointRead,
-  MeterType,
   RegisterStateRead,
 } from '@/lib/types';
-
-const TYPE_LABELS: Record<MeterType, string> = {
-  electricity: 'Strom',
-  gas: 'Gas',
-  water: 'Wasser',
-  oil: 'Ölheizung',
-};
+import { describeMeterType } from '@/lib/meterLabels';
 
 export function MeasuringPointDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -117,7 +110,7 @@ export function MeasuringPointDetailPage() {
         <Card>
           <div className="text-caption-bold uppercase text-tertiary">Stammdaten</div>
           <div className="mt-3 grid grid-cols-2 gap-4">
-            <FieldRow k="Typ" v={TYPE_LABELS[mp.type]} />
+            <FieldRow k="Typ" v={describeMeterType(mp.type, mp.heating_source)} />
             <FieldRow
               k="Standort"
               v={
@@ -154,7 +147,7 @@ export function MeasuringPointDetailPage() {
                 />
               </>
             ) : null}
-            {mp.type === 'oil' && mp.tank_capacity ? (
+            {mp.type === 'heating' && mp.tank_capacity ? (
               <FieldRow
                 k="Tankvolumen"
                 v={
