@@ -33,3 +33,19 @@ createRoot(container).render(
     </BrowserRouter>
   </StrictMode>,
 );
+
+// Service Worker registrieren — Cache-First für Assets, Network-First mit
+// Fallback für API-GETs, Tile-Caching für die Standort-Karte. So ist die App
+// nach dem ersten Besuch installierbar und verträgt kurze Netz-Aussetzer.
+// `vite-plugin-pwa` erzeugt das Modul `virtual:pwa-register`, das wir nur
+// in der gebauten App importieren — im Test/SSR-Kontext gibt's das Modul
+// nicht, daher dynamic import + try/catch.
+if (import.meta.env.PROD) {
+  void import('virtual:pwa-register')
+    .then(({ registerSW }) => {
+      registerSW({ immediate: true });
+    })
+    .catch(() => {
+      /* SW im aktuellen Kontext nicht verfügbar — kein Fehler */
+    });
+}

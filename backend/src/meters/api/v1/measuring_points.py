@@ -15,6 +15,7 @@ from decimal import Decimal
 
 from fastapi import APIRouter, Request, status
 from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session as DbSession
 from sqlalchemy.orm import selectinload
 
@@ -303,18 +304,32 @@ def replace_meter_endpoint(
     if mp is None:
         raise ProblemError(status_code=404, title="Measuring point not found")
 
-    replace_meter(
-        db,
-        measuring_point=mp,
-        final_readings=dict(payload.final_readings),
-        removed_at=payload.removed_at,
-        new_serial_number=payload.new_serial_number,
-        installed_at=payload.installed_at,
-        initial_readings=dict(payload.initial_readings),
-        user_id=admin.id,
-        ip_address=client_ip(request),
-    )
-    db.commit()
+    try:
+        replace_meter(
+            db,
+            measuring_point=mp,
+            final_readings=dict(payload.final_readings),
+            removed_at=payload.removed_at,
+            new_serial_number=payload.new_serial_number,
+            installed_at=payload.installed_at,
+            initial_readings=dict(payload.initial_readings),
+            user_id=admin.id,
+            ip_address=client_ip(request),
+        )
+        db.commit()
+    except IntegrityError as exc:
+        # Tritt auf, wenn der partielle UNIQUE-Index `uq_physical_meter_active_per_mp`
+        # einen zweiten aktiven Meter pro MP verhindert — Race-Bedingung bei
+        # parallelen Tausch-Requests. Sauberes 409 statt 500.
+        db.rollback()
+        raise ProblemError(
+            status_code=409,
+            title="Meter replacement conflict",
+            detail=(
+                "Diese Messstelle hat bereits einen frisch installierten Meter — "
+                "ein paralleler Tausch ist gerade durchgelaufen. Bitte erneut laden."
+            ),
+        ) from exc
     refreshed = _load_with_meters(db, mp.id)
     assert refreshed is not None
     return _to_read(refreshed)

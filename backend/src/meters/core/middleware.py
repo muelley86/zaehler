@@ -31,12 +31,13 @@ _PERMISSIONS_POLICY = (
 
 
 def _csp() -> str:
-    # Self-hosted Fonts/Assets, ein Inline-Theme-Bootstrap-Skript wird über
-    # das ``script-src 'unsafe-inline'``-Token erlaubt; ``style-src
-    # 'unsafe-inline'`` wegen React-inline-style-Props (Glow-Hintergründe).
+    # Self-hosted Fonts/Assets. ``style-src 'unsafe-inline'`` ist
+    # nötig wegen React-inline-style-Props (Glow-Hintergründe).
+    # ``script-src`` kommt ohne 'unsafe-inline' aus — das frühere
+    # Theme-Bootstrap-Skript ist nach ``/theme-bootstrap.js`` ausgelagert.
     parts = [
         "default-src 'self'",
-        "script-src 'self' 'unsafe-inline'",
+        "script-src 'self'",
         "style-src 'self' 'unsafe-inline'",
         # Tile-PNGs für die Standort-Karte (LocationMap). Browser lädt
         # die Tiles direkt vom jeweiligen CDN, keine API von uns.
