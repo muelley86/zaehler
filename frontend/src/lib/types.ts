@@ -50,7 +50,7 @@ export interface RegisterRead {
 export interface DeliveryRead {
   id: number;
   register_id: number;
-  delivery_date: string;
+  delivery_at: string;
   amount: string;
   note: string | null;
   created_at: string;

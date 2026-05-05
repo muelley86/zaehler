@@ -2,7 +2,7 @@
 
 Für nachfüllbare Register (z. B. Heizöl-Tank):
     current = letzter_reading.value
-              + Summe(Lieferungen, delivery_date > letzter_reading.reading_at.date())
+              + Summe(Lieferungen, delivery_at > letzter_reading.reading_at)
 
 Für reguläre Zähler:
     current = letzter_reading.value
@@ -43,7 +43,7 @@ def state_for_register(register: Register) -> RegisterState:
     refilled = Decimal("0")
     if register.accepts_deliveries:
         for d in register.deliveries:
-            if last is None or d.delivery_date > last.reading_at.date():
+            if last is None or d.delivery_at > last.reading_at:
                 refilled += d.amount
 
     current: Decimal | None

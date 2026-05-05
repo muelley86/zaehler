@@ -4,7 +4,7 @@ import { Trash2 } from 'lucide-react';
 
 import { Button, Sheet, TextField } from '@/components/ui';
 import { ApiError, api } from '@/lib/api';
-import { formatDateDe, formatDe, parseDe } from '@/lib/format';
+import { formatDateTimeDe, formatDe, nowForInput, parseDe } from '@/lib/format';
 import type { DeliveryRead, RegisterRead } from '@/lib/types';
 
 export function DeliveriesSheet({
@@ -21,8 +21,7 @@ export function DeliveriesSheet({
   const [tick, setTick] = useState(0);
   const [busy, setBusy] = useState(false);
 
-  const today = new Date().toISOString().slice(0, 10);
-  const [date, setDate] = useState(today);
+  const [deliveryAt, setDeliveryAt] = useState(nowForInput());
   const [amount, setAmount] = useState('');
   const [note, setNote] = useState('');
 
@@ -43,13 +42,13 @@ export function DeliveriesSheet({
     try {
       const numeric = parseDe(amount);
       await api.post(`/registers/${register.id}/deliveries`, {
-        delivery_date: date,
+        delivery_at: deliveryAt,
         amount: numeric,
         note: note || null,
       });
       setAmount('');
       setNote('');
-      setDate(today);
+      setDeliveryAt(nowForInput());
       setTick((t) => t + 1);
     } catch (err) {
       if (err instanceof ApiError) setError(err.problem.detail ?? err.problem.title);
@@ -78,10 +77,10 @@ export function DeliveriesSheet({
         <form onSubmit={(e) => void add(e)} className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
             <TextField
-              label="Datum"
-              type="date"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
+              label="Zeitpunkt"
+              type="datetime-local"
+              value={deliveryAt}
+              onChange={(e) => setDeliveryAt(e.target.value)}
               required
             />
             <TextField
@@ -122,7 +121,9 @@ export function DeliveriesSheet({
               {items.map((d) => (
                 <li key={d.id} className="flex items-center gap-3 px-4 py-3">
                   <div className="min-w-0 flex-1">
-                    <div className="num text-body text-label">{formatDateDe(d.delivery_date)}</div>
+                    <div className="num text-body text-label">
+                      {formatDateTimeDe(d.delivery_at)}
+                    </div>
                     {d.note ? <div className="text-caption text-tertiary">{d.note}</div> : null}
                     <div className="text-caption text-tertiary">
                       {d.created_by_username ?? '—'} ·{' '}

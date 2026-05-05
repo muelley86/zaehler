@@ -56,5 +56,5 @@ class Register(Base, TimestampMixin):
         "Delivery",
         back_populates="register",
         cascade="all, delete-orphan",
-        order_by="Delivery.delivery_date",
+        order_by="Delivery.delivery_at",
     )

@@ -154,10 +154,12 @@ export function RecordReadingPage() {
     } else {
       const created = await api.post<DeliveryRead>(`/registers/${registerId}/deliveries`, {
         amount: numeric,
-        delivery_date: readingAt.slice(0, 10),
+        delivery_at: readingAt,
         note: note || null,
       });
-      setSuccess(`Lieferung erfasst: ${formatDe(created.amount)} (${created.delivery_date}).`);
+      setSuccess(
+        `Lieferung erfasst: ${formatDe(created.amount)} (${formatDateTimeDe(created.delivery_at)}).`,
+      );
     }
     setValue('');
     setNote('');
@@ -282,7 +284,7 @@ export function RecordReadingPage() {
                   </div>
                 ) : null}
                 {selected && selected.measuringPoint.transformer_factor !== null ? (
-                  <div className="mt-3 rounded-card border-hairline border-primary/40 bg-primary-soft p-3 text-caption text-primary-deep">
+                  <div className="border-primary/40 mt-3 rounded-card border-hairline bg-primary-soft p-3 text-caption text-primary-deep">
                     Wandlerfaktor ×{selected.measuringPoint.transformer_factor} — gib hier den
                     Sekundärwert vom Zähler ein. Verbräuche werden mit diesem Faktor multipliziert.
                   </div>
@@ -337,11 +339,9 @@ export function RecordReadingPage() {
                 />
                 <TextField
                   label={dateLabel}
-                  type={mode === 'delivery' ? 'date' : 'datetime-local'}
-                  value={mode === 'delivery' ? readingAt.slice(0, 10) : readingAt}
-                  onChange={(e) =>
-                    setReadingAt(mode === 'delivery' ? `${e.target.value}T12:00` : e.target.value)
-                  }
+                  type="datetime-local"
+                  value={readingAt}
+                  onChange={(e) => setReadingAt(e.target.value)}
                   required
                 />
                 <TextField
