@@ -41,7 +41,7 @@ class MeasuringPointBase(BaseModel):
     is_bidirectional: bool = False
     has_dual_tariff: bool = False
     tank_capacity: Decimal | None = Field(default=None, gt=Decimal("0"))
-    transformer_factor: int | None = Field(default=None, gt=0)
+    transformer_factor: int | None = Field(default=None, gt=0, le=10000)
     heating_source: HeatingSource | None = None
 
     @model_validator(mode="after")
@@ -94,7 +94,7 @@ class MeasuringPointUpdate(BaseModel):
     has_dual_tariff: bool | None = None
     tank_capacity: Decimal | None = Field(default=None, gt=Decimal("0"))
     clear_tank_capacity: bool = False
-    transformer_factor: int | None = Field(default=None, gt=0)
+    transformer_factor: int | None = Field(default=None, gt=0, le=10000)
     clear_transformer_factor: bool = False
     heating_source: HeatingSource | None = None
 

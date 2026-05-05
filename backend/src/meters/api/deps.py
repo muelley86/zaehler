@@ -9,6 +9,7 @@ umgehen sowie das Audit-Log mit beliebigen IPs füttern.
 
 from __future__ import annotations
 
+import ipaddress
 from typing import Annotated
 
 from fastapi import Cookie, Depends, Request
@@ -73,8 +74,21 @@ AdminUser = Annotated[User, Depends(require_admin)]
 
 
 def client_ip(request: Request) -> str | None:
+    """Tatsächliche Client-IP — bei METERS_TRUST_PROXY aus X-Forwarded-For,
+    sonst aus der direkten Verbindung.
+
+    Der Header wird gegen ``ipaddress.ip_address`` validiert. Damit landen
+    fehlerhaft konfigurierte Proxies oder manipulierte Header nicht im
+    Audit-Log oder den Rate-Limit-Buckets.
+    """
     if settings.trust_proxy:
         forwarded = request.headers.get("x-forwarded-for")
         if forwarded:
-            return forwarded.split(",")[0].strip()
+            candidate = forwarded.split(",")[0].strip()
+            try:
+                ipaddress.ip_address(candidate)
+            except ValueError:
+                pass  # falsch formatiert → fallback
+            else:
+                return candidate
     return request.client.host if request.client else None

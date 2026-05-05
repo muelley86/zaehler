@@ -10,7 +10,7 @@ Anfangsständen anlegen — alles in einer Transaktion.
 from __future__ import annotations
 
 from datetime import date, datetime, time
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 
 from sqlalchemy.orm import Session as DbSession
 
@@ -29,7 +29,20 @@ from meters.services.audit import record
 
 
 def _coerce_decimal_map(values: dict[str, Decimal | str]) -> dict[str, Decimal]:
-    return {k: v if isinstance(v, Decimal) else Decimal(str(v)) for k, v in values.items()}
+    out: dict[str, Decimal] = {}
+    for key, value in values.items():
+        if isinstance(value, Decimal):
+            out[key] = value
+            continue
+        try:
+            out[key] = Decimal(str(value))
+        except (InvalidOperation, ValueError) as exc:
+            raise ProblemError(
+                status_code=400,
+                title="Ungültiger Zahlenwert",
+                detail=f"Wert für '{key}' ist keine gültige Zahl: {value!r}",
+            ) from exc
+    return out
 
 
 def install_first_meter(

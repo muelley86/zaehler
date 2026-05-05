@@ -156,8 +156,21 @@ def create_pending_challenge(
 
 
 def resolve_pending_challenge(
-    db: DbSession, *, token: str
+    db: DbSession,
+    *,
+    token: str,
+    user_agent: str | None = None,
+    ip_address: str | None = None,
 ) -> tuple[User, PendingTotpChallenge] | None:
+    """Pending Challenge auflösen.
+
+    Wenn ``user_agent`` oder ``ip_address`` übergeben werden, müssen sie
+    mit den beim Erzeugen gespeicherten Werten übereinstimmen — Schutz gegen
+    Token-Replay aus einer anderen Sitzung. Beim Erzeugen werden gekürzte
+    Werte gespeichert (UA: 255 Zeichen), daher hier nicht verlangen, dass
+    die volle UA-Zeichenkette identisch ist, sondern nur das gespeicherte
+    255-Zeichen-Prefix.
+    """
     if not token:
         return None
     token_hash = hash_session_token(token)
@@ -170,6 +183,20 @@ def resolve_pending_challenge(
     if expires_at.tzinfo is None:
         expires_at = expires_at.replace(tzinfo=UTC)
     if expires_at <= _utcnow():
+        db.delete(challenge)
+        return None
+    if (
+        user_agent is not None
+        and challenge.user_agent is not None
+        and user_agent[:255] != challenge.user_agent
+    ):
+        db.delete(challenge)
+        return None
+    if (
+        ip_address is not None
+        and challenge.ip_address is not None
+        and ip_address != challenge.ip_address
+    ):
         db.delete(challenge)
         return None
     user = db.get(User, challenge.user_id)
