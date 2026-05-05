@@ -36,9 +36,12 @@ class Reading(Base, TimestampMixin):
     reading_at: Mapped[datetime] = mapped_column(nullable=False, index=True)
     note: Mapped[str | None] = mapped_column(String(500))
     photo_path: Mapped[str | None] = mapped_column(String(255))
-    created_by_user_id: Mapped[int | None] = mapped_column(
-        ForeignKey("user.id", ondelete="SET NULL"), index=True
+    # NOT NULL erzwingt CLAUDE.md-Invariante "wird IMMER gesetzt".
+    # ondelete=SET NULL kombiniert mit NOT NULL ist effektives RESTRICT:
+    # ein User-Hard-Delete scheitert, solange noch Readings dranhängen.
+    created_by_user_id: Mapped[int] = mapped_column(
+        ForeignKey("user.id", ondelete="SET NULL"), nullable=False, index=True
     )
 
     register: Mapped[Register] = relationship("Register", back_populates="readings")
-    created_by: Mapped[User | None] = relationship("User")
+    created_by: Mapped[User] = relationship("User")
