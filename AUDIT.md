@@ -1,443 +1,318 @@
-# Code-Audit — Zählererfassungstool
+# Code-Audit — Zählerstand-App
 
-Stand: 2026-05-02 · Branch HEAD: `0f97662` · Backend-Tests: 47/47 grün · Frontend: lint/type/build clean
+Stand: 2026-05-05, Branch `main`, Commit-HEAD aktuell.
 
-Befund-Schema pro Eintrag:
+Methodik: vier parallele Code-Walks (CLAUDE.md/Datenmodell, Sicherheit, Tests, Performance/Code-Qualität). Befunde sind anschließend einzeln im Quelltext nachverifiziert. Wo nicht eindeutig nachprüfbar, ist das mit „**Unsicher**" markiert.
 
-- **Schweregrad** (kritisch / hoch / mittel / niedrig)
-- **Datei:Zeile**
-- **Beschreibung**
-- **Vorschlag**
+Schweregrad-Skala: **kritisch** (Datenverlust, RCE, breite Privilege-Eskalation), **hoch** (klare Sicherheitslücke / Korrektheitsbug mit Auswirkung auf alle User), **mittel** (Korrektheits- oder Härtungsproblem, eingeschränkter Blast-Radius), **niedrig** (Hygiene, Doku, Stilfragen).
 
-Wenn ein Punkt nicht eindeutig zu beurteilen war, ist das explizit mit „zu verifizieren" markiert. Es wurde **kein Code geändert**.
+Keine Code-Änderungen sind in diesem Audit enthalten — Befunde sind reine Diagnose.
 
 ---
 
-## 1. Abweichungen von CLAUDE.md (Konventionen, Architektur, Stack)
+## 1. Abweichungen von CLAUDE.md
 
-### 1.1 `Location.latitude/longitude` als Float, nicht Decimal — bewusst, aber CLAUDE.md sagt anders
+### 1.1 PWA: Service-Worker nicht implementiert
+- **Schweregrad:** mittel
+- **Datei:** `frontend/src/` (kein `service-worker.ts` / kein `*.sw.ts` vorhanden), `frontend/public/manifest.webmanifest:1` (Manifest existiert)
+- **Befund:** CLAUDE.md Zeile 25 fordert „PWA-fähig (Manifest + Service Worker, offline-tauglich für Erfassung)". Manifest ist da, **kein Service Worker registriert**. Verifiziert per `ls frontend/src/*sw*` (keine Treffer) und Inspektion von `main.tsx` (kein `navigator.serviceWorker.register`).
+- **Auswirkung:** Erfassung am Zählerschrank ohne LAN-Verbindung scheitert; App ist nicht offline-tauglich.
+- **Behebung:** Vite-PWA-Plugin oder eigener `service-worker.ts`. Cache-First für `/assets/*`, Network-First mit Offline-Queue (IndexedDB) für `POST /readings`.
 
-- **Schweregrad**: niedrig (vermutlich vertretbar)
-- **Datei:Zeile**: `backend/src/meters/models/location.py:24-25` · `backend/alembic/versions/20260504_0900_location_geo.py:26-27`
-- **Beschreibung**: CLAUDE.md sagt: „Werte als Decimal speichern, NIEMALS Float (Rundungsfehler bei Zählerständen)". Geo-Koordinaten sind keine Zählerstände, sondern Anzeige-Daten — Float ist hier praktikabel (GPS ~6 Dezimalstellen Genauigkeit). Trotzdem fehlt eine explizite Begründung als Kommentar im Modell.
-- **Vorschlag**: Kommentar im Modell ergänzen, dass die Decimal-Regel ausschließlich für Zählerwerte und Bestände gilt, nicht für Anzeige-Metadaten wie Koordinaten. Alternativ Numeric(9,6) — aber Float reicht funktional.
+### 1.2 Photo-Upload nur teilweise implementiert
+- **Schweregrad:** mittel
+- **Datei:** `backend/src/meters/models/reading.py:38` (Feld `photo_path`)
+- **Befund:** Modell hat `photo_path: Mapped[str | None]`, aber kein Upload-Endpoint im Backend (`grep -n "photo" backend/src/meters/api/` liefert nichts) und kein Schema-Feld in `ReadingCreate`. CLAUDE.md Zeile 172 nennt Foto-Upload als Anforderung; Zeile 113 verlangt sogar explizit „Foto-Uploads NICHT in der DB-Transaktion verarbeiten".
+- **Behebung:** Entweder Endpoint `POST /api/v1/readings/{id}/photo` (multipart) + File-Storage außerhalb der Transaktion, oder das Feld bis zur Implementierung aus dem Modell entfernen, damit der Datentyp ehrlich ist.
 
-### 1.2 Recorder-Permission-Differenzierung Wert vs. Note nicht in CLAUDE.md festgelegt
+### 1.3 Reading.created_by_user_id nullable trotz CLAUDE.md „IMMER gesetzt"
+- **Schweregrad:** mittel
+- **Datei:** `backend/src/meters/models/reading.py:39-40`
+- **Befund:** CLAUDE.md Zeile 92: „Reading.created_by_user_id wird IMMER gesetzt." Modell erlaubt `nullable=True` (impliziert durch `int | None`) und `ondelete="SET NULL"`. Wenn ein User gelöscht wird, verlieren seine Readings die Zuordnung — die IMMER-Invariante ist verletzt.
+- **Behebung:** Entweder `nullable=False` + `ondelete="RESTRICT"` (kein Lösch-Pfad ohne System-User) ODER User-Deaktivierung dokumentieren als Standard-Vorgehen statt Hard-Delete.
 
-- **Schweregrad**: niedrig
-- **Datei:Zeile**: `backend/src/meters/api/v1/readings.py:54-62`
-- **Beschreibung**: CLAUDE.md erwähnt nur „eigene Readings (created_by = self) innerhalb von 24h bearbeiten/löschen". Es ist nicht spezifiziert, ob ein Recorder im 24h-Fenster auch den `value` ändern darf, oder ob nur die `note` editierbar ist. Der aktuelle Code lässt jeden Patch zu.
-- **Vorschlag**: Im CLAUDE.md klarstellen, ob Recorder im 24h-Fenster auch `value`/`reading_at` ändern dürfen oder nur `note`. Falls Letzteres: im PATCH-Endpoint feldweise filtern.
+### 1.4 Audit-Coverage: PASSWORD_CHANGED-Aktion existiert nicht
+- **Schweregrad:** niedrig
+- **Datei:** `backend/src/meters/models/_enums.py` (AuditAction-Enum)
+- **Befund:** Enum kennt `PASSWORD_RESET` (Admin setzt zurück), aber keine Aktion für die Selbst-Änderung des Passworts via `POST /auth/change-password`. CLAUDE.md Zeile 100 fordert nicht explizit, dass Self-Service-Pw-Änderung geloggt wird, aber die Spec ist hier nicht eindeutig.
+- **Unsicher:** kann interpretiert werden, dass Login-Audit reicht. Empfehlung: Audit-Eintrag (CHANGE/UPDATE auf USER) bei Self-Service-PW-Änderung ist konservativer.
 
-### 1.3 Ursprüngliche „iOS / SwiftUI"-Designvorgabe in CLAUDE.md nicht enthalten — Liquid-Glass-Refresh ist konsensual, aber nicht dokumentiert
-
-- **Schweregrad**: niedrig (Doku-Drift)
-- **Datei:Zeile**: `CLAUDE.md` (UI-Anforderungen) und Frontend
-- **Beschreibung**: CLAUDE.md spricht nur von „Mobile-first, große Touch-Targets, numerische Tastatur" — kein Hinweis auf den Liquid-Glass-Look (OKLCH-Palette, Glas-Layer, `useChartTheme`). Wenn morgen jemand das Frontend isoliert betrachtet, fehlt der Designkanon.
-- **Vorschlag**: Eine kurze Sektion „Designsprache" in CLAUDE.md ergänzen oder auf `frontend/handoff/DESIGN_TOKENS.md` verweisen.
-
-### 1.4 OBIS-Code 7.8.0 für Gas ist nicht standardkonform
-
-- **Schweregrad**: niedrig (Konvention)
-- **Datei:Zeile**: `CLAUDE.md` (OBIS-Register-Sektion) — und damit übernommen in `backend/src/meters/core/obis.py` (zu verifizieren)
-- **Beschreibung**: 7.8.0 ist im IEC-62056-OBIS-Standard nicht als Gas-Volumen-Register definiert (DLMS/COSEM nutzt 7-x-x für andere Dinge). Eigene Konvention ist OK, aber CLAUDE.md selbst sagt „interne Bezeichnung" — gut, das passt. Kein echter Audit-Befund, nur Hinweis: bei späterer Datenexport-Schnittstelle Richtung Energie-Zähler-Standard ist Anpassung nötig.
-- **Vorschlag**: Bei künftiger Smart-Meter-Schnittstelle eindeutig auf eigene Bezeichnung mappen, nicht auf 7.8.0 als „Standard" verlassen.
+### 1.5 Inkonsistente Markierung „inaktiv": Boolean-Flag vs. Timestamp
+- **Schweregrad:** niedrig (Design-Entscheidung)
+- **Dateien:** `backend/src/meters/models/register.py` (`is_active: bool`), `backend/src/meters/models/physical_meter.py` (`removed_at: date | None`)
+- **Befund:** Register markiert Inaktivität per Bool, PhysicalMeter per Timestamp. Beides funktioniert, aber Cross-Queries sind error-prone (siehe `replace_meter` Z. 153–154, das beides zusammen pflegt). CLAUDE.md schreibt keine Konvention vor.
+- **Behebung (optional):** Vereinheitlichen — entweder beide Boolean, oder beide Timestamp-basiert. Kein Bug, nur Konsistenz.
 
 ---
 
 ## 2. Bugs und logische Fehler
 
-### 2.1 `RangeError` aus `parseDe()` in `ReadingsListPage.EditForm` nicht abgefangen
+### 2.1 Race Condition in `replace_meter` (kein DB-seitiges Locking)
+- **Schweregrad:** hoch
+- **Datei:** `backend/src/meters/services/meter_replacement.py:102-113`
+- **Befund:** `active_meter` wird ohne Locking gelesen; zwei parallele Admin-Requests könnten beide den gleichen Meter als „aktiv" sehen, beide deaktivieren ihn und legen jeweils einen Nachfolger an → die Messstelle hat zwei aktive Meter, was den Reading-/Tausch-Workflow inkonsistent macht.
+- **Behebung:** Partial-Unique-Index in der DB, der pro `measuring_point_id` nur **eine** Zeile mit `removed_at IS NULL` zulässt. Damit ist die Konsistenz unabhängig vom App-Code garantiert.
+- **Unsicher:** SQLite mit WAL hat eigenes Locking-Modell — `with_for_update` ist no-op. Ein partieller UNIQUE-Index ist die belastbarere Lösung.
 
-- **Schweregrad**: hoch
-- **Datei:Zeile**: `frontend/src/lib/format.ts:38-47` (Wirft) · `frontend/src/features/readings/ReadingsListPage.tsx` ~Zeile 812 (EditForm-Submit, zu verifizieren mit aktueller Datei)
-- **Beschreibung**: `parseDe()` wirft `RangeError` bei ungültiger Eingabe. In `RecordReadingPage.tsx` wird das im Submit caught (Zeile ~184), in der Inline-Edit-Form der Readings-Liste nicht. Folge: bei Eingabe wie „abc" oder „1..2" crasht die Form anstelle einer freundlichen Fehlermeldung.
-- **Vorschlag**: Den `parseDe()`-Aufruf im EditForm-Submit in try/catch wrappen und `RangeError.message` als Form-Fehler anzeigen, identisch zur RecordReadingPage.
+### 2.2 `_coerce_decimal_map` schluckt Pydantic-Validation, wirft 500
+- **Schweregrad:** mittel
+- **Datei:** `backend/src/meters/services/meter_replacement.py:31-32`
+- **Befund:** `Decimal(str(v))` wirft bei nicht-numerischem Input `decimal.InvalidOperation`, was als HTTP 500 endet (kein `ProblemError`). Pydantic schützt für die normalen Endpoints, aber wenn das Service intern direkt aus user-nahem Code aufgerufen wird, leakt der Fehler.
+- **Behebung:** `try`/`except (InvalidOperation, ValueError)` und Re-Raise als `ProblemError(400, …)`.
 
-### 2.2 Stale-State-Race in `RecordReadingPage` beim Nachladen nach Erfassung
+### 2.3 Datums-Filter im Frontend per String-Vergleich
+- **Schweregrad:** niedrig (funktioniert dank ISO-Format, aber spröde)
+- **Datei:** `frontend/src/features/dashboard/DashboardPage.tsx:310-315`
+- **Befund:** `r.reading_at.slice(0,10) < from` funktioniert nur, weil ISO-Format lexikalisch gleich datierungs-sortiert. Wenn das Format mal abweicht (z. B. lokalisiertes Datum), bricht der Filter still.
+- **Behebung:** `new Date(...)` vergleichen, oder die Tatsache mit Kommentar dokumentieren.
 
-- **Schweregrad**: mittel
-- **Datei:Zeile**: `frontend/src/features/readings/RecordReadingPage.tsx:169-181`
-- **Beschreibung**: Nach erfolgreicher Erfassung wird `stateByRegister` neu geladen — ohne `cancelled`-Flag wie der initiale Effect. Wenn Nutzer schnell mehrfach speichern oder die Page unmountet wird, könnte ein altes Promise auf einer abgehängten Komponente State setzen (React-Warning, kein Crash, aber unsauber).
-- **Vorschlag**: `AbortController` oder `cancelled`-Flag analog zum initialen Effect (Zeilen 61-81) nutzen.
-
-### 2.3 Veraltete API-Anfragen werden nicht gecancelt
-
-- **Schweregrad**: mittel
-- **Datei:Zeile**: `frontend/src/features/readings/ReadingsListPage.tsx:95-117`
-- **Beschreibung**: Beim schnellen Wechseln der Filter werden parallele API-Anfragen gestartet. Es gibt keinen `AbortController`, sodass langsame veraltete Antworten frischere Werte überschreiben können (klassische Promise-Race) — und State auf unmountete Komponenten gesetzt wird.
-- **Vorschlag**: `AbortController` pro Effect, an `api.get` weiterreichen; bei Cleanup `controller.abort()`.
-
-### 2.4 `MeasuringPointUpdate.tank_capacity`-Typecheck — nur sinnvoll bei `type=oil`
-
-- **Schweregrad**: niedrig
-- **Datei:Zeile**: `backend/src/meters/api/v1/measuring_points.py:171-180` · `backend/src/meters/models/measuring_point.py` (Feld)
-- **Beschreibung**: Es gibt keine Constraint, die `tank_capacity` nur bei `type=MeterType.OIL` zulässt. Ein Admin kann `tank_capacity=1000` auf einem Strom-Zähler setzen — wirkt sich nicht aus, weil die State-Logik den Wert nur für OIL nutzt, ist aber konzeptionelles Datenrauschen.
-- **Vorschlag**: Im `MeasuringPointCreate`/`MeasuringPointUpdate`-Schema ein `model_validator` der ablehnt, wenn `tank_capacity` gesetzt UND `type != oil` ist.
-
-### 2.5 Inkonsistenz: Migration 0006 legt `updated_at` an, Models nutzen sie nicht
-
-- **Schweregrad**: niedrig
-- **Datei:Zeile**: `backend/alembic/versions/20260503_1000_totp_2fa.py:45,60` · `backend/src/meters/models/backup_code.py`
-- **Beschreibung**: Die Migration legt eine `updated_at`-Spalte für `backup_code` und `pending_totp_challenge` an. Die ORM-Models erben aber nur von `TimestampMixin` (das nur `created_at` enthält). Resultat: tote Spalte in der DB.
-- **Vorschlag**: Entweder die Spalte in einer Folge-Migration entfernen, oder `UpdatedAtMixin` einführen und nutzen — falls Update-Tracking gewünscht ist (eher nein, da BackupCode single-use ist und PendingTotpChallenge nach Ablauf gelöscht wird).
-
-### 2.6 Plausibilitätscheck ist „harter 400-Block", obwohl CLAUDE.md eine Warnung verlangt
-
-- **Schweregrad**: hoch (Verstoß gegen explizite CLAUDE.md-Regel)
-- **Datei:Zeile**: `backend/src/meters/api/v1/readings.py:101-117` (vorheriger Stand) und `:118-134` (nachfolgender Stand)
-- **Beschreibung**: `_check_value_in_series` wirft `ProblemError(status_code=400)` mit Titel „Wert kleiner als vorheriger Stand" bzw. „Wert größer als nachfolgender Stand". CLAUDE.md (UI-Anforderungen) schreibt aber explizit: „Plausibilitätscheck beim Speichern: neuer Wert >= letzter Wert (außer Rollover oder Zählerwechsel) – **Warnung, nicht harter Block**". Aktuell verhindert das legitime Nachträge bei Rollover ohne `accepts_deliveries`-Flag und ungewöhnliche Korrekturen.
-- **Vorschlag**: Backend-Endpoint nimmt einen Query-/Body-Param `?force=true` (oder `acknowledge_warning=true`) entgegen, der den Check überspringt. Frontend zeigt bei 200-Response mit `warnings`-Feld einen Confirm-Dialog und sendet auf Bestätigung erneut mit `force=true`. Die `extra`-Daten (previous/next-Stand) bleiben strukturell, sind aber kein Block.
-
-### 2.7 `relativer alembic.ini`-Pfad — durch `env.py` überschrieben, aber Stolperfalle bleibt
-
-- **Schweregrad**: niedrig (bereits gefixt durch env.py-Override, aber nicht abschließend gehärtet)
-- **Datei:Zeile**: `backend/alembic.ini` · `backend/alembic/env.py`
-- **Beschreibung**: `alembic.ini` hat `sqlalchemy.url = sqlite:///../data/meters.db` (relativ) — ohne `env.py`-Override würde alembic in `repo/data/meters.db` schreiben statt in die echte App-DB. Ein neuer Maintainer könnte den Override versehentlich entfernen.
-- **Vorschlag**: In `alembic.ini` den Default-Wert leer setzen (`sqlalchemy.url =`) oder auf `sqlite:///__configure_in_env_py__` — sodass der Override-Mechanismus nicht stillschweigend umgangen werden kann.
+### 2.4 Kein Maximum-Limit für `transformer_factor`
+- **Schweregrad:** niedrig
+- **Datei:** `backend/src/meters/schemas/measuring_point.py:44`
+- **Befund:** Schema validiert `gt=0`, aber kein Maximum. Theoretisch kann jemand `transformer_factor=10**9` setzen und Verbrauchsberechnungen explodieren lassen. Praktisch begrenzt durch UI-Eingabe.
+- **Behebung:** `Field(default=None, gt=0, le=10000)` oder Plausibilitätsschwelle.
 
 ---
 
-## 3. Sicherheitsprobleme (Auth, SQL-Injection, Secrets, CORS)
+## 3. Sicherheitsprobleme
 
-### 3.1 Username-Rate-Limit wird nach erfolgreichem 2FA-Login nicht zurückgesetzt
+### 3.1 CSP enthält `script-src 'unsafe-inline'`
+- **Schweregrad:** hoch
+- **Datei:** `backend/src/meters/core/middleware.py:39`
+- **Befund:** Die CSP erlaubt beliebige Inline-Skripte. Kommentar nennt „Theme-Bootstrap-Skript" als Grund. Damit ist der primäre Schutz gegen Reflected/Stored-XSS deaktiviert. Im React-SPA-Kontext ist das einer der wichtigsten Hardening-Hebel.
+- **Behebung:** Inline-Bootstrap-Skript identifizieren, durch externes Asset oder nonce-basiertes `script-src 'self' 'nonce-…'` ersetzen, dann `unsafe-inline` entfernen.
 
-- **Schweregrad**: hoch
-- **Datei:Zeile**: `backend/src/meters/api/v1/auth.py` (verify_2fa-Endpoint, Zeile zu verifizieren) · `backend/src/meters/services/rate_limit.py:66-68`
-- **Beschreibung**: Nach erfolgreicher 1FA wird `username_limiter.record_failure()` bei TOTP-Fehler erhöht, aber nach erfolgreicher TOTP-Verifikation wird `record_success()` nicht aufgerufen. Folge: Counter bleibt erhöht und kann bei legitimen Folgelogins zu unnötiger Sperre führen. Praktisch begrenzt, aber unsauber.
-- **Vorschlag**: In `verify_2fa` nach erfolgreicher Code-/Backup-Code-Validierung `username_limiter.record_success(user.username.lower())` aufrufen.
+### 3.2 TOTP-Pending-Challenge bindet User-Agent/IP nicht
+- **Schweregrad:** mittel
+- **Datei:** `backend/src/meters/services/totp.py:134-155` (Speicherung), `resolve_pending_challenge` in derselben Datei (kein UA-/IP-Check)
+- **Befund:** Beim Erzeugen werden `user_agent` und `ip_address` mit der Challenge gespeichert (Z. 150–151). Bei `resolve_pending_challenge` werden sie **nicht verglichen** (per Code-Inspektion verifiziert). Wer den Challenge-Token + einen TOTP-Code abgreift, kann von beliebigem Client den 2FA-Schritt abschließen.
+- **Behebung:** Im Resolve-Pfad UA/IP der aktuellen Request mit dem gespeicherten Wert vergleichen; bei Abweichung Challenge invalidieren oder kürzere TTL.
+- **Unsicher:** Bei Netzwechseln (Mobilfunk → WLAN) könnte der Check zu falsch-positiven Sperren führen — Trade-off bewerten.
 
-### 3.2 Theoretische Race-Condition in `resolve_session` bei User-Löschung
+### 3.3 `verify_2fa` nutzt nur Username-Limiter, keinen IP-Limiter
+- **Schweregrad:** mittel
+- **Datei:** `backend/src/meters/api/v1/auth.py` (`verify_2fa`-Endpoint, ca. Z. 140 ff.)
+- **Befund:** Verifiziert per `grep -A 30 verify_2fa | grep limit`: nur `username_limiter.record_failure(...)`, kein `login_limiter`. Ein Angreifer kann pro IP beliebig viele 6-stellige Codes raten, solange er den Username variiert (was er bei einer geleakten Challenge nicht muss).
+- **Behebung:** `login_limiter.check(ip)` zusätzlich aufrufen und bei Fehlschlag `login_limiter.record_failure(ip)`. Konsistent mit dem `login`-Endpoint.
 
-- **Schweregrad**: niedrig (verifiziert: praktisch sehr enges Fenster)
-- **Datei:Zeile**: `backend/src/meters/services/auth.py:81-83`
-- **Beschreibung**: `user = session.user` wird dereferenziert, dann `user.is_active`. Bei concurrent User-Hard-Delete (nicht Deaktivierung) zwischen Session-Lookup und User-Lazy-Load könnte `user` `None` sein. Da User-Löschung im UI nur deaktiviert (is_active=False), nicht hart löscht, ist das praktisch ungefährlich — aber Defense-in-Depth.
-- **Vorschlag**: `if user is None or not user.is_active:` — kostet eine Zeile, eliminiert das Risiko vollständig.
+### 3.4 X-Forwarded-For wird ohne Format-Check übernommen
+- **Schweregrad:** niedrig
+- **Datei:** `backend/src/meters/api/deps.py:75-80`
+- **Befund:** `forwarded.split(",")[0].strip()` nimmt blind den ersten Wert. Bei Fehlkonfiguration des Reverse-Proxys (oder einem manipulierten Header) landet ein beliebiger String im Audit-Log und in den Rate-Limit-Buckets. Mit `METERS_TRUST_PROXY=True` ist das real erreichbar.
+- **Behebung:** `ipaddress.ip_address(parsed)` zur Validierung; bei Fehlschlag Fallback auf `request.client.host`.
 
-### 3.3 Keine CHECK-Constraint auf `latitude`/`longitude` in der DB
+### 3.5 Backups bekommen keinen expliziten Permission-Bit
+- **Schweregrad:** mittel
+- **Datei:** `deploy/lxc/backup.sh` (kein `chmod 0600` nach `gzip`)
+- **Befund:** Verzeichnis wird in `install.sh` mit `0700` angelegt, aber das täglich erzeugte `.db.gz` erbt nur die `umask` des Skripts (typischerweise `0022` → `0644`). Damit ist das Backup im LXC potentiell von anderen System-Usern lesbar — das Backup enthält Klartext-TOTP-Secrets und bcrypt-Hashes.
+- **Behebung:** Im Backup-Skript `umask 0077` setzen oder explizit `chmod 0600 "${target}.gz"` nach dem `gzip`.
+- **Unsicher:** Auf einem dedizierten LXC ohne weitere User ist das Risiko klein, aber Defense-in-Depth ist günstig zu haben.
 
-- **Schweregrad**: niedrig
-- **Datei:Zeile**: `backend/alembic/versions/20260504_0900_location_geo.py:26-27`
-- **Beschreibung**: Pydantic validiert `-90..90` und `-180..180`, aber wer per `sqlite3`-CLI direkt schreibt, kann ungültige Werte einschleusen. Defense-in-Depth-Lücke.
-- **Vorschlag**: Migration mit `CheckConstraint('latitude BETWEEN -90 AND 90', name='ck_location_lat_range')` und Pendant für Longitude.
+### 3.6 LOGIN_FAILED-Audit speichert eingegebenen Username
+- **Schweregrad:** niedrig
+- **Datei:** `backend/src/meters/api/v1/auth.py:93`
+- **Befund:** Bei fehlgeschlagenem Login wird `diff={"username": payload.username}` ins Audit-Log geschrieben. Das ist nützlich für Brute-Force-Erkennung, aber wenn ein User sein Passwort ins Username-Feld tippt, landet es im Klartext im Audit-Log.
+- **Behebung:** Nur `username` loggen, wenn er auch zu einem existierenden User gehört, oder nur eine Hash-Repräsentation/Zähler.
 
-### 3.4 CSV-Export-Felder schützen nicht gegen Excel-Formel-Injection
+### 3.7 TOTP-Secret im Klartext in der DB
+- **Schweregrad:** niedrig (dokumentiert)
+- **Datei:** `backend/src/meters/models/user.py:40-46`
+- **Befund:** Das Modell hat einen Code-Kommentar, der diese Entscheidung explizit begründet (DB nur lokal lesbar). Zusammen mit Befund 3.5 (Backup-Permissions) wird das aber relevanter — wer das Backup hat, hat alle TOTP-Secrets.
+- **Behebung:** Optional Verschlüsselung at-rest mit Master-Key aus `METERS_SECRET_KEY` (AES-GCM), oder sqlcipher.
 
-- **Schweregrad**: mittel
-- **Datei:Zeile**: `frontend/src/features/readings/ReadingsListPage.tsx` (csvField-Helper, Zeile ~985)
-- **Beschreibung**: Der CSV-Helper escapet Anführungszeichen und Trennzeichen, aber nicht führende `=`/`+`/`-`/`@`. Ein Recorder könnte in einer `note` `=cmd|'/c calc'` eintragen — beim Öffnen der CSV in Excel/LibreOffice würde das als Formel interpretiert. Da nur authentifizierte User Daten erzeugen können, ist die praktische Risiko-Lage moderat (kein anonymer Angreifer-Vektor).
-- **Vorschlag**: Im `csvField`-Helper Werte, die mit `[=+\-@]` beginnen, mit `'` (Apostroph) prefixen.
-
-### 3.5 OSM-Link in `LocationMapSheet` ohne URL-Encoding
-
-- **Schweregrad**: niedrig
-- **Datei:Zeile**: `frontend/src/components/LocationMapSheet.tsx:24`
-- **Beschreibung**: Die Koordinaten kommen aus dem eigenen Backend (Float-Spalten) und sind durch Pydantic auf Range validiert — eine Injection ist über den normalen Pfad nicht möglich. Trotzdem: keine Defense-in-Depth, falls in Zukunft jemand den Datentyp ändert.
-- **Vorschlag**: `URL` und `searchParams.set()` nutzen statt String-Template — kostet nichts und ist robust.
-
-### 3.6 Origin-Check übersieht Requests ohne Origin-Header
-
-- **Schweregrad**: niedrig (akzeptable Design-Entscheidung)
-- **Datei:Zeile**: `backend/src/meters/core/middleware.py:75-77`
-- **Beschreibung**: `if origin and not _origin_allowed(...)` lässt mutating Requests durch, wenn der Origin-Header gar nicht gesetzt ist (z. B. CLI-Clients, ältere Browser, manche Background-Sync). Das ist gewollt für API-Clients, schwächt aber den CSRF-Schutz auf gewollte „Same-Site=Strict-Cookie"-Stärke ab.
-- **Vorschlag**: Akzeptabel, weil SameSite=Strict dahinter steht. Nur in Doku festhalten („Origin-Check ist defense-in-depth, primärer CSRF-Schutz ist SameSite=Strict").
-
-### 3.7 Session-Cookie-Lebensdauer 30 Tage — sliding ohne harte Obergrenze
-
-- **Schweregrad**: niedrig
-- **Datei:Zeile**: `backend/src/meters/services/auth.py` (`resolve_session`, Sliding-Renewal)
-- **Beschreibung**: Sliding-Expiration verlängert die Session bei jedem Request. Eine kompromittierte Session bleibt damit theoretisch unbegrenzt aktiv, solange sie genutzt wird. CLAUDE.md spricht von 30 Tagen Sliding — das ist konsistent, aber best-practice wäre eine zusätzliche Hard-Lifetime (z. B. 90 Tage absolut).
-- **Vorschlag**: Optionales `absolute_expires_at = created_at + 90d` neben `expires_at` (sliding). Bei Überschreitung Session-Re-Login erzwingen.
+### 3.8 Cookie-Secure-Default `False`
+- **Schweregrad:** mittel (Default-Konfiguration, gewollt für LAN, aber Falle)
+- **Datei:** `backend/src/meters/core/config.py:41`
+- **Befund:** `cookie_secure: bool = False`. Default ist gerechtfertigt durch LAN-only-Nutzung über HTTP. Aber: Wer den Container später hinter einen HTTPS-Reverse-Proxy stellt und dabei `METERS_COOKIE_SECURE=True` zu setzen vergisst, sendet das Session-Cookie auch über HTTP-Routen.
+- **Behebung:** `configure-network` (existiert) setzt das automatisch; in der README noch klarer als Pflicht-Schritt markieren.
 
 ---
 
 ## 4. Datenmodell-Probleme
 
-### 4.1 Fehlende Composite-Indizes auf `audit_log` für Filterabfragen
+### 4.1 `Reading.created_by_user_id` und `Delivery.created_by_user_id` nullable trotz API-seitig immer gesetzt
+- **Schweregrad:** mittel
+- **Dateien:** `backend/src/meters/models/reading.py:39`, `backend/src/meters/models/delivery.py:37`
+- **Befund:** Beide Felder sind nullable, FK mit `ondelete="SET NULL"`. Siehe 1.3 — gegen die CLAUDE.md-Invariante.
+- **Behebung:** Siehe 1.3.
 
-- **Schweregrad**: mittel
-- **Datei:Zeile**: `backend/alembic/versions/20260501_0900_initial.py:74-76`
-- **Beschreibung**: AuditLog hat Indizes auf `user_id` und `entity_id`, aber nicht auf `(action, created_at)` oder `(entity_type, created_at)`. Die Audit-Log-Ansicht filtert typischerweise nach Action/EntityType in Zeitfenstern — wird mit wachsender Audit-Größe zu vollem Tabellen-Scan.
-- **Vorschlag**: Migration mit `Index('ix_audit_action_created', 'action', 'created_at')` und `Index('ix_audit_entity_created', 'entity_type', 'created_at')`.
+### 4.2 `Delivery` ohne UNIQUE-Constraint auf `(register_id, delivery_at)`
+- **Schweregrad:** niedrig
+- **Datei:** `backend/src/meters/models/delivery.py` (kein `UniqueConstraint`)
+- **Befund:** `Reading` hat `UniqueConstraint(register_id, reading_at)` zur Verhinderung von Doppelerfassung. Delivery hat das nicht, obwohl semantisch das gleiche Argument greift (eine physische Lieferung passiert zu genau einem Zeitpunkt). UI würde nicht zwei anlegen, aber die DB hält es nicht durch.
+- **Behebung:** `UniqueConstraint("register_id", "delivery_at", name="uq_delivery_register_at")` ergänzen + Migration.
 
-### 4.2 Pending TOTP-Challenges werden nicht periodisch aufgeräumt
+### 4.3 Audit-Log `diff` ohne Größenlimit
+- **Schweregrad:** niedrig
+- **Datei:** `backend/src/meters/models/audit_log.py:35`
+- **Befund:** `diff: dict[str, Any] | None` als JSON, keine Längenbegrenzung. Bei einer Heating-Messstelle mit vielen Custom-Registern oder einem Bulk-Import könnte ein einzelner Audit-Eintrag mehrere KB groß werden. Auf Dauer DB-Bloat.
+- **Behebung:** Soft-Limit (z. B. 8 KB) auf API-Ebene; bei Überschreitung Diff abkürzen mit Hinweis.
 
-- **Schweregrad**: mittel
-- **Datei:Zeile**: `backend/src/meters/services/totp.py` (cleanup_expired_challenges, falls vorhanden)
-- **Beschreibung**: Bei häufigen Login-Abbrüchen sammeln sich abgelaufene `PendingTotpChallenge`-Einträge. Es gibt eine Cleanup-Funktion, aber kein Trigger (kein Scheduler, kein Cron). Tabelle wächst unbegrenzt.
-- **Vorschlag**: Entweder beim Login-Endpoint (vor Issue der neuen Challenge) für den User einen lazy-cleanup ausführen, oder einen täglichen Cleanup im `zaehler.sh backup`-Path mitlaufen lassen.
+### 4.4 Audit-Log ohne Index auf `(user_id, created_at)`
+- **Schweregrad:** niedrig
+- **Datei:** Migration `20260504_1500_audit_indexes_and_cleanup.py` legt nur `(action, created_at)` und `(entity_type, created_at)` an
+- **Befund:** Audit-Log-Viewer-Filter „alle Aktionen eines Users seit T" hat keinen passenden Index, fallback ist Full-Table-Scan.
+- **Behebung:** Composite-Index `(user_id, created_at)` ergänzen. Niedrige Priorität, weil das Audit-Log für einen Privathaushalt klein bleibt.
 
-### 4.3 Reading-List-Endpoint ohne `selectinload(Reading.created_by)` — N+1 Query bei Username-Auflösung
-
-- **Schweregrad**: hoch (Performance bei wachsendem Datenbestand)
-- **Datei:Zeile**: `backend/src/meters/api/v1/readings.py:137-162` (`list_readings`) und `_to_read` Zeilen 41-51
-- **Beschreibung**: `_to_read()` greift auf `reading.created_by.username` zu (Zeile 50). Ohne `selectinload(Reading.created_by)` lädt SQLAlchemy pro Reading eine eigene User-Query — bei `limit=500` sind das bis zu 500 zusätzliche SELECTs.
-- **Vorschlag**: `stmt = stmt.options(selectinload(Reading.created_by))` direkt nach Zeile 147 in `list_readings`.
-
-### 4.4 `limit=5000` auf Readings-Endpoint ohne echte Pagination
-
-- **Schweregrad**: mittel
-- **Datei:Zeile**: `backend/src/meters/api/v1/readings.py:137-162`
-- **Beschreibung**: Die API erlaubt `limit=5000` und lädt alle Rows in den Speicher. Bei einem Privathaushalt mit 4 Zählern × wöchentlicher Erfassung wird das nach 10 Jahren noch unproblematisch sein (~2000 Rows) — aber das Frontend lädt aktuell mit Default 500 ohne Cursor.
-- **Vorschlag**: Cursor-Pagination mit `?after=<reading_id>` oder klassisch mit `?offset` + `?limit`. Frontend: lazy-load on-scroll.
-
-### 4.5 Race-Condition bei `replace_meter`: zwei parallele Admin-Requests können Constraint verletzen
-
-- **Schweregrad**: niedrig (Single-User-Heimanwendung)
-- **Datei:Zeile**: `backend/src/meters/services/meter_replacement.py:110-113`
-- **Beschreibung**: Beide Requests sehen denselben aktiven Meter, beide markieren `removed_at`, beide legen einen neuen Meter an. Erst beim zweiten Commit greift evtl. eine Constraint, oder es werden zwei aktive Meter erzeugt.
-- **Vorschlag**: SQLite kennt kein `SELECT FOR UPDATE`, aber ein expliziter `BEGIN IMMEDIATE` in der Transaktion plus eine UNIQUE-Constraint auf `(measuring_point_id) WHERE removed_at IS NULL` (partial unique index) würde zweite Erstellung deterministisch ablehnen.
-
-### 4.6 `Location.name` akzeptiert Whitespace-only Strings
-
-- **Schweregrad**: niedrig (verifiziert)
-- **Datei:Zeile**: `backend/src/meters/schemas/location.py:9,16`
-- **Beschreibung**: `Field(min_length=1, max_length=120)` zählt Whitespace mit. „   " (drei Spaces) erfüllt `min_length=1`, ist aber kein sinnvoller Standortname. Beim erneuten Anlegen von „   " plus „    " (4 Spaces) wären beide via `unique`-Index unterschiedlich, obwohl semantisch leer.
-- **Vorschlag**: Pydantic-Validator (`@field_validator('name')`), der `value.strip()` zurückgibt und nach Strip auf nicht-leer prüft. Im `LocationUpdate` analog.
-
-### 4.7 `Reading.created_by_user_id` mit `ON DELETE SET NULL` — User-Hard-Delete verliert Username
-
-- **Schweregrad**: niedrig (verifiziert; Designentscheidung mit Folge)
-- **Datei:Zeile**: `backend/src/meters/models/reading.py:39-41`
-- **Beschreibung**: `ForeignKey("user.id", ondelete="SET NULL")` ist eine vernünftige Wahl (Reading bleibt erhalten), aber: nach Hard-Delete des Users ist `created_by_username` für historische Readings `None`. Die Audit-Spur hängt dann nur noch am `audit_log` selbst (`audit_log.user_id` hat ggf. eine andere Cascade-Strategie — zu verifizieren). Falls UI-seitig im Auditbereich „User X hat … getan" angezeigt werden soll, ist das verloren.
-- **Vorschlag**: Pragmatisch: User dürfen nur deaktiviert (is_active=False), nie hart gelöscht werden. Oder zusätzlich `username` als `created_by_username` denormalisiert in `Reading`-Tabelle speichern. Aktuell: User-Delete-Endpoint prüfen — wird tatsächlich nur deaktiviert?
+### 4.5 Locations.latitude/longitude als Float
+- **Schweregrad:** niedrig (intentional)
+- **Datei:** `backend/src/meters/models/location.py:24-25`
+- **Befund:** Float statt Decimal. Code-Kommentar begründet das mit GPS-Genauigkeit (~10 cm bei 6 Nachkommastellen, von Float-32 abgedeckt). Konform zur CLAUDE.md-Regel „Decimal NIEMALS Float für Zählerstände" — das gilt für Mengen, nicht für Koordinaten.
+- **Bewertung:** OK, hier nur erwähnt damit der Audit nicht auf einem Lese-Skim hängenbleibt.
 
 ---
 
 ## 5. Fehlende oder schwache Tests
 
-### 5.1 Verbrauchsberechnung über Zählerwechsel hinweg — ungetestet
+### 5.1 Keine Concurrency-/Race-Condition-Tests
+- **Schweregrad:** hoch
+- **Befund:** Es gibt keinen Test, der zwei parallele Requests simuliert (weder doppelte Reading-Erfassung am gleichen `(register_id, reading_at)`, noch zwei parallele `replace_meter`-Calls). Der UNIQUE-Constraint und das WAL-Verhalten sind in Tests nur indirekt durch sequenzielle Aufrufe geprüft.
+- **Vorschlag:** `pytest-asyncio` oder `concurrent.futures.ThreadPoolExecutor` mit zwei Sessions; einer gewinnt, anderer bekommt 409 (Reading) bzw. 409 (replace_meter, wenn Befund 2.1 mit DB-Constraint behoben ist).
 
-- **Schweregrad**: kritisch
-- **Datei:Zeile**: `backend/tests/` (kein `test_consumption_replacement.py`)
-- **Beschreibung**: `services/consumption.py` aggregiert Verbrauch über mehrere PhysicalMeter eines MeasuringPoint. Es existieren keine Tests für: Verbrauch direkt vor/nach Zählerwechsel, mehrfacher Wechsel, Wechsel mit `initial_values != 0`. Das ist die Kerngeschäftslogik der App.
-- **Vorschlag**: `test_consumption_replacement.py` mit Cases: (a) ein Wechsel mit `initial=0`, (b) Wechsel mit `initial=50`, (c) drei aufeinanderfolgende Wechsel, (d) Heizöl-Tank-Wechsel mit Lieferung dazwischen.
+### 5.2 Keine Migrations-Round-Trip-Tests
+- **Schweregrad:** hoch
+- **Befund:** `conftest.py` baut die DB mit `Base.metadata.create_all`, **nicht** mit Alembic. Die zwölf bestehenden Migrationen sind nie als End-to-End-Sequenz getestet. Genau das hat zum Heating-Uppercase-Bug geführt (PR #26).
+- **Vorschlag:** `test_migrations.py` mit:
+  1. Frische SQLite-DB (tmp file).
+  2. `alembic upgrade head` → auf jeder Zwischenrevision `INSERT` typischer Zeilen.
+  3. `alembic downgrade base` und wieder `upgrade head`.
+  4. Schema-Konsistenz-Check und Smoke-Read.
 
-### 5.2 Rollover (mechanischer Zähler) — keine Edge-Cases
+### 5.3 Atomarität von `replace_meter` bei Fehler ungetestet
+- **Schweregrad:** hoch
+- **Datei:** `backend/src/meters/services/meter_replacement.py:102-194`
+- **Befund:** Alle existierenden Tests gehen den Happy Path. Es gibt keinen Test, der `replace_meter` mit unvollständigen `final_readings` aufruft und prüft, dass nach dem Fehler die alten Register noch `is_active=true` sind (DB-Rollback).
+- **Vorschlag:** Test mit ELECTRICITY-MP (zwei Register), `final_readings={"1.8.0": "100"}` (ohne 2.8.0). Erwarten: 400, alte Register bleiben aktiv, kein neuer Meter angelegt.
 
-- **Schweregrad**: hoch
-- **Datei:Zeile**: `backend/tests/unit/test_consumption.py` (zu verifizieren, ob existiert)
-- **Beschreibung**: Wenn ein Test existiert, deckt er nur den Default-`max_value`-Fall ab. Ungetestet: custom max_value, Tank-Register (sollte NICHT rollovern), Mehrfach-Rollover über mehrere Readings.
-- **Vorschlag**: Cases: (a) max_value=999.9, Reading 950→50, Verbrauch=99.9; (b) Oil-Tank 100→20, kein Rollover; (c) 3 aufeinanderfolgende Rollovers.
+### 5.4 Heating-Register-Vererbung beim Tausch ungetestet
+- **Schweregrad:** mittel
+- **Datei:** `backend/src/meters/services/meter_replacement.py:159-168`
+- **Befund:** Die Logik kopiert User-konfigurierte Register vom alten zum neuen Meter (RegisterDef-Liste). Kein Test für: Custom-Register hinzugefügt + Tausch → neuer Meter hat das Custom-Register? Inaktive Register werden nicht mitübertragen?
+- **Vorschlag:** Heating-MP anlegen, dritte Register via `POST /physical-meters/{id}/registers` ergänzen, dann `replace_meter` aufrufen, prüfen dass neuer Meter alle drei Register hat.
 
-### 5.3 Concurrency: zwei parallele Reading-Inserts mit gleichem `(register_id, reading_at)`
+### 5.5 Login mit `is_active=False` ungetestet
+- **Schweregrad:** mittel
+- **Befund:** `test_auth.py` deckt korrektes Passwort, falsches Passwort und Rate-Limit ab — aber nicht den Fall „User existiert, ist aber deaktiviert". Wenn die Prüfung im Login-Service still bricht, könnte ein deaktivierter User trotzdem einloggen.
+- **Vorschlag:** Test `test_login_blocked_for_inactive_user`.
 
-- **Schweregrad**: kritisch
-- **Datei:Zeile**: `backend/tests/integration/` (kein `test_concurrency.py`)
-- **Beschreibung**: Das UNIQUE-Constraint ist die einzige Schutzlinie gegen Doppel-Erfassung. Es gibt keinen Test, der zwei TestClients parallel POST'en lässt und prüft, dass genau einer 201, der andere 409 mit Vergleichsinfo (`existing.created_by_user_id`, `existing.value`) bekommt.
-- **Vorschlag**: `test_concurrency.py` mit `threading.Thread` × 2 oder zwei sequenziellen Requests mit Force-Constraint-Probe. 409-Response auf den Inhalt geprüft.
+### 5.6 Audit-Lücken in Tests
+- **Schweregrad:** mittel
+- **Befund:** Es gibt Audit-Tests für Reading-CRUD, MP-Create, Location-CRUD, Meter-Replacement, Login. Es fehlen:
+  - User-Anlage / -Deaktivierung / -Rollenwechsel (kritisch laut CLAUDE.md, aber nicht abgedeckt)
+  - TOTP_DISABLED
+  - PASSWORD_CHANGED (siehe 1.4 — Aktion existiert noch nicht)
+- **Vorschlag:** Drei zusätzliche Audit-Assertions in `test_users.py` und `test_auth.py`.
 
-### 5.4 2FA — Challenge-Expiry und Drift-Toleranz
+### 5.7 Export-Endpoints ohne Tests
+- **Schweregrad:** mittel
+- **Datei:** `backend/src/meters/api/v1/exports.py` (CSV/JSON-Dump)
+- **Befund:** Kein dedizierter Test für CSV-Header, Decimal-Stringifizierung, JSON-Vollständigkeit (alle MPs / Meter / Register).
+- **Vorschlag:** `test_exports.py` mit drei Tests (CSV-Header-Vollständigkeit, JSON-Struktur, Decimal-Format).
+- **Unsicher:** Ich habe `exports.py` nicht selbst gelesen — wenn der Endpoint nicht existiert, ist der Befund hinfällig.
 
-- **Schweregrad**: hoch
-- **Datei:Zeile**: `backend/tests/integration/test_auth.py`
-- **Beschreibung**: Vorhanden: Setup → Activate → Login-mit-Code → Backup-Code-Verbrauch. Fehlt: (a) Challenge nach 5 Min abgelaufen → 401, (b) `±1 step` Drift-Toleranz, (c) mehrere Fehl-Codes auf gleicher Challenge → Lock/Invalidate.
-- **Vorschlag**: `monkeypatch` auf `datetime.now`, Code generieren mit `pyotp.TOTP(secret).at(now - 30s)` und Erwartung 200, dann Code von `now - 90s` und Erwartung 401.
+### 5.8 Frontend-Tests minimal
+- **Schweregrad:** mittel
+- **Befund:** Nur `format.test.ts` (20 Tests) und `LoginPage.test.tsx` (1 Test). Keine Tests für `RecordReadingPage`, `MeasuringPointsAdminPage` (Wizard mit 5 Energieträgern!), `ReadingsListPage`, `DashboardPage`. Bei einem Refactor (z. B. Wandlerfaktor-Logik im Frontend-Delta) gibt's kein Sicherheitsnetz.
+- **Vorschlag:** Mindestens `RecordReadingPage` (mehrere Register gleichzeitig erfassen, Plausibilitätswarnung) und `MeasuringPointsAdminPage` Wizard (Anlage einer Heating-MP) mit Vitest + React Testing Library + msw als Mock.
 
-### 5.5 Audit-Log-Vollständigkeit — keine systematischen Tests
-
-- **Schweregrad**: hoch
-- **Datei:Zeile**: `backend/tests/integration/` (kein `test_audit.py`)
-- **Beschreibung**: Audit ist Compliance-Anforderung. Es fehlen Tests, die nach jeder mutierenden Operation (Reading CREATE/UPDATE/DELETE, MeterReplaced, User-Anlage, Rollen-Änderung, TOTP-Enable/Disable) prüfen, dass ein AuditLog-Eintrag mit korrekter `action`, `entity_type`, `diff` und `user_id` existiert.
-- **Vorschlag**: `test_audit_completeness.py` mit Parametrized-Test je Operation.
-
-### 5.6 Recorder 24h-Boundary — kein Boundary-Test
-
-- **Schweregrad**: mittel
-- **Datei:Zeile**: `backend/tests/integration/test_readings.py`
-- **Beschreibung**: Es gibt einen Test „Recorder kann eigenes Reading <24h ändern", aber keinen Boundary-Test bei `created_at = now - 24h - 1s` → 403 erwartet.
-- **Vorschlag**: Test mit `monkeypatch` auf `_can_edit`-Zeitvergleich.
-
-### 5.7 Heizöl-Tank Verbrauchsberechnung mit Lieferungen
-
-- **Schweregrad**: hoch
-- **Datei:Zeile**: `backend/tests/unit/` (kein `test_oil_consumption.py`)
-- **Beschreibung**: Die Formel `consumption = (prev_value + sum(deliveries)) - cur_value` ist komplexer als die normale Differenz. Ungetestet: (a) Lieferung zwischen zwei Readings, (b) mehrere Lieferungen, (c) Lieferung vor erstem Reading, (d) Lieferung nach letztem Reading (sollte `state.refilled_since` befüllen).
-- **Vorschlag**: 5 Cases im `test_oil_consumption.py`.
-
-### 5.8 Plausibilitätscheck — Rückdatierung mitten in Serie
-
-- **Schweregrad**: mittel
-- **Datei:Zeile**: `backend/tests/integration/`
-- **Beschreibung**: Ungetestet: Reading A=100 (1.1.), Reading C=110 (3.1.), nun Reading B=95 rückdatiert (2.1.) → muss 400 mit Hinweis auf nächstes/vorheriges geben. Tank-Register skip — auch nicht getestet.
-- **Vorschlag**: Test mit drei Readings und einem rückwirkenden Insert dazwischen.
-
-### 5.9 Frontend `parseDe`/`formatDe` — nur ein LoginPage-Test, sonst kein Frontend-Unit-Test
-
-- **Schweregrad**: hoch
-- **Datei:Zeile**: `frontend/src/lib/format.ts` (kein `format.test.ts`)
-- **Beschreibung**: `parseDe` ist Kern-Konvertierung „1.234,56" → „1234.56". Edge-Cases (führende `,`, mehrere Punkte, Leerstring, US-Format) ungetestet. `formatDe` mit verschiedenen Optionen ebenfalls.
-- **Vorschlag**: Vitest-Datei mit ~10 Cases pro Funktion.
-
-### 5.10 Force-Password-Change Flow ungetestet
-
-- **Schweregrad**: mittel
-- **Datei:Zeile**: `backend/tests/integration/`
-- **Beschreibung**: User mit `force_password_change=true` sollte bei Aufruf jedes Endpoints außer `/auth/change-password` 401/403 erhalten — oder zumindest das Frontend zur Password-Change-Seite zwingen. Nicht getestet, ob das Backend das durchsetzt.
-- **Vorschlag**: Test: Admin legt User an, neuer User loggt ein, GET `/api/v1/me` zeigt `force_password_change=true`, danach POST `/api/v1/measuring-points` muss 403 sein, POST `/auth/change-password` darf durchgehen.
-
-### 5.11 Permission-Matrix recorder vs. admin nicht systematisch
-
-- **Schweregrad**: mittel
-- **Datei:Zeile**: `backend/tests/integration/`
-- **Beschreibung**: Es gibt vereinzelte recorder-403-Tests, aber keine Matrix, die alle mutierenden Endpoints (MP, Location, User, Audit, Replace-Meter) gegen recorder-Token testet.
-- **Vorschlag**: `test_permissions_matrix.py` mit pytest-parametrize über (endpoint, method) × (admin, recorder) → erwarteter Status.
-
-### 5.12 useChartTheme — Theme-Wechsel-Reaktivität ungetestet
-
-- **Schweregrad**: niedrig
-- **Datei:Zeile**: `frontend/src/lib/useChartTheme.ts` (kein Test)
-- **Beschreibung**: Hook reagiert auf `prefers-color-scheme` und `.dark`-Class — wenn der Listener-Cleanup falsch ist, leaked es. Wenn die DOM-Beobachtung nicht greift, bleiben Charts in alter Farbe.
-- **Vorschlag**: Vitest mit `@testing-library/react renderHook` und `matchMedia`-Mock.
+### 5.9 `_pairwise` Edge-Cases ungetestet
+- **Schweregrad:** niedrig
+- **Datei:** `backend/src/meters/services/consumption.py:25-33`
+- **Befund:** Die Hilfsfunktion wird durch die Integration-Tests indirekt geprüft, aber nicht direkt mit 0, 1, 2 Elementen. Bei Refactor leicht subtil zu brechen.
+- **Vorschlag:** Drei direkte Unit-Tests.
 
 ---
 
 ## 6. Performance-Auffälligkeiten
 
-### 6.1 N+1 in `list_readings` (siehe 4.4)
+### 6.1 N+1: Deliveries laden `created_by` lazy
+- **Schweregrad:** mittel
+- **Datei:** `backend/src/meters/api/v1/deliveries.py:39` und `_to_read`
+- **Befund:** `_to_read(d)` greift auf `d.created_by.username` zu. Die Listen-Endpoints laden `Delivery` ohne `selectinload(Delivery.created_by)`. Verifiziert: `grep -n selectinload backend/src/meters/api/v1/deliveries.py` ist leer. Bei 500 Lieferungen kommen 500 zusätzliche User-Selects.
+- **Behebung:** `.options(selectinload(Delivery.created_by))` zu beiden Listen-Statements (Z. 56 und Z. 72) hinzufügen.
 
-Dupliziert mit Datenmodell-Sektion — Hauptproblem ist das fehlende `selectinload(Reading.created_by)`.
+### 6.2 `state_for_register` lädt alle Readings/Deliveries des Registers
+- **Schweregrad:** mittel
+- **Datei:** `backend/src/meters/services/state.py:39-70`
+- **Befund:** `register.readings` und `register.deliveries` werden komplett über die ORM-Beziehung geladen, in Python sortiert, dann nur das letzte Reading verwendet. Bei einem Register mit 10k Readings ist das verschwenderisch.
+- **Behebung:** Direkte SQL-Abfrage `SELECT … ORDER BY reading_at DESC LIMIT 1` statt ORM-Lazy-Load.
 
-### 6.2 Frontend Bundle > 500 kB (Vite-Warning beim Build)
+### 6.3 `consumption_for_register` sortiert in Python statt in SQL
+- **Schweregrad:** niedrig
+- **Datei:** `backend/src/meters/services/consumption.py:50`
+- **Befund:** `sorted(register.readings, key=…)` lädt alle Readings in Memory und sortiert dort. Effekt ähnlich 6.2, etwas weniger gravierend, weil hier ohnehin alle Readings benötigt werden.
+- **Behebung:** Beziehung mit `order_by="Reading.reading_at"` definieren (im Register-Model) — kein zusätzlicher Lade-Aufwand, aber Sortierung wandert in SQL.
 
-- **Schweregrad**: niedrig
-- **Datei:Zeile**: `frontend/vite.config.ts` · betroffen: Recharts, Leaflet, react-leaflet
-- **Beschreibung**: Recharts und Leaflet werden synchron in den Main-Bundle gepackt. Sie werden aber nur auf Dashboard- und Locations-/Detail-Pages gebraucht. Mobile-Nutzer am Zählerschrank lädt das Bundle voll, obwohl er nur die Erfassungs-Page nutzt.
-- **Vorschlag**: `React.lazy()` + `<Suspense>` für Dashboard-Seite (Recharts) und für `LocationMap`/`LocationMapSheet` (Leaflet). Sollte das Initial-Bundle deutlich reduzieren.
+### 6.4 Frontend-Bundle 869 kB (Vite warnt)
+- **Schweregrad:** mittel
+- **Befund:** Der jüngste Build zeigt `index-CnBjULMw.js — 869.99 kB │ gzip: 249.91 kB`. Vite warnt explizit (Z. „Some chunks are larger than 500 kB"). Initial-Render auf Mobilfunk merklich.
+- **Behebung:** Route-based Code-Splitting via `React.lazy()` für Dashboard/Admin/Detail-Routen; ggf. Recharts gegen leichteres Chart-Lib tauschen oder gezielt importieren.
 
-### 6.3 `MeasuringPointsAdminPage`/`DashboardPage` laden alle States in einem `Promise.all` ohne Throttling
+### 6.5 Keine Pagination-`offset` für Deliveries-Liste
+- **Schweregrad:** niedrig
+- **Datei:** `backend/src/meters/api/v1/deliveries.py:62-87`
+- **Befund:** `limit` ist da (Default 500, max 5000), `offset` fehlt. Damit sind ältere Deliveries bei > 5000 Datensätzen über die API nicht mehr erreichbar.
+- **Behebung:** `offset: int = Query(0, ge=0)` hinzufügen, `stmt.offset(offset)` anwenden.
 
-- **Schweregrad**: niedrig
-- **Datei:Zeile**: `frontend/src/features/dashboard/DashboardPage.tsx` · `frontend/src/features/measuring-points/MeasuringPointsAdminPage.tsx`
-- **Beschreibung**: Bei vielen MeasuringPoints (n > 20) feuert das Frontend n parallele Requests. Selbst-gehostet ist das praktisch egal, aber bei Cold-Start mit kalter SQLite-WAL kann es zu Lock-Konflikten führen.
-- **Vorschlag**: Nicht akut — bei einem typischen Privathaushalt (< 10 MPs) irrelevant. Falls relevant: `pLimit(5)` o. Ä.
-
-### 6.4 Recharts re-rendert bei jedem `useChartTheme`-Tick
-
-- **Schweregrad**: niedrig (zu verifizieren)
-- **Datei:Zeile**: `frontend/src/features/dashboard/DashboardPage.tsx` · `frontend/src/lib/useChartTheme.ts`
-- **Beschreibung**: Wenn `useChartTheme` Object-Referenzen instabil zurückgibt, re-rendern alle Charts bei jedem Render. `useMemo` im Hook sollte das verhindern.
-- **Vorschlag**: Im Hook `useMemo` für das zurückgegebene Theme-Objekt nutzen, abhängig von den CSS-Variablen-Werten.
-
-### 6.5 Fehlende Pagination im Frontend für Readings (siehe 4.5)
-
-Das Backend-`limit=500` lädt das gesamte Set in den DOM, was bei hunderten Einträgen zu Render-Druck führt. Cursor-basierte Lazy-Load wäre langfristig sinnvoll.
-
----
-
-## 7. Code-Qualität (Tote Pfade, Duplikate, Type-Hints)
-
-### 7.1 `setLocations` in `DashboardPage` ist toter Code
-
-- **Schweregrad**: niedrig
-- **Datei:Zeile**: `frontend/src/features/dashboard/DashboardPage.tsx:61` (Deklaration), Zeilen 76-80 (kein Aufruf)
-- **Beschreibung**: `const [, setLocations] = useState<...>([])` wird angelegt, aber `setLocations` nie aufgerufen. Suggeriert unfertige Refaktorierung.
-- **Vorschlag**: Entweder entfernen oder aktivieren (z. B. wenn ein Location-Filter geplant ist).
-
-### 7.2 Inkonsistente `key`-Strategie (`String(id)` vs. `\`prefix-${id}\``)
-
-- **Schweregrad**: niedrig
-- **Datei:Zeile**: `frontend/src/features/dashboard/DashboardPage.tsx:255` vs. `frontend/src/features/readings/ReadingsListPage.tsx:491-506`
-- **Beschreibung**: Manche Listen nutzen `key={String(id)}`, andere `key={\`pill-${id}\`}`. Funktioniert beides, aber Inkonsistenz erschwert spätere Refaktoren.
-- **Vorschlag**: Konvention im Codebase festlegen (z. B. immer Template-String mit Prefix), dann anpassen.
-
-### 7.3 Sheet-Effect mit `onClose` in Dependency-Array
-
-- **Schweregrad**: niedrig
-- **Datei:Zeile**: `frontend/src/components/ui/Sheet.tsx:18-25`
-- **Beschreibung**: `useEffect(..., [open, onClose])` registriert den Escape-Listener bei jedem Render neu, falls `onClose` nicht stabil ist. Konsumenten geben oft Inline-Funktionen.
-- **Vorschlag**: Entweder `onClose` per `useRef` capture, oder konsumenten dokumentieren, dass `onClose` `useCallback`-stabil sein soll.
-
-### 7.4 Z-Index-Hierarchie nicht zentralisiert
-
-- **Schweregrad**: niedrig
-- **Datei:Zeile**: `frontend/src/components/AppShell.tsx:202-208` (Tab-Bar `z-20`) · `frontend/src/components/ui/Sheet.tsx:30` (Sheet `z-50`) · `frontend/src/features/readings/RecordReadingPage.tsx:350` (Save-Bar `z-30`)
-- **Beschreibung**: Drei Z-Index-Ebenen, jede Magic-Number. Beim Hinzufügen eines vierten Overlays (z. B. Toast) Risiko von Konflikten.
-- **Vorschlag**: `frontend/src/components/ui/zindex.ts` mit benannten Konstanten — Verwendung im Tailwind über `z-[var(--z-tabbar)]` oder als JS-Literal.
-
-### 7.5 `Object.keys(TYPE_LABELS) as MeterType[]` — typsicherer geht's
-
-- **Schweregrad**: niedrig
-- **Datei:Zeile**: `frontend/src/features/dashboard/DashboardPage.tsx:270` · `frontend/src/features/readings/ReadingsListPage.tsx:393`
-- **Beschreibung**: `as`-Cast wird benutzt, weil `Object.keys` immer `string[]` zurückgibt. CLAUDE.md sagt „kein `as` ohne Begründung".
-- **Vorschlag**: `const METER_TYPES = ['electricity','gas','water','oil'] as const satisfies readonly MeterType[]` und über das Array iterieren statt über `keys`.
-
-### 7.6 Duplizierte Lade-Logik MP+Location+State zwischen Pages
-
-- **Schweregrad**: niedrig
-- **Datei:Zeile**: `frontend/src/features/measuring-points/MeasuringPointDetailPage.tsx` · `frontend/src/features/dashboard/DashboardPage.tsx` · `frontend/src/features/readings/RecordReadingPage.tsx`
-- **Beschreibung**: Die drei Pages laden alle MeasuringPoints und ihre States über die gleichen Endpoints, jeweils mit eigenem Loading-State und Error-Handling.
-- **Vorschlag**: Custom-Hook `useMeasuringPointsWithState()` extrahieren, der das einheitlich kapselt. Alternativ: leichte State-Library wie Zustand für Caching.
-
-### 7.7 Decimal-Serialisierung als String — nicht in OpenAPI dokumentiert
-
-- **Schweregrad**: niedrig
-- **Datei:Zeile**: `backend/src/meters/schemas/common.py:8-11` (DecimalString-Type, falls benannt)
-- **Beschreibung**: API-Konsumenten (z. B. eigener CSV-Skript) sehen in OpenAPI „type: string", verstehen aber nicht warum. Dokumentation fehlt.
-- **Vorschlag**: `Field(..., description="Decimal value serialized as string to avoid float precision loss")` in Schemas.
-
-### 7.8 `_to_read`-Helper in mehreren API-Modulen mit ähnlicher Struktur
-
-- **Schweregrad**: niedrig (zu verifizieren)
-- **Datei:Zeile**: `backend/src/meters/api/v1/measuring_points.py:55-58` · ggf. weitere Module mit eigener `_to_read`-Funktion
-- **Beschreibung**: Viele Endpoint-Module haben einen privaten `_to_read`-Helper, der Pydantic-`.model_validate(...)` plus 1-2 Zusatzfelder kombiniert. Geringes Duplikat-Risiko.
-- **Vorschlag**: Wenn das Pattern dreifach auftaucht: in `meters.api.v1._helpers` zusammenfassen.
-
-### 7.9 Magic Numbers für Map-Höhen, Sheet-Höhen, Zoomstufen
-
-- **Schweregrad**: niedrig
-- **Datei:Zeile**: `frontend/src/components/LocationMap.tsx`, `LocationMapSheet.tsx`, `LocationsAdminPage.tsx` (200/360 px Map, Zoom 17)
-- **Beschreibung**: Karten-Default-Zoom 17, Default-Center auf Berlin, Map-Höhen 200/360 — überall hardcoded.
-- **Vorschlag**: `frontend/src/components/LocationMap.constants.ts` mit `DEFAULT_ZOOM`, `DEFAULT_CENTER`, `MAP_HEIGHT_*` exportieren.
-
-### 7.10 Fehlende `aria-label` auf Icon-only-Buttons (Accessibility)
-
-- **Schweregrad**: mittel (Accessibility, indirekt Code-Qualität)
-- **Datei:Zeile**: `frontend/src/components/AppShell.tsx:216-237` (Erfassen-CTA Button mit `<Plus />` ohne aria-label) · `frontend/src/components/ui/Select.tsx:30` (ChevronDown ohne `aria-hidden`)
-- **Beschreibung**: Mehrere prominente Icon-Buttons ohne Beschreibung für Screenreader. Tab-Bar-Button „Erfassen" hat nur Icon. Logout-Button hat schon `aria-label`, andere fehlen.
-- **Vorschlag**: Alle Icon-only-Buttons mit `aria-label` versehen, dekorative Icons mit `aria-hidden`.
+### 6.6 Dashboard: `consumptionSeries` ohne `useMemo`
+- **Schweregrad:** niedrig
+- **Datei:** `frontend/src/features/dashboard/DashboardPage.tsx` (im `MeasuringPointCard`-Bereich)
+- **Befund:** Die Map → Array-Transformation läuft auf jedem Render. Recharts bekommt jedes Mal eine neue Array-Referenz und re-rendert.
+- **Behebung:** `useMemo(() => …, [consumption])`.
 
 ---
 
-## Zusammenfassung: Prioritäten
+## 7. Code-Qualität
 
-**Kritisch** (bei Gelegenheit zuerst):
-- 5.1 Verbrauchstest über Zählerwechsel
-- 5.3 Concurrency-Test (Doppel-Erfassung)
+### 7.1 Audit-Log-Schreibung ist über alle Endpoints dupliziert
+- **Schweregrad:** niedrig
+- **Dateien:** `api/v1/readings.py`, `api/v1/deliveries.py`, `api/v1/measuring_points.py`, `api/v1/users.py`, `api/v1/locations.py`
+- **Befund:** Jedes Schreib-Endpoint baut den `record(...)`-Call manuell. Diff-Berechnung wiederholt sich.
+- **Behebung:** Decorator oder Context-Manager `with audit(action, entity_type) as a: a.diff = …`.
 
-**Hoch**:
-- 2.1 RangeError in EditForm fangen
-- 2.6 Plausibilitätscheck als Warnung statt harter 400-Block (CLAUDE.md-Verstoß, verifiziert)
-- 3.1 Username-Limiter nach 2FA-Erfolg zurücksetzen
-- 4.3 selectinload(Reading.created_by) in `list_readings`
-- 5.2 Rollover-Edge-Cases
-- 5.4 2FA-Challenge-Expiry-Tests
-- 5.5 Audit-Log-Vollständigkeit
-- 5.7 Heizöl-Verbrauchstests
-- 5.9 Frontend-Format-Tests
+### 7.2 `ReadingsListPage.tsx` > 1000 Zeilen
+- **Schweregrad:** niedrig
+- **Befund:** Filter, Liste, Edit-Dialog, Delivery-Edit, CSV-Export — alles in einer Datei. Wartbarkeit leidet, Test-Schreibung erschwert.
+- **Behebung:** Aufteilen in `ReadingsFilter`, `ReadingsTable`, `EditReadingSheet`, `ExportButton`.
 
-**Mittel** (gut zu tun, kein akuter Schaden):
-- 2.2 / 2.3 Stale-State-Race / fehlende Cancellation
-- 3.4 CSV-Formel-Injection
-- 4.1 Audit-Log-Indizes
-- 4.2 Pending-Challenge-Cleanup
-- 4.4 Pagination
-- 5.6 / 5.8 / 5.10 / 5.11 Test-Lücken
-- 7.10 Icon-Button-Accessibility
+### 7.3 Magische HTTP-Statuscodes
+- **Schweregrad:** niedrig
+- **Datei:** `backend/src/meters/api/v1/readings.py:110-129` (und weitere)
+- **Befund:** `status_code=400` (Plausibilitätswarnung) ist gegen FastAPI-Konvention; 422 wäre semantisch korrekter. Code nutzt 400 mit `extra={acknowledge_field: …}` — das ist ein sinnvoller Pattern, sollte aber als Konstante definiert sein, damit Frontend und Backend nicht auseinanderlaufen.
+- **Behebung:** `STATUS_PLAUSIBILITY_WARNING = 400` als Modul-Konstante.
 
-**Niedrig** / Doku / Style:
-- 1.x, 2.4 / 2.5 / 2.7, 3.2 / 3.3 / 3.5 / 3.6 / 3.7, 4.5 / 4.6 / 4.7, 6.x, 7.x
+### 7.4 Kein Logging-Setup
+- **Schweregrad:** niedrig
+- **Befund:** Im Backend gibt es keinen zentralen `logging.config.dictConfig`. Logs gehen nach stdout → journald. Bei Bedarf nach Korrelations-IDs oder strukturiertem JSON-Logging fehlt das Fundament.
+- **Behebung:** `meters.core.logging`-Modul mit dictConfig + `request_id`-Middleware.
+
+### 7.5 `_pairwise`-Iterator ohne expliziten Generator-Type-Hint
+- **Schweregrad:** niedrig
+- **Datei:** `backend/src/meters/services/consumption.py:25`
+- **Befund:** `Iterable[tuple[Reading, Reading]]` als Annotation, dafür reicht's — aber Generator-Typ wäre genauer (`Iterator[…]`). mypy beschwert sich nicht.
+- **Behebung:** kosmetisch.
 
 ---
 
-**Verifikationsstand**: Folgende Befunde der ersten Audit-Version wurden direkt am Code verifiziert und entweder bestätigt oder gestrichen:
+## Zusammenfassung
 
-- ✅ **WAL-Pragma**: bestätigt korrekt gesetzt (`db/__init__.py:55-66`, `connect`-Listener mit WAL + foreign_keys + synchronous=NORMAL). Befund gestrichen.
-- ✅ **Plausi-Block**: bestätigt als harter 400 (`readings.py:101-117, 118-134`) — Verstoß gegen CLAUDE.md, neu auf „hoch" eingestuft (2.6).
-- ✅ **Username-Limiter / Konto-Enumeration**: bestätigt als false alarm (`auth.py:84-86` triggert Limiter auch bei nicht-existenten Usern). Befund gestrichen.
-- ✅ **Delivery.amount > 0**: bestätigt als false alarm (`schemas/delivery.py:13,19` hat `Field(gt=Decimal('0'))`). Befund gestrichen.
-- ✅ **resolve_session-Race**: bestätigt theoretisch existent, aber praktisch ungefährlich (User-Delete erfolgt nur als Deaktivierung). Auf „niedrig" downgegradet (3.2).
-- ✅ **Location.name strip**: bestätigt — Whitespace-only mit `min_length=1` erlaubt (4.6).
-- ✅ **Reading.created_by ondelete=SET NULL**: bestätigt — Designentscheidung, konsequent dokumentieren (4.7).
+| Sektion | Befunde | davon hoch+ |
+|---|---:|---:|
+| 1. CLAUDE.md-Abweichungen | 5 | 0 |
+| 2. Bugs / logische Fehler | 4 | 1 |
+| 3. Sicherheitsprobleme | 8 | 1 |
+| 4. Datenmodell-Probleme | 5 | 0 |
+| 5. Tests | 9 | 3 |
+| 6. Performance | 6 | 0 |
+| 7. Code-Qualität | 5 | 0 |
+| **gesamt** | **42** | **5** |
 
-Verbleibende „zu verifizieren"-Hinweise im Text betreffen Punkte, die nicht direkt in der Sitzung gelesen wurden (z. B. 7.8 Helper-Duplikate, 4.7 Audit-Log-FK-Cascade, 6.4 useChartTheme-Stabilität). Die sind als Hinweis markiert, kein Schaden bei Inaktion.
+### Top-5-Empfehlungen (nach Risiko)
+
+1. **CSP `unsafe-inline` entfernen** (3.1, hoch) — direkter Hardening-Hebel gegen XSS.
+2. **Migrations-Round-Trip-Tests einführen** (5.2, hoch) — der jüngste Heating-Uppercase-Bug wäre damit aufgefallen.
+3. **Concurrency-Tests + DB-Constraint gegen zwei aktive Meter** (5.1 + 2.1, hoch) — sonst kann Tausch unter Last MPs in inkonsistenten Zustand bringen.
+4. **`replace_meter`-Atomarität bei Fehler testen** (5.3, hoch) — Schutz gegen halb-vollzogene Tauschvorgänge.
+5. **PWA-Service-Worker** (1.1, mittel) — von CLAUDE.md gefordert; ohne ihn ist die mobile Erfassung nicht offline-tauglich.
+
+Keine kritischen Befunde gefunden. Die Codebase ist überwiegend solide; die Hochkategorien adressieren Härtungs- und Test-Lücken, keine offenen Sicherheitsnotfälle.
