@@ -164,12 +164,46 @@ sudo bash /opt/zaehler/repo/deploy/lxc/zaehler.sh upgrade-all
 Das aktualisiert in einem Lauf:
 1. **System-Pakete** (apt upgrade)
 2. **uv** und **pnpm** (self-update)
-3. **App-Code** (git pull + neuer Build + Datenbank-Migrationen + Service-Neustart)
+3. **App-Code** (`git fetch` + `git reset --hard origin/main` + neuer Build
+   + Datenbank-Migrationen + Service-Neustart)
 
 Vor dem App-Update wird automatisch ein DB-Snapshot nach
 `/opt/zaehler/backups/` geschrieben.
 
 Nur App-Code ohne System-/Tool-Updates: `zaehler.sh upgrade-app`.
+
+### Erst-Update für alte Container (vor v2.3.0)
+
+Container, die noch auf einer Version **vor v2.3.0** sind, haben
+ein altes `zaehler.sh` mit `git pull --ff-only` und scheitern beim
+Update an lokal modifizierten Frontend-Build-Artefakten
+(`backend/src/meters/static/index.html` o. ä.). Symptom:
+
+```
+error: Your local changes to the following files would be overwritten by merge:
+        backend/src/meters/static/index.html
+Please commit your changes or stash them before you merge.
+Aborting
+```
+
+Das Skript kann sich nicht selbst reparieren, weil es **vor** dem Pull
+abbricht. Einmaliger Bootstrap mit dem aktuellen Skript direkt aus
+GitHub:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/muelley86/zaehler/main/deploy/lxc/zaehler.sh \
+  -o /tmp/zaehler.sh
+sudo bash /tmp/zaehler.sh upgrade-app
+```
+
+Das aktuelle Skript nutzt `git fetch` + `git reset --hard` und räumt
+die alten Build-Artefakte mit `git clean` weg. Persistente Daten unter
+`$DATA_DIR` (Standard: `/opt/zaehler/data/`) sind vom Reset nicht
+betroffen; das Backup ist als Sicherheitsnetz schon angelegt.
+
+Ab dem Punkt sind Repo und Skript synchron — `sudo bash
+/opt/zaehler/repo/deploy/lxc/zaehler.sh upgrade-all` läuft danach
+für alle weiteren Updates ohne Sonderbehandlung durch.
 
 ---
 
