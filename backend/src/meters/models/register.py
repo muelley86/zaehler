@@ -50,11 +50,13 @@ class Register(Base, TimestampMixin):
         "Reading",
         back_populates="register",
         cascade="all, delete-orphan",
-        order_by="Reading.reading_at",
+        # Stabil sortieren (Tie-Breaker id) — sonst muss der Service
+        # nochmal in Python sortieren.
+        order_by="(Reading.reading_at, Reading.id)",
     )
     deliveries: Mapped[list[Delivery]] = relationship(
         "Delivery",
         back_populates="register",
         cascade="all, delete-orphan",
-        order_by="Delivery.delivery_at",
+        order_by="(Delivery.delivery_at, Delivery.id)",
     )

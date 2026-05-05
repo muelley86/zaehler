@@ -5,24 +5,57 @@
  *  1) nicht angemeldet  → nur /login
  *  2) Force-Password-Change → nur /passwort-aendern
  *  3) angemeldet → AppShell mit allen Routen, Admin-Bereiche per AdminOnly
+ *
+ * Routen-Komponenten sind ``React.lazy``-geladen — das initiale JS-Bundle
+ * enthält damit nur AppShell + Login + ChangePassword. Der Rest wird beim
+ * ersten Aufruf der jeweiligen Route nachgeladen (Recharts, Leaflet etc.
+ * landen so nicht im Initial-Chunk).
  */
 
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
+import { Suspense, lazy } from 'react';
 import type { ReactNode } from 'react';
 
 import { AppShell } from '@/components/AppShell';
 import { useAuth } from '@/features/auth/auth-context';
 import { ChangePasswordPage } from '@/features/auth/ChangePasswordPage';
 import { LoginPage } from '@/features/auth/LoginPage';
-import { DashboardPage } from '@/features/dashboard/DashboardPage';
-import { RecordReadingPage } from '@/features/readings/RecordReadingPage';
-import { ReadingsListPage } from '@/features/readings/ReadingsListPage';
-import { MeasuringPointsAdminPage } from '@/features/measuring-points/MeasuringPointsAdminPage';
-import { MeasuringPointDetailPage } from '@/features/measuring-points/MeasuringPointDetailPage';
-import { UsersAdminPage } from '@/features/admin/UsersAdminPage';
-import { LocationsAdminPage } from '@/features/admin/LocationsAdminPage';
-import { AuditLogPage } from '@/features/admin/AuditLogPage';
-import { MorePage } from '@/features/more/MorePage';
+
+const DashboardPage = lazy(() =>
+  import('@/features/dashboard/DashboardPage').then((m) => ({ default: m.DashboardPage })),
+);
+const RecordReadingPage = lazy(() =>
+  import('@/features/readings/RecordReadingPage').then((m) => ({ default: m.RecordReadingPage })),
+);
+const ReadingsListPage = lazy(() =>
+  import('@/features/readings/ReadingsListPage').then((m) => ({ default: m.ReadingsListPage })),
+);
+const MeasuringPointsAdminPage = lazy(() =>
+  import('@/features/measuring-points/MeasuringPointsAdminPage').then((m) => ({
+    default: m.MeasuringPointsAdminPage,
+  })),
+);
+const MeasuringPointDetailPage = lazy(() =>
+  import('@/features/measuring-points/MeasuringPointDetailPage').then((m) => ({
+    default: m.MeasuringPointDetailPage,
+  })),
+);
+const UsersAdminPage = lazy(() =>
+  import('@/features/admin/UsersAdminPage').then((m) => ({ default: m.UsersAdminPage })),
+);
+const LocationsAdminPage = lazy(() =>
+  import('@/features/admin/LocationsAdminPage').then((m) => ({ default: m.LocationsAdminPage })),
+);
+const AuditLogPage = lazy(() =>
+  import('@/features/admin/AuditLogPage').then((m) => ({ default: m.AuditLogPage })),
+);
+const MorePage = lazy(() =>
+  import('@/features/more/MorePage').then((m) => ({ default: m.MorePage })),
+);
+
+function RouteFallback(): JSX.Element {
+  return <div className="flex h-full items-center justify-center text-tertiary">Lade…</div>;
+}
 
 export function App() {
   const { me, loading } = useAuth();
@@ -55,54 +88,56 @@ export function App() {
 
   return (
     <AppShell>
-      <Routes>
-        <Route path="/" element={<DashboardPage />} />
-        <Route path="/erfassen" element={<RecordReadingPage />} />
-        <Route path="/erfassungen" element={<ReadingsListPage />} />
-        <Route path="/mehr" element={<MorePage />} />
-        <Route path="/passwort-aendern" element={<ChangePasswordPage />} />
-        <Route
-          path="/messstellen"
-          element={
-            <AdminOnly>
-              <MeasuringPointsAdminPage />
-            </AdminOnly>
-          }
-        />
-        <Route
-          path="/messstellen/:id"
-          element={
-            <AdminOnly>
-              <MeasuringPointDetailPage />
-            </AdminOnly>
-          }
-        />
-        <Route
-          path="/standorte"
-          element={
-            <AdminOnly>
-              <LocationsAdminPage />
-            </AdminOnly>
-          }
-        />
-        <Route
-          path="/benutzer"
-          element={
-            <AdminOnly>
-              <UsersAdminPage />
-            </AdminOnly>
-          }
-        />
-        <Route
-          path="/audit"
-          element={
-            <AdminOnly>
-              <AuditLogPage />
-            </AdminOnly>
-          }
-        />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
+      <Suspense fallback={<RouteFallback />}>
+        <Routes>
+          <Route path="/" element={<DashboardPage />} />
+          <Route path="/erfassen" element={<RecordReadingPage />} />
+          <Route path="/erfassungen" element={<ReadingsListPage />} />
+          <Route path="/mehr" element={<MorePage />} />
+          <Route path="/passwort-aendern" element={<ChangePasswordPage />} />
+          <Route
+            path="/messstellen"
+            element={
+              <AdminOnly>
+                <MeasuringPointsAdminPage />
+              </AdminOnly>
+            }
+          />
+          <Route
+            path="/messstellen/:id"
+            element={
+              <AdminOnly>
+                <MeasuringPointDetailPage />
+              </AdminOnly>
+            }
+          />
+          <Route
+            path="/standorte"
+            element={
+              <AdminOnly>
+                <LocationsAdminPage />
+              </AdminOnly>
+            }
+          />
+          <Route
+            path="/benutzer"
+            element={
+              <AdminOnly>
+                <UsersAdminPage />
+              </AdminOnly>
+            }
+          />
+          <Route
+            path="/audit"
+            element={
+              <AdminOnly>
+                <AuditLogPage />
+              </AdminOnly>
+            }
+          />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </Suspense>
     </AppShell>
   );
 }
