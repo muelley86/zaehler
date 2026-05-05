@@ -36,6 +36,7 @@ import type {
   ReadingRead,
   RegisterStateRead,
 } from '@/lib/types';
+import { TYPE_LABELS, TYPE_ORDER, describeMeterType } from '@/lib/meterLabels';
 
 interface ConsumptionsByMP {
   [mpId: number]: ConsumptionPoint[];
@@ -48,13 +49,6 @@ interface StatesByMP {
 interface ReadingsByMP {
   [mpId: number]: ReadingRead[];
 }
-
-const TYPE_LABELS: Record<MeterType, string> = {
-  electricity: 'Strom',
-  gas: 'Gas',
-  water: 'Wasser',
-  oil: 'Ölheizung',
-};
 
 export function DashboardPage() {
   const [points, setPoints] = useState<MeasuringPointRead[] | null>(null);
@@ -452,7 +446,7 @@ function MeasuringPointCard({
         <div className="min-w-0 flex-1">
           <h2 className="truncate text-title-3 text-label">{mp.name}</h2>
           <div className="text-caption text-tertiary">
-            {TYPE_LABELS[mp.type]}
+            {describeMeterType(mp.type, mp.heating_source)}
             {mp.location_name ? ` · ${mp.location_name}` : ''}
             {mp.transformer_factor !== null ? ` · Wandlerfaktor ×${mp.transformer_factor}` : ''}
           </div>
@@ -830,8 +824,6 @@ function ConsumptionSummary({
     </Section>
   );
 }
-
-const TYPE_ORDER: MeterType[] = ['electricity', 'gas', 'water', 'oil'];
 
 function CurrentStateTile({ state }: { state: RegisterStateRead }) {
   return (

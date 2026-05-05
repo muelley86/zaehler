@@ -1,4 +1,16 @@
-export type MeterType = 'electricity' | 'gas' | 'water' | 'oil';
+export type MeterType = 'electricity' | 'water' | 'heating';
+export type HeatingSource = 'oil' | 'gas' | 'wood_chips' | 'wood' | 'district_heat';
+export type HeatingUnit = 'kWh' | 'MWh' | 'SRM' | 'CBM' | 'To' | 'h' | 'L' | 'm³';
+export const HEATING_UNITS: readonly HeatingUnit[] = [
+  'kWh',
+  'MWh',
+  'SRM',
+  'CBM',
+  'To',
+  'h',
+  'L',
+  'm³',
+];
 export type UserRole = 'admin' | 'recorder';
 
 export interface Me {
@@ -98,6 +110,7 @@ export interface MeasuringPointRead {
   has_dual_tariff: boolean;
   tank_capacity: string | null;
   transformer_factor: number | null;
+  heating_source: HeatingSource | null;
   physical_meters: PhysicalMeterRead[];
 }
 

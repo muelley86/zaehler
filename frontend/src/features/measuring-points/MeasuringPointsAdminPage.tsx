@@ -18,20 +18,87 @@ import { PageGlows } from '@/components/PageGlows';
 import { DeliveriesSheet } from './DeliveriesSheet';
 import { ApiError, api } from '@/lib/api';
 import { parseDe } from '@/lib/format';
+import { HEATING_SOURCE_LABELS, TYPE_LABELS, describeMeterType } from '@/lib/meterLabels';
 import type {
+  HeatingSource,
+  HeatingUnit,
   LocationRead,
   MeasuringPointRead,
   MeterType,
   PhysicalMeterRead,
   RegisterRead,
 } from '@/lib/types';
+import { HEATING_UNITS } from '@/lib/types';
 import { cx } from '@/components/ui/cx';
 
-const TYPE_LABELS: Record<MeterType, string> = {
-  electricity: 'Strom',
-  gas: 'Gas',
-  water: 'Wasser',
-  oil: 'Ölheizung',
+interface RegisterDraft {
+  label: string;
+  unit: HeatingUnit;
+  accepts_deliveries: boolean;
+  initial_value: string;
+  max_value: string;
+}
+
+const HEATING_PRESETS: Record<HeatingSource, RegisterDraft[]> = {
+  oil: [
+    {
+      label: 'Betriebsstunden',
+      unit: 'h',
+      accepts_deliveries: false,
+      initial_value: '0',
+      max_value: '',
+    },
+    {
+      label: 'Tankstand',
+      unit: 'L',
+      accepts_deliveries: true,
+      initial_value: '',
+      max_value: '',
+    },
+  ],
+  gas: [
+    {
+      label: 'Verbrauch',
+      unit: 'm³',
+      accepts_deliveries: false,
+      initial_value: '0',
+      max_value: '',
+    },
+  ],
+  wood_chips: [
+    {
+      label: 'Betriebsstunden',
+      unit: 'h',
+      accepts_deliveries: false,
+      initial_value: '0',
+      max_value: '',
+    },
+    {
+      label: 'Vorrat',
+      unit: 'SRM',
+      accepts_deliveries: true,
+      initial_value: '',
+      max_value: '',
+    },
+  ],
+  wood: [
+    {
+      label: 'Vorrat',
+      unit: 'SRM',
+      accepts_deliveries: true,
+      initial_value: '',
+      max_value: '',
+    },
+  ],
+  district_heat: [
+    {
+      label: 'Wärmemengenzähler',
+      unit: 'kWh',
+      accepts_deliveries: false,
+      initial_value: '0',
+      max_value: '',
+    },
+  ],
 };
 
 export function MeasuringPointsAdminPage() {
@@ -128,7 +195,7 @@ function MPCard({
           <div className="min-w-0 flex-1">
             <div className="truncate text-headline tracking-tight text-label">{mp.name}</div>
             <div className="text-caption text-tertiary">
-              {TYPE_LABELS[mp.type]}
+              {describeMeterType(mp.type, mp.heating_source)}
               {mp.location_name ? ` · ${mp.location_name}` : ''}
             </div>
           </div>
@@ -227,7 +294,7 @@ function MPEditForm({
         is_bidirectional: bidi,
         has_dual_tariff: dual,
       };
-      if (mp.type === 'oil') {
+      if (mp.type === 'heating') {
         if (tankCapacity.trim() === '') {
           body['clear_tank_capacity'] = true;
         } else {
@@ -291,15 +358,22 @@ function MPEditForm({
           </div>
         </>
       ) : null}
-      {mp.type === 'oil' ? (
-        <TextField
-          label="Tankvolumen (Liter)"
-          inputMode="decimal"
-          value={tankCapacity}
-          onChange={(e) => setTankCapacity(e.target.value)}
-          hint="leer = nicht gesetzt; wird für Prozent-Anzeige genutzt"
-          numeric
-        />
+      {mp.type === 'heating' ? (
+        <>
+          <TextField
+            label="Tankvolumen / Vorratsmenge (optional)"
+            inputMode="decimal"
+            value={tankCapacity}
+            onChange={(e) => setTankCapacity(e.target.value)}
+            hint="leer = nicht gesetzt; wird für die Prozent-Anzeige des Vorrats genutzt"
+            numeric
+          />
+          <div className="text-caption text-tertiary">
+            Energieträger:{' '}
+            <span className="text-label">{HEATING_SOURCE_LABELS[mp.heating_source ?? 'oil']}</span>{' '}
+            · Register-Liste verwaltest du im aktiven Zähler weiter unten.
+          </div>
+        </>
       ) : null}
       {error ? (
         <div className="border-danger/40 bg-danger/10 rounded-card border-hairline p-3 text-caption text-danger">
@@ -387,13 +461,18 @@ function MeterPanel({
       </div>
 
       {edit ? (
-        <MeterEditForm
-          meter={meter}
-          onSaved={() => {
-            setEdit(false);
-            onChanged();
-          }}
-        />
+        <>
+          <MeterEditForm
+            meter={meter}
+            onSaved={() => {
+              setEdit(false);
+              onChanged();
+            }}
+          />
+          {mp.type === 'heating' && meter.removed_at === null ? (
+            <RegisterEditor meter={meter} onChanged={onChanged} />
+          ) : null}
+        </>
       ) : null}
 
       <Sheet open={replace} onClose={() => setReplace(false)} title="Zähler tauschen">
@@ -460,6 +539,153 @@ function MeterEditForm({ meter, onSaved }: { meter: PhysicalMeterRead; onSaved: 
   );
 }
 
+function RegisterEditor({ meter, onChanged }: { meter: PhysicalMeterRead; onChanged: () => void }) {
+  const [adding, setAdding] = useState(false);
+  const [draft, setDraft] = useState<RegisterDraft>({
+    label: '',
+    unit: 'kWh',
+    accepts_deliveries: false,
+    initial_value: '',
+    max_value: '',
+  });
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function add() {
+    setBusy(true);
+    setError(null);
+    try {
+      const body: Record<string, unknown> = {
+        label: draft.label,
+        unit: draft.unit,
+        accepts_deliveries: draft.accepts_deliveries,
+      };
+      if (draft.initial_value.trim()) body['initial_value'] = parseDe(draft.initial_value);
+      if (draft.max_value.trim()) body['max_value'] = parseDe(draft.max_value);
+      await api.post(`/physical-meters/${meter.id}/registers`, body);
+      setDraft({
+        label: '',
+        unit: 'kWh',
+        accepts_deliveries: false,
+        initial_value: '',
+        max_value: '',
+      });
+      setAdding(false);
+      onChanged();
+    } catch (err) {
+      if (err instanceof ApiError) setError(err.problem.detail ?? err.problem.title);
+      else if (err instanceof RangeError) setError(err.message);
+      else setError('Hinzufügen fehlgeschlagen.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function remove(id: number, label: string) {
+    if (!window.confirm(`Register "${label}" wirklich löschen?`)) return;
+    try {
+      await api.delete(`/registers/${id}`);
+      onChanged();
+    } catch (err) {
+      if (err instanceof ApiError) window.alert(err.problem.detail ?? err.problem.title);
+    }
+  }
+
+  return (
+    <div className="mt-3 space-y-3 border-t-hairline border-separator pt-3">
+      <div className="text-caption-bold uppercase text-tertiary">Register verwalten</div>
+      <ul className="space-y-1.5">
+        {meter.registers.map((r) => (
+          <li
+            key={r.id}
+            className="flex items-center gap-2 rounded-card border-hairline border-border bg-fill px-3 py-2"
+          >
+            <span className="flex-1 text-body-sm text-label">
+              {r.label} <span className="text-tertiary">({r.unit})</span>
+              {r.accepts_deliveries ? (
+                <span className="ml-2 rounded-full bg-primary-soft px-2 py-0.5 text-caption text-primary-deep">
+                  Lieferungen
+                </span>
+              ) : null}
+            </span>
+            <button
+              type="button"
+              onClick={() => void remove(r.id, r.label)}
+              aria-label="Register löschen"
+              className="hover:bg-danger/10 flex h-7 w-7 items-center justify-center rounded-full text-danger transition-colors"
+            >
+              <Trash2 size={13} />
+            </button>
+          </li>
+        ))}
+      </ul>
+      {adding ? (
+        <div className="space-y-2 rounded-card border-hairline border-border bg-fill p-3">
+          <TextField
+            label="Label"
+            value={draft.label}
+            onChange={(e) => setDraft((d) => ({ ...d, label: e.target.value }))}
+            required
+          />
+          <Select
+            label="Einheit"
+            value={draft.unit}
+            onChange={(e) => setDraft((d) => ({ ...d, unit: e.target.value as HeatingUnit }))}
+          >
+            {HEATING_UNITS.map((u) => (
+              <option key={u} value={u}>
+                {u}
+              </option>
+            ))}
+          </Select>
+          <ToggleRow
+            label="Nachfüllbar (Lieferungen)"
+            checked={draft.accepts_deliveries}
+            onChange={(v) => setDraft((d) => ({ ...d, accepts_deliveries: v }))}
+          />
+          <TextField
+            label="Anfangsstand (optional)"
+            inputMode="decimal"
+            value={draft.initial_value}
+            onChange={(e) => setDraft((d) => ({ ...d, initial_value: e.target.value }))}
+            numeric
+          />
+          {error ? (
+            <div className="border-danger/40 bg-danger/10 rounded-card border-hairline p-2 text-caption text-danger">
+              {error}
+            </div>
+          ) : null}
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant="filled"
+              size="sm"
+              fullWidth
+              onClick={() => void add()}
+              disabled={busy || !draft.label.trim()}
+            >
+              {busy ? 'Speichere…' : 'Register hinzufügen'}
+            </Button>
+            <Button type="button" variant="bordered" size="sm" onClick={() => setAdding(false)}>
+              Abbrechen
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <Button
+          type="button"
+          variant="bordered"
+          size="sm"
+          leftIcon={<Plus size={14} />}
+          onClick={() => setAdding(true)}
+        >
+          Register hinzufügen
+        </Button>
+      )}
+    </div>
+  );
+}
+
 function CreateForm({
   locations,
   onCreated,
@@ -468,68 +694,11 @@ function CreateForm({
   onCreated: () => void;
 }) {
   const [open, setOpen] = useState(false);
-  const [name, setName] = useState('');
-  const [type, setType] = useState<MeterType>('electricity');
-  const [locationId, setLocationId] = useState<number | null>(null);
-  const [bidi, setBidi] = useState(false);
-  const [dual, setDual] = useState(false);
-  const [serial, setSerial] = useState('');
-  const [installedAt, setInstalledAt] = useState(new Date().toISOString().slice(0, 10));
-  const [oilHours, setOilHours] = useState('0');
-  const [oilTank, setOilTank] = useState('');
-  const [tankCapacity, setTankCapacity] = useState('');
-  const [transformerFactor, setTransformerFactor] = useState('');
-  const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
+  const [type, setType] = useState<MeterType | null>(null);
 
-  async function handleSubmit(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    setBusy(true);
-    setError(null);
-    try {
-      const initialValues: Record<string, string> = {};
-      if (type === 'oil') {
-        initialValues['oil.hours'] = parseDe(oilHours || '0');
-        if (oilTank.trim()) {
-          initialValues['oil.tank'] = parseDe(oilTank);
-        }
-      }
-      const body: Record<string, unknown> = {
-        name,
-        type,
-        location_id: locationId,
-        is_bidirectional: bidi,
-        has_dual_tariff: dual,
-        serial_number: serial,
-        installed_at: installedAt,
-        initial_values: initialValues,
-      };
-      if (type === 'oil' && tankCapacity.trim()) {
-        body['tank_capacity'] = parseDe(tankCapacity);
-      }
-      if (type === 'electricity' && transformerFactor.trim()) {
-        const parsed = Number(transformerFactor.trim());
-        if (!Number.isInteger(parsed) || parsed <= 0) {
-          throw new RangeError('Wandlerfaktor muss eine positive Ganzzahl sein.');
-        }
-        body['transformer_factor'] = parsed;
-      }
-      await api.post('/measuring-points', body);
-      setName('');
-      setSerial('');
-      setOilHours('0');
-      setOilTank('');
-      setTankCapacity('');
-      setTransformerFactor('');
-      setOpen(false);
-      onCreated();
-    } catch (err) {
-      if (err instanceof ApiError) setError(err.problem.detail ?? err.problem.title);
-      else if (err instanceof RangeError) setError(err.message);
-      else setError('Konnte Messstelle nicht anlegen.');
-    } finally {
-      setBusy(false);
-    }
+  function close() {
+    setOpen(false);
+    setType(null);
   }
 
   return (
@@ -545,99 +714,302 @@ function CreateForm({
           <Plus size={16} strokeWidth={2.5} />
           Messstelle anlegen
         </button>
+      ) : type === null ? (
+        <div className="space-y-2 p-5">
+          <div className="text-caption-bold uppercase text-tertiary">Welcher Messstellen-Typ?</div>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+            {(['electricity', 'water', 'heating'] as MeterType[]).map((t) => (
+              <button
+                key={t}
+                type="button"
+                onClick={() => setType(t)}
+                className="flex items-center gap-3 rounded-card border-hairline border-border bg-surface-high px-4 py-3 text-left transition-colors hover:bg-fill"
+              >
+                <TypeBadge type={t} size="md" />
+                <span className="text-body font-semibold text-label">{TYPE_LABELS[t]}</span>
+              </button>
+            ))}
+          </div>
+          <div className="pt-2">
+            <Button type="button" variant="bordered" onClick={close}>
+              Abbrechen
+            </Button>
+          </div>
+        </div>
       ) : (
-        <form onSubmit={(e) => void handleSubmit(e)} className="space-y-3 p-5">
-          <TextField label="Name" value={name} onChange={(e) => setName(e.target.value)} required />
-          <Select label="Typ" value={type} onChange={(e) => setType(e.target.value as MeterType)}>
-            <option value="electricity">Strom</option>
-            <option value="gas">Gas</option>
-            <option value="water">Wasser</option>
-            <option value="oil">Ölheizung</option>
-          </Select>
+        <CreateFormFields
+          type={type}
+          locations={locations}
+          onBack={() => setType(null)}
+          onCreated={() => {
+            close();
+            onCreated();
+          }}
+        />
+      )}
+    </Section>
+  );
+}
+
+function CreateFormFields({
+  type,
+  locations,
+  onBack,
+  onCreated,
+}: {
+  type: MeterType;
+  locations: LocationRead[];
+  onBack: () => void;
+  onCreated: () => void;
+}) {
+  const [name, setName] = useState('');
+  const [locationId, setLocationId] = useState<number | null>(null);
+  const [serial, setSerial] = useState('');
+  const [installedAt, setInstalledAt] = useState(new Date().toISOString().slice(0, 10));
+
+  // Strom
+  const [bidi, setBidi] = useState(false);
+  const [dual, setDual] = useState(false);
+  const [transformerFactor, setTransformerFactor] = useState('');
+
+  // Heizung
+  const [heatingSource, setHeatingSource] = useState<HeatingSource>('oil');
+  const [registers, setRegisters] = useState<RegisterDraft[]>(HEATING_PRESETS.oil);
+  const [tankCapacity, setTankCapacity] = useState('');
+
+  function applyPreset(src: HeatingSource) {
+    setHeatingSource(src);
+    setRegisters(HEATING_PRESETS[src].map((r) => ({ ...r })));
+  }
+
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function handleSubmit(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setBusy(true);
+    setError(null);
+    try {
+      const body: Record<string, unknown> = {
+        name,
+        type,
+        location_id: locationId,
+        is_bidirectional: bidi,
+        has_dual_tariff: dual,
+        serial_number: serial,
+        installed_at: installedAt,
+        initial_values: {},
+      };
+      if (type === 'electricity' && transformerFactor.trim()) {
+        const parsed = Number(transformerFactor.trim());
+        if (!Number.isInteger(parsed) || parsed <= 0) {
+          throw new RangeError('Wandlerfaktor muss eine positive Ganzzahl sein.');
+        }
+        body['transformer_factor'] = parsed;
+      }
+      if (type === 'heating') {
+        body['heating_source'] = heatingSource;
+        if (tankCapacity.trim()) body['tank_capacity'] = parseDe(tankCapacity);
+        body['registers'] = registers.map((r) => {
+          const out: Record<string, unknown> = {
+            label: r.label,
+            unit: r.unit,
+            accepts_deliveries: r.accepts_deliveries,
+          };
+          if (r.initial_value.trim()) out['initial_value'] = parseDe(r.initial_value);
+          if (r.max_value.trim()) out['max_value'] = parseDe(r.max_value);
+          return out;
+        });
+      }
+      await api.post('/measuring-points', body);
+      onCreated();
+    } catch (err) {
+      if (err instanceof ApiError) setError(err.problem.detail ?? err.problem.title);
+      else if (err instanceof RangeError) setError(err.message);
+      else setError('Konnte Messstelle nicht anlegen.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <form onSubmit={(e) => void handleSubmit(e)} className="space-y-3 p-5">
+      <div className="flex items-center gap-2 text-caption text-tertiary">
+        <button type="button" onClick={onBack} className="text-primary-deep hover:underline">
+          ← Typ ändern
+        </button>
+        <span>·</span>
+        <TypeBadge type={type} size="sm" />
+        <span className="font-semibold text-label">{TYPE_LABELS[type]}</span>
+      </div>
+      <TextField label="Name" value={name} onChange={(e) => setName(e.target.value)} required />
+      <Select
+        label="Standort"
+        value={locationId ?? ''}
+        onChange={(e) => setLocationId(e.target.value ? Number(e.target.value) : null)}
+      >
+        <option value="">— kein Standort —</option>
+        {locations.map((loc) => (
+          <option key={loc.id} value={loc.id}>
+            {loc.name}
+          </option>
+        ))}
+      </Select>
+      <TextField
+        label="Seriennummer"
+        value={serial}
+        onChange={(e) => setSerial(e.target.value)}
+        required
+      />
+      <TextField
+        label="Eingebaut am"
+        type="date"
+        value={installedAt}
+        onChange={(e) => setInstalledAt(e.target.value)}
+        required
+      />
+
+      {type === 'electricity' ? (
+        <>
+          <ToggleRow label="Bidirektional (Einspeisung)" checked={bidi} onChange={setBidi} />
+          <ToggleRow label="Doppeltarif (HT/NT)" checked={dual} onChange={setDual} />
+          <TextField
+            label="Wandlerfaktor (optional)"
+            inputMode="numeric"
+            pattern="[0-9]*"
+            value={transformerFactor}
+            onChange={(e) => setTransformerFactor(e.target.value)}
+            hint="leer = kein Wandler; Verbräuche werden mit dem Faktor multipliziert."
+            numeric
+          />
+        </>
+      ) : null}
+
+      {type === 'heating' ? (
+        <>
           <Select
-            label="Standort"
-            value={locationId ?? ''}
-            onChange={(e) => setLocationId(e.target.value ? Number(e.target.value) : null)}
+            label="Energieträger"
+            value={heatingSource}
+            onChange={(e) => applyPreset(e.target.value as HeatingSource)}
           >
-            <option value="">— kein Standort —</option>
-            {locations.map((loc) => (
-              <option key={loc.id} value={loc.id}>
-                {loc.name}
+            {(Object.keys(HEATING_SOURCE_LABELS) as HeatingSource[]).map((s) => (
+              <option key={s} value={s}>
+                {HEATING_SOURCE_LABELS[s]}
               </option>
             ))}
           </Select>
           <TextField
-            label="Seriennummer"
-            value={serial}
-            onChange={(e) => setSerial(e.target.value)}
-            required
+            label="Tankvolumen / Vorratsmenge (optional)"
+            inputMode="decimal"
+            value={tankCapacity}
+            onChange={(e) => setTankCapacity(e.target.value)}
+            hint="für Prozent-Anzeige des Vorrats"
+            numeric
           />
-          <TextField
-            label="Eingebaut am"
-            type="date"
-            value={installedAt}
-            onChange={(e) => setInstalledAt(e.target.value)}
-            required
-          />
-          {type === 'electricity' ? (
-            <>
-              <ToggleRow label="Bidirektional (Einspeisung)" checked={bidi} onChange={setBidi} />
-              <ToggleRow label="Doppeltarif (HT/NT)" checked={dual} onChange={setDual} />
+          <RegisterDraftList registers={registers} onChange={setRegisters} />
+        </>
+      ) : null}
+
+      {error ? (
+        <div className="border-danger/40 bg-danger/10 rounded-card border-hairline p-3 text-caption text-danger">
+          {error}
+        </div>
+      ) : null}
+      <div className="flex gap-2">
+        <Button type="submit" variant="filled" fullWidth disabled={busy}>
+          {busy ? 'Speichere…' : 'Anlegen'}
+        </Button>
+        <Button type="button" variant="bordered" onClick={onBack}>
+          Abbrechen
+        </Button>
+      </div>
+    </form>
+  );
+}
+
+function RegisterDraftList({
+  registers,
+  onChange,
+}: {
+  registers: RegisterDraft[];
+  onChange: (rs: RegisterDraft[]) => void;
+}) {
+  function update(idx: number, patch: Partial<RegisterDraft>) {
+    onChange(registers.map((r, i) => (i === idx ? { ...r, ...patch } : r)));
+  }
+  function remove(idx: number) {
+    onChange(registers.filter((_, i) => i !== idx));
+  }
+  function add() {
+    onChange([
+      ...registers,
+      {
+        label: '',
+        unit: 'kWh',
+        accepts_deliveries: false,
+        initial_value: '',
+        max_value: '',
+      },
+    ]);
+  }
+  return (
+    <div className="space-y-2">
+      <div className="text-caption-bold uppercase text-tertiary">Register</div>
+      {registers.map((r, idx) => (
+        <div key={idx} className="space-y-2 rounded-card border-hairline border-border bg-fill p-3">
+          <div className="flex items-start gap-2">
+            <div className="flex-1 space-y-2">
               <TextField
-                label="Wandlerfaktor (optional)"
-                inputMode="numeric"
-                pattern="[0-9]*"
-                value={transformerFactor}
-                onChange={(e) => setTransformerFactor(e.target.value)}
-                hint="leer = kein Wandler; ganzzahlig (z. B. 20, 50, 100). Verbräuche werden mit dem Faktor multipliziert."
-                numeric
+                label="Label"
+                value={r.label}
+                onChange={(e) => update(idx, { label: e.target.value })}
+                required
               />
-            </>
-          ) : null}
-          {type === 'oil' ? (
-            <>
+              <Select
+                label="Einheit"
+                value={r.unit}
+                onChange={(e) => update(idx, { unit: e.target.value as HeatingUnit })}
+              >
+                {HEATING_UNITS.map((u) => (
+                  <option key={u} value={u}>
+                    {u}
+                  </option>
+                ))}
+              </Select>
+              <ToggleRow
+                label="Nachfüllbar (Lieferungen)"
+                checked={r.accepts_deliveries}
+                onChange={(v) => update(idx, { accepts_deliveries: v })}
+              />
               <TextField
-                label="Anfangs-Betriebsstunden"
+                label="Anfangsstand (optional)"
                 inputMode="decimal"
-                value={oilHours}
-                onChange={(e) => setOilHours(e.target.value)}
-                hint="leer = 0"
+                value={r.initial_value}
+                onChange={(e) => update(idx, { initial_value: e.target.value })}
                 numeric
               />
-              <TextField
-                label="Anfangs-Tankstand (Liter)"
-                inputMode="decimal"
-                value={oilTank}
-                onChange={(e) => setOilTank(e.target.value)}
-                hint="leer = nicht erfassen"
-                numeric
-              />
-              <TextField
-                label="Tankvolumen (Liter)"
-                inputMode="decimal"
-                value={tankCapacity}
-                onChange={(e) => setTankCapacity(e.target.value)}
-                hint="für Prozent-Anzeige; optional"
-                numeric
-              />
-            </>
-          ) : null}
-          {error ? (
-            <div className="border-danger/40 bg-danger/10 rounded-card border-hairline p-3 text-caption text-danger">
-              {error}
             </div>
-          ) : null}
-          <div className="flex gap-2">
-            <Button type="submit" variant="filled" fullWidth disabled={busy}>
-              {busy ? 'Speichere…' : 'Anlegen'}
-            </Button>
-            <Button type="button" variant="bordered" onClick={() => setOpen(false)}>
-              Abbrechen
-            </Button>
+            <button
+              type="button"
+              onClick={() => remove(idx)}
+              aria-label="Register entfernen"
+              className="hover:bg-danger/10 mt-1 flex h-7 w-7 items-center justify-center rounded-full text-danger transition-colors"
+            >
+              <Trash2 size={13} />
+            </button>
           </div>
-        </form>
-      )}
-    </Section>
+        </div>
+      ))}
+      <Button
+        type="button"
+        variant="bordered"
+        size="sm"
+        leftIcon={<Plus size={14} />}
+        onClick={add}
+      >
+        Register hinzufügen
+      </Button>
+    </div>
   );
 }
 

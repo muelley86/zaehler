@@ -1,6 +1,6 @@
 import { cx } from './cx';
 
-export type MeterType = 'electricity' | 'gas' | 'water' | 'oil';
+export type MeterType = 'electricity' | 'water' | 'heating';
 
 const META: Record<MeterType, { label: string; symbol: string; gradient: string; glow: string }> = {
   electricity: {
@@ -9,23 +9,17 @@ const META: Record<MeterType, { label: string; symbol: string; gradient: string;
     gradient: 'bg-type-electricity',
     glow: 'shadow-glow-electricity',
   },
-  gas: {
-    label: 'Gas',
-    symbol: '◉',
-    gradient: 'bg-type-gas',
-    glow: 'shadow-glow-gas',
-  },
   water: {
     label: 'Wasser',
     symbol: '◈',
     gradient: 'bg-type-water',
     glow: 'shadow-glow-water',
   },
-  oil: {
-    label: 'Heizöl',
+  heating: {
+    label: 'Heizung',
     symbol: '◆',
-    gradient: 'bg-type-oil',
-    glow: 'shadow-glow-oil',
+    gradient: 'bg-type-heating',
+    glow: 'shadow-glow-heating',
   },
 };
 

@@ -19,14 +19,9 @@ import { formatDateDe, formatDateTimeDe, formatDe, parseDe, toInputDateTime } fr
 import type { DeliveryRead, Me, MeasuringPointRead, MeterType, ReadingRead } from '@/lib/types';
 import { cx } from '@/components/ui/cx';
 
-type ItemKind = 'reading' | 'correction' | 'delivery';
+import { TYPE_LABELS } from '@/lib/meterLabels';
 
-const TYPE_LABELS: Record<MeterType, string> = {
-  electricity: 'Strom',
-  gas: 'Gas',
-  water: 'Wasser',
-  oil: 'Ölheizung',
-};
+type ItemKind = 'reading' | 'correction' | 'delivery';
 
 interface RegisterIndex {
   registerId: number;

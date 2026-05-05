@@ -5,12 +5,11 @@
  * jede Page den gleichen Boilerplate-Block schreiben muss.
  */
 
-const ACCENT_VARS: Record<'primary' | 'electricity' | 'gas' | 'water' | 'oil', string> = {
+const ACCENT_VARS: Record<'primary' | 'electricity' | 'water' | 'heating', string> = {
   primary: 'var(--primary)',
   electricity: 'var(--electricity)',
-  gas: 'var(--gas)',
   water: 'var(--water)',
-  oil: 'var(--oil)',
+  heating: 'var(--oil)',
 };
 
 export function PageGlows({
