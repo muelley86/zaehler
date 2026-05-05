@@ -10,6 +10,13 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.5.1](https://github.com/muelley86/zaehler/compare/v2.5.0...v2.5.1) (2026-05-05)
+
+
+### Dokumentation
+
+* **lxc:** Bootstrap-Anleitung für Container vor v2.3.0 ([#22](https://github.com/muelley86/zaehler/issues/22)) ([a1a54ad](https://github.com/muelley86/zaehler/commit/a1a54adb8d2d6f9978fcbc572725beea48467f88))
+
 ## [2.5.0](https://github.com/muelley86/zaehler/compare/v2.4.0...v2.5.0) (2026-05-05)
 
 
