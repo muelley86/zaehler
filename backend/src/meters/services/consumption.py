@@ -53,11 +53,7 @@ def consumption_for_register(
         deliveries = sorted(register.deliveries, key=lambda d: d.delivery_at)
         for prev, cur in _pairwise(sorted_readings):
             refilled = sum(
-                (
-                    d.amount
-                    for d in deliveries
-                    if prev.reading_at < d.delivery_at <= cur.reading_at
-                ),
+                (d.amount for d in deliveries if prev.reading_at < d.delivery_at <= cur.reading_at),
                 start=Decimal("0"),
             )
             delta = prev.value + refilled - cur.value
