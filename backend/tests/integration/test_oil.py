@@ -44,7 +44,11 @@ def test_create_delivery_and_listing(admin_client: TestClient) -> None:
 
     create = admin_client.post(
         f"/api/v1/registers/{tank_id}/deliveries",
-        json={"delivery_date": "2024-03-10", "amount": "1500.5", "note": "Lieferung Frühjahr"},
+        json={
+            "delivery_at": "2024-03-10T12:00:00",
+            "amount": "1500.5",
+            "note": "Lieferung Frühjahr",
+        },
     )
     assert create.status_code == 201, create.text
     body = create.json()
@@ -60,7 +64,7 @@ def test_delivery_only_on_accepting_register(admin_client: TestClient) -> None:
     hours_id: int = _registers(mp)["oil.hours"]["id"]
     resp = admin_client.post(
         f"/api/v1/registers/{hours_id}/deliveries",
-        json={"delivery_date": "2024-03-10", "amount": "1000"},
+        json={"delivery_at": "2024-03-10T12:00:00", "amount": "1000"},
     )
     assert resp.status_code == 400
 
@@ -70,7 +74,7 @@ def test_delete_delivery(admin_client: TestClient) -> None:
     tank_id: int = _registers(mp)["oil.tank"]["id"]
     created = admin_client.post(
         f"/api/v1/registers/{tank_id}/deliveries",
-        json={"delivery_date": "2024-03-10", "amount": "1000"},
+        json={"delivery_at": "2024-03-10T12:00:00", "amount": "1000"},
     ).json()
     resp = admin_client.delete(f"/api/v1/deliveries/{created['id']}")
     assert resp.status_code == 204
@@ -89,7 +93,7 @@ def test_oil_consumption_with_deliveries(admin_client: TestClient) -> None:
     )
     admin_client.post(
         f"/api/v1/registers/{tank_id}/deliveries",
-        json={"delivery_date": "2024-02-15", "amount": "1500"},
+        json={"delivery_at": "2024-02-15T12:00:00", "amount": "1500"},
     )
     admin_client.post(
         "/api/v1/readings",
@@ -129,7 +133,7 @@ def test_recorder_can_record_delivery(
     tank_id: int = _registers(mp)["oil.tank"]["id"]
     resp = recorder_client.post(
         f"/api/v1/registers/{tank_id}/deliveries",
-        json={"delivery_date": "2024-04-01", "amount": "500"},
+        json={"delivery_at": "2024-04-01T12:00:00", "amount": "500"},
     )
     assert resp.status_code == 201
 
@@ -138,10 +142,10 @@ def test_global_deliveries_listing_with_filters(admin_client: TestClient) -> Non
     mp = _create_oil(admin_client)
     tank_id: int = _registers(mp)["oil.tank"]["id"]
 
-    for d, amt in [("2024-02-15", "1500"), ("2024-04-15", "1200")]:
+    for d, amt in [("2024-02-15T12:00:00", "1500"), ("2024-04-15T12:00:00", "1200")]:
         admin_client.post(
             f"/api/v1/registers/{tank_id}/deliveries",
-            json={"delivery_date": d, "amount": amt},
+            json={"delivery_at": d, "amount": amt},
         )
     listing = admin_client.get("/api/v1/deliveries")
     assert listing.status_code == 200
@@ -149,7 +153,7 @@ def test_global_deliveries_listing_with_filters(admin_client: TestClient) -> Non
 
     filtered = admin_client.get("/api/v1/deliveries", params={"from_date": "2024-04-01"})
     assert len(filtered.json()) == 1
-    assert filtered.json()[0]["delivery_date"] == "2024-04-15"
+    assert filtered.json()[0]["delivery_at"] == "2024-04-15T12:00:00"
 
     by_mp = admin_client.get("/api/v1/deliveries", params={"measuring_point_id": mp["id"]})
     assert len(by_mp.json()) == 2
@@ -165,7 +169,7 @@ def test_state_includes_deliveries_after_last_reading(admin_client: TestClient) 
     )
     admin_client.post(
         f"/api/v1/registers/{tank_id}/deliveries",
-        json={"delivery_date": "2024-02-15", "amount": "1500"},
+        json={"delivery_at": "2024-02-15T12:00:00", "amount": "1500"},
     )
 
     resp = admin_client.get(f"/api/v1/measuring-points/{mp['id']}/state")
@@ -187,7 +191,7 @@ def test_state_after_new_reading_resets_refilled_since(admin_client: TestClient)
     )
     admin_client.post(
         f"/api/v1/registers/{tank_id}/deliveries",
-        json={"delivery_date": "2024-02-15", "amount": "1500"},
+        json={"delivery_at": "2024-02-15T12:00:00", "amount": "1500"},
     )
     admin_client.post(
         "/api/v1/readings",

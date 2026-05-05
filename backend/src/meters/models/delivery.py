@@ -7,11 +7,11 @@ Bestandsanzeige (``services.state``) ein.
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
-from sqlalchemy import ForeignKey, String
+from sqlalchemy import DateTime, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from meters.db import Base, TimestampMixin
@@ -31,7 +31,7 @@ class Delivery(Base, TimestampMixin):
     register_id: Mapped[int] = mapped_column(
         ForeignKey("register.id", ondelete="CASCADE"), nullable=False, index=True
     )
-    delivery_date: Mapped[date] = mapped_column(nullable=False, index=True)
+    delivery_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, index=True)
     amount: Mapped[Decimal] = mapped_column(DecimalText(32), nullable=False)
     note: Mapped[str | None] = mapped_column(String(500))
     created_by_user_id: Mapped[int | None] = mapped_column(

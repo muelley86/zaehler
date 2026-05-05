@@ -189,11 +189,11 @@ export function ReadingsListPage() {
       if (!info) continue;
       out.push({
         kind: 'delivery',
-        day: d.delivery_date,
-        date: d.delivery_date,
+        day: d.delivery_at.slice(0, 10),
+        date: d.delivery_at,
         info,
         delivery: d,
-        sortKey: `${d.delivery_date}T${d.created_at}-${String(d.id).padStart(8, '0')}`,
+        sortKey: `${d.delivery_at}-${String(d.id).padStart(8, '0')}`,
       });
     }
     out.sort((a, b) => b.sortKey.localeCompare(a.sortKey));
@@ -284,7 +284,7 @@ export function ReadingsListPage() {
         const d = item.delivery;
         lines.push(
           [
-            d.delivery_date,
+            d.delivery_at.replace('T', ' ').slice(0, 16),
             'Lieferung',
             info.mpName,
             info.locationName ?? '',
@@ -726,7 +726,7 @@ function DeliveryItem({
   async function remove() {
     if (
       !window.confirm(
-        `Lieferung vom ${delivery.delivery_date} (${info.mpName}, ${formatDe(delivery.amount)} ${info.unit}) wirklich löschen?`,
+        `Lieferung vom ${formatDateTimeDe(delivery.delivery_at)} (${info.mpName}, ${formatDe(delivery.amount)} ${info.unit}) wirklich löschen?`,
       )
     )
       return;
@@ -753,7 +753,7 @@ function DeliveryItem({
             </span>
           </div>
           <div className="text-caption text-tertiary">
-            <span className="num">{formatDateDe(delivery.delivery_date)}</span> · {info.label}
+            <span className="num">{formatDateTimeDe(delivery.delivery_at)}</span> · {info.label}
             {info.locationName ? ` · ${info.locationName}` : ''}
           </div>
           {delivery.note ? (
@@ -908,7 +908,7 @@ function DeliveryEditForm({
   onCancel: () => void;
 }) {
   const [amount, setAmount] = useState(delivery.amount.replace('.', ','));
-  const [date, setDate] = useState(delivery.delivery_date);
+  const [deliveryAt, setDeliveryAt] = useState(delivery.delivery_at.slice(0, 16));
   const [note, setNote] = useState(delivery.note ?? '');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -917,7 +917,10 @@ function DeliveryEditForm({
     setBusy(true);
     setError(null);
     try {
-      const body: Record<string, unknown> = { delivery_date: date, note: note || null };
+      const body: Record<string, unknown> = {
+        delivery_at: deliveryAt,
+        note: note || null,
+      };
       if (amount !== delivery.amount.replace('.', ',')) {
         body['amount'] = parseDe(amount);
       }
@@ -951,10 +954,10 @@ function DeliveryEditForm({
         numeric
       />
       <TextField
-        label="Lieferdatum"
-        type="date"
-        value={date}
-        onChange={(e) => setDate(e.target.value)}
+        label="Lieferzeitpunkt"
+        type="datetime-local"
+        value={deliveryAt}
+        onChange={(e) => setDeliveryAt(e.target.value)}
       />
       <TextField
         label="Notiz"

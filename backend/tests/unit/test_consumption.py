@@ -379,8 +379,20 @@ def test_oil_consumption_with_multiple_deliveries_in_period(db: Session) -> None
 
     tank = next(r for r in mp.physical_meters[0].registers if r.obis_code == "oil.tank")
     # Zwei Lieferungen zwischen den beiden Readings
-    db.add(Delivery(register_id=tank.id, delivery_date=date(2024, 2, 5), amount=Decimal("400")))
-    db.add(Delivery(register_id=tank.id, delivery_date=date(2024, 2, 20), amount=Decimal("250")))
+    db.add(
+        Delivery(
+            register_id=tank.id,
+            delivery_at=datetime(2024, 2, 5, 12, 0, 0),
+            amount=Decimal("400"),
+        )
+    )
+    db.add(
+        Delivery(
+            register_id=tank.id,
+            delivery_at=datetime(2024, 2, 20, 12, 0, 0),
+            amount=Decimal("250"),
+        )
+    )
     db.add(Reading(register_id=tank.id, value=Decimal("1300"), reading_at=datetime(2024, 3, 1)))
     db.commit()
     db.refresh(tank)
@@ -389,3 +401,52 @@ def test_oil_consumption_with_multiple_deliveries_in_period(db: Session) -> None
     assert len(points) == 1
     # Verbrauch = 1000 + 400 + 250 - 1300 = 350
     assert points[0].consumption == Decimal("350")
+
+
+def test_oil_consumption_same_day_reading_then_delivery_then_reading(db: Session) -> None:
+    """Lieferung und Reading am selben Tag — Reihenfolge per Zeitstempel.
+
+    Szenario: morgens Tankstand abgelesen, mittags Lieferung, abends erneut
+    abgelesen. Mit nur Datum (ohne Zeit) wäre die Lieferung weder dem ersten
+    noch dem zweiten Reading-Intervall zuzuordnen → falsche Bilanz.
+    """
+    mp = MeasuringPoint(name="Tank3", type=MeterType.OIL)
+    db.add(mp)
+    db.flush()
+    install_first_meter(
+        db,
+        measuring_point=mp,
+        serial_number="OIL-3",
+        installed_at=date(2024, 1, 1),
+        initial_values={"oil.hours": Decimal("0"), "oil.tank": Decimal("800")},
+        user_id=None,
+        ip_address=None,
+    )
+    db.commit()
+    db.refresh(mp)
+
+    tank = next(r for r in mp.physical_meters[0].registers if r.obis_code == "oil.tank")
+    # Initial = 800 am 2024-01-01 (Default-Zeit aus install_first_meter)
+    # Tag 2024-02-15: morgens 700, mittags Lieferung 1500, abends 2050
+    db.add(
+        Reading(register_id=tank.id, value=Decimal("700"), reading_at=datetime(2024, 2, 15, 8, 0))
+    )
+    db.add(
+        Delivery(
+            register_id=tank.id,
+            delivery_at=datetime(2024, 2, 15, 12, 0),
+            amount=Decimal("1500"),
+        )
+    )
+    db.add(
+        Reading(register_id=tank.id, value=Decimal("2050"), reading_at=datetime(2024, 2, 15, 18, 0))
+    )
+    db.commit()
+    db.refresh(tank)
+
+    points = consumption_for_register(tank)
+    consumptions = [p.consumption for p in points]
+    # Erstes Intervall (Initial 800 → 700, vor der Lieferung): Verbrauch 100.
+    # Zweites Intervall (700 → 2050, mit Lieferung 1500 dazwischen):
+    #   Verbrauch = 700 + 1500 - 2050 = 150.
+    assert consumptions == [Decimal("100"), Decimal("150")]

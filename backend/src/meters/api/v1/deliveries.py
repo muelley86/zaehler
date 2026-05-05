@@ -7,7 +7,7 @@ Erfassen darf jeder eingeloggte User; Bearbeiten/Löschen nur Admin.
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime, time
 
 from fastapi import APIRouter, Query, Request, status
 from sqlalchemy import select
@@ -31,7 +31,7 @@ def _to_read(d: Delivery) -> DeliveryRead:
     return DeliveryRead(
         id=d.id,
         register_id=d.register_id,
-        delivery_date=d.delivery_date,
+        delivery_at=d.delivery_at,
         amount=d.amount,
         note=d.note,
         created_at=d.created_at,
@@ -53,7 +53,7 @@ def list_deliveries(
         db.scalars(
             select(Delivery)
             .where(Delivery.register_id == register_id)
-            .order_by(Delivery.delivery_date.desc(), Delivery.id.desc())
+            .order_by(Delivery.delivery_at.desc(), Delivery.id.desc())
         )
     )
     return [_to_read(d) for d in rows]
@@ -69,7 +69,7 @@ def list_all_deliveries(
     to_date: date | None = Query(None),
     limit: int = Query(500, ge=1, le=5000),
 ) -> list[DeliveryRead]:
-    stmt = select(Delivery).order_by(Delivery.delivery_date.desc(), Delivery.id.desc())
+    stmt = select(Delivery).order_by(Delivery.delivery_at.desc(), Delivery.id.desc())
     if register_id is not None:
         stmt = stmt.where(Delivery.register_id == register_id)
     if measuring_point_id is not None:
@@ -79,9 +79,9 @@ def list_all_deliveries(
             .where(PhysicalMeter.measuring_point_id == measuring_point_id)
         )
     if from_date is not None:
-        stmt = stmt.where(Delivery.delivery_date >= from_date)
+        stmt = stmt.where(Delivery.delivery_at >= datetime.combine(from_date, time.min))
     if to_date is not None:
-        stmt = stmt.where(Delivery.delivery_date <= to_date)
+        stmt = stmt.where(Delivery.delivery_at <= datetime.combine(to_date, time.max))
     stmt = stmt.limit(limit)
     rows = list(db.scalars(stmt))
     return [_to_read(d) for d in rows]
@@ -110,7 +110,7 @@ def create_delivery(
         )
     delivery = Delivery(
         register_id=register.id,
-        delivery_date=payload.delivery_date,
+        delivery_at=payload.delivery_at,
         amount=payload.amount,
         note=payload.note,
         created_by_user_id=user.id,
@@ -125,7 +125,7 @@ def create_delivery(
         entity_id=delivery.id,
         diff={
             "register_id": register.id,
-            "delivery_date": payload.delivery_date.isoformat(),
+            "delivery_at": payload.delivery_at.isoformat(),
             "amount": format(payload.amount, "f"),
         },
         ip_address=client_ip(request),
@@ -147,12 +147,12 @@ def update_delivery(
     if delivery is None:
         raise ProblemError(status_code=404, title="Delivery not found")
     diff: dict[str, object] = {}
-    if payload.delivery_date is not None and payload.delivery_date != delivery.delivery_date:
-        diff["delivery_date"] = {
-            "from": delivery.delivery_date.isoformat(),
-            "to": payload.delivery_date.isoformat(),
+    if payload.delivery_at is not None and payload.delivery_at != delivery.delivery_at:
+        diff["delivery_at"] = {
+            "from": delivery.delivery_at.isoformat(),
+            "to": payload.delivery_at.isoformat(),
         }
-        delivery.delivery_date = payload.delivery_date
+        delivery.delivery_at = payload.delivery_at
     if payload.amount is not None and payload.amount != delivery.amount:
         diff["amount"] = {
             "from": format(delivery.amount, "f"),
@@ -195,7 +195,7 @@ def delete_delivery(
         entity_id=delivery.id,
         diff={
             "register_id": delivery.register_id,
-            "delivery_date": delivery.delivery_date.isoformat(),
+            "delivery_at": delivery.delivery_at.isoformat(),
             "amount": format(delivery.amount, "f"),
         },
         ip_address=client_ip(request),
