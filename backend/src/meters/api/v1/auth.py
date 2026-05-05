@@ -238,10 +238,9 @@ def change_password(
     record(
         db,
         user_id=user.id,
-        action=AuditAction.PASSWORD_RESET,
+        action=AuditAction.PASSWORD_CHANGED,
         entity_type=AuditEntityType.USER,
         entity_id=user.id,
-        diff={"self_change": True},
         ip_address=client_ip(request),
     )
     db.commit()

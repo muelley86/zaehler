@@ -29,7 +29,8 @@ class AuditAction(enum.StrEnum):
     LOGIN = "login"
     LOGIN_FAILED = "login_failed"
     LOGOUT = "logout"
-    PASSWORD_RESET = "password_reset"
+    PASSWORD_RESET = "password_reset"  # Admin setzt fremdes Passwort zurück
+    PASSWORD_CHANGED = "password_changed"  # User ändert eigenes Passwort
     METER_REPLACED = "meter_replaced"
     TOTP_ENABLED = "totp_enabled"
     TOTP_DISABLED = "totp_disabled"

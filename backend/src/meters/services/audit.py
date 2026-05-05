@@ -8,11 +8,34 @@ in einer Transaktion.
 
 from __future__ import annotations
 
+import json
 from typing import Any
 
 from sqlalchemy.orm import Session
 
 from meters.models import AuditAction, AuditEntityType, AuditLog
+
+# Soft-Limit für die JSON-Größe von ``diff``. Bei Überschreitung wird der
+# Inhalt durch einen Marker ersetzt — schützt vor DB-Bloat bei sehr großen
+# Bulk-Operationen oder Custom-Register-Listen.
+_DIFF_MAX_BYTES = 8 * 1024
+
+
+def _capped_diff(diff: dict[str, Any] | None) -> dict[str, Any] | None:
+    if diff is None:
+        return None
+    try:
+        encoded = json.dumps(diff, default=str)
+    except (TypeError, ValueError):
+        return {"_truncated": True, "reason": "not-json-serializable"}
+    if len(encoded.encode("utf-8")) <= _DIFF_MAX_BYTES:
+        return diff
+    return {
+        "_truncated": True,
+        "reason": "diff-too-large",
+        "original_bytes": len(encoded.encode("utf-8")),
+        "preview": encoded[:512],
+    }
 
 
 def record(
@@ -30,7 +53,7 @@ def record(
         action=action,
         entity_type=entity_type,
         entity_id=entity_id,
-        diff=diff,
+        diff=_capped_diff(diff),
         ip_address=ip_address,
     )
     db.add(entry)
