@@ -10,6 +10,13 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.4.0](https://github.com/muelley86/zaehler/compare/v2.3.1...v2.4.0) (2026-05-05)
+
+
+### Funktionen
+
+* **deliveries:** Zeitstempel statt nur Datum ([#16](https://github.com/muelley86/zaehler/issues/16)) ([7c4c156](https://github.com/muelley86/zaehler/commit/7c4c156dd8af29e2fe96340ef1b8c9949e9ccb8b))
+
 ## [2.3.1](https://github.com/muelley86/zaehler/compare/v2.3.0...v2.3.1) (2026-05-04)
 
 
