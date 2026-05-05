@@ -11,7 +11,7 @@ from datetime import date
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
-from sqlalchemy import JSON, ForeignKey, String
+from sqlalchemy import JSON, ForeignKey, Index, String, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from meters.db import Base, TimestampMixin
@@ -23,6 +23,17 @@ if TYPE_CHECKING:
 
 class PhysicalMeter(Base, TimestampMixin):
     __tablename__ = "physical_meter"
+    # Partieller UNIQUE-Index — pro MeasuringPoint nur ein Gerät mit
+    # removed_at IS NULL. DB-Garantie gegen parallele Zählertäusche, die
+    # zwei aktive Meter erzeugen würden.
+    __table_args__ = (
+        Index(
+            "uq_physical_meter_active_per_mp",
+            "measuring_point_id",
+            unique=True,
+            sqlite_where=text("removed_at IS NULL"),
+        ),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     measuring_point_id: Mapped[int] = mapped_column(

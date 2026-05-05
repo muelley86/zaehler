@@ -204,3 +204,37 @@ def test_replace_meter_marks_old_inactive_and_creates_new(admin_client: TestClie
     assert new["removed_at"] is None
     assert all(not r["is_active"] for r in old["registers"])
     assert all(r["is_active"] for r in new["registers"])
+
+
+def test_replace_meter_rolls_back_on_incomplete_finals(admin_client: TestClient) -> None:
+    """Atomarität: bei unvollständigen final_readings darf der alte Meter
+    nicht halb-deaktiviert sein, und es darf kein neuer Meter angelegt werden."""
+    mp = _create_electricity(admin_client)
+    mp_id = mp["id"]
+    old_meter = mp["physical_meters"][0]
+    old_register_ids = {r["id"] for r in old_meter["registers"]}
+
+    # Strom (bidirektional, kein Doppeltarif) hat zwei Register: 1.8.0 + 2.8.0.
+    # Wir liefern nur eines der beiden Endstände → Service muss 400 werfen
+    # (siehe meter_replacement._validate_finals).
+    resp = admin_client.post(
+        f"/api/v1/measuring-points/{mp_id}/replace-meter",
+        json={
+            "final_readings": {"1.8.0": "12999.9"},
+            "removed_at": "2025-06-30",
+            "new_serial_number": "SN-FAIL",
+            "installed_at": "2025-06-30",
+            "initial_readings": {"1.8.0": "0.0", "2.8.0": "0.0"},
+        },
+    )
+    assert resp.status_code == 400, resp.text
+
+    # Nach dem Fehler muss alles wie vorher sein:
+    after = admin_client.get(f"/api/v1/measuring-points/{mp_id}").json()
+    assert len(after["physical_meters"]) == 1, "Kein neuer Meter erlaubt"
+    only_meter = after["physical_meters"][0]
+    assert only_meter["removed_at"] is None, "Alter Meter darf nicht deaktiviert sein"
+    assert all(r["is_active"] for r in only_meter["registers"]), (
+        "Alle Register müssen weiter aktiv sein"
+    )
+    assert {r["id"] for r in only_meter["registers"]} == old_register_ids

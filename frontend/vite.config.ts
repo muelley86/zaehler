@@ -1,11 +1,61 @@
 import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
+import { VitePWA } from 'vite-plugin-pwa';
 import path from 'node:path';
 
 const BACKEND = process.env.VITE_DEV_API ?? 'http://localhost:8000';
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [
+    react(),
+    VitePWA({
+      registerType: 'autoUpdate',
+      // Manifest liegt schon unter public/ — wir lassen ihn da und
+      // referenzieren ihn nur, statt ihn doppelt zu generieren.
+      manifest: false,
+      // Workbox-Caching: assets per Precache, OSM/Esri-Tiles + API-GETs
+      // mit Runtime-Cache. Schreib-Endpoints werden NICHT gecached
+      // (siehe `dontCacheBustURLsMatching` und `urlPattern`-Filter).
+      workbox: {
+        globPatterns: ['**/*.{js,css,html,svg,png,woff,woff2}'],
+        navigateFallback: '/index.html',
+        navigateFallbackDenylist: [/^\/api\//],
+        runtimeCaching: [
+          {
+            urlPattern: /^https:\/\/.*\.tile\.openstreetmap\.org\/.*$/,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'osm-tiles',
+              expiration: { maxEntries: 200, maxAgeSeconds: 60 * 60 * 24 * 30 },
+            },
+          },
+          {
+            urlPattern: /^https:\/\/server\.arcgisonline\.com\/.*$/,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'esri-tiles',
+              expiration: { maxEntries: 200, maxAgeSeconds: 60 * 60 * 24 * 30 },
+            },
+          },
+          {
+            urlPattern: ({ url, request }) =>
+              url.pathname.startsWith('/api/') && request.method === 'GET',
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'api-get',
+              networkTimeoutSeconds: 5,
+              expiration: { maxEntries: 50, maxAgeSeconds: 60 * 5 },
+              cacheableResponse: { statuses: [200] },
+            },
+          },
+        ],
+      },
+      // Tests / Storybook brauchen den SW nicht — und `npm run dev` lädt
+      // ihn nur, wenn `devOptions.enabled=true`. Wir lassen ihn aus,
+      // damit dev und Tests deterministisch sind.
+      devOptions: { enabled: false },
+    }),
+  ],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, 'src'),

@@ -11,25 +11,8 @@
     <meta name="apple-mobile-web-app-title" content="Zählerstand" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <title>Zählerstand</title>
-    <script>
-      // Theme-Bootstrap vor React-Mount, um FOUC zu vermeiden.
-      // Folgt System-Setting; ein expliziter User-Toggle (Schritt 9) kann
-      // 'theme' im localStorage auf 'light' / 'dark' setzen, dann gewinnt das.
-      (function () {
-        var stored = null;
-        try {
-          stored = window.localStorage.getItem('theme');
-        } catch (e) {
-          /* private mode */
-        }
-        var isDark =
-          stored === 'dark' ||
-          (stored !== 'light' &&
-            window.matchMedia &&
-            window.matchMedia('(prefers-color-scheme: dark)').matches);
-        document.documentElement.classList.add(isDark ? 'dark' : 'light');
-      })();
-    </script>
+    <!-- Externes Theme-Bootstrap-Skript, damit CSP ohne 'unsafe-inline' auskommt. -->
+    <script src="/theme-bootstrap.js"></script>
   </head>
   <body>
     <div id="root"></div>

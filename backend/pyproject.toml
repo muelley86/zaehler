@@ -114,4 +114,8 @@ filterwarnings = [
     # HTTP_422_UNPROCESSABLE_ENTITY (FastAPI nutzt das intern).
     # Library-interna, kein eigener Code-Smell.
     "ignore:.*HTTP_422_UNPROCESSABLE_ENTITY.*:DeprecationWarning",
+    # Alembic 1.x warnt über fehlendes path_separator in alembic.ini
+    # (kommt erst ab 2.x als Pflicht). Externes Setting, kein eigener
+    # Bug.
+    "ignore:.*path_separator.*:DeprecationWarning",
 ]

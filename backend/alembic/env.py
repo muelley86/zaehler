@@ -43,6 +43,19 @@ def run_migrations_offline() -> None:
 
 
 def run_migrations_online() -> None:
+    # Tests können eine eigene Connection vorbeireichen
+    # (cfg.attributes["connection"]); dann nicht selbst eine Engine bauen.
+    existing_conn = config.attributes.get("connection")
+    if existing_conn is not None:
+        context.configure(
+            connection=existing_conn,
+            target_metadata=target_metadata,
+            render_as_batch=True,
+        )
+        with context.begin_transaction():
+            context.run_migrations()
+        return
+
     connectable = engine_from_config(
         config.get_section(config.config_ini_section, {}),
         prefix="sqlalchemy.",
