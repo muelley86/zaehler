@@ -10,6 +10,14 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.7.1](https://github.com/muelley86/zaehler/compare/v2.7.0...v2.7.1) (2026-05-06)
+
+
+### Performance
+
+* iOS-Layout, Eingabe-Performance, Asset-Compression & -Caching ([2d67d6e](https://github.com/muelley86/zaehler/commit/2d67d6e3bf8b64b713c95cf121ecd040ba28bbf3))
+* Memo-Layer, Search-Debounce, Vendor-Chunks, Latin-Fonts, Slow-Query-Log ([797e850](https://github.com/muelley86/zaehler/commit/797e850cde010f92727b15676ad0defb006be46d))
+
 ## [2.7.0](https://github.com/muelley86/zaehler/compare/v2.6.3...v2.7.0) (2026-05-06)
 
 
