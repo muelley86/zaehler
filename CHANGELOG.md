@@ -10,6 +10,23 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.9.0](https://github.com/muelley86/zaehler/compare/v2.8.3...v2.9.0) (2026-05-06)
+
+
+### Funktionen
+
+* **backend:** Datenmodell und Migration für Per-Recorder-MP-Zugriff ([a099796](https://github.com/muelley86/zaehler/commit/a099796a288c6385fd72aaee8bb0943775786567))
+* **backend:** Read-Endpoints filtern + dump.json admin-only ([78f79fe](https://github.com/muelley86/zaehler/commit/78f79fec4369495d7ac2ac023e3e8207f74f0d63))
+* **backend:** Service-Layer für MP-Zugriff (accessible_mp_ids, restrict_mp_query) ([336836a](https://github.com/muelley86/zaehler/commit/336836a9693209dc77d7643f758d3ba66364a6db))
+* **backend:** Verwaltungs-Endpoints für MP-Zugriff ([8e286fc](https://github.com/muelley86/zaehler/commit/8e286fc8852f6abce89afd6cf1a342ef60f3d4af))
+* **frontend:** MpAccessCard zeigt User mit MP-Zugriff (read-only) ([f4f81c6](https://github.com/muelley86/zaehler/commit/f4f81c6e0c8a33aa94027057f30b3e879a4afec7))
+* **frontend:** UserAccessSheet für MP-Zugriffsverwaltung ([3964585](https://github.com/muelley86/zaehler/commit/396458545274d922cab1a400d58e11b90f6d241e))
+
+
+### Dokumentation
+
+* Per-Recorder MP-Zugriff in CLAUDE.md beschreiben ([b0cf81e](https://github.com/muelley86/zaehler/commit/b0cf81ef25195088e0bbd90c0309fd9f71737d6c))
+
 ## [2.8.3](https://github.com/muelley86/zaehler/compare/v2.8.2...v2.8.3) (2026-05-06)
 
 
