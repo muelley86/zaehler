@@ -1,11 +1,9 @@
 from __future__ import annotations
 
-from datetime import datetime
-
 from pydantic import BaseModel, Field
 
 from meters.models import UserRole
-from meters.schemas.common import APIModel
+from meters.schemas.common import APIModel, UtcDateTime
 
 
 class LoginRequest(BaseModel):
@@ -26,7 +24,7 @@ class MeResponse(APIModel):
     is_active: bool
     force_password_change: bool
     totp_enabled: bool
-    last_login_at: datetime | None
+    last_login_at: UtcDateTime | None
 
 
 class LoginResponse(BaseModel):

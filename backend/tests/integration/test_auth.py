@@ -320,6 +320,28 @@ def test_2fa_challenge_bound_to_user_agent(admin_client: TestClient) -> None:
     assert bad.status_code == 401, bad.text
 
 
+def test_datetimes_serialized_as_utc_with_z_suffix(
+    admin_client: TestClient, admin_user: User
+) -> None:
+    """Server-erzeugte Zeitstempel müssen mit ``Z`` enden, sonst interpretiert
+    der Browser sie als lokale Zeit (ES2017) und die Anzeige ist um den UTC-
+    Offset verschoben."""
+    me = admin_client.get("/api/v1/auth/me")
+    assert me.status_code == 200
+    last_login = me.json()["last_login_at"]
+    assert isinstance(last_login, str)
+    assert last_login.endswith("Z"), last_login
+
+    users = admin_client.get("/api/v1/users")
+    assert users.status_code == 200
+    rows = users.json()
+    assert rows
+    for row in rows:
+        assert row["created_at"].endswith("Z"), row
+        if row["last_login_at"] is not None:
+            assert row["last_login_at"].endswith("Z"), row
+
+
 def test_login_blocked_for_inactive_user(client: TestClient, db: Session) -> None:
     """Deaktivierter User (is_active=False) darf nicht einloggen — auch nicht
     mit korrektem Passwort."""

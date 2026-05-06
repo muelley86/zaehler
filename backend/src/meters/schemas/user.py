@@ -1,11 +1,9 @@
 from __future__ import annotations
 
-from datetime import datetime
-
 from pydantic import BaseModel, EmailStr, Field
 
 from meters.models import UserRole
-from meters.schemas.common import APIModel
+from meters.schemas.common import APIModel, UtcDateTime
 
 
 class UserCreate(BaseModel):
@@ -28,8 +26,8 @@ class UserRead(APIModel):
     role: UserRole
     is_active: bool
     force_password_change: bool
-    created_at: datetime
-    last_login_at: datetime | None
+    created_at: UtcDateTime
+    last_login_at: UtcDateTime | None
 
 
 class PasswordResetRequest(BaseModel):

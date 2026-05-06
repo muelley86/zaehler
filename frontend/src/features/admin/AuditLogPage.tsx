@@ -7,6 +7,26 @@ import { formatDateDe } from '@/lib/format';
 import type { AuditLogRead } from '@/lib/types';
 import { cx } from '@/components/ui/cx';
 
+const timeFmt = new Intl.DateTimeFormat('de-DE', {
+  hour: '2-digit',
+  minute: '2-digit',
+  second: '2-digit',
+});
+
+/** Lokaler ISO-Datumsteil (YYYY-MM-DD) eines ISO-Strings — fällt bei
+ * Parse-Fehler auf die ersten 10 Zeichen des Inputs zurück. */
+function localIsoDay(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso.slice(0, 10);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+function formatLocalTime(iso: string): string {
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? iso : timeFmt.format(d);
+}
+
 const ACTION_TONES: Record<string, string> = {
   create: 'bg-success/15 text-success',
   update: 'bg-primary-soft text-primary-deep',
@@ -40,7 +60,7 @@ export function AuditLogPage() {
     if (!rows) return [];
     const map = new Map<string, AuditLogRead[]>();
     for (const r of rows) {
-      const day = r.created_at.slice(0, 10);
+      const day = localIsoDay(r.created_at);
       const list = map.get(day) ?? [];
       list.push(r);
       map.set(day, list);
@@ -89,7 +109,7 @@ export function AuditLogPage() {
                         {r.action}
                       </span>
                       <div className="num text-caption text-tertiary">
-                        {r.created_at.replace('T', ' ').slice(11, 19)}
+                        {formatLocalTime(r.created_at)}
                       </div>
                     </div>
                     <div className="mt-1.5 text-body text-label">

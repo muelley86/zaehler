@@ -15,6 +15,7 @@ import {
 } from '@/components/ui';
 import { PageGlows } from '@/components/PageGlows';
 import { ApiError, api } from '@/lib/api';
+import { formatDateTimeDe } from '@/lib/format';
 import type { UserRead, UserRole } from '@/lib/types';
 import { cx } from '@/components/ui/cx';
 
@@ -226,7 +227,7 @@ function UserRow({ user, onChanged }: { user: UserRead; onChanged: () => void })
         <span className="text-body-sm text-secondary">{user.is_active ? 'Aktiv' : 'Inaktiv'}</span>
       </div>
       <div className="num text-caption text-secondary">
-        {user.last_login_at ? user.last_login_at.slice(0, 16).replace('T', ' ') : '—'}
+        {user.last_login_at ? formatDateTimeDe(user.last_login_at) : '—'}
       </div>
       <Button
         variant="plain"
@@ -280,9 +281,7 @@ function UserListItem({ user, onChanged }: { user: UserRead; onChanged: () => vo
             <StatusDot active={user.is_active} />
             <span>{user.is_active ? 'Aktiv' : 'Inaktiv'}</span>
             <span>·</span>
-            <span>
-              Login: {user.last_login_at ? user.last_login_at.slice(0, 16).replace('T', ' ') : '—'}
-            </span>
+            <span>Login: {user.last_login_at ? formatDateTimeDe(user.last_login_at) : '—'}</span>
           </div>
           {user.force_password_change ? (
             <div className="mt-1 text-caption font-semibold text-danger">

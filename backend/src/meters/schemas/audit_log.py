@@ -1,10 +1,9 @@
 from __future__ import annotations
 
-from datetime import datetime
 from typing import Any
 
 from meters.models import AuditAction, AuditEntityType
-from meters.schemas.common import APIModel
+from meters.schemas.common import APIModel, UtcDateTime
 
 
 class AuditLogRead(APIModel):
@@ -15,4 +14,4 @@ class AuditLogRead(APIModel):
     entity_id: int | None
     diff: dict[str, Any] | None
     ip_address: str | None
-    created_at: datetime
+    created_at: UtcDateTime
