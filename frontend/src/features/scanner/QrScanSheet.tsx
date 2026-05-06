@@ -107,7 +107,13 @@ export function QrScanSheet({ open, onClose }: QrScanSheetProps) {
             // useEffect-Cleanup räumt parallel auf. Wir warten nicht auf
             // ``stop()``, damit der UX-Übergang sofort passiert.
             void teardown();
-            navigateRef.current(`/erfassen?mp=${result.mp}`);
+            // Token-Pfad: zur Erfassungsmaske mit ?token=, dort wird per
+            // resolve aufgelöst. Legacy-MP-Pfad: direkt mit ?mp=.
+            const target =
+              result.kind === 'token'
+                ? `/erfassen?token=${result.token}`
+                : `/erfassen?mp=${result.mp}`;
+            navigateRef.current(target);
             onCloseRef.current();
           },
           () => {

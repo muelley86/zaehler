@@ -1,32 +1,36 @@
 /**
- * Pure Helper: extrahiert die Messstellen-ID aus dem dekodierten QR-Inhalt.
+ * Pure Helper: extrahiert MP-ID oder Token aus dem dekodierten QR-Inhalt.
  *
- * Akzeptiert:
- * - vollständige URLs (``https://host/erfassen?mp=42``)
- * - Pfade (``/erfassen?mp=42``)
+ * Akzeptierte Formate:
+ * - ``…/erfassen?token=K7MP3X9F`` (neu, Token-Verheiratung) — bevorzugt
+ * - ``…/erfassen?mp=42`` (Legacy, Direkt-URL — kommt nur noch von alten
+ *   Etiketten vor; wir generieren das nicht mehr)
  *
- * Liefert ``null``, wenn der Inhalt keine gültige MP-ID enthält. Das ruft
- * den Aufrufer (QrScanSheet) dazu auf, dem User eine "ungültiger Code"-
- * Meldung zu zeigen, statt blind eine Navigation auszulösen.
+ * Sowohl absolute URLs als auch reine Pfade sind erlaubt.
  *
- * Sicherheits-Invariante: Wir verwenden nur ``mp`` aus der Query und liefern
- * nie einen Cross-Origin-Hostname zurück — der Aufrufer navigiert immer auf
- * dieselbe App-Origin.
+ * Liefert ``null``, wenn der Inhalt nicht passt — der Aufrufer
+ * (:file:`QrScanSheet.tsx`) zeigt dann implizit "weiter scannen", bis ein
+ * gültiger Code im Sucher landet.
+ *
+ * Sicherheits-Invariante: Wir verwenden ausschließlich ``mp`` bzw. ``token``
+ * aus der Query und liefern nie einen Cross-Origin-Hostname zurück — der
+ * Aufrufer navigiert immer auf dieselbe App-Origin.
  */
 
-export interface ScannedMeasuringPoint {
-  mp: number;
-}
+export type ScannedQr = { kind: 'mp'; mp: number } | { kind: 'token'; token: string };
 
-export function parseScannedUrl(decoded: string): ScannedMeasuringPoint | null {
+// Crockford-Base32-Alphabet (8 Zeichen). Wir akzeptieren beim Scan auch
+// Kleinbuchstaben für Robustheit (manche Scanner normalisieren), normalisieren
+// aber später zu Großschreibung.
+const TOKEN_RE = /^[0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{8}$/;
+
+export function parseScannedUrl(decoded: string): ScannedQr | null {
   const text = decoded.trim();
   if (text === '') return null;
 
   let pathname: string;
   let search: string;
   try {
-    // Absolut: zweiter Parameter wird ignoriert. Relativ: brauchen wir
-    // eine Base-URL, damit ``new URL`` nicht wirft.
     const url = /^[a-z][a-z0-9+.-]*:\/\//i.test(text)
       ? new URL(text)
       : new URL(text, 'https://placeholder.invalid');
@@ -36,16 +40,26 @@ export function parseScannedUrl(decoded: string): ScannedMeasuringPoint | null {
     return null;
   }
 
-  // Nur exakter Pfad ``/erfassen`` (Trailing-Slash ist erlaubt). Defensiv
-  // gegen freaky decoded Inhalte wie ``/erfassen2`` oder ``/admin/erfassen``.
   const normalized = pathname.replace(/\/+$/, '') || '/';
   if (normalized !== '/erfassen') return null;
 
   const params = new URLSearchParams(search);
-  const raw = params.get('mp');
-  if (raw === null) return null;
 
-  const id = Number.parseInt(raw, 10);
-  if (!Number.isFinite(id) || id <= 0 || String(id) !== raw.trim()) return null;
-  return { mp: id };
+  // Token hat Vorrang vor MP — wenn beide vorhanden sind, gewinnt der Token
+  // (das ist der neue Pfad, MP ist Legacy).
+  const tokenRaw = params.get('token');
+  if (tokenRaw !== null) {
+    const trimmed = tokenRaw.trim();
+    if (!TOKEN_RE.test(trimmed)) return null;
+    return { kind: 'token', token: trimmed.toUpperCase() };
+  }
+
+  const mpRaw = params.get('mp');
+  if (mpRaw !== null) {
+    const id = Number.parseInt(mpRaw, 10);
+    if (!Number.isFinite(id) || id <= 0 || String(id) !== mpRaw.trim()) return null;
+    return { kind: 'mp', mp: id };
+  }
+
+  return null;
 }

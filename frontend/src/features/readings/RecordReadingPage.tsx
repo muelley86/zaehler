@@ -20,6 +20,7 @@ import { describeMeterType } from '@/lib/meterLabels';
 import type {
   DeliveryRead,
   MeasuringPointRead,
+  QrTokenResolveResponse,
   ReadingRead,
   RegisterRead,
   RegisterStateRead,
@@ -30,6 +31,9 @@ import { cx } from '@/components/ui/cx';
 // nur beim ersten Tap auf "Scannen" tatsächlich geladen.
 const QrScanSheet = lazy(() =>
   import('@/features/scanner/QrScanSheet').then((m) => ({ default: m.QrScanSheet })),
+);
+const TokenAssignSheet = lazy(() =>
+  import('@/features/scanner/TokenAssignSheet').then((m) => ({ default: m.TokenAssignSheet })),
 );
 
 type Mode = 'reading' | 'delivery';
@@ -59,11 +63,13 @@ export function RecordReadingPage() {
 
   const [mpId, setMpId] = useState<number | null>(null);
   const [mode, setMode] = useState<Mode>('reading');
-  // QR-/URL-Param-Hinweis ("?mp=42 nicht gefunden"). Einmaliger Toast,
-  // der nach Anzeige automatisch verworfen wird, damit er beim nächsten
-  // MP-Wechsel nicht erneut feuert.
+  // QR-/URL-Param-Hinweis ("?mp=42 nicht gefunden" oder Token-Probleme).
+  // Einmaliger Toast, der nach Anzeige automatisch verworfen wird.
   const [paramWarning, setParamWarning] = useState<string | null>(null);
   const [scannerOpen, setScannerOpen] = useState(false);
+  // Sheet zum Zuordnen eines noch unzugeordneten Tokens (für Admin und
+  // Recorder mit can_assign_qr_tokens-Flag).
+  const [assignToken, setAssignToken] = useState<string | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
 
   useEffect(() => {
@@ -98,7 +104,42 @@ export function RecordReadingPage() {
     refreshStates(points);
   }, [points]);
 
-  // MP-Auswahl: URL-Param ?mp= hat IMMER Priorität (auch wenn die User schon
+  // Token-Pfad: wenn ?token=X gesetzt ist, beim Backend auflösen.
+  // - assigned MP → setMpId, URL aufräumen
+  // - unassigned + can_assign → Assign-Modal öffnen, URL aufräumen
+  // - unassigned + !can_assign → Hinweis "Bitte Admin um Zuordnung bitten"
+  // - 404 → Hinweis "ungültiger QR-Code"
+  useEffect(() => {
+    const tokenParam = searchParams.get('token');
+    if (tokenParam === null) return;
+
+    const next = new URLSearchParams(searchParams);
+    next.delete('token');
+
+    api
+      .get<QrTokenResolveResponse>(`/qr-tokens/${tokenParam}/resolve`)
+      .then((resolved) => {
+        if (resolved.measuring_point_id !== null) {
+          setMpId(resolved.measuring_point_id);
+        } else if (resolved.can_assign) {
+          setAssignToken(tokenParam);
+        } else {
+          setParamWarning(
+            'Dieser QR-Code ist noch keiner Messstelle zugeordnet — bitte den Admin um die Zuordnung bitten.',
+          );
+        }
+      })
+      .catch((err: unknown) => {
+        if (err instanceof ApiError && err.status === 404) {
+          setParamWarning('Ungültiger QR-Code — keine Zuordnung gefunden.');
+        } else {
+          setParamWarning('QR-Code konnte nicht aufgelöst werden.');
+        }
+      })
+      .finally(() => setSearchParams(next, { replace: true }));
+  }, [searchParams, setSearchParams]);
+
+  // MP-Auswahl: URL-Param ?mp= hat IMMER Priorität (auch wenn der User schon
   // eine andere MP gewählt hat — typisch nach einem QR-Scan, der per
   // navigate() den Param setzt während wir bereits auf /erfassen sind).
   // Der Param wird nach Anwendung aus der URL entfernt, damit er beim
@@ -266,6 +307,19 @@ export function RecordReadingPage() {
         <Suspense fallback={null}>
           {scannerOpen ? (
             <QrScanSheet open={scannerOpen} onClose={handleScannerClose} />
+          ) : null}
+        </Suspense>
+        <Suspense fallback={null}>
+          {assignToken !== null ? (
+            <TokenAssignSheet
+              token={assignToken}
+              measuringPoints={recordableMPs}
+              onAssigned={(mpAssignedId) => {
+                setMpId(mpAssignedId);
+                setAssignToken(null);
+              }}
+              onClose={() => setAssignToken(null)}
+            />
           ) : null}
         </Suspense>
       </div>

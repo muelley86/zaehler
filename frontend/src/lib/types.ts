@@ -21,6 +21,7 @@ export interface Me {
   is_active: boolean;
   force_password_change: boolean;
   totp_enabled: boolean;
+  can_assign_qr_tokens: boolean;
   last_login_at: string | null;
 }
 
@@ -169,4 +170,21 @@ export interface MpAccessUserRead {
   username: string;
   role: UserRole;
   source: 'admin' | 'grant';
+}
+
+// QR-Token-Verheiratung (Feature A)
+export interface QrTokenRead {
+  id: number;
+  token: string;
+  measuring_point_id: number | null;
+  measuring_point_name: string | null;
+  created_at: string;
+  created_by_user_id: number;
+  assigned_at: string | null;
+  assigned_by_user_id: number | null;
+}
+
+export interface QrTokenResolveResponse {
+  measuring_point_id: number | null;
+  can_assign: boolean;
 }
