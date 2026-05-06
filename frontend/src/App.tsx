@@ -49,6 +49,9 @@ const LocationsAdminPage = lazy(() =>
 const AuditLogPage = lazy(() =>
   import('@/features/admin/AuditLogPage').then((m) => ({ default: m.AuditLogPage })),
 );
+const QrCodesAdminPage = lazy(() =>
+  import('@/features/admin/QrCodesAdminPage').then((m) => ({ default: m.QrCodesAdminPage })),
+);
 const MorePage = lazy(() =>
   import('@/features/more/MorePage').then((m) => ({ default: m.MorePage })),
 );
@@ -132,6 +135,14 @@ export function App() {
             element={
               <AdminOnly>
                 <AuditLogPage />
+              </AdminOnly>
+            }
+          />
+          <Route
+            path="/qr-codes"
+            element={
+              <AdminOnly>
+                <QrCodesAdminPage />
               </AdminOnly>
             }
           />

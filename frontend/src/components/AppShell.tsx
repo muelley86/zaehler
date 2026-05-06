@@ -20,6 +20,7 @@ import {
   MoreHorizontal,
   PencilLine,
   Plus,
+  QrCode,
   ScrollText,
   Settings,
   Users,
@@ -54,6 +55,7 @@ const ADMIN_NAV: NavItem[] = [
   { to: '/messstellen', label: 'Messstellen', icon: <Gauge size={18} /> },
   { to: '/standorte', label: 'Standorte', icon: <MapPin size={18} /> },
   { to: '/benutzer', label: 'Benutzer', icon: <Users size={18} /> },
+  { to: '/qr-codes', label: 'QR-Codes', icon: <QrCode size={18} /> },
   { to: '/audit', label: 'Audit', icon: <ScrollText size={18} /> },
 ];
 
