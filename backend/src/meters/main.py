@@ -21,7 +21,7 @@ from meters.api import router as api_router
 from meters.core.config import assert_secure_secret_key, settings
 from meters.core.logging import configure_logging
 from meters.core.middleware import install_origin_check, install_security_headers
-from meters.core.problem import install_problem_handlers
+from meters.core.problem import ProblemError, install_problem_handlers
 
 
 # Cache-Header für die von Vite gehashten Bundle-Dateien unter /assets.
@@ -76,8 +76,22 @@ def _mount_static(app: FastAPI, static_dir: Path) -> None:
 
     @app.get("/{full_path:path}", include_in_schema=False)
     def spa_fallback(full_path: str) -> Response:
-        # API-Pfade gehen schon vorher in den API-Router; hier landen nur
-        # Frontend-Routen oder echte Static-Files (z. B. manifest, icons).
+        # Die Catch-All-Route greift auch für GET-Requests auf unbekannte
+        # API-Pfade — FastAPI hat keinen eingebauten "match nur Nicht-API"-
+        # Filter. Würden wir unbeschadet durchfallen, käme für
+        # ``GET /api/v1/foo-existiert-nicht`` die index.html als 200 OK
+        # zurück (und API-Clients würden sich darüber wundern, warum sie
+        # HTML zurückbekommen). Daher: alles unter ``api/`` explizit als
+        # RFC-7807-404 ablehnen, das passt zum Format der echten
+        # API-Routen.
+        if full_path.startswith("api/"):
+            raise ProblemError(
+                status_code=404,
+                title="Not Found",
+                detail=f"Unbekannter API-Pfad: /{full_path}",
+            )
+        # Echte Static-Files (manifest, sw.js, icons, …) werden direkt
+        # ausgeliefert. Alles andere ist eine Client-Route → index.html.
         candidate = static_dir / full_path
         if full_path and candidate.is_file():
             response = FileResponse(candidate)
