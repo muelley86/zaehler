@@ -10,6 +10,13 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.8.2](https://github.com/muelley86/zaehler/compare/v2.8.1...v2.8.2) (2026-05-06)
+
+
+### Fehlerbehebungen
+
+* **test:** TS-Narrowing im QrScanSheet-Test umgehen ([ab84152](https://github.com/muelley86/zaehler/commit/ab84152bbdf408bbeeca6bedc733386fe1350592))
+
 ## [2.8.1](https://github.com/muelley86/zaehler/compare/v2.8.0...v2.8.1) (2026-05-06)
 
 
