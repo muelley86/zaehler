@@ -10,6 +10,28 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.10.0](https://github.com/muelley86/zaehler/compare/v2.9.0...v2.10.0) (2026-05-06)
+
+
+### Funktionen
+
+* **backend:** Datenmodell für QR-Token-Verheiratung + can_assign-Flag ([332ca86](https://github.com/muelley86/zaehler/commit/332ca868f245098958339aeb6f5bbf368d8e56b7))
+* **backend:** QR-Token-Endpoints + can_assign-Flag in User-API ([bfb30c6](https://github.com/muelley86/zaehler/commit/bfb30c6e55f543a8a0beb9956042f79625fe4499))
+* **backend:** Service-Layer für QR-Tokens (Crockford-Base32, 8 Zeichen) ([49b14ab](https://github.com/muelley86/zaehler/commit/49b14ab21e1c8d808a87889c09e4883b147bdd02))
+* **frontend:** Admin-Page /qr-codes mit Bulk-Create und Bulk-Druck ([4c8b957](https://github.com/muelley86/zaehler/commit/4c8b9573e5314b03fb0d4ecfb8d95124ef5adec3))
+* **frontend:** QrCodeCard auf Token-Pfad umgebaut + can_assign-Switch ([cc229cd](https://github.com/muelley86/zaehler/commit/cc229cdb027a7efd5b172ffb9b3f80dfb8eedcd6))
+* **frontend:** Scanner unterstützt Token-Pfad zusätzlich zu Legacy-MP ([e30436f](https://github.com/muelley86/zaehler/commit/e30436f9dc7b136a95118ffa1734287fe6836899))
+
+
+### Fehlerbehebungen
+
+* **migration:** can_assign_qr_tokens ohne batch_alter_table erzeugen ([8658f14](https://github.com/muelley86/zaehler/commit/8658f1439f0d5fd6ac51fa50904332b72c94eb27))
+
+
+### Dokumentation
+
+* QR-Token-Verheiratung und can_assign-Flag in CLAUDE.md ([2f14c47](https://github.com/muelley86/zaehler/commit/2f14c478ca67ec4e138543d7c42040525098673b))
+
 ## [2.9.0](https://github.com/muelley86/zaehler/compare/v2.8.3...v2.9.0) (2026-05-06)
 
 
