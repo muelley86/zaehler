@@ -59,7 +59,8 @@
       "Bash(pnpm install *)",
       "Bash(pnpm lint *)",
       "Bash(pnpm build *)",
-      "Bash(pnpm test *)"
+      "Bash(pnpm test *)",
+      "Bash(gh auth *)"
     ]
   }
 }

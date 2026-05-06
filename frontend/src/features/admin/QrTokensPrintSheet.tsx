@@ -7,9 +7,14 @@
  *    und Messstellen-Namen. Default — die Etiketten werden ausgeschnitten
  *    und auf den Zähler geklebt.
  * 2. ``avery-l4731rev`` — Avery Zweckform L4731REV, 25,4 × 10 mm, 7×27
- *    = 189 Etiketten pro Bogen.
+ *    = 189 Etiketten pro Bogen. Nur QR-Code, keine Beschriftung.
  * 3. ``avery-3320`` — Avery Zweckform 3320 / „32×10-R", 32 × 10 mm,
- *    4×11 = 44 Etiketten pro Bogen.
+ *    4×11 = 44 Etiketten pro Bogen. Nur QR-Code, keine Beschriftung.
+ *
+ * Auf den Avery-Bögen (10 mm Höhe) wird der QR als 10 × 10 mm Quadrat
+ * mittig zentriert. Die menschenlesbare Token-Bezeichnung („K7MP3X9F")
+ * wird bewusst weggelassen — auf dieser Etikettengröße kostet sie Platz
+ * ohne echten Mehrwert (zur Identifikation reicht der QR-Scan).
  *
  * Pattern: neues Fenster, HTML schreiben, ``window.print()`` triggern.
  * Wichtig: KEIN ``noopener`` beim ``window.open`` — sonst liefert der Call
@@ -91,7 +96,7 @@ export const DEFAULT_LAYOUTS: Record<LabelLayoutId, LabelLayout> = {
   'avery-l4731rev': {
     id: 'avery-l4731rev',
     name: 'Avery L4731REV',
-    description: '25,4 × 10 mm, 7 × 27 = 189/Bogen',
+    description: '25,4 × 10 mm, 7 × 27 = 189/Bogen — nur QR, ohne Beschriftung',
     pageWidthMm: 210,
     pageHeightMm: 297,
     cols: 7,
@@ -103,13 +108,13 @@ export const DEFAULT_LAYOUTS: Record<LabelLayoutId, LabelLayout> = {
     labelWidthMm: 25.4,
     labelHeightMm: 10,
     showCutBorder: false,
-    showLabelText: true,
-    qrPlacement: 'left-with-text-right',
+    showLabelText: false,
+    qrPlacement: 'center-only',
   },
   'avery-3320': {
     id: 'avery-3320',
     name: 'Avery 3320 / 32×10-R',
-    description: '32 × 10 mm, 4 × 11 = 44/Bogen',
+    description: '32 × 10 mm, 4 × 11 = 44/Bogen — nur QR, ohne Beschriftung',
     pageWidthMm: 210,
     pageHeightMm: 297,
     cols: 4,
@@ -122,8 +127,8 @@ export const DEFAULT_LAYOUTS: Record<LabelLayoutId, LabelLayout> = {
     labelWidthMm: 32,
     labelHeightMm: 10,
     showCutBorder: false,
-    showLabelText: true,
-    qrPlacement: 'left-with-text-right',
+    showLabelText: false,
+    qrPlacement: 'center-only',
   },
 };
 
@@ -295,8 +300,15 @@ function buildPrintHtml(tokens: QrTokenRead[], layout: LabelLayout): string {
     white-space: nowrap;
   }
 
-  /* Layout: QR füllt das gesamte Etikett */
-  .label .qr-fill { width: 100%; height: 100%; }
+  /* Layout: nur QR — quadratisch, in der Etikettenmitte zentriert.
+     Bei Landscape-Etiketten (32×10, 25,4×10) ist die kürzere Seite die
+     Höhe, also wird der QR auf Etiketten-Höhe begrenzt und automatisch
+     horizontal zentriert (flex justify-content: center am Parent). */
+  .label .qr-fill {
+    height: 100%;
+    aspect-ratio: 1 / 1;
+    width: auto;
+  }
   .label .qr-fill img { width: 100%; height: 100%; display: block; }
 
   /* Bedienleiste — nur am Bildschirm sichtbar */

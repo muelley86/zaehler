@@ -246,10 +246,9 @@ export function QrCodesAdminPage() {
 
           {supportsOverride ? (
             <p className="text-caption text-tertiary">
-              Die QR-Codes enthalten die volle URL (~50 Zeichen) — bei 10 mm Etikettenhöhe sind die
-              Module ca. 0,3 mm groß und damit grenzwertig scannbar. Vor dem ersten Echtdruck eine
-              Testseite auf Normalpapier ausgeben und gegen den Etikettenbogen halten; Margin/Pitch
-              ggf. unten korrigieren.
+              Reine QR-Codes ohne Beschriftung — ein 10 × 10 mm Quadrat, zentriert auf jedem
+              Etikett. Vor dem ersten Echtdruck eine Testseite auf Normalpapier ausgeben und gegen
+              den Etikettenbogen halten; Margin/Pitch ggf. unten korrigieren.
             </p>
           ) : null}
 
