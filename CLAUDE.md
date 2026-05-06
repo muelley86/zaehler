@@ -95,7 +95,9 @@ Audit:
   diff (JSON: vorher/nachher), created_at
 - Audit auch für: User-Anlage/Deaktivierung, Rollen-Änderung,
   Zählerwechsel, Vergabe/Entzug von MP-Zugriffen
-  (action=access_granted/access_revoked, entity_type=user)
+  (action=access_granted/access_revoked, entity_type=user),
+  QR-Token-Lebenszyklus (action=token_created/token_assigned/
+  token_unassigned/token_deleted, entity_type=qr_token)
 
 Per-Recorder MP-Zugriff:
 - Tabelle UserMeasuringPointAccess (Composite-PK user_id + mp_id, Cascade)
@@ -200,13 +202,30 @@ Atomar in einer Transaktion:
 - Admin-Bereich: User-Verwaltung (Liste, anlegen, deaktivieren,
   Rolle ändern, Passwort zurücksetzen), AuditLog-Ansicht
 - Reading-Liste zeigt Ersteller-Namen pro Eintrag
-- Optionaler QR-Scan: pro Messstelle erzeugt der Admin in den Stammdaten
-  einen QR-Code (PNG/SVG, druckbar als A6-Etikette). Der Code zeigt auf
-  `/erfassen?mp={id}` — gescannt wird wahlweise mit der Smartphone-Kamera
-  (Deep-Link) oder dem In-App-Scanner (`html5-qrcode`, lazy-loaded).
-  Endpoint: `GET /api/v1/measuring-points/{id}/qr` (admin-only). Kein
-  Pflicht-Workflow; das bestehende MP-Dropdown bleibt voll funktional.
-  Permissions-Policy: `camera=(self)` für Same-Origin-Kamera-Zugriff.
+- QR-Scan-Workflow (Token-Verheiratung):
+  - Admin erzeugt im Bereich `/qr-codes` anonyme Tokens auf Vorrat
+    (8-Zeichen Crockford-Base32, z.B. `K7MP3X9F`). Tokens werden in einer
+    eigenen Tabelle `qr_token` verwaltet — nicht direkt aus der MP-ID
+    abgeleitet.
+  - Bulk-Druck: ausgewählte Tokens werden auf einem A4-Bogen (2×4-Raster)
+    ausgedruckt, abgeschnitten und an die Zähler geklebt.
+  - Vor Ort: Mitarbeiter scannt mit Smartphone-Kamera (oder In-App-Scanner
+    `html5-qrcode`, lazy-loaded), landet auf `/erfassen?token=…`. Backend
+    löst über `GET /api/v1/qr-tokens/{token}/resolve` auf:
+    - zugeordnet → MP wird vorausgewählt, sofort erfassen
+    - frei + Berechtigung → Assign-Modal mit MP-Dropdown
+    - frei ohne Berechtigung → Hinweis "Bitte Admin um Zuordnung bitten"
+    - unbekannt → "Ungültiger QR-Code"
+  - Token-Endpoints (`/api/v1/qr-tokens`): Listing/Bulk-Create/Render-QR
+    /Unassign/Delete sind admin-only. Der Assign-Endpoint ist auch für
+    Recorder offen, deren `User.can_assign_qr_tokens=true` ist — und nur
+    für MPs, auf die der Recorder über Feature B Zugriff hat.
+  - `parseScannedUrl` versteht zusätzlich das Legacy-Format `?mp=X` für
+    eventuell noch existierende ausgedruckte Direkt-URL-Etiketten —
+    neu wird nur noch `?token=X` ausgegeben.
+  - Permissions-Policy: `camera=(self)` für Same-Origin-Kamera-Zugriff.
+  - Der frühere Endpoint `GET /api/v1/measuring-points/{id}/qr` ist
+    entfernt (Direkt-URL-Druck wird nicht mehr unterstützt).
 
 ## Konventionen
 - Python: ruff (lint+format), mypy strict, type hints überall
