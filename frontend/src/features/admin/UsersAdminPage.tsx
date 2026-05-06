@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
-import { KeyRound, Plus } from 'lucide-react';
+import { KeyRound, ListChecks, Plus } from 'lucide-react';
 
 import {
   Button,
@@ -18,6 +18,8 @@ import { ApiError, api } from '@/lib/api';
 import { formatDateTimeDe } from '@/lib/format';
 import type { UserRead, UserRole } from '@/lib/types';
 import { cx } from '@/components/ui/cx';
+
+import { UserAccessSheet } from './UserAccessSheet';
 
 type Filter = 'all' | UserRole | 'inactive';
 
@@ -90,7 +92,7 @@ export function UsersAdminPage() {
         <Card padded={false}>
           {/* Desktop-Tabelle */}
           <div className="hidden md:block">
-            <div className="grid grid-cols-[40px_1.4fr_1.6fr_1fr_1fr_1.1fr_44px] items-center gap-3 border-b-hairline border-separator px-5 py-3 text-micro uppercase text-tertiary">
+            <div className="grid grid-cols-[40px_1.4fr_1.6fr_1fr_1fr_1.1fr_88px] items-center gap-3 border-b-hairline border-separator px-5 py-3 text-micro uppercase text-tertiary">
               <div />
               <div>Benutzer</div>
               <div>E-Mail</div>
@@ -170,6 +172,7 @@ function RoleBadge({ role }: { role: UserRole }) {
 
 function UserRow({ user, onChanged }: { user: UserRead; onChanged: () => void }) {
   const [busy, setBusy] = useState(false);
+  const [accessOpen, setAccessOpen] = useState(false);
 
   async function toggleActive() {
     setBusy(true);
@@ -192,59 +195,87 @@ function UserRow({ user, onChanged }: { user: UserRead; onChanged: () => void })
     }
   }
 
+  // Access-Editor nur für Recorder anbieten — Admin hat impliziten Vollzugriff,
+  // der Backend-Endpoint lehnt den PUT ohnehin mit 422 ab.
+  const showAccessButton = user.role === 'recorder' && user.is_active;
+
   return (
-    <li
-      className={cx(
-        'grid grid-cols-[40px_1.4fr_1.6fr_1fr_1fr_1.1fr_44px] items-center gap-3 px-5 py-3.5',
-        !user.is_active && 'opacity-60',
-      )}
-    >
-      <UserAvatar user={user} />
-      <div className="min-w-0">
-        <div className="truncate text-body font-semibold text-label">{user.username}</div>
-        {user.force_password_change ? (
-          <div className="text-caption font-semibold text-danger">Passwortwechsel erforderlich</div>
-        ) : null}
-      </div>
-      <div
+    <>
+      <li
         className={cx(
-          'truncate text-body-sm',
-          user.email ? 'text-secondary' : 'italic text-quaternary',
+          'grid grid-cols-[40px_1.4fr_1.6fr_1fr_1fr_1.1fr_88px] items-center gap-3 px-5 py-3.5',
+          !user.is_active && 'opacity-60',
         )}
       >
-        {user.email ?? '—'}
-      </div>
-      <div>
-        <RoleBadge role={user.role} />
-      </div>
-      <div className="flex items-center gap-2">
-        <Switch
-          checked={user.is_active}
-          onChange={() => void toggleActive()}
-          disabled={busy}
-          ariaLabel={`Aktiv: ${user.is_active}`}
-        />
-        <span className="text-body-sm text-secondary">{user.is_active ? 'Aktiv' : 'Inaktiv'}</span>
-      </div>
-      <div className="num text-caption text-secondary">
-        {user.last_login_at ? formatDateTimeDe(user.last_login_at) : '—'}
-      </div>
-      <Button
-        variant="plain"
-        size="sm"
-        leftIcon={<KeyRound size={14} />}
-        onClick={() => void resetPassword()}
-        disabled={busy}
-        title="Passwort zurücksetzen"
-      >
-        <span className="sr-only">Passwort zurücksetzen</span>
-      </Button>
-    </li>
+        <UserAvatar user={user} />
+        <div className="min-w-0">
+          <div className="truncate text-body font-semibold text-label">{user.username}</div>
+          {user.force_password_change ? (
+            <div className="text-caption font-semibold text-danger">
+              Passwortwechsel erforderlich
+            </div>
+          ) : null}
+        </div>
+        <div
+          className={cx(
+            'truncate text-body-sm',
+            user.email ? 'text-secondary' : 'italic text-quaternary',
+          )}
+        >
+          {user.email ?? '—'}
+        </div>
+        <div>
+          <RoleBadge role={user.role} />
+        </div>
+        <div className="flex items-center gap-2">
+          <Switch
+            checked={user.is_active}
+            onChange={() => void toggleActive()}
+            disabled={busy}
+            ariaLabel={`Aktiv: ${user.is_active}`}
+          />
+          <span className="text-body-sm text-secondary">
+            {user.is_active ? 'Aktiv' : 'Inaktiv'}
+          </span>
+        </div>
+        <div className="num text-caption text-secondary">
+          {user.last_login_at ? formatDateTimeDe(user.last_login_at) : '—'}
+        </div>
+        <div className="flex items-center justify-end gap-1">
+          {showAccessButton ? (
+            <Button
+              variant="plain"
+              size="sm"
+              leftIcon={<ListChecks size={14} />}
+              onClick={() => setAccessOpen(true)}
+              disabled={busy}
+              title="Messstellen-Zugriff bearbeiten"
+            >
+              <span className="sr-only">Messstellen-Zugriff bearbeiten</span>
+            </Button>
+          ) : null}
+          <Button
+            variant="plain"
+            size="sm"
+            leftIcon={<KeyRound size={14} />}
+            onClick={() => void resetPassword()}
+            disabled={busy}
+            title="Passwort zurücksetzen"
+          >
+            <span className="sr-only">Passwort zurücksetzen</span>
+          </Button>
+        </div>
+      </li>
+      {accessOpen ? (
+        <UserAccessSheet user={user} onClose={() => setAccessOpen(false)} onSaved={onChanged} />
+      ) : null}
+    </>
   );
 }
 
 function UserListItem({ user, onChanged }: { user: UserRead; onChanged: () => void }) {
   const [busy, setBusy] = useState(false);
+  const [accessOpen, setAccessOpen] = useState(false);
   async function toggleActive() {
     setBusy(true);
     try {
@@ -265,6 +296,7 @@ function UserListItem({ user, onChanged }: { user: UserRead; onChanged: () => vo
       setBusy(false);
     }
   }
+  const showAccessButton = user.role === 'recorder' && user.is_active;
   return (
     <li className={cx('px-5 py-3.5', !user.is_active && 'opacity-60')}>
       <div className="flex items-start gap-3">
@@ -296,7 +328,18 @@ function UserListItem({ user, onChanged }: { user: UserRead; onChanged: () => vo
           ariaLabel={`Aktiv: ${user.is_active}`}
         />
       </div>
-      <div className="mt-2 flex justify-end">
+      <div className="mt-2 flex flex-wrap justify-end gap-1">
+        {showAccessButton ? (
+          <Button
+            variant="plain"
+            size="sm"
+            leftIcon={<ListChecks size={14} />}
+            onClick={() => setAccessOpen(true)}
+            disabled={busy}
+          >
+            Messstellen
+          </Button>
+        ) : null}
         <Button
           variant="plain"
           size="sm"
@@ -307,6 +350,9 @@ function UserListItem({ user, onChanged }: { user: UserRead; onChanged: () => vo
           Passwort zurücksetzen
         </Button>
       </div>
+      {accessOpen ? (
+        <UserAccessSheet user={user} onClose={() => setAccessOpen(false)} onSaved={onChanged} />
+      ) : null}
     </li>
   );
 }

@@ -153,3 +153,20 @@ export interface ProblemDetails {
   instance?: string;
   [key: string]: unknown;
 }
+
+// Per-Recorder MP-Zugriff (Feature B)
+export interface UserAccessRead {
+  user_id: number;
+  measuring_point_ids: number[];
+}
+
+export interface UserAccessUpdate {
+  measuring_point_ids: number[];
+}
+
+export interface MpAccessUserRead {
+  user_id: number;
+  username: string;
+  role: UserRole;
+  source: 'admin' | 'grant';
+}
