@@ -10,6 +10,13 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.7.0](https://github.com/muelley86/zaehler/compare/v2.6.3...v2.7.0) (2026-05-06)
+
+
+### Funktionen
+
+* **measuring-point:** Namen direkt auf der Detail-Seite umbenennen ([1ca1c45](https://github.com/muelley86/zaehler/commit/1ca1c45a30987b46943bd984a2c7d6a6a08fdf91))
+
 ## [2.6.3](https://github.com/muelley86/zaehler/compare/v2.6.2...v2.6.3) (2026-05-06)
 
 
