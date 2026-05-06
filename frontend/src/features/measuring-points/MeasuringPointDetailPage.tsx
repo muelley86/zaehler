@@ -26,7 +26,7 @@ import { PageGlows } from '@/components/PageGlows';
 import { LocationMapSheet } from '@/components/LocationMapSheet';
 import { useAuth } from '@/features/auth/auth-context';
 import { ApiError, api } from '@/lib/api';
-import { formatDateTimeDe, formatDe } from '@/lib/format';
+import { formatDateTickDe, formatDateTimeDe, formatDe } from '@/lib/format';
 import { useChartTheme } from '@/lib/useChartTheme';
 import type {
   ConsumptionPoint,
@@ -459,7 +459,12 @@ function ConsumptionChart({
                 ))}
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke={theme.grid} />
-              <XAxis dataKey="date" tick={{ fontSize: 11, fill: theme.axis }} stroke={theme.axis} />
+              <XAxis
+                dataKey="date"
+                tick={{ fontSize: 11, fill: theme.axis }}
+                stroke={theme.axis}
+                tickFormatter={formatDateTickDe}
+              />
               <YAxis
                 tick={{ fontSize: 11, fill: theme.axis }}
                 stroke={theme.axis}
@@ -469,6 +474,7 @@ function ConsumptionChart({
                 contentStyle={tooltipContentStyle}
                 labelStyle={tooltipLabelStyle}
                 formatter={tooltipFormatter}
+                labelFormatter={formatDateTickDe}
               />
               <Legend formatter={legendFormatter} wrapperStyle={legendWrapperStyle} />
               {obisCodes.map((code, idx) => (

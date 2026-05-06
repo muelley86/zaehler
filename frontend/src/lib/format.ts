@@ -46,10 +46,28 @@ export function parseDe(input: string): string {
   return normalized;
 }
 
-const dateFmt = new Intl.DateTimeFormat('de-DE', { dateStyle: 'short' });
+// Explizite Optionen statt `dateStyle: 'short'`: letzteres liefert in `de-DE`
+// auf modernen V8-Engines ein 2-stelliges Jahr ("06.05.26"). Wir wollen
+// durchgängig DD.MM.YYYY, also vier Stellen.
+const dateFmt = new Intl.DateTimeFormat('de-DE', {
+  day: '2-digit',
+  month: '2-digit',
+  year: 'numeric',
+});
 const dateTimeFmt = new Intl.DateTimeFormat('de-DE', {
-  dateStyle: 'short',
-  timeStyle: 'short',
+  day: '2-digit',
+  month: '2-digit',
+  year: 'numeric',
+  hour: '2-digit',
+  minute: '2-digit',
+});
+const dateTimeSecFmt = new Intl.DateTimeFormat('de-DE', {
+  day: '2-digit',
+  month: '2-digit',
+  year: 'numeric',
+  hour: '2-digit',
+  minute: '2-digit',
+  second: '2-digit',
 });
 
 export function formatDateDe(iso: string | null | undefined): string {
@@ -62,6 +80,40 @@ export function formatDateTimeDe(iso: string | null | undefined): string {
   if (!iso) return '';
   const d = new Date(iso);
   return Number.isNaN(d.getTime()) ? String(iso) : dateTimeFmt.format(d);
+}
+
+/** Wie {@link formatDateTimeDe}, aber inkl. Sekunden — für CSV-Exports. */
+export function formatDateTimeSecDe(iso: string | null | undefined): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? String(iso) : dateTimeSecFmt.format(d);
+}
+
+/**
+ * Formatiert reine ISO-Datums- oder ISO-DateTime-Strings für Chart-Achsen
+ * und -Tooltips als DD.MM.YYYY. Akzeptiert `2026-05-06`, `2026-05-06T14:30`
+ * und Date-Objekte. Bei reinen `YYYY-MM-DD`-Strings wird die Zeitzone
+ * umgangen, damit z. B. `2026-05-06` nicht in MEZ als `05.05.2026` (UTC-1)
+ * herauskommt.
+ */
+export function formatDateTickDe(value: string | number | Date): string {
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? '' : dateFmt.format(value);
+  }
+  if (typeof value === 'number') {
+    const d = new Date(value);
+    return Number.isNaN(d.getTime()) ? String(value) : dateFmt.format(d);
+  }
+  if (!value) return '';
+  // Pure ISO-Date ohne Zeit: tageweise Anzeige, aber als lokale Komponenten
+  // parsen — sonst verschiebt UTC-Interpretation den Tag.
+  const dateOnly = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (dateOnly) {
+    const [, y, m, day] = dateOnly;
+    return `${day}.${m}.${y}`;
+  }
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? String(value) : dateFmt.format(d);
 }
 
 /** Aktueller Zeitpunkt für `<input type="datetime-local">`-Default. */

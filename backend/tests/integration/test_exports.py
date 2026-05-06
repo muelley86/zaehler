@@ -73,6 +73,17 @@ def test_csv_export_has_expected_columns(admin_client: TestClient) -> None:
     matching = [r for r in rows if r["value"] == "123.456"]
     assert len(matching) == 1, "POST-Reading 123.456 muss exakt einmal im CSV stehen"
     assert matching[0]["unit"] == "m³"
+    # Datum im deutschen Format DD.MM.YYYY HH:MM (Anwender öffnen das CSV in
+    # Excel/LibreOffice, dort wird ISO 8601 nicht erkannt).
+    assert matching[0]["reading_at"] == "01.06.2024 08:00", (
+        f"reading_at sollte DD.MM.YYYY HH:MM sein, war: {matching[0]['reading_at']!r}"
+    )
+    # created_at inkludiert Sekunden (Server-generierter Timestamp).
+    import re
+
+    assert re.match(r"^\d{2}\.\d{2}\.\d{4} \d{2}:\d{2}:\d{2}$", matching[0]["created_at"]), (
+        f"created_at sollte DD.MM.YYYY HH:MM:SS sein, war: {matching[0]['created_at']!r}"
+    )
 
 
 def test_json_dump_structure(admin_client: TestClient) -> None:

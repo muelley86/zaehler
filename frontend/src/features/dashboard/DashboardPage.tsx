@@ -26,7 +26,14 @@ import {
 } from '@/components/ui';
 import { PageGlows } from '@/components/PageGlows';
 import { ApiError, api } from '@/lib/api';
-import { formatDateTimeDe, formatDe, nowForInput, parseDe } from '@/lib/format';
+import {
+  formatDateDe,
+  formatDateTickDe,
+  formatDateTimeDe,
+  formatDe,
+  nowForInput,
+  parseDe,
+} from '@/lib/format';
 import { useChartTheme } from '@/lib/useChartTheme';
 import type {
   ConsumptionPoint,
@@ -214,8 +221,8 @@ export function DashboardPage() {
           p.mp.type,
           p.obis_code,
           p.unit,
-          p.period_start,
-          p.period_end,
+          formatDateDe(p.period_start),
+          formatDateDe(p.period_end),
           p.consumption.replace('.', ','),
         ]
           .map(csvField)
@@ -600,7 +607,12 @@ const MeasuringPointCard = memo(function MeasuringPointCard({
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={series} margin={CHART_MARGIN}>
               <CartesianGrid strokeDasharray="3 3" stroke={theme.grid} />
-              <XAxis dataKey="date" tick={{ fontSize: 11, fill: theme.axis }} stroke={theme.axis} />
+              <XAxis
+                dataKey="date"
+                tick={{ fontSize: 11, fill: theme.axis }}
+                stroke={theme.axis}
+                tickFormatter={formatDateTickDe}
+              />
               <YAxis
                 tick={{ fontSize: 11, fill: theme.axis }}
                 stroke={theme.axis}
@@ -621,6 +633,7 @@ const MeasuringPointCard = memo(function MeasuringPointCard({
                 contentStyle={tooltipContentStyle}
                 labelStyle={tooltipLabelStyle}
                 formatter={tooltipFormatter}
+                labelFormatter={formatDateTickDe}
               />
               <Legend formatter={legendFormatter} wrapperStyle={legendWrapperStyle} />
               {obisCodes.map((code, idx) => (

@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'vitest';
 
-import { formatDe, formatDeInt, parseDe, toInputDateTime } from './format';
+import {
+  formatDateDe,
+  formatDateTickDe,
+  formatDateTimeDe,
+  formatDateTimeSecDe,
+  formatDe,
+  formatDeInt,
+  parseDe,
+  toInputDateTime,
+} from './format';
 
 describe('parseDe', () => {
   it('akzeptiert ein einfaches Integer', () => {
@@ -82,6 +91,52 @@ describe('formatDeInt', () => {
 
   it('Fallback auf String bei NaN', () => {
     expect(formatDeInt('foo')).toBe('foo');
+  });
+});
+
+describe('formatDateDe', () => {
+  it('liefert DD.MM.YYYY mit 4-stelligem Jahr', () => {
+    expect(formatDateDe('2026-05-06')).toBe('06.05.2026');
+  });
+
+  it('liefert leeren String für null/undefined', () => {
+    expect(formatDateDe(null)).toBe('');
+    expect(formatDateDe(undefined)).toBe('');
+  });
+
+  it('Fallback auf rohen String bei ungültigem Datum', () => {
+    expect(formatDateDe('xxxx')).toBe('xxxx');
+  });
+});
+
+describe('formatDateTimeDe', () => {
+  it('liefert DD.MM.YYYY, HH:MM mit 4-stelligem Jahr', () => {
+    // ISO mit lokaler Zeit (kein Z), damit das Ergebnis Zeitzonen-frei stabil ist.
+    expect(formatDateTimeDe('2026-05-06T14:30:00')).toMatch(
+      /^06\.05\.2026,? 14:30$/,
+    );
+  });
+});
+
+describe('formatDateTimeSecDe', () => {
+  it('inkludiert Sekunden für CSV-Exports', () => {
+    expect(formatDateTimeSecDe('2026-05-06T14:30:45')).toMatch(
+      /^06\.05\.2026,? 14:30:45$/,
+    );
+  });
+});
+
+describe('formatDateTickDe', () => {
+  it('formatiert reines ISO-Datum als DD.MM.YYYY (zeitzonenfrei)', () => {
+    expect(formatDateTickDe('2026-05-06')).toBe('06.05.2026');
+  });
+
+  it('formatiert ISO-DateTime als DD.MM.YYYY', () => {
+    expect(formatDateTickDe('2026-05-06T14:30:00')).toBe('06.05.2026');
+  });
+
+  it('liefert leeren String für leere Eingabe', () => {
+    expect(formatDateTickDe('')).toBe('');
   });
 });
 

@@ -114,11 +114,12 @@ def _check_value_in_series(
     after = db.scalar(after_stmt)
 
     if before is not None and value < before.value:
+        before_str = before.reading_at.strftime("%d.%m.%Y %H:%M")
         raise ProblemError(
             status_code=STATUS_PLAUSIBILITY_WARNING,
             title="Wert kleiner als vorheriger Stand",
             detail=(
-                f"Vorheriger Stand am {before.reading_at.isoformat(sep=' ', timespec='minutes')}: "
+                f"Vorheriger Stand am {before_str}: "
                 f"{format(before.value, 'f')}. Bei Strom-, Gas-, Wasserzählern und "
                 "Betriebsstunden darf der Wert normalerweise nicht zurückgehen. "
                 "Wenn das beabsichtigt ist (Rollover, Korrektur), bestätige die Warnung."
@@ -134,7 +135,7 @@ def _check_value_in_series(
             },
         )
     if after is not None and value > after.value:
-        after_str = after.reading_at.isoformat(sep=" ", timespec="minutes")
+        after_str = after.reading_at.strftime("%d.%m.%Y %H:%M")
         raise ProblemError(
             status_code=STATUS_PLAUSIBILITY_WARNING,
             title="Wert größer als nachfolgender Stand",

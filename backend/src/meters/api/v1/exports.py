@@ -29,6 +29,17 @@ from meters.models import (
 router = APIRouter(prefix="/export", tags=["export"])
 
 
+def _format_de(dt: datetime, *, with_seconds: bool = False) -> str:
+    """Datums-/Zeit-Anzeige im deutschen Format DD.MM.YYYY HH:MM[:SS].
+
+    CSV-Exports werden überwiegend in Excel/LibreOffice gesichtet — dort
+    erwarten Anwender deutsche Schreibweise. JSON-Dumps bleiben bewusst
+    ISO-8601 (siehe :func:`full_dump`), das ist Maschinen-Format.
+    """
+    fmt = "%d.%m.%Y %H:%M:%S" if with_seconds else "%d.%m.%Y %H:%M"
+    return dt.strftime(fmt)
+
+
 @router.get("/readings.csv")
 def readings_csv(db: DbDep, _user: CurrentUser) -> StreamingResponse:
     rows = list(
@@ -66,7 +77,7 @@ def readings_csv(db: DbDep, _user: CurrentUser) -> StreamingResponse:
         writer.writerow(
             [
                 r.id,
-                r.reading_at.isoformat(),
+                _format_de(r.reading_at),
                 format(r.value, "f"),
                 register.unit,
                 register.obis_code,
@@ -75,7 +86,7 @@ def readings_csv(db: DbDep, _user: CurrentUser) -> StreamingResponse:
                 meter.serial_number,
                 meter.measuring_point_id,
                 r.note or "",
-                r.created_at.isoformat(),
+                _format_de(r.created_at, with_seconds=True),
                 r.created_by.username if r.created_by else "",
             ]
         )

@@ -15,7 +15,14 @@ import {
 } from '@/components/ui';
 import { PageGlows } from '@/components/PageGlows';
 import { ApiError, api, isPlausibilityWarning } from '@/lib/api';
-import { formatDateDe, formatDateTimeDe, formatDe, parseDe, toInputDateTime } from '@/lib/format';
+import {
+  formatDateDe,
+  formatDateTimeDe,
+  formatDateTimeSecDe,
+  formatDe,
+  parseDe,
+  toInputDateTime,
+} from '@/lib/format';
 import type { DeliveryRead, Me, MeasuringPointRead, MeterType, ReadingRead } from '@/lib/types';
 import { cx } from '@/components/ui/cx';
 
@@ -290,7 +297,7 @@ export function ReadingsListPage() {
         const d = item.delivery;
         lines.push(
           [
-            d.delivery_at.replace('T', ' ').slice(0, 16),
+            formatDateTimeDe(d.delivery_at),
             'Lieferung',
             info.mpName,
             info.locationName ?? '',
@@ -302,7 +309,7 @@ export function ReadingsListPage() {
             info.unit,
             d.note ?? '',
             d.created_by_username ?? '',
-            d.created_at.replace('T', ' ').slice(0, 19),
+            formatDateTimeSecDe(d.created_at),
           ]
             .map(csvField)
             .join(';'),
@@ -311,7 +318,7 @@ export function ReadingsListPage() {
         const r = item.reading;
         lines.push(
           [
-            r.reading_at.replace('T', ' ').slice(0, 16),
+            formatDateTimeDe(r.reading_at),
             item.kind === 'correction' ? 'Bestandskorrektur' : 'Erfassung',
             info.mpName,
             info.locationName ?? '',
@@ -323,7 +330,7 @@ export function ReadingsListPage() {
             info.unit,
             r.note ?? '',
             r.created_by_username ?? '',
-            r.created_at.replace('T', ' ').slice(0, 19),
+            formatDateTimeSecDe(r.created_at),
           ]
             .map(csvField)
             .join(';'),
