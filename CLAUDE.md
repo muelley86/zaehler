@@ -180,6 +180,13 @@ Atomar in einer Transaktion:
 - Admin-Bereich: User-Verwaltung (Liste, anlegen, deaktivieren,
   Rolle ändern, Passwort zurücksetzen), AuditLog-Ansicht
 - Reading-Liste zeigt Ersteller-Namen pro Eintrag
+- Optionaler QR-Scan: pro Messstelle erzeugt der Admin in den Stammdaten
+  einen QR-Code (PNG/SVG, druckbar als A6-Etikette). Der Code zeigt auf
+  `/erfassen?mp={id}` — gescannt wird wahlweise mit der Smartphone-Kamera
+  (Deep-Link) oder dem In-App-Scanner (`html5-qrcode`, lazy-loaded).
+  Endpoint: `GET /api/v1/measuring-points/{id}/qr` (admin-only). Kein
+  Pflicht-Workflow; das bestehende MP-Dropdown bleibt voll funktional.
+  Permissions-Policy: `camera=(self)` für Same-Origin-Kamera-Zugriff.
 
 ## Konventionen
 - Python: ruff (lint+format), mypy strict, type hints überall
