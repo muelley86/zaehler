@@ -35,6 +35,7 @@ import type {
   RegisterStateRead,
 } from '@/lib/types';
 import { describeMeterType } from '@/lib/meterLabels';
+import { QrCodeCard } from './QrCodeCard';
 
 // Konstante Chart-Margin als Modul-Const, damit Recharts keine neue
 // Object-Referenz pro Render sieht.
@@ -210,6 +211,8 @@ export function MeasuringPointDetailPage() {
       <ConsumptionChart consumption={consumption} mp={mp} />
 
       <RegisterTable mp={mp} states={states} />
+
+      <QrCodeCard mp={mp} />
 
       {location && location.latitude !== null && location.longitude !== null ? (
         <LocationMapSheet
