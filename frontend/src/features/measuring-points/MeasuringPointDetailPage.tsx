@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { ArrowLeft, ChevronRight, Map as MapIcon } from 'lucide-react';
+import type { FormEvent } from 'react';
+import { ArrowLeft, ChevronRight, Map as MapIcon, Pencil } from 'lucide-react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
   Area,
@@ -12,9 +13,10 @@ import {
   YAxis,
 } from 'recharts';
 
-import { Card, EmptyState, LargeTitle, Section, TypeBadge } from '@/components/ui';
+import { Button, Card, EmptyState, LargeTitle, Section, TextField, TypeBadge } from '@/components/ui';
 import { PageGlows } from '@/components/PageGlows';
 import { LocationMapSheet } from '@/components/LocationMapSheet';
+import { useAuth } from '@/features/auth/auth-context';
 import { ApiError, api } from '@/lib/api';
 import { formatDateTimeDe, formatDe } from '@/lib/format';
 import { useChartTheme } from '@/lib/useChartTheme';
@@ -98,13 +100,7 @@ export function MeasuringPointDetailPage() {
   return (
     <PageContainer>
       <BackLink />
-      <div className="flex items-center gap-3">
-        <TypeBadge type={mp.type} size="lg" />
-        <div className="min-w-0">
-          <div className="text-caption-bold uppercase text-tertiary">Messstelle</div>
-          <LargeTitle title={mp.name} />
-        </div>
-      </div>
+      <MeasuringPointTitle mp={mp} onRenamed={(updated) => setMp(updated)} />
 
       <div className="grid gap-4 md:grid-cols-[1.4fr_1fr]">
         <Card>
@@ -206,6 +202,98 @@ export function MeasuringPointDetailPage() {
         />
       ) : null}
     </PageContainer>
+  );
+}
+
+function MeasuringPointTitle({
+  mp,
+  onRenamed,
+}: {
+  mp: MeasuringPointRead;
+  onRenamed: (updated: MeasuringPointRead) => void;
+}) {
+  const { me } = useAuth();
+  const isAdmin = me?.role === 'admin';
+  const [editing, setEditing] = useState(false);
+  const [name, setName] = useState(mp.name);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  function startEdit() {
+    setName(mp.name);
+    setError(null);
+    setEditing(true);
+  }
+  function cancel() {
+    setEditing(false);
+    setError(null);
+  }
+  async function save(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const trimmed = name.trim();
+    if (trimmed === '' || trimmed === mp.name) {
+      setEditing(false);
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      const updated = await api.patch<MeasuringPointRead>(`/measuring-points/${mp.id}`, {
+        name: trimmed,
+      });
+      onRenamed(updated);
+      setEditing(false);
+    } catch (err) {
+      if (err instanceof ApiError) setError(err.problem.detail ?? err.problem.title);
+      else setError('Speichern fehlgeschlagen.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="flex items-start gap-3">
+      <TypeBadge type={mp.type} size="lg" />
+      <div className="min-w-0 flex-1">
+        <div className="text-caption-bold uppercase text-tertiary">Messstelle</div>
+        {editing ? (
+          <form onSubmit={(e) => void save(e)} className="mt-1 space-y-2">
+            <TextField
+              label="Name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              required
+              autoFocus
+              maxLength={120}
+              error={error}
+            />
+            <div className="flex flex-wrap gap-2">
+              <Button type="submit" variant="filled" size="sm" disabled={busy}>
+                {busy ? 'Speichere…' : 'Speichern'}
+              </Button>
+              <Button type="button" variant="bordered" size="sm" onClick={cancel} disabled={busy}>
+                Abbrechen
+              </Button>
+            </div>
+          </form>
+        ) : (
+          <div className="flex items-center gap-2">
+            <LargeTitle title={mp.name} />
+            {isAdmin ? (
+              <button
+                type="button"
+                onClick={startEdit}
+                className="hover:bg-fill-strong rounded-full bg-fill p-2 text-tertiary transition-colors hover:text-label"
+                aria-label="Namen bearbeiten"
+                title="Namen bearbeiten"
+              >
+                <Pencil size={14} />
+              </button>
+            ) : null}
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
 
