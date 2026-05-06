@@ -10,6 +10,25 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.8.0](https://github.com/muelley86/zaehler/compare/v2.7.1...v2.8.0) (2026-05-06)
+
+
+### Funktionen
+
+* **backend:** QR-Code-Endpoint und Service für Messstellen ([217b625](https://github.com/muelley86/zaehler/commit/217b625c37195b27b71c9551c8f52e79f7cab239))
+* **frontend:** QR-Code-Karte mit Druck auf Messstellen-Detail ([bab2113](https://github.com/muelley86/zaehler/commit/bab2113b654ce9ff82cb6c98b7bed26046723979))
+* **frontend:** QR-Scan-Workflow in Erfassungsmaske ([8d5c16a](https://github.com/muelley86/zaehler/commit/8d5c16a048369946f9947b49c3c35c67945b843b))
+
+
+### Fehlerbehebungen
+
+* **format:** durchgehend deutsches Datumsformat DD.MM.YYYY ([1e19e86](https://github.com/muelley86/zaehler/commit/1e19e86ab88e7c86ff600f3ad5fbf00972c04423))
+
+
+### Dokumentation
+
+* optionalen QR-Scan-Workflow in CLAUDE.md beschreiben ([1f90fd7](https://github.com/muelley86/zaehler/commit/1f90fd7e02dcc61ead53c5f62ba1f66d8a8494be))
+
 ## [2.7.1](https://github.com/muelley86/zaehler/compare/v2.7.0...v2.7.1) (2026-05-06)
 
 
