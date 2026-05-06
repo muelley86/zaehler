@@ -61,6 +61,7 @@ def create_user(
         password_hash=hash_password(payload.initial_password),
         is_active=True,
         force_password_change=True,
+        can_assign_qr_tokens=payload.can_assign_qr_tokens,
     )
     db.add(user)
     db.flush()
@@ -100,6 +101,15 @@ def update_user(
     if payload.is_active is not None and payload.is_active != user.is_active:
         diff["is_active"] = {"from": user.is_active, "to": payload.is_active}
         user.is_active = payload.is_active
+    if (
+        payload.can_assign_qr_tokens is not None
+        and payload.can_assign_qr_tokens != user.can_assign_qr_tokens
+    ):
+        diff["can_assign_qr_tokens"] = {
+            "from": user.can_assign_qr_tokens,
+            "to": payload.can_assign_qr_tokens,
+        }
+        user.can_assign_qr_tokens = payload.can_assign_qr_tokens
 
     if diff:
         record(

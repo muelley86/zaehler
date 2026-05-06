@@ -31,6 +31,12 @@ from meters.schemas.physical_meter import (
     RegisterRead,
     RegisterUpdate,
 )
+from meters.schemas.qr_token import (
+    QrTokenAssignRequest,
+    QrTokenBulkCreateRequest,
+    QrTokenRead,
+    QrTokenResolveResponse,
+)
 from meters.schemas.reading import (
     ConsumptionPoint,
     ReadingCreate,
@@ -74,6 +80,10 @@ __all__ = [
     "PhysicalMeterRead",
     "PhysicalMeterUpdate",
     "ProblemDetails",
+    "QrTokenAssignRequest",
+    "QrTokenBulkCreateRequest",
+    "QrTokenRead",
+    "QrTokenResolveResponse",
     "ReadingCreate",
     "ReadingRead",
     "ReadingUpdate",

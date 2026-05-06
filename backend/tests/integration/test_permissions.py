@@ -30,6 +30,15 @@ from fastapi.testclient import TestClient
         ("GET", "/api/v1/users/1/measuring-points", None),
         ("PUT", "/api/v1/users/1/measuring-points", {}),
         ("GET", "/api/v1/measuring-points/1/users", None),
+        # Feature A: QR-Token-Verwaltung — Bulk-Create, Listing, QR-Render,
+        # Unassign und Delete sind admin-only. Der Assign-Endpoint ist NICHT
+        # in dieser Liste, weil er für berechtigte Recorder offen ist
+        # (siehe test_qr_tokens für die feinere Matrix dort).
+        ("GET", "/api/v1/qr-tokens", None),
+        ("POST", "/api/v1/qr-tokens", {"count": 1}),
+        ("GET", "/api/v1/qr-tokens/ABC12345/qr", None),
+        ("DELETE", "/api/v1/qr-tokens/ABC12345/assign", None),
+        ("DELETE", "/api/v1/qr-tokens/ABC12345", None),
     ],
 )
 def test_recorder_blocked_on_admin_endpoints(

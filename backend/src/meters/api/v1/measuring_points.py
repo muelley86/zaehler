@@ -12,9 +12,8 @@ Eine Messstelle kann nur gelöscht werden, wenn keine Erfassungen daran hängen
 from __future__ import annotations
 
 from decimal import Decimal
-from typing import Literal
 
-from fastapi import APIRouter, Request, Response, status
+from fastapi import APIRouter, Request, status
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session as DbSession
@@ -47,10 +46,7 @@ from meters.schemas import (
 from meters.services.access import assert_can_access_mp, restrict_mp_query
 from meters.services.audit import record
 from meters.services.meter_replacement import install_first_meter, replace_meter
-from meters.services.qr import build_measuring_point_url, qr_png_bytes, qr_svg_bytes
 from meters.services.state import state_for_measuring_point
-
-_QR_BOX_SIZES: dict[str, int] = {"small": 6, "medium": 8, "large": 12}
 
 router = APIRouter(prefix="/measuring-points", tags=["measuring-points"])
 
@@ -425,42 +421,9 @@ def get_mp_users(
     return out
 
 
-@router.get(
-    "/{mp_id}/qr",
-    responses={
-        200: {
-            "content": {"image/png": {}, "image/svg+xml": {}},
-            "description": "QR-Code als PNG oder SVG mit Deeplink in die Erfassungsmaske.",
-        }
-    },
-)
-def get_qr_code(
-    mp_id: int,
-    request: Request,
-    db: DbDep,
-    _admin: AdminUser,
-    format: Literal["png", "svg"] = "png",
-    size: Literal["small", "medium", "large"] = "medium",
-) -> Response:
-    """Liefert einen QR-Code, der auf ``/erfassen?mp={mp_id}`` zeigt.
-
-    Admin-only — analog zu allen anderen mutierenden Stammdaten-Operationen.
-    Der QR-Code wird bei jedem Aufruf neu erzeugt (deterministisch aus der
-    MP-ID) und nicht gecached, weil sich der Origin (Reverse-Proxy-Hostname)
-    zwischen Aufrufen ändern kann.
-    """
-    if db.get(MeasuringPoint, mp_id) is None:
-        raise ProblemError(status_code=404, title="Measuring point not found")
-    url = build_measuring_point_url(request, mp_id)
-    box_size = _QR_BOX_SIZES[size]
-    if format == "svg":
-        body = qr_svg_bytes(url, box_size=box_size)
-        media_type = "image/svg+xml"
-    else:
-        body = qr_png_bytes(url, box_size=box_size)
-        media_type = "image/png"
-    return Response(
-        content=body,
-        media_type=media_type,
-        headers={"Cache-Control": "no-store"},
-    )
+# Der frühere GET /measuring-points/{id}/qr-Endpoint wurde mit Feature A
+# (QR-Token-Verheiratung) entfernt. Direkter MP-zu-URL-Druck ist nicht mehr
+# vorgesehen — neue QR-Codes werden über /qr-tokens erzeugt und der MP per
+# /qr-tokens/{token}/assign zugeordnet. parseScannedUrl im Frontend
+# unterstützt das alte ?mp=X-Format weiterhin, falls noch ausgedruckte
+# Etiketten in der Wildbahn existieren.

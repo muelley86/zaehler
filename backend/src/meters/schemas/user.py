@@ -11,12 +11,14 @@ class UserCreate(BaseModel):
     email: EmailStr | None = None
     role: UserRole
     initial_password: str = Field(min_length=12, max_length=256)
+    can_assign_qr_tokens: bool = False
 
 
 class UserUpdate(BaseModel):
     email: EmailStr | None = None
     role: UserRole | None = None
     is_active: bool | None = None
+    can_assign_qr_tokens: bool | None = None
 
 
 class UserRead(APIModel):
@@ -26,6 +28,7 @@ class UserRead(APIModel):
     role: UserRole
     is_active: bool
     force_password_change: bool
+    can_assign_qr_tokens: bool
     created_at: UtcDateTime
     last_login_at: UtcDateTime | None
 

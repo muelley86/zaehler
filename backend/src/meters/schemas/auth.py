@@ -24,6 +24,7 @@ class MeResponse(APIModel):
     is_active: bool
     force_password_change: bool
     totp_enabled: bool
+    can_assign_qr_tokens: bool
     last_login_at: UtcDateTime | None
 
 
