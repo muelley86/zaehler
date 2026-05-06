@@ -27,6 +27,7 @@ const _RECORDER: UserRead = {
   is_active: true,
   force_password_change: false,
   totp_enabled: false,
+  can_assign_qr_tokens: false,
   last_login_at: null,
   created_at: '2024-01-01T00:00:00Z',
 };

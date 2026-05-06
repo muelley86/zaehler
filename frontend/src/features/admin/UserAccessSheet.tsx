@@ -13,7 +13,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Save, Search, X } from 'lucide-react';
 
-import { Button, Pill, Sheet, TextField } from '@/components/ui';
+import { Button, Pill, Sheet, Switch, TextField } from '@/components/ui';
 import { ApiError, api } from '@/lib/api';
 import { describeMeterType } from '@/lib/meterLabels';
 import type {
@@ -35,6 +35,7 @@ interface UserAccessSheetProps {
 export function UserAccessSheet({ user, onClose, onSaved }: UserAccessSheetProps) {
   const [allMps, setAllMps] = useState<MeasuringPointRead[] | null>(null);
   const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [canAssignTokens, setCanAssignTokens] = useState<boolean>(user.can_assign_qr_tokens);
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all');
   const [search, setSearch] = useState('');
   const [busy, setBusy] = useState(false);
@@ -111,6 +112,10 @@ export function UserAccessSheet({ user, onClose, onSaved }: UserAccessSheetProps
     try {
       const body: UserAccessUpdate = { measuring_point_ids: Array.from(selected) };
       await api.put<UserAccessRead>(`/users/${user.id}/measuring-points`, body);
+      // Token-Assign-Flag separat patchen, falls geändert
+      if (canAssignTokens !== user.can_assign_qr_tokens) {
+        await api.patch(`/users/${user.id}`, { can_assign_qr_tokens: canAssignTokens });
+      }
       onSaved?.();
       onClose();
     } catch (err) {
@@ -142,6 +147,23 @@ export function UserAccessSheet({ user, onClose, onSaved }: UserAccessSheetProps
 
       {allMps !== null ? (
         <div className="space-y-4">
+          <div className="rounded-card border-hairline border-border bg-fill p-3">
+            <label className="flex cursor-pointer items-start gap-3">
+              <Switch
+                checked={canAssignTokens}
+                onChange={() => setCanAssignTokens((v) => !v)}
+                ariaLabel="QR-Codes zuweisen"
+              />
+              <div className="min-w-0 flex-1">
+                <div className="text-body font-semibold text-label">QR-Codes zuweisen</div>
+                <div className="text-caption text-tertiary">
+                  Erlaubt diesem Recorder, einen frisch geklebten QR-Sticker selbst einer
+                  zugänglichen Messstelle zuzuordnen — ohne Admin-Eingriff.
+                </div>
+              </div>
+            </label>
+          </div>
+
           <div className="text-body-sm text-secondary">
             {selected.size} von {counts.all} Messstellen zugeordnet.
           </div>
