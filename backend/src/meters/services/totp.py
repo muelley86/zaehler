@@ -12,20 +12,18 @@
 from __future__ import annotations
 
 import base64
-import io
 import re
 import secrets
 from datetime import UTC, datetime, timedelta
 
 import pyotp
-import qrcode  # type: ignore[import-untyped]
-from qrcode.constants import ERROR_CORRECT_M  # type: ignore[import-untyped]
 from sqlalchemy import select
 from sqlalchemy.orm import Session as DbSession
 
 from meters.core.config import settings
 from meters.core.security import hash_session_token
 from meters.models import BackupCode, PendingTotpChallenge, User
+from meters.services.qr import qr_png_bytes
 
 PENDING_TTL = timedelta(minutes=5)
 BACKUP_CODE_COUNT = 10
@@ -50,18 +48,7 @@ def provisioning_uri(*, secret: str, username: str) -> str:
 
 def qr_png_base64(uri: str) -> str:
     """Liefert ein PNG mit dem ``otpauth://``-URI als Data-URL-Body."""
-    qr = qrcode.QRCode(
-        version=None,
-        error_correction=ERROR_CORRECT_M,
-        box_size=8,
-        border=2,
-    )
-    qr.add_data(uri)
-    qr.make(fit=True)
-    img = qr.make_image(fill_color="black", back_color="white")
-    buf = io.BytesIO()
-    img.save(buf, format="PNG")
-    return base64.b64encode(buf.getvalue()).decode("ascii")
+    return base64.b64encode(qr_png_bytes(uri)).decode("ascii")
 
 
 def verify_totp(secret: str, code: str) -> bool:

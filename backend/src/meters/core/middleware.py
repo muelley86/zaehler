@@ -25,7 +25,7 @@ CallNext = Callable[[Request], Awaitable[Response]]
 _MUTATING_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
 
 _PERMISSIONS_POLICY = (
-    "accelerometer=(), camera=(), geolocation=(), gyroscope=(), "
+    "accelerometer=(), camera=(self), geolocation=(), gyroscope=(), "
     "magnetometer=(), microphone=(), payment=(), usb=()"
 )
 
