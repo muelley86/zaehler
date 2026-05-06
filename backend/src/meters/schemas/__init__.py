@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from meters.schemas.access import MpAccessUserRead, UserAccessRead, UserAccessUpdate
 from meters.schemas.audit_log import AuditLogRead
 from meters.schemas.auth import (
     BackupCodesResponse,
@@ -48,6 +49,9 @@ from meters.schemas.user import (
 __all__ = [
     "APIModel",
     "AuditLogRead",
+    "MpAccessUserRead",
+    "UserAccessRead",
+    "UserAccessUpdate",
     "BackupCodesResponse",
     "ChangePasswordRequest",
     "ConsumptionPoint",

@@ -14,10 +14,19 @@ from sqlalchemy import select
 from meters.api.deps import AdminUser, DbDep, client_ip
 from meters.core.problem import ProblemError
 from meters.core.security import hash_password
-from meters.models import AuditAction, AuditEntityType, User
+from meters.models import (
+    AuditAction,
+    AuditEntityType,
+    MeasuringPoint,
+    User,
+    UserMeasuringPointAccess,
+    UserRole,
+)
 from meters.schemas import (
     PasswordResetRequest,
     PasswordResetResponse,
+    UserAccessRead,
+    UserAccessUpdate,
     UserCreate,
     UserRead,
     UserUpdate,
@@ -155,3 +164,133 @@ def revoke_sessions(
         ip_address=client_ip(request),
     )
     db.commit()
+
+
+# ---------------------------------------------------------------------------
+# Per-Recorder MP-Zugriff (Feature B)
+# ---------------------------------------------------------------------------
+
+
+@router.get("/{user_id}/measuring-points", response_model=UserAccessRead)
+def get_user_access(
+    user_id: int,
+    db: DbDep,
+    _admin: AdminUser,
+) -> UserAccessRead:
+    """Listet die MP-IDs auf, auf die der User Zugriff hat.
+
+    Für Admin-User wird die komplette MP-Liste zurückgegeben (impliziter
+    Vollzugriff). Für Recorder kommen die expliziten Grants.
+    """
+    user = db.get(User, user_id)
+    if user is None:
+        raise ProblemError(status_code=404, title="User not found")
+    if user.role is UserRole.ADMIN:
+        ids = list(db.scalars(select(MeasuringPoint.id).order_by(MeasuringPoint.id)))
+    else:
+        ids = list(
+            db.scalars(
+                select(UserMeasuringPointAccess.measuring_point_id)
+                .where(UserMeasuringPointAccess.user_id == user_id)
+                .order_by(UserMeasuringPointAccess.measuring_point_id)
+            )
+        )
+    return UserAccessRead(user_id=user_id, measuring_point_ids=ids)
+
+
+@router.put("/{user_id}/measuring-points", response_model=UserAccessRead)
+def set_user_access(
+    user_id: int,
+    payload: UserAccessUpdate,
+    request: Request,
+    db: DbDep,
+    admin: AdminUser,
+) -> UserAccessRead:
+    """Ersetzt die Access-Liste des Users durch das übergebene Set.
+
+    Idempotent: Server berechnet Diff zur aktuellen Menge, fügt fehlende
+    Einträge hinzu, entfernt nicht mehr enthaltene und schreibt für jede
+    Veränderung einen Audit-Eintrag.
+
+    Lehnt 422 ab, wenn:
+    - der Ziel-User nicht existiert,
+    - der Ziel-User Admin ist (für Admins ist die Tabelle bedeutungslos),
+    - eine der angegebenen MP-IDs nicht existiert.
+    """
+    user = db.get(User, user_id)
+    if user is None:
+        raise ProblemError(status_code=404, title="User not found")
+    if user.role is UserRole.ADMIN:
+        raise ProblemError(
+            status_code=422,
+            title="Cannot grant access to admin",
+            detail=(
+                "Admin-Benutzer haben automatisch Zugriff auf alle Messstellen — "
+                "explizite Zuweisungen sind nicht zulässig."
+            ),
+        )
+
+    requested = set(payload.measuring_point_ids)
+
+    # Existenz aller MPs prüfen, bevor wir etwas ändern.
+    if requested:
+        existing_ids = set(
+            db.scalars(
+                select(MeasuringPoint.id).where(MeasuringPoint.id.in_(requested))
+            )
+        )
+        unknown = sorted(requested - existing_ids)
+        if unknown:
+            raise ProblemError(
+                status_code=422,
+                title="Unknown measuring point ids",
+                detail=f"Folgende Messstellen existieren nicht: {unknown}",
+                extra={"unknown_ids": unknown},
+            )
+
+    current = set(
+        db.scalars(
+            select(UserMeasuringPointAccess.measuring_point_id).where(
+                UserMeasuringPointAccess.user_id == user_id
+            )
+        )
+    )
+    to_add = sorted(requested - current)
+    to_remove = sorted(current - requested)
+
+    ip = client_ip(request)
+    for mp_id in to_add:
+        db.add(
+            UserMeasuringPointAccess(
+                user_id=user_id,
+                measuring_point_id=mp_id,
+                granted_by_user_id=admin.id,
+            )
+        )
+        record(
+            db,
+            user_id=admin.id,
+            action=AuditAction.ACCESS_GRANTED,
+            entity_type=AuditEntityType.USER,
+            entity_id=user_id,
+            diff={"measuring_point_id": mp_id},
+            ip_address=ip,
+        )
+    if to_remove:
+        db.query(UserMeasuringPointAccess).filter(
+            UserMeasuringPointAccess.user_id == user_id,
+            UserMeasuringPointAccess.measuring_point_id.in_(to_remove),
+        ).delete(synchronize_session=False)
+        for mp_id in to_remove:
+            record(
+                db,
+                user_id=admin.id,
+                action=AuditAction.ACCESS_REVOKED,
+                entity_type=AuditEntityType.USER,
+                entity_id=user_id,
+                diff={"measuring_point_id": mp_id},
+                ip_address=ip,
+            )
+    db.commit()
+
+    return UserAccessRead(user_id=user_id, measuring_point_ids=sorted(requested))

@@ -26,6 +26,10 @@ from fastapi.testclient import TestClient
         ("PATCH", "/api/v1/users/1", {}),
         ("DELETE", "/api/v1/users/1", None),
         ("GET", "/api/v1/audit-log", None),
+        # Feature B: Per-Recorder MP-Zugriff — Verwaltung admin-only.
+        ("GET", "/api/v1/users/1/measuring-points", None),
+        ("PUT", "/api/v1/users/1/measuring-points", {}),
+        ("GET", "/api/v1/measuring-points/1/users", None),
     ],
 )
 def test_recorder_blocked_on_admin_endpoints(
@@ -37,6 +41,8 @@ def test_recorder_blocked_on_admin_endpoints(
         resp = recorder_client.post(path, json=body or {})
     elif method == "PATCH":
         resp = recorder_client.patch(path, json=body or {})
+    elif method == "PUT":
+        resp = recorder_client.put(path, json=body or {})
     elif method == "DELETE":
         resp = recorder_client.delete(path)
     else:
