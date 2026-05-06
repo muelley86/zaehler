@@ -17,6 +17,7 @@ from meters.models.reading import Reading
 from meters.models.register import Register
 from meters.models.session import Session
 from meters.models.user import User
+from meters.models.user_measuring_point_access import UserMeasuringPointAccess
 
 __all__ = [
     "AuditAction",
@@ -34,5 +35,6 @@ __all__ = [
     "Register",
     "Session",
     "User",
+    "UserMeasuringPointAccess",
     "UserRole",
 ]

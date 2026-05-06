@@ -36,6 +36,12 @@ class AuditAction(enum.StrEnum):
     TOTP_DISABLED = "totp_disabled"
     TOTP_FAILED = "totp_failed"
     BACKUP_CODE_USED = "backup_code_used"
+    # Per-Recorder MP-Zugriff (Feature B): Admin gewährt/entzieht
+    # einem Recorder Zugriff auf eine bestimmte Messstelle. ``entity_type``
+    # ist ``USER`` (das Subjekt der Berechtigung), die betroffene MP-ID
+    # steht im ``diff``.
+    ACCESS_GRANTED = "access_granted"
+    ACCESS_REVOKED = "access_revoked"
 
 
 class AuditEntityType(enum.StrEnum):
