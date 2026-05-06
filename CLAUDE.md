@@ -94,7 +94,27 @@ Audit:
   AuditLog: id, user_id, action, entity_type, entity_id,
   diff (JSON: vorher/nachher), created_at
 - Audit auch für: User-Anlage/Deaktivierung, Rollen-Änderung,
-  Zählerwechsel
+  Zählerwechsel, Vergabe/Entzug von MP-Zugriffen
+  (action=access_granted/access_revoked, entity_type=user)
+
+Per-Recorder MP-Zugriff:
+- Tabelle UserMeasuringPointAccess (Composite-PK user_id + mp_id, Cascade)
+  steuert, welche MeasuringPoints ein Recorder lesen und bebuchen darf.
+- Default für neue Recorder: keine Zuordnung (least privilege). Admin
+  vergibt explizit, was sichtbar sein soll.
+- Admin sieht und bedient alle MPs unabhängig von der Tabelle (kein
+  Eintrag nötig — Rolle reicht).
+- Filter greift in: GET /measuring-points (+/{id}/state, /consumption,
+  /qr admin-only sowieso), GET /readings, /deliveries und beim POST/PATCH/
+  DELETE auf Reading/Delivery via Pre-Check über register_id.
+- Recorder bekommt 404 statt 403 auf nicht-zugeordnete MPs — verhindert
+  Existenz-Leaks.
+- Verwaltung: GET/PUT /api/v1/users/{id}/measuring-points (admin-only,
+  PUT ersetzt das komplette Set, lehnt Admin-Targets mit 422 ab).
+  Read-only-Liste pro MP: GET /api/v1/measuring-points/{id}/users.
+- Side-Effect: GET /api/v1/export/dump.json ist jetzt admin-only
+  (Voll-Backup ist als Recorder-Artefakt sinnlos und semantisch
+  inkonsistent mit dem Filter-Modell).
 
 ## Gleichzeitige Erfassung (Concurrency)
 
