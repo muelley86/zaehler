@@ -5,13 +5,16 @@
  * relevanten Pfade: erfolgreicher Decode und Permission-Denied.
  */
 
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import { renderWithRouter } from '@/tests/render';
 
 // Wird im Test pro Fall überschrieben (Decode-Erfolg vs. Permission-Denied).
+// Reset passiert in beforeEach, damit der TS-Control-Flow im Test-Body den
+// declared Union-Typ behält und Optional-Calls (``capturedSuccess?.(...)``)
+// nicht zu ``never`` narrowen.
 let _capturedSuccess: ((decodedText: string) => void) | null = null;
 let _startBehavior: 'success' | 'denied' = 'success';
 
@@ -55,11 +58,13 @@ async function loadSheet() {
 }
 
 describe('QrScanSheet', () => {
-  it('navigiert nach erfolgreichem Decode auf /erfassen?mp=…', async () => {
-    _startBehavior = 'success';
+  beforeEach(() => {
     _capturedSuccess = null;
+    _startBehavior = 'success';
     navigateMock.mockReset();
+  });
 
+  it('navigiert nach erfolgreichem Decode auf /erfassen?mp=…', async () => {
     const QrScanSheet = await loadSheet();
     const onClose = vi.fn();
     renderWithRouter(<QrScanSheet open onClose={onClose} />);
@@ -75,8 +80,6 @@ describe('QrScanSheet', () => {
 
   it('zeigt Permission-Denied-Hinweis, wenn Kamera abgelehnt wurde', async () => {
     _startBehavior = 'denied';
-    _capturedSuccess = null;
-    navigateMock.mockReset();
 
     const QrScanSheet = await loadSheet();
     renderWithRouter(<QrScanSheet open onClose={() => {}} />);
@@ -92,10 +95,6 @@ describe('QrScanSheet', () => {
   });
 
   it('schließt sich beim Klick auf den X-Button', async () => {
-    _startBehavior = 'success';
-    _capturedSuccess = null;
-    navigateMock.mockReset();
-
     const QrScanSheet = await loadSheet();
     const onClose = vi.fn();
     const user = userEvent.setup();
@@ -107,10 +106,6 @@ describe('QrScanSheet', () => {
   });
 
   it('ignoriert QR-Codes ohne mp-Param', async () => {
-    _startBehavior = 'success';
-    _capturedSuccess = null;
-    navigateMock.mockReset();
-
     const QrScanSheet = await loadSheet();
     const onClose = vi.fn();
     renderWithRouter(<QrScanSheet open onClose={onClose} />);
