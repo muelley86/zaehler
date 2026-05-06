@@ -162,6 +162,53 @@ def test_qr_render_404_for_unknown_token(admin_client: TestClient) -> None:
     assert resp.status_code == 404
 
 
+def test_qr_svg_encodes_short_q_path(admin_client: TestClient) -> None:
+    """Der QR-Inhalt nutzt den ``/q/<token>``-Shortpath statt der langen
+    ``/erfassen?token=…``-URL — siehe ``_build_token_url``-Doc. Das spart
+    13 Zeichen QR-Inhalt → typisch eine QR-Version kleiner."""
+    create = admin_client.post("/api/v1/qr-tokens", json={"count": 1}).json()
+    token = create[0]["token"]
+    resp = admin_client.get(f"/api/v1/qr-tokens/{token}/qr?format=svg")
+    assert resp.status_code == 200
+    # SVG-QR-Codes haben den Klartext-Inhalt nicht im Response — wir
+    # prüfen daher das URL-Format direkt am Service-Helper.
+    from starlette.requests import Request as StarletteRequest
+
+    from meters.api.v1.qr_tokens import _build_token_url
+
+    fake_scope = {
+        "type": "http",
+        "scheme": "https",
+        "server": ("zaehler.example", 443),
+        "headers": [(b"host", b"zaehler.example")],
+        "path": "/api/v1/qr-tokens/x/qr",
+        "query_string": b"",
+        "method": "GET",
+        "client": ("127.0.0.1", 0),
+    }
+    url = _build_token_url(StarletteRequest(fake_scope), token)  # type: ignore[arg-type]
+    assert url == f"https://zaehler.example/q/{token}"
+
+
+def test_print_bootstrap_js_is_public(admin_client: TestClient) -> None:
+    """Das Bootstrap-Script ist öffentlich (keine Auth) — es enthält nur
+    generische Print-Logik, keinen User-spezifischen Inhalt, und wird vom
+    Druck-Fenster (about:blank) via ``<script src="…">`` geladen.
+
+    Wir nutzen den admin_client lediglich, weil das Test-Setup so eine
+    bequeme TestClient-Instanz mit DB-Initialisierung liefert; Auth ist
+    für diesen Endpoint nicht erforderlich.
+    """
+    resp = admin_client.get("/api/v1/qr-tokens/print-bootstrap.js")
+    assert resp.status_code == 200
+    assert resp.headers["content-type"].startswith("application/javascript")
+    body = resp.text
+    # Die für den Druck unverzichtbaren Bausteine müssen drin sein.
+    assert "window.print" in body
+    assert "window.close" in body
+    assert "data-action" in body
+
+
 # ---------------------------------------------------------------------------
 # Assign / Unassign
 # ---------------------------------------------------------------------------

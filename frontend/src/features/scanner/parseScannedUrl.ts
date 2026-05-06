@@ -2,9 +2,12 @@
  * Pure Helper: extrahiert MP-ID oder Token aus dem dekodierten QR-Inhalt.
  *
  * Akzeptierte Formate:
- * - ``…/erfassen?token=K7MP3X9F`` (neu, Token-Verheiratung) — bevorzugt
- * - ``…/erfassen?mp=42`` (Legacy, Direkt-URL — kommt nur noch von alten
- *   Etiketten vor; wir generieren das nicht mehr)
+ * - ``…/q/K7MP3X9F`` (neu, kompakter Shortpath — wird ab 2.x für neu
+ *   generierte Etiketten verwendet, spart 13 Zeichen QR-Inhalt)
+ * - ``…/erfassen?token=K7MP3X9F`` (vorheriges Token-Format — bestehende
+ *   geklebte Etiketten funktionieren weiter)
+ * - ``…/erfassen?mp=42`` (Legacy Direkt-URL — kommt nur noch von ganz
+ *   alten Etiketten vor; wir generieren das nicht mehr)
  *
  * Sowohl absolute URLs als auch reine Pfade sind erlaubt.
  *
@@ -23,6 +26,8 @@ export type ScannedQr = { kind: 'mp'; mp: number } | { kind: 'token'; token: str
 // Kleinbuchstaben für Robustheit (manche Scanner normalisieren), normalisieren
 // aber später zu Großschreibung.
 const TOKEN_RE = /^[0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{8}$/;
+// Path-Match für /q/<TOKEN> mit optionalem Trailing-Slash.
+const Q_PATH_RE = /^\/q\/([0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{8})\/?$/;
 
 export function parseScannedUrl(decoded: string): ScannedQr | null {
   const text = decoded.trim();
@@ -38,6 +43,14 @@ export function parseScannedUrl(decoded: string): ScannedQr | null {
     search = url.search;
   } catch {
     return null;
+  }
+
+  // Neuer Shortpath: /q/<TOKEN> — gewinnt vor allem anderen, weil das
+  // unser primäres Ausgabeformat ist.
+  const qMatch = Q_PATH_RE.exec(pathname);
+  const qToken = qMatch?.[1];
+  if (qToken) {
+    return { kind: 'token', token: qToken.toUpperCase() };
   }
 
   const normalized = pathname.replace(/\/+$/, '') || '/';

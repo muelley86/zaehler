@@ -16,11 +16,20 @@
  * wird bewusst weggelassen — auf dieser Etikettengröße kostet sie Platz
  * ohne echten Mehrwert (zur Identifikation reicht der QR-Scan).
  *
- * Pattern: neues Fenster, HTML schreiben, ``window.print()`` triggern.
- * Wichtig: KEIN ``noopener`` beim ``window.open`` — sonst liefert der Call
- * laut Spec ``null`` zurück, und das ``document.write`` greift nie. Genau
- * das war der Grund, warum der Bulk-Druck zwischenzeitlich nur eine weiße
- * Seite zeigte (siehe Issue zur QR-Druck-Funktion).
+ * Pattern: neues Fenster, HTML schreiben, externes Bootstrap-JS lädt das
+ * Auto-Print- und Button-Verhalten. Zwei Stolpersteine, die hier bewusst
+ * vermieden werden:
+ *
+ *  1. ``window.open(url, '_blank', 'noopener')`` liefert laut Spec ``null``
+ *     zurück — damit greift das frühe return und das ``document.write``
+ *     läuft nie (sichtbar als weiße Seite). Daher KEIN noopener.
+ *  2. Das ``about:blank``-Fenster erbt die CSP des Openers. Die App setzt
+ *     ``script-src 'self'``, das blockiert sowohl Inline-``<script>``-
+ *     Blöcke als auch Inline-``onclick=""``-Handler. Druck-Logik liegt
+ *     deshalb in ``GET /api/v1/qr-tokens/print-bootstrap.js`` und wird via
+ *     ``<script src="…">`` geladen (same-origin → erlaubt). Buttons tragen
+ *     ``data-action="print|close"``, ein delegierter Handler im Bootstrap
+ *     ruft ``window.print()`` bzw. ``window.close()``.
  *
  * Hinweis Scannbarkeit: Der QR-Code enthält die volle URL
  * ``${origin}/erfassen?token=${token}`` (~50 Zeichen), das ergibt einen
@@ -32,7 +41,7 @@
 
 import type { QrTokenRead } from '@/lib/types';
 
-const PRINT_TIMEOUT_MS = 600;
+const BOOTSTRAP_SRC = '/api/v1/qr-tokens/print-bootstrap.js';
 
 export type LabelLayoutId = 'cut-2x4' | 'avery-l4731rev' | 'avery-3320';
 
@@ -353,28 +362,10 @@ function buildPrintHtml(tokens: QrTokenRead[], layout: LabelLayout): string {
   ${pagesHtml}
   <div class="controls">
     <span class="info">${tokens.length} QR · ${escapeHtml(layout.name)}</span>
-    <button onclick="window.print()">Drucken</button>
-    <button class="secondary" onclick="window.close()">Schließen</button>
+    <button type="button" data-action="print">Drucken</button>
+    <button type="button" class="secondary" data-action="close">Schließen</button>
   </div>
-  <script>
-    (function () {
-      var imgs = Array.from(document.images);
-      var pending = imgs.length;
-      function go() {
-        setTimeout(function () { window.focus(); window.print(); }, ${PRINT_TIMEOUT_MS});
-      }
-      if (pending === 0) { go(); return; }
-      imgs.forEach(function (img) {
-        if (img.complete) {
-          if (--pending === 0) go();
-        } else {
-          var done = function () { if (--pending === 0) go(); };
-          img.addEventListener('load', done);
-          img.addEventListener('error', done);
-        }
-      });
-    })();
-  </script>
+  <script src="${BOOTSTRAP_SRC}"></script>
 </body>
 </html>`;
 }

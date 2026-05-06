@@ -12,7 +12,7 @@
  * landen so nicht im Initial-Chunk).
  */
 
-import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
+import { Navigate, Route, Routes, useLocation, useParams } from 'react-router-dom';
 import { Suspense, lazy } from 'react';
 import type { ReactNode } from 'react';
 
@@ -60,6 +60,25 @@ function RouteFallback(): JSX.Element {
   return <div className="flex h-full items-center justify-center text-tertiary">Lade…</div>;
 }
 
+/** Crockford-Base32, 8 Zeichen — siehe parseScannedUrl. */
+const TOKEN_RE = /^[0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{8}$/;
+
+/**
+ * Shortpath-Redirect: ``/q/{token}`` → ``/erfassen?token={token}``.
+ *
+ * Diese Route existiert primär, damit der QR-Code den kürzeren URL-String
+ * enkodieren kann (eine Version weniger im QR — siehe Backend-Doc in
+ * ``_build_token_url``). Token wird zur Großschreibung normalisiert, bei
+ * ungültigem Format Weiterleitung zur Startseite.
+ */
+function QrShortRedirect(): JSX.Element {
+  const { token } = useParams<{ token: string }>();
+  if (!token || !TOKEN_RE.test(token)) {
+    return <Navigate to="/" replace />;
+  }
+  return <Navigate to={`/erfassen?token=${token.toUpperCase()}`} replace />;
+}
+
 export function App() {
   const { me, loading } = useAuth();
   const location = useLocation();
@@ -69,13 +88,13 @@ export function App() {
   }
 
   if (!me) {
+    // ``/q/:token`` als from-Hint inkl. Search beibehalten, damit der User
+    // nach dem Login direkt im Erfassen-Flow landet.
+    const from = location.pathname + location.search;
     return (
       <Routes>
         <Route path="/login" element={<LoginPage />} />
-        <Route
-          path="*"
-          element={<Navigate to="/login" state={{ from: location.pathname }} replace />}
-        />
+        <Route path="*" element={<Navigate to="/login" state={{ from }} replace />} />
       </Routes>
     );
   }
@@ -95,6 +114,7 @@ export function App() {
         <Routes>
           <Route path="/" element={<DashboardPage />} />
           <Route path="/erfassen" element={<RecordReadingPage />} />
+          <Route path="/q/:token" element={<QrShortRedirect />} />
           <Route path="/erfassungen" element={<ReadingsListPage />} />
           <Route path="/mehr" element={<MorePage />} />
           <Route path="/passwort-aendern" element={<ChangePasswordPage />} />

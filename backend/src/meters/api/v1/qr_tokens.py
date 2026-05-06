@@ -60,11 +60,22 @@ def _to_read(token: QrToken, *, mp_name: str | None = None) -> QrTokenRead:
 
 
 def _build_token_url(request: Request, token_str: str) -> str:
-    """``${scheme}://${host}/erfassen?token=${token}`` analog zum
-    Build-Pattern für Direkt-URL-QRs."""
+    """``${scheme}://${host}/q/${token}`` — kompakte URL für QR-Codes.
+
+    Der Shortpath ``/q/X`` spart gegenüber ``/erfassen?token=X`` 13 Zeichen,
+    was den QR-Code typischerweise eine Version kleiner werden lässt
+    (V3 -> V2: 29x29 -> 25x25 Module). Bei 10 mm Etikettengroesse entspricht
+    das ~17 % größeren Modulen — spürbar bessere Scannbarkeit auf den
+    schmalen Avery-Etiketten.
+
+    Frontend hat eine SPA-Route ``/q/:token``, die intern auf
+    ``/erfassen?token=...`` weiterleitet (siehe ``App.tsx``). Die
+    Legacy-URL ``/erfassen?token=...`` bleibt parallel gültig — bestehende
+    geklebte Etiketten funktionieren weiter.
+    """
     scheme = request.url.scheme or "http"
     host = request.url.netloc or request.headers.get("host", "")
-    return f"{scheme}://{host}/erfassen?token={token_str}"
+    return f"{scheme}://{host}/q/{token_str}"
 
 
 def _can_user_assign(user: User) -> bool:
@@ -141,6 +152,65 @@ def _load_or_404(db: DbSession, token_str: str) -> QrToken:
     if t is None:
         raise ProblemError(status_code=404, title="Token not found")
     return t
+
+
+@router.get("/print-bootstrap.js", include_in_schema=False)
+def print_bootstrap_script() -> Response:
+    """Statisches JS für die Bulk-Druck-Seite.
+
+    Hintergrund: Die App setzt ``Content-Security-Policy: script-src 'self'``.
+    Das via ``window.open('') + document.write`` erzeugte Druck-Fenster ist
+    ``about:blank`` und erbt die CSP des Openers — Inline-``<script>`` und
+    ``onclick=""`` werden dort blockiert. Das Bootstrap-JS wird stattdessen
+    via ``<script src="…">`` geladen, was ``script-src 'self'`` erlaubt.
+
+    Verhalten:
+    - Wartet, bis alle Bilder (= QR-SVGs) geladen sind, dann ``window.print()``.
+    - Hängt einen delegierten Click-Handler an document, der
+      ``[data-action="print"]`` und ``[data-action="close"]`` bedient.
+
+    Kein User-spezifischer Inhalt → öffentlich cachebar (5 min reicht; bei
+    Code-Änderung wird die Datei beim nächsten Reload aktualisiert).
+    """
+    body = b"""(function () {
+  'use strict';
+  var imgs = Array.prototype.slice.call(document.images);
+  var pending = imgs.length;
+  function autoprint() {
+    setTimeout(function () { try { window.focus(); } catch (e) {} window.print(); }, 600);
+  }
+  if (pending === 0) {
+    autoprint();
+  } else {
+    imgs.forEach(function (img) {
+      if (img.complete) {
+        if (--pending === 0) autoprint();
+      } else {
+        var done = function () { if (--pending === 0) autoprint(); };
+        img.addEventListener('load', done);
+        img.addEventListener('error', done);
+      }
+    });
+  }
+  document.addEventListener('click', function (e) {
+    var t = e.target;
+    if (!t || typeof t.closest !== 'function') return;
+    var btn = t.closest('[data-action]');
+    if (!btn) return;
+    var action = btn.getAttribute('data-action');
+    if (action === 'print') {
+      window.print();
+    } else if (action === 'close') {
+      window.close();
+    }
+  });
+})();
+"""
+    return Response(
+        content=body,
+        media_type="application/javascript",
+        headers={"Cache-Control": "public, max-age=300"},
+    )
 
 
 @router.get("/{token_str}/qr")
