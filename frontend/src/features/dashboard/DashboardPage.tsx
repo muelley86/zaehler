@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
 import { Download, Filter, Plus } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -42,6 +42,14 @@ import { TYPE_LABELS, TYPE_ORDER, describeMeterType } from '@/lib/meterLabels';
 // Render eine neue Object-Referenz sieht (Recharts vergleicht per ===).
 const CHART_MARGIN = { top: 10, right: 16, bottom: 8, left: 8 } as const;
 
+// Stabile Leer-Sentinel — wenn eine Messstelle (noch) keine Daten hat,
+// bekommt sie immer dieselbe Array-Referenz. Sonst würden React.memo-
+// Vergleiche fälschlich „neue Daten" sehen. Diese Arrays werden nirgends
+// mutiert (Konvention).
+const EMPTY_CONSUMPTION: ConsumptionPoint[] = [];
+const EMPTY_READINGS: ReadingRead[] = [];
+const EMPTY_STATES: RegisterStateRead[] = [];
+
 interface ConsumptionsByMP {
   [mpId: number]: ConsumptionPoint[];
 }
@@ -62,6 +70,9 @@ export function DashboardPage() {
   const [readingsByMP, setReadingsByMP] = useState<ReadingsByMP>({});
   const [error, setError] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
+
+  // Stabile Refresh-Referenz für memoizierte Sub-Komponenten.
+  const handleChanged = useCallback(() => setTick((t) => t + 1), []);
 
   const [locationFilter, setLocationFilter] = useState<Set<number | null>>(new Set());
   const [typeFilter, setTypeFilter] = useState<Set<MeterType>>(new Set());
@@ -142,6 +153,36 @@ export function DashboardPage() {
     }
     return out;
   }, [filteredPoints, consumptions, from, to]);
+
+  // Pro-MP gefilterte Listen vorab in eine Map packen — React.memo vergleicht
+  // per Reference-Identity, daher dürfen wir diese Arrays NICHT inline im
+  // JSX bauen (sonst neue Reference bei jedem Render).
+  const consumptionByMp = useMemo(() => {
+    const out = new Map<number, ConsumptionPoint[]>();
+    for (const mp of filteredPoints) {
+      const list = (consumptions[mp.id] ?? []).filter((p) => {
+        if (from && p.period_end < from) return false;
+        if (to && p.period_end > to) return false;
+        return true;
+      });
+      if (list.length > 0) out.set(mp.id, list);
+    }
+    return out;
+  }, [filteredPoints, consumptions, from, to]);
+
+  const readingsFilteredByMp = useMemo(() => {
+    const out = new Map<number, ReadingRead[]>();
+    for (const mp of filteredPoints) {
+      const list = (readingsByMP[mp.id] ?? []).filter((r) => {
+        const day = r.reading_at.slice(0, 10);
+        if (from && day < from) return false;
+        if (to && day > to) return false;
+        return true;
+      });
+      if (list.length > 0) out.set(mp.id, list);
+    }
+    return out;
+  }, [filteredPoints, readingsByMP, from, to]);
 
   const locationOptions = useMemo(() => {
     const map = new Map<number | null, string>();
@@ -306,19 +347,10 @@ export function DashboardPage() {
           <MeasuringPointCard
             key={mp.id}
             mp={mp}
-            consumption={(consumptions[mp.id] ?? []).filter((p) => {
-              if (from && p.period_end < from) return false;
-              if (to && p.period_end > to) return false;
-              return true;
-            })}
-            readings={(readingsByMP[mp.id] ?? []).filter((r) => {
-              const day = r.reading_at.slice(0, 10);
-              if (from && day < from) return false;
-              if (to && day > to) return false;
-              return true;
-            })}
-            state={states[mp.id] ?? []}
-            onChanged={() => setTick((t) => t + 1)}
+            consumption={consumptionByMp.get(mp.id) ?? EMPTY_CONSUMPTION}
+            readings={readingsFilteredByMp.get(mp.id) ?? EMPTY_READINGS}
+            state={states[mp.id] ?? EMPTY_STATES}
+            onChanged={handleChanged}
           />
         ))
       )}
@@ -363,7 +395,12 @@ function DateInput({
   );
 }
 
-function MeasuringPointCard({
+// React.memo: rendert nur, wenn sich Props effektiv ändern.
+// Die zugehörigen Daten-Arrays werden im Parent vorab in stabile Maps
+// gepackt, der onChanged-Callback ist ein useCallback. So rendern bei
+// einem tick-Refresh nur die MPs neu, deren Daten sich tatsächlich
+// geändert haben — nicht alle Cards der Liste.
+const MeasuringPointCard = memo(function MeasuringPointCard({
   mp,
   consumption,
   readings,
@@ -622,7 +659,7 @@ function MeasuringPointCard({
       </Sheet>
     </Card>
   );
-}
+});
 
 function TankTile({
   mp,

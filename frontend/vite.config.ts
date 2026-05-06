@@ -77,6 +77,18 @@ export default defineConfig({
     // Komponentenstruktur im public Repo. Für Dev (`pnpm dev`) erzeugt Vite
     // ohnehin transparente Maps zur Laufzeit.
     sourcemap: false,
+    rollupOptions: {
+      output: {
+        // Vendor-Chunks separieren, damit App-Updates nicht den Browser-Cache
+        // der schweren Libraries (recharts, leaflet) invalidieren. Die hier
+        // gelisteten Pakete bekommen jeweils einen eigenen, langlebigen Chunk.
+        manualChunks: {
+          recharts: ['recharts'],
+          leaflet: ['leaflet', 'react-leaflet'],
+          'react-vendor': ['react', 'react-dom', 'react-router-dom'],
+        },
+      },
+    },
   },
   test: {
     environment: 'jsdom',

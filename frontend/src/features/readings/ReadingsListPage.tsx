@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
 import { Download, Pencil, Search, Trash2 } from 'lucide-react';
 
@@ -78,7 +78,17 @@ export function ReadingsListPage() {
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const [search, setSearch] = useState('');
+  // Verzögerter Filterwert — die Filterung läuft 250 ms nach dem letzten
+  // Tastendruck statt nach jedem Zeichen. Das Eingabefeld selbst zeigt
+  // weiterhin sofort den aktuellen `search`-Wert, nur die teure Filter-
+  // Pipeline (über tausende Readings) wird debounced.
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [kindFilter, setKindFilter] = useState<Set<ItemKind>>(new Set());
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedSearch(search), 250);
+    return () => window.clearTimeout(timer);
+  }, [search]);
 
   useEffect(() => {
     api
@@ -116,7 +126,8 @@ export function ReadingsListPage() {
     return () => controller.abort();
   }, [from, to, tick]);
 
-  const refresh = () => setTick((t) => t + 1);
+  // Stabile Referenz für memoizierte Item-Komponenten.
+  const refresh = useCallback(() => setTick((t) => t + 1), []);
 
   const registerIndex = useMemo<Map<number, RegisterIndex>>(() => {
     const index = new Map<number, RegisterIndex>();
@@ -196,6 +207,7 @@ export function ReadingsListPage() {
   }, [readings, deliveries, registerIndex]);
 
   const filtered = useMemo(() => {
+    const needle = debouncedSearch ? debouncedSearch.toLowerCase() : '';
     return items.filter((item) => {
       const { info } = item;
       if (locationFilter.size > 0 && !locationFilter.has(info.locationId)) return false;
@@ -203,8 +215,7 @@ export function ReadingsListPage() {
       if (mpFilter.size > 0 && !mpFilter.has(info.mpId)) return false;
       if (obisFilter.size > 0 && !obisFilter.has(info.obisCode)) return false;
       if (kindFilter.size > 0 && !kindFilter.has(item.kind)) return false;
-      if (search) {
-        const needle = search.toLowerCase();
+      if (needle) {
         const note =
           item.kind === 'delivery' ? (item.delivery.note ?? '') : (item.reading.note ?? '');
         const haystack =
@@ -221,7 +232,7 @@ export function ReadingsListPage() {
       }
       return true;
     });
-  }, [items, locationFilter, typeFilter, mpFilter, obisFilter, search, kindFilter]);
+  }, [items, locationFilter, typeFilter, mpFilter, obisFilter, debouncedSearch, kindFilter]);
 
   // Tag-Gruppen für die Anzeige
   const groupedByDay = useMemo(() => {
@@ -493,13 +504,7 @@ export function ReadingsListPage() {
                       delivery={item.delivery}
                       info={item.info}
                       me={me}
-                      onEdit={() =>
-                        setEditTarget({
-                          kind: 'delivery',
-                          delivery: item.delivery,
-                          info: item.info,
-                        })
-                      }
+                      setEditTarget={setEditTarget}
                       onChanged={refresh}
                     />
                   ) : (
@@ -510,13 +515,7 @@ export function ReadingsListPage() {
                       kind={item.kind}
                       previous={prevValueByReading.get(item.reading.id) ?? null}
                       me={me}
-                      onEdit={() =>
-                        setEditTarget({
-                          kind: 'reading',
-                          reading: item.reading,
-                          info: item.info,
-                        })
-                      }
+                      setEditTarget={setEditTarget}
                       onChanged={refresh}
                     />
                   ),
@@ -586,13 +585,17 @@ function DateInput({
   );
 }
 
-function ReadingItem({
+// React.memo: rendert nur, wenn sich Props effektiv ändern. Mit stabilem
+// `setEditTarget` (React garantiert stable setState) und stabilem `onChanged`
+// (useCallback im Parent) re-rendert ein Item beim Sheet-Open / Filter-Wechsel
+// nur dann, wenn seine eigenen Daten sich geändert haben.
+const ReadingItem = memo(function ReadingItem({
   reading,
   info,
   kind,
   previous,
   me,
-  onEdit,
+  setEditTarget,
   onChanged,
 }: {
   reading: ReadingRead;
@@ -600,12 +603,17 @@ function ReadingItem({
   kind: 'reading' | 'correction';
   previous: number | null;
   me: Me | null;
-  onEdit: () => void;
+  setEditTarget: (target: EditTarget) => void;
   onChanged: () => void;
 }) {
   const editable = me ? canEdit(me, reading) : false;
   const correction = kind === 'correction';
   const [busy, setBusy] = useState(false);
+
+  const onEdit = useCallback(
+    () => setEditTarget({ kind: 'reading', reading, info }),
+    [setEditTarget, reading, info],
+  );
 
   const current = Number(reading.value);
   const rawDelta = !correction && previous !== null ? current - previous : null;
@@ -700,23 +708,28 @@ function ReadingItem({
       </div>
     </li>
   );
-}
+});
 
-function DeliveryItem({
+const DeliveryItem = memo(function DeliveryItem({
   delivery,
   info,
   me,
-  onEdit,
+  setEditTarget,
   onChanged,
 }: {
   delivery: DeliveryRead;
   info: RegisterIndex;
   me: Me | null;
-  onEdit: () => void;
+  setEditTarget: (target: EditTarget) => void;
   onChanged: () => void;
 }) {
   const editable = me?.role === 'admin';
   const [busy, setBusy] = useState(false);
+
+  const onEdit = useCallback(
+    () => setEditTarget({ kind: 'delivery', delivery, info }),
+    [setEditTarget, delivery, info],
+  );
 
   async function remove() {
     if (
@@ -788,7 +801,7 @@ function DeliveryItem({
       </div>
     </li>
   );
-}
+});
 
 function EditForm({
   reading,
