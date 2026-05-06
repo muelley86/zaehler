@@ -10,6 +10,13 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.6.3](https://github.com/muelley86/zaehler/compare/v2.6.2...v2.6.3) (2026-05-06)
+
+
+### Fehlerbehebungen
+
+* **audit:** UTC-Marker für Server-Zeitstempel + Lokalzeit-Anzeige ([9376786](https://github.com/muelley86/zaehler/commit/937678610d05297c6f8956e2aa65d29e3d8d9d18))
+
 ## [2.6.2](https://github.com/muelley86/zaehler/compare/v2.6.1...v2.6.2) (2026-05-05)
 
 
