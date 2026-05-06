@@ -48,7 +48,18 @@
       "Bash(python -c 'import ast; ast.parse\\(open\\('\\\\''__TRACKED_VAR__'\\\\'', encoding='\\\\''utf-8'\\\\''\\).read\\(\\)\\)')",
       "Bash(python *)",
       "Bash('/c/Program Files/nodejs/corepack.cmd' pnpm test -- --run src/features/admin)",
-      "Bash('/c/Program Files/nodejs/corepack.cmd' pnpm test -- --run)"
+      "Bash('/c/Program Files/nodejs/corepack.cmd' pnpm test -- --run)",
+      "WebSearch",
+      "WebFetch(domain:www.avery-zweckform.com)",
+      "WebFetch(domain:hlabels.com)",
+      "WebFetch(domain:gist.githubusercontent.com)",
+      "WebFetch(domain:www.avery.ae)",
+      "WebFetch(domain:foxylabels.com)",
+      "Bash(pnpm type-check *)",
+      "Bash(pnpm install *)",
+      "Bash(pnpm lint *)",
+      "Bash(pnpm build *)",
+      "Bash(pnpm test *)"
     ]
   }
 }
