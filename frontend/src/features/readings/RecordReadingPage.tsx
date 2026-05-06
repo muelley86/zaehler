@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
 import { Check, Gauge } from 'lucide-react';
 
@@ -224,9 +224,11 @@ function ReadingsForm({
     setError(null);
   }, [mp.id]);
 
-  function setValue(registerId: number, v: string) {
+  // Stabile Referenz, damit React.memo in RegisterRow greift und nur die
+  // tatsächlich getippte Zeile re-rendert (wichtig bei mehreren Registern).
+  const setValue = useCallback((registerId: number, v: string) => {
     setValues((prev) => ({ ...prev, [registerId]: v }));
-  }
+  }, []);
 
   async function postOne(
     registerId: number,
@@ -316,7 +318,7 @@ function ReadingsForm({
                 register={ar.register}
                 state={state}
                 value={values[ar.register.id] ?? ''}
-                onChange={(v) => setValue(ar.register.id, v)}
+                setValue={setValue}
                 transformerFactor={mp.transformer_factor}
               />
             );
@@ -365,31 +367,41 @@ function ReadingsForm({
   );
 }
 
-function RegisterRow({
+// React.memo: rendert nur, wenn sich Props effektiv ändern. Zusammen mit
+// useCallback(setValue, []) und useMemo für die Delta-Berechnung sorgt das
+// dafür, dass beim Tippen in Feld 1 nur dessen RegisterRow re-rendert.
+const RegisterRow = memo(function RegisterRow({
   register,
   state,
   value,
-  onChange,
+  setValue,
   transformerFactor,
 }: {
   register: RegisterRead;
   state: RegisterStateRead | null;
   value: string;
-  onChange: (v: string) => void;
+  setValue: (registerId: number, v: string) => void;
   transformerFactor: number | null;
 }) {
-  const parsed = (() => {
+  const onChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => setValue(register.id, e.target.value),
+    [setValue, register.id],
+  );
+
+  const { delta, negative } = useMemo(() => {
+    let parsed: number | null;
     try {
-      return value.trim() === '' ? null : Number(parseDe(value));
+      parsed = value.trim() === '' ? null : Number(parseDe(value));
     } catch {
-      return null;
+      parsed = null;
     }
-  })();
-  const lastValue = state?.last_reading_value ? Number(state.last_reading_value) : null;
-  const rawDelta = parsed !== null && lastValue !== null ? parsed - lastValue : null;
-  const delta =
-    rawDelta !== null && transformerFactor !== null ? rawDelta * transformerFactor : rawDelta;
-  const negative = delta !== null && delta < 0 && !register.accepts_deliveries;
+    const lastValue = state?.last_reading_value ? Number(state.last_reading_value) : null;
+    const rawDelta = parsed !== null && lastValue !== null ? parsed - lastValue : null;
+    const d =
+      rawDelta !== null && transformerFactor !== null ? rawDelta * transformerFactor : rawDelta;
+    const neg = d !== null && d < 0 && !register.accepts_deliveries;
+    return { delta: d, negative: neg };
+  }, [value, state, transformerFactor, register.accepts_deliveries]);
 
   return (
     <div className="space-y-1.5">
@@ -413,7 +425,7 @@ function RegisterRow({
           inputMode="decimal"
           pattern="[0-9.,]+"
           value={value}
-          onChange={(e) => onChange(e.target.value)}
+          onChange={onChange}
           placeholder="leer = nicht erfassen"
           numeric
           inputClassName="text-headline"
@@ -432,7 +444,7 @@ function RegisterRow({
       ) : null}
     </div>
   );
-}
+});
 
 // ---------------------------------------------------------------------------
 // Lieferungs-Formular: ein Register + Menge + Zeitpunkt.

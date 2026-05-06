@@ -122,7 +122,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     );
 
   return (
-    <div className="flex min-h-full flex-col md:flex-row">
+    <div className="flex min-h-full w-full min-w-0 flex-col md:flex-row">
       {/* ============ Sidebar (Desktop) ============ */}
       <aside
         data-testid="app-sidebar"
@@ -214,7 +214,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       </aside>
 
       {/* ============ Main + Mobile-Chrome ============ */}
-      <div className="flex min-h-0 flex-1 flex-col">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         {/* Mobile-Header */}
         <header
           data-testid="app-mobile-header"
@@ -226,7 +226,9 @@ export function AppShell({ children }: { children: ReactNode }) {
           <div className="pt-3 text-caption text-tertiary">{me?.username}</div>
         </header>
 
-        <main className="min-h-0 flex-1 overflow-y-auto pb-24 md:pb-8">{children}</main>
+        <main className="min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden pb-24 md:pb-8">
+          {children}
+        </main>
 
         {/* Mobile-Bottom-Tab-Bar */}
         <nav

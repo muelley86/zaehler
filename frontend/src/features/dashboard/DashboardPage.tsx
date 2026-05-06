@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
 import { Download, Filter, Plus } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -37,6 +37,10 @@ import type {
   RegisterStateRead,
 } from '@/lib/types';
 import { TYPE_LABELS, TYPE_ORDER, describeMeterType } from '@/lib/meterLabels';
+
+// Konstante Chart-Margin als Modul-Const, damit Recharts nicht bei jedem
+// Render eine neue Object-Referenz sieht (Recharts vergleicht per ===).
+const CHART_MARGIN = { top: 10, right: 16, bottom: 8, left: 8 } as const;
 
 interface ConsumptionsByMP {
   [mpId: number]: ConsumptionPoint[];
@@ -429,18 +433,46 @@ function MeasuringPointCard({
       ?.unit ??
     '';
 
-  const labelByObis = new Map<string, string>();
-  const unitByObis = new Map<string, string>();
-  for (const meter of mp.physical_meters) {
-    for (const r of meter.registers) {
-      if (!labelByObis.has(r.obis_code)) labelByObis.set(r.obis_code, r.label);
-      if (!unitByObis.has(r.obis_code)) unitByObis.set(r.obis_code, r.unit);
+  const labelByObis = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const meter of mp.physical_meters) {
+      for (const r of meter.registers) {
+        if (!m.has(r.obis_code)) m.set(r.obis_code, r.label);
+      }
     }
-  }
-  const seriesLabel = (code: string) => {
-    const base = labelByObis.get(code) ?? code;
-    return mode === 'consumption' ? `Verbrauch · ${base}` : base;
-  };
+    return m;
+  }, [mp.physical_meters]);
+
+  const seriesLabel = useCallback(
+    (code: string) => {
+      const base = labelByObis.get(code) ?? code;
+      return mode === 'consumption' ? `Verbrauch · ${base}` : base;
+    },
+    [labelByObis, mode],
+  );
+
+  // Stabile Style-Objekte für Recharts (Tooltip/Legend) — sonst sieht
+  // Recharts bei jedem Render neue Referenzen und re-rendert die ganze
+  // Subtree, auch wenn theme & Daten gleich sind.
+  const tooltipContentStyle = useMemo(
+    () => ({
+      backgroundColor: theme.tooltipBg,
+      border: `1px solid ${theme.tooltipBorder}`,
+      borderRadius: 12,
+      color: theme.label,
+    }),
+    [theme],
+  );
+  const tooltipLabelStyle = useMemo(() => ({ color: theme.label }), [theme.label]);
+  const legendWrapperStyle = useMemo(() => ({ fontSize: 12, color: theme.label }), [theme.label]);
+  const tooltipFormatter = useCallback(
+    (value: number | string, name: string) => [
+      `${formatDe(value as number)}${unit ? ' ' + unit : ''}`,
+      seriesLabel(String(name)),
+    ],
+    [unit, seriesLabel],
+  );
+  const legendFormatter = useCallback((name: string) => seriesLabel(String(name)), [seriesLabel]);
 
   const consumptionTotals = new Map<string, { sum: number; unit: string }>();
   for (const p of consumption) {
@@ -529,7 +561,7 @@ function MeasuringPointCard({
       ) : (
         <div className="h-64 w-full">
           <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={series} margin={{ top: 10, right: 16, bottom: 8, left: 8 }}>
+            <LineChart data={series} margin={CHART_MARGIN}>
               <CartesianGrid strokeDasharray="3 3" stroke={theme.grid} />
               <XAxis dataKey="date" tick={{ fontSize: 11, fill: theme.axis }} stroke={theme.axis} />
               <YAxis
@@ -549,22 +581,11 @@ function MeasuringPointCard({
                   : {})}
               />
               <Tooltip
-                contentStyle={{
-                  backgroundColor: theme.tooltipBg,
-                  border: `1px solid ${theme.tooltipBorder}`,
-                  borderRadius: 12,
-                  color: theme.label,
-                }}
-                labelStyle={{ color: theme.label }}
-                formatter={(value, name) => [
-                  `${formatDe(value as number)}${unit ? ' ' + unit : ''}`,
-                  seriesLabel(String(name)),
-                ]}
+                contentStyle={tooltipContentStyle}
+                labelStyle={tooltipLabelStyle}
+                formatter={tooltipFormatter}
               />
-              <Legend
-                formatter={(name) => seriesLabel(String(name))}
-                wrapperStyle={{ fontSize: 12, color: theme.label }}
-              />
+              <Legend formatter={legendFormatter} wrapperStyle={legendWrapperStyle} />
               {obisCodes.map((code, idx) => (
                 <Line
                   key={code}

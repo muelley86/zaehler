@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
 import { ArrowLeft, ChevronRight, Map as MapIcon, Pencil } from 'lucide-react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
@@ -13,7 +13,15 @@ import {
   YAxis,
 } from 'recharts';
 
-import { Button, Card, EmptyState, LargeTitle, Section, TextField, TypeBadge } from '@/components/ui';
+import {
+  Button,
+  Card,
+  EmptyState,
+  LargeTitle,
+  Section,
+  TextField,
+  TypeBadge,
+} from '@/components/ui';
 import { PageGlows } from '@/components/PageGlows';
 import { LocationMapSheet } from '@/components/LocationMapSheet';
 import { useAuth } from '@/features/auth/auth-context';
@@ -27,6 +35,10 @@ import type {
   RegisterStateRead,
 } from '@/lib/types';
 import { describeMeterType } from '@/lib/meterLabels';
+
+// Konstante Chart-Margin als Modul-Const, damit Recharts keine neue
+// Object-Referenz pro Render sieht.
+const CHART_MARGIN = { top: 10, right: 16, bottom: 8, left: 8 } as const;
 
 export function MeasuringPointDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -45,19 +57,11 @@ export function MeasuringPointDetailPage() {
       navigate('/messstellen', { replace: true });
       return;
     }
+    // Drei Endpoints parallel — keine Cascade. Location wird in einem
+    // separaten useEffect anhand von mp.location_id nachgeladen.
     api
       .get<MeasuringPointRead>(`/measuring-points/${mpId}`)
-      .then((data) => {
-        setMp(data);
-        if (data.location_id !== null) {
-          api
-            .get<LocationRead>(`/locations/${data.location_id}`)
-            .then(setLocation)
-            .catch(() => {
-              /* nicht kritisch — Standort-Detail optional */
-            });
-        }
-      })
+      .then(setMp)
       .catch((err: unknown) => {
         if (err instanceof ApiError) setError(err.problem.detail ?? err.problem.title);
         else setError('Konnte Messstelle nicht laden.');
@@ -75,6 +79,21 @@ export function MeasuringPointDetailPage() {
         /* nicht kritisch */
       });
   }, [mpId, navigate]);
+
+  // Standort-Detail nur laden, wenn die MP einen hat. Optional, daher
+  // schluckt der Catch leise.
+  useEffect(() => {
+    if (mp?.location_id == null) {
+      setLocation(null);
+      return;
+    }
+    api
+      .get<LocationRead>(`/locations/${mp.location_id}`)
+      .then(setLocation)
+      .catch(() => {
+        /* nicht kritisch — Standort-Detail optional */
+      });
+  }, [mp?.location_id]);
 
   if (error) {
     return (
@@ -283,7 +302,7 @@ function MeasuringPointTitle({
               <button
                 type="button"
                 onClick={startEdit}
-                className="hover:bg-fill-strong rounded-full bg-fill p-2 text-tertiary transition-colors hover:text-label"
+                className="rounded-full bg-fill p-2 text-tertiary transition-colors hover:bg-fill-strong hover:text-label"
                 aria-label="Namen bearbeiten"
                 title="Namen bearbeiten"
               >
@@ -336,6 +355,57 @@ function ConsumptionChart({
 }) {
   const theme = useChartTheme();
 
+  // Alle Hooks vor dem early return — Rules of Hooks.
+  // Pro period_end ein Punkt mit allen OBIS-Codes daneben.
+  const { series, obisCodes } = useMemo(() => {
+    const merged = new Map<string, Record<string, number | string>>();
+    for (const p of consumption) {
+      const row = merged.get(p.period_end) ?? { date: p.period_end };
+      row[p.obis_code] = Number(p.consumption);
+      merged.set(p.period_end, row);
+    }
+    const sorted = Array.from(merged.values()).sort((a, b) =>
+      String(a['date']).localeCompare(String(b['date'])),
+    );
+    const codes = Array.from(new Set(consumption.map((p) => p.obis_code)));
+    return { series: sorted, obisCodes: codes };
+  }, [consumption]);
+  const unit = consumption[0]?.unit ?? '';
+
+  const labelByObis = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const meter of mp.physical_meters) {
+      for (const r of meter.registers) {
+        if (!m.has(r.obis_code)) m.set(r.obis_code, r.label);
+      }
+    }
+    return m;
+  }, [mp.physical_meters]);
+
+  // Stabile Recharts-Props (siehe DashboardPage für Begründung).
+  const tooltipContentStyle = useMemo(
+    () => ({
+      backgroundColor: theme.tooltipBg,
+      border: `1px solid ${theme.tooltipBorder}`,
+      borderRadius: 12,
+      color: theme.label,
+    }),
+    [theme],
+  );
+  const tooltipLabelStyle = useMemo(() => ({ color: theme.label }), [theme.label]);
+  const legendWrapperStyle = useMemo(() => ({ fontSize: 12, color: theme.label }), [theme.label]);
+  const tooltipFormatter = useCallback(
+    (value: number | string, name: string) => [
+      `${formatDe(value as number)}${unit ? ' ' + unit : ''}`,
+      labelByObis.get(String(name)) ?? String(name),
+    ],
+    [unit, labelByObis],
+  );
+  const legendFormatter = useCallback(
+    (name: string) => labelByObis.get(String(name)) ?? String(name),
+    [labelByObis],
+  );
+
   if (consumption.length === 0) {
     return (
       <Section header="Verbrauchskurve">
@@ -344,26 +414,6 @@ function ConsumptionChart({
         </div>
       </Section>
     );
-  }
-
-  // Pro period_end ein Punkt mit allen OBIS-Codes daneben.
-  const merged = new Map<string, Record<string, number | string>>();
-  for (const p of consumption) {
-    const row = merged.get(p.period_end) ?? { date: p.period_end };
-    row[p.obis_code] = Number(p.consumption);
-    merged.set(p.period_end, row);
-  }
-  const series = Array.from(merged.values()).sort((a, b) =>
-    String(a['date']).localeCompare(String(b['date'])),
-  );
-  const obisCodes = Array.from(new Set(consumption.map((p) => p.obis_code)));
-  const unit = consumption[0]?.unit ?? '';
-
-  const labelByObis = new Map<string, string>();
-  for (const meter of mp.physical_meters) {
-    for (const r of meter.registers) {
-      if (!labelByObis.has(r.obis_code)) labelByObis.set(r.obis_code, r.label);
-    }
   }
 
   const total = consumption.reduce((acc, p) => acc + Number(p.consumption), 0);
@@ -384,7 +434,7 @@ function ConsumptionChart({
         </div>
         <div className="h-64 w-full">
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={series} margin={{ top: 10, right: 16, bottom: 8, left: 8 }}>
+            <AreaChart data={series} margin={CHART_MARGIN}>
               <defs>
                 {obisCodes.map((code, idx) => (
                   <linearGradient
@@ -416,22 +466,11 @@ function ConsumptionChart({
                 tickFormatter={(v) => formatDe(v as number)}
               />
               <Tooltip
-                contentStyle={{
-                  backgroundColor: theme.tooltipBg,
-                  border: `1px solid ${theme.tooltipBorder}`,
-                  borderRadius: 12,
-                  color: theme.label,
-                }}
-                labelStyle={{ color: theme.label }}
-                formatter={(value, name) => [
-                  `${formatDe(value as number)}${unit ? ' ' + unit : ''}`,
-                  labelByObis.get(String(name)) ?? String(name),
-                ]}
+                contentStyle={tooltipContentStyle}
+                labelStyle={tooltipLabelStyle}
+                formatter={tooltipFormatter}
               />
-              <Legend
-                formatter={(name) => labelByObis.get(String(name)) ?? String(name)}
-                wrapperStyle={{ fontSize: 12, color: theme.label }}
-              />
+              <Legend formatter={legendFormatter} wrapperStyle={legendWrapperStyle} />
               {obisCodes.map((code, idx) => (
                 <Area
                   key={code}

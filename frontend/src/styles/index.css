@@ -105,6 +105,17 @@ body,
   height: 100%;
 }
 
+/*
+ * iOS-Safari rendert die Seite initial herausgezoomt, sobald irgendein
+ * Kind über die Viewport-Breite hinausragt. `overflow-x: clip` schneidet
+ * solche Ausreißer ab, ohne (anders als overflow: hidden) einen scroll-
+ * Container zu erzeugen — sticky/fixed bleiben relativ zum Viewport.
+ */
+html,
+body {
+  overflow-x: clip;
+}
+
 body {
   background-color: var(--bg);
   color: var(--label);
