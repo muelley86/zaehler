@@ -13,6 +13,7 @@ from meters.models.delivery import Delivery
 from meters.models.location import Location
 from meters.models.measuring_point import MeasuringPoint
 from meters.models.physical_meter import PhysicalMeter
+from meters.models.qr_token import QrToken
 from meters.models.reading import Reading
 from meters.models.register import Register
 from meters.models.session import Session
@@ -31,6 +32,7 @@ __all__ = [
     "MeterType",
     "PendingTotpChallenge",
     "PhysicalMeter",
+    "QrToken",
     "Reading",
     "Register",
     "Session",

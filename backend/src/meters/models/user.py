@@ -45,6 +45,14 @@ class User(Base, TimestampMixin):
     totp_enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     totp_secret: Mapped[str | None] = mapped_column(String(64))
 
+    # Recorder-Berechtigung: darf unzugeordnete QR-Codes selbst einer MP
+    # zuordnen. Default false — Admin schaltet pro Mitarbeiter explizit frei.
+    # Für Admins ist der Wert irrelevant, da sie die Berechtigung implizit
+    # haben.
+    can_assign_qr_tokens: Mapped[bool] = mapped_column(
+        Boolean, default=False, nullable=False, server_default="0",
+    )
+
     sessions: Mapped[list[Session]] = relationship(
         "Session",
         back_populates="user",

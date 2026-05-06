@@ -68,6 +68,7 @@ def test_full_upgrade_to_head(fresh_engine: Engine) -> None:
             "delivery",
             "location",
             "user_measuring_point_access",
+            "qr_token",
         ):
             row = conn.execute(
                 text("SELECT name FROM sqlite_master WHERE type='table' AND name=:n"),

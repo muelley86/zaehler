@@ -42,6 +42,14 @@ class AuditAction(enum.StrEnum):
     # steht im ``diff``.
     ACCESS_GRANTED = "access_granted"
     ACCESS_REVOKED = "access_revoked"
+    # QR-Token-Verheiratung (Feature A): Admin oder berechtigter Recorder
+    # erzeugt einen anonymen Token, ordnet ihn einer MP zu, hängt ihn um
+    # oder löscht ihn. ``entity_type`` ist ``QR_TOKEN``, ``entity_id`` ist
+    # die DB-ID des Tokens.
+    TOKEN_CREATED = "token_created"
+    TOKEN_ASSIGNED = "token_assigned"
+    TOKEN_UNASSIGNED = "token_unassigned"
+    TOKEN_DELETED = "token_deleted"
 
 
 class AuditEntityType(enum.StrEnum):
@@ -53,3 +61,4 @@ class AuditEntityType(enum.StrEnum):
     LOCATION = "location"
     DELIVERY = "delivery"
     SESSION = "session"
+    QR_TOKEN = "qr_token"
