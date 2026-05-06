@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(uv run *)",
+      "PowerShell(Get-Command *)",
+      "PowerShell($PWD.Path)",
+      "PowerShell(where.exe uv 2>$null; if \\($LASTEXITCODE -ne 0\\) { \"uv not in PATH\" })",
+      "PowerShell(Get-ChildItem -Force | Where-Object { $_.Name -match 'venv|env' } | Select-Object Name; Get-ChildItem .. -Force | Where-Object { $_.Name -match 'venv|env' } | Select-Object Name)",
+      "PowerShell($env:PATH -split ';' | Where-Object { $_ -match 'node|python|uv|pnpm' })",
+      "PowerShell(& 'C:\\\\Program Files\\\\nodejs\\\\npm.cmd' exec --offline -- pnpm --version 2>&1 | Select-Object -Last 5)",
+      "PowerShell(git *)",
+      "PowerShell(Get-ChildItem *)",
+      "PowerShell(git status *)"
+    ]
+  }
+}
