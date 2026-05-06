@@ -33,7 +33,22 @@
       "PowerShell(where.exe node 2>&1; where.exe pnpm 2>&1; where.exe npm 2>&1; \"PATH:\"; $env:Path)",
       "PowerShell(Get-ChildItem \"C:\\\\Users\\\\kmueller\\\\DEV\\\\zaehler\\\\backend\" -Filter \".venv\" -Directory; Get-ChildItem \"C:\\\\Users\\\\kmueller\\\\DEV\\\\zaehler\\\\backend\\\\.venv\\\\Scripts\" -ErrorAction SilentlyContinue | Where-Object { $_.Name -match \"python|pytest\" } | Select-Object Name)",
       "Bash(git commit *)",
-      "Bash(pnpm --version)"
+      "Bash(pnpm --version)",
+      "Bash('/c/Program Files/nodejs/corepack.cmd' pnpm --version)",
+      "Bash('/c/Program Files/nodejs/corepack.cmd' pnpm install --lockfile-only)",
+      "Bash('/c/Program Files/nodejs/corepack.cmd' pnpm install)",
+      "Bash('/c/Program Files/nodejs/corepack.cmd' pnpm type-check)",
+      "Bash('/c/Program Files/nodejs/corepack.cmd' pnpm build)",
+      "Bash('/c/Program Files/nodejs/corepack.cmd' pnpm test --run src/features/scanner src/features/readings)",
+      "Bash('/c/Program Files/nodejs/corepack.cmd' pnpm test -- --run src/features/scanner src/features/readings)",
+      "Bash('/c/Program Files/nodejs/corepack.cmd' pnpm test -- --run src/features/readings)",
+      "Bash('/c/Program Files/nodejs/corepack.cmd' pnpm test -- --run src/features/readings/RecordReadingPage.test.tsx)",
+      "PowerShell(python -c \"import ast; ast.parse\\(open\\(r'C:\\\\Users\\\\kmueller\\\\DEV\\\\zaehler\\\\backend\\\\src\\\\meters\\\\models\\\\user_measuring_point_access.py', encoding='utf-8'\\).read\\(\\)\\); print\\('user_measuring_point_access.py: OK'\\)\"; python -c \"import ast; ast.parse\\(open\\(r'C:\\\\Users\\\\kmueller\\\\DEV\\\\zaehler\\\\backend\\\\alembic\\\\versions\\\\20260506_1300_user_mp_access.py', encoding='utf-8'\\).read\\(\\)\\); print\\('migration: OK'\\)\"; python -c \"import ast; ast.parse\\(open\\(r'C:\\\\Users\\\\kmueller\\\\DEV\\\\zaehler\\\\backend\\\\src\\\\meters\\\\models\\\\_enums.py', encoding='utf-8'\\).read\\(\\)\\); print\\('_enums.py: OK'\\)\"; python -c \"import ast; ast.parse\\(open\\(r'C:\\\\Users\\\\kmueller\\\\DEV\\\\zaehler\\\\backend\\\\src\\\\meters\\\\models\\\\__init__.py', encoding='utf-8'\\).read\\(\\)\\); print\\('__init__.py: OK'\\)\")",
+      "PowerShell(python -c \"import ast; ast.parse\\(open\\(r'C:\\\\Users\\\\kmueller\\\\DEV\\\\zaehler\\\\backend\\\\src\\\\meters\\\\services\\\\access.py', encoding='utf-8'\\).read\\(\\)\\); print\\('access.py: OK'\\)\"; python -c \"import ast; ast.parse\\(open\\(r'C:\\\\Users\\\\kmueller\\\\DEV\\\\zaehler\\\\backend\\\\tests\\\\unit\\\\test_access_service.py', encoding='utf-8'\\).read\\(\\)\\); print\\('test_access_service.py: OK'\\)\")",
+      "Bash(python -c 'import ast; ast.parse\\(open\\('\\\\''__TRACKED_VAR__'\\\\'', encoding='\\\\''utf-8'\\\\''\\).read\\(\\)\\)')",
+      "Bash(python *)",
+      "Bash('/c/Program Files/nodejs/corepack.cmd' pnpm test -- --run src/features/admin)",
+      "Bash('/c/Program Files/nodejs/corepack.cmd' pnpm test -- --run)"
     ]
   }
 }
