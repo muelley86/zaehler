@@ -13,6 +13,7 @@ import { http, HttpResponse } from 'msw';
 import { describe, expect, it, vi } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { useNavigate } from 'react-router-dom';
 
 import { renderWithRouter } from '@/tests/render';
 import { server } from '@/tests/server';
@@ -181,5 +182,60 @@ describe('RecordReadingPage', () => {
     expect(await screen.findByTestId('record-param-warning')).toHaveTextContent(/999/);
     // Default-MP greift trotzdem.
     expect(screen.getByText('Bezug')).toBeInTheDocument();
+  });
+
+  // Regression: Bug "QR-Scan navigiert nicht zur richtigen MP". Ein per
+  // navigate('/erfassen?mp=N') gesetzter Param muss auch dann greifen, wenn
+  // bereits eine andere MP ausgewählt ist (typisch nach In-App-Scan).
+  it('wechselt die MP, wenn ?mp= nachträglich per navigate gesetzt wird', async () => {
+    _mockListEndpoints([
+      _mp({ id: 1, name: 'Strom' }),
+      _mp({
+        id: 2,
+        name: 'Wasser',
+        type: 'water',
+        physical_meters: [
+          {
+            id: 20,
+            serial_number: 'W-1',
+            installed_at: '2024-01-01',
+            removed_at: null,
+            registers: [
+              { id: 200, obis_code: 'water', label: 'Wasser', unit: 'm³', ..._baseRegister },
+            ],
+          },
+        ],
+      }),
+    ]);
+
+    function ScanTrigger() {
+      const navigate = useNavigate();
+      return (
+        <button type="button" onClick={() => navigate('/erfassen?mp=2')}>
+          simulate-scan
+        </button>
+      );
+    }
+
+    const user = userEvent.setup();
+    renderWithRouter(
+      <>
+        <ScanTrigger />
+        <RecordReadingPage />
+      </>,
+      { initialEntries: ['/erfassen'] },
+    );
+
+    // Default-MP (Strom) wird zuerst geladen.
+    expect(await screen.findByText('Bezug')).toBeInTheDocument();
+    const select = screen.getByRole('combobox') as HTMLSelectElement;
+    expect(select.value).toBe('1');
+
+    // Scan simulieren: navigate setzt ?mp=2.
+    await user.click(screen.getByRole('button', { name: 'simulate-scan' }));
+
+    // MP 2 muss aktiv werden — Bezug-Register verschwindet, Select springt auf 2.
+    await waitFor(() => expect(select.value).toBe('2'));
+    expect(screen.queryByText('Bezug')).not.toBeInTheDocument();
   });
 });

@@ -98,12 +98,13 @@ export function RecordReadingPage() {
     refreshStates(points);
   }, [points]);
 
-  // MP-Auswahl: zuerst URL-Param ?mp= (vom QR-Scan), dann Default = erste MP
-  // mit aktiven Registern. Der URL-Param wird nach erfolgreicher Anwendung
-  // entfernt, damit er beim nächsten manuellen Wechsel nicht zurückspringt.
+  // MP-Auswahl: URL-Param ?mp= hat IMMER Priorität (auch wenn die User schon
+  // eine andere MP gewählt hat — typisch nach einem QR-Scan, der per
+  // navigate() den Param setzt während wir bereits auf /erfassen sind).
+  // Der Param wird nach Anwendung aus der URL entfernt, damit er beim
+  // nächsten manuellen Wechsel nicht zurückspringt.
   useEffect(() => {
     if (!points) return;
-    if (mpId !== null && points.some((mp) => mp.id === mpId)) return;
 
     const mpParam = searchParams.get('mp');
     if (mpParam !== null) {
@@ -112,24 +113,29 @@ export function RecordReadingPage() {
         Number.isFinite(parsed) ? points.find((mp) => mp.id === parsed) ?? null : null;
       if (target && activeRegistersOf(target).length > 0) {
         setMpId(target.id);
-        const next = new URLSearchParams(searchParams);
-        next.delete('mp');
-        setSearchParams(next, { replace: true });
-        return;
+      } else {
+        setParamWarning(
+          target
+            ? `Messstelle „${target.name}" hat keine aktiven Register.`
+            : `Messstelle mit ID ${mpParam} wurde nicht gefunden.`,
+        );
       }
-      setParamWarning(
-        target
-          ? `Messstelle „${target.name}" hat keine aktiven Register.`
-          : `Messstelle mit ID ${mpParam} wurde nicht gefunden.`,
-      );
       const next = new URLSearchParams(searchParams);
       next.delete('mp');
       setSearchParams(next, { replace: true });
+      return;
     }
 
+    // Default: erste MP mit aktiven Registern, falls noch keine ausgewählt
+    if (mpId !== null && points.some((mp) => mp.id === mpId)) return;
     const first = points.find((mp) => activeRegistersOf(mp).length > 0);
     if (first) setMpId(first.id);
   }, [points, mpId, searchParams, setSearchParams]);
+
+  // Stabiler Close-Callback — verhindert, dass der QrScanSheet-Effect bei
+  // jedem Parent-Re-Render neu startet (sonst neuer getUserMedia-Aufruf
+  // und damit neuer Permission-Prompt).
+  const handleScannerClose = useCallback(() => setScannerOpen(false), []);
 
   const selectedMP = useMemo(
     () => (points && mpId !== null ? (points.find((mp) => mp.id === mpId) ?? null) : null),
@@ -259,7 +265,7 @@ export function RecordReadingPage() {
 
         <Suspense fallback={null}>
           {scannerOpen ? (
-            <QrScanSheet open={scannerOpen} onClose={() => setScannerOpen(false)} />
+            <QrScanSheet open={scannerOpen} onClose={handleScannerClose} />
           ) : null}
         </Suspense>
       </div>

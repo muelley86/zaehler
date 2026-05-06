@@ -9,6 +9,12 @@
  * Sicherheits-Invariante: ``parseScannedUrl`` extrahiert ausschließlich die
  * MP-ID; die Origin aus dem QR-Inhalt wird verworfen, damit ein unter-
  * geschobener Fremd-QR keine Cross-Origin-Navigation erzwingen kann.
+ *
+ * **Wichtig:** Der Camera-Effect hängt nur von ``open`` ab. ``navigate`` und
+ * ``onClose`` werden über Refs gespiegelt, damit Parent-Re-Renders den
+ * laufenden Stream NICHT neu starten — sonst würde der Browser bei jedem
+ * Re-Render erneut nach Kamera-Erlaubnis fragen und der iOS-Privacy-
+ * Indikator dauerhaft "blinken".
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -46,6 +52,13 @@ export function QrScanSheet({ open, onClose }: QrScanSheetProps) {
   const instanceRef = useRef<Html5QrcodeInstance | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [starting, setStarting] = useState(false);
+
+  // Refs für Callbacks, die der Parent pro Render möglicherweise neu erzeugt.
+  // Damit bleibt der Camera-Effect unabhängig vom Render-Zyklus stabil.
+  const navigateRef = useRef(navigate);
+  navigateRef.current = navigate;
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
 
   // Stop & clear in einem zentralen Helper, damit Unmount, manueller Close
   // und Erfolgs-Pfad alle dieselbe Cleanup-Sequenz verwenden.
@@ -94,8 +107,8 @@ export function QrScanSheet({ open, onClose }: QrScanSheetProps) {
             // useEffect-Cleanup räumt parallel auf. Wir warten nicht auf
             // ``stop()``, damit der UX-Übergang sofort passiert.
             void teardown();
-            navigate(`/erfassen?mp=${result.mp}`);
-            onClose();
+            navigateRef.current(`/erfassen?mp=${result.mp}`);
+            onCloseRef.current();
           },
           () => {
             /* Pro Frame ohne Treffer — bewusst keine Logs. */
@@ -123,14 +136,17 @@ export function QrScanSheet({ open, onClose }: QrScanSheetProps) {
       cancelled = true;
       void teardown();
     };
-  }, [open, navigate, onClose, teardown]);
+    // navigate und onClose absichtlich NICHT in den Deps — wir lesen sie
+    // über die Refs und vermeiden dadurch unnötige Stream-Neustarts.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, teardown]);
 
-  // Body-Scroll-Lock + ESC analog zum Sheet-Komponente. Der Scanner braucht
+  // Body-Scroll-Lock + ESC analog zur Sheet-Komponente. Der Scanner braucht
   // ein eigenes Layout (Vollbild Video), darum kein Re-Use des Sheet-UI.
   useEffect(() => {
     if (!open) return;
     function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape') onCloseRef.current();
     }
     document.addEventListener('keydown', onKey);
     const previous = document.body.style.overflow;
@@ -139,7 +155,7 @@ export function QrScanSheet({ open, onClose }: QrScanSheetProps) {
       document.removeEventListener('keydown', onKey);
       document.body.style.overflow = previous;
     };
-  }, [open, onClose]);
+  }, [open]);
 
   if (!open) return null;
 
@@ -152,7 +168,7 @@ export function QrScanSheet({ open, onClose }: QrScanSheetProps) {
         </div>
         <button
           type="button"
-          onClick={onClose}
+          onClick={() => onCloseRef.current()}
           aria-label="Scanner schließen"
           className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20"
         >
@@ -178,9 +194,12 @@ export function QrScanSheet({ open, onClose }: QrScanSheetProps) {
             {error}
           </div>
         ) : (
-          <div>
-            QR-Code in den Sucher halten — die App öffnet die richtige Erfassungsmaske
-            automatisch.
+          <div className="space-y-1">
+            <div>QR-Code in den Sucher halten — die App öffnet die richtige Maske automatisch.</div>
+            <div className="text-white/50">
+              Hinweis: Das rote bzw. grüne Symbol oben am Handy ist der System-Indikator für aktive
+              Kameranutzung — keine Aufnahme.
+            </div>
           </div>
         )}
       </div>
