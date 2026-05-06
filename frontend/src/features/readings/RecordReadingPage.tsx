@@ -1,6 +1,7 @@
-import { memo, useCallback, useEffect, useMemo, useState } from 'react';
+import { lazy, memo, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
-import { Check, Gauge } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
+import { Check, Gauge, QrCode } from 'lucide-react';
 
 import {
   Button,
@@ -24,6 +25,12 @@ import type {
   RegisterStateRead,
 } from '@/lib/types';
 import { cx } from '@/components/ui/cx';
+
+// Lazy-Load: der QR-Scanner zieht ``html5-qrcode`` nach (~70 KB) und wird
+// nur beim ersten Tap auf "Scannen" tatsächlich geladen.
+const QrScanSheet = lazy(() =>
+  import('@/features/scanner/QrScanSheet').then((m) => ({ default: m.QrScanSheet })),
+);
 
 type Mode = 'reading' | 'delivery';
 
@@ -52,6 +59,12 @@ export function RecordReadingPage() {
 
   const [mpId, setMpId] = useState<number | null>(null);
   const [mode, setMode] = useState<Mode>('reading');
+  // QR-/URL-Param-Hinweis ("?mp=42 nicht gefunden"). Einmaliger Toast,
+  // der nach Anzeige automatisch verworfen wird, damit er beim nächsten
+  // MP-Wechsel nicht erneut feuert.
+  const [paramWarning, setParamWarning] = useState<string | null>(null);
+  const [scannerOpen, setScannerOpen] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
 
   useEffect(() => {
     api
@@ -85,13 +98,38 @@ export function RecordReadingPage() {
     refreshStates(points);
   }, [points]);
 
-  // MP-Auswahl: Default = erste MP mit aktiven Registern
+  // MP-Auswahl: zuerst URL-Param ?mp= (vom QR-Scan), dann Default = erste MP
+  // mit aktiven Registern. Der URL-Param wird nach erfolgreicher Anwendung
+  // entfernt, damit er beim nächsten manuellen Wechsel nicht zurückspringt.
   useEffect(() => {
     if (!points) return;
     if (mpId !== null && points.some((mp) => mp.id === mpId)) return;
+
+    const mpParam = searchParams.get('mp');
+    if (mpParam !== null) {
+      const parsed = Number.parseInt(mpParam, 10);
+      const target =
+        Number.isFinite(parsed) ? points.find((mp) => mp.id === parsed) ?? null : null;
+      if (target && activeRegistersOf(target).length > 0) {
+        setMpId(target.id);
+        const next = new URLSearchParams(searchParams);
+        next.delete('mp');
+        setSearchParams(next, { replace: true });
+        return;
+      }
+      setParamWarning(
+        target
+          ? `Messstelle „${target.name}" hat keine aktiven Register.`
+          : `Messstelle mit ID ${mpParam} wurde nicht gefunden.`,
+      );
+      const next = new URLSearchParams(searchParams);
+      next.delete('mp');
+      setSearchParams(next, { replace: true });
+    }
+
     const first = points.find((mp) => activeRegistersOf(mp).length > 0);
     if (first) setMpId(first.id);
-  }, [points, mpId]);
+  }, [points, mpId, searchParams, setSearchParams]);
 
   const selectedMP = useMemo(
     () => (points && mpId !== null ? (points.find((mp) => mp.id === mpId) ?? null) : null),
@@ -139,15 +177,46 @@ export function RecordReadingPage() {
       <div className="space-y-5">
         <LargeTitle title="Erfassen" />
 
+        {paramWarning ? (
+          <div
+            data-testid="record-param-warning"
+            className="border-warning/40 bg-warning/10 flex items-start justify-between gap-3 rounded-card border-hairline p-3 text-caption text-secondary"
+            style={{ borderColor: 'var(--gas)' }}
+          >
+            <span>{paramWarning}</span>
+            <button
+              type="button"
+              onClick={() => setParamWarning(null)}
+              className="font-semibold text-primary-deep hover:underline"
+              aria-label="Hinweis schließen"
+            >
+              OK
+            </button>
+          </div>
+        ) : null}
+
         <Section header="Messstelle">
           <div className="p-5">
-            <Select value={mpId ?? ''} onChange={(e) => setMpId(Number(e.target.value))}>
-              {recordableMPs.map((mp) => (
-                <option key={mp.id} value={mp.id}>
-                  {mp.name}
-                </option>
-              ))}
-            </Select>
+            <div className="flex items-stretch gap-2">
+              <div className="flex-1">
+                <Select value={mpId ?? ''} onChange={(e) => setMpId(Number(e.target.value))}>
+                  {recordableMPs.map((mp) => (
+                    <option key={mp.id} value={mp.id}>
+                      {mp.name}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+              <button
+                type="button"
+                onClick={() => setScannerOpen(true)}
+                aria-label="QR-Code scannen"
+                title="QR-Code scannen"
+                className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-pill border-hairline border-border bg-fill text-secondary transition-colors hover:bg-fill-strong hover:text-label"
+              >
+                <QrCode size={20} />
+              </button>
+            </div>
             {selectedMP ? (
               <div className="mt-3 flex items-center gap-2.5 text-caption text-tertiary">
                 <TypeBadge type={selectedMP.type} size="sm" />
@@ -187,6 +256,12 @@ export function RecordReadingPage() {
             <DeliveryForm registers={deliveryRegisters} onSaved={() => refreshStates(points)} />
           )
         ) : null}
+
+        <Suspense fallback={null}>
+          {scannerOpen ? (
+            <QrScanSheet open={scannerOpen} onClose={() => setScannerOpen(false)} />
+          ) : null}
+        </Suspense>
       </div>
     </PageContainer>
   );

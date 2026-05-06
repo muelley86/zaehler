@@ -148,4 +148,38 @@ describe('RecordReadingPage', () => {
       expect(screen.getByTestId('record-error')).toHaveTextContent(/mindestens einen Wert/i),
     );
   });
+
+  it('wählt MP aus URL-Param ?mp= vor (QR-Scan-Deeplink)', async () => {
+    _mockListEndpoints([
+      _mp({ id: 1, name: 'Strom' }),
+      _mp({
+        id: 2,
+        name: 'Wasser',
+        type: 'water',
+        physical_meters: [
+          {
+            id: 20,
+            serial_number: 'W-1',
+            installed_at: '2024-01-01',
+            removed_at: null,
+            registers: [
+              { id: 200, obis_code: 'water', label: 'Wasser', unit: 'm³', ..._baseRegister },
+            ],
+          },
+        ],
+      }),
+    ]);
+    renderWithRouter(<RecordReadingPage />, { initialEntries: ['/erfassen?mp=2'] });
+    // Register-Label aus MP 2 muss erscheinen, nicht das aus MP 1.
+    expect(await screen.findByText('Wasser')).toBeInTheDocument();
+    expect(screen.queryByText('Bezug')).not.toBeInTheDocument();
+  });
+
+  it('zeigt Hinweis, wenn ?mp= auf eine unbekannte ID zeigt', async () => {
+    _mockListEndpoints([_mp({ id: 1, name: 'Strom' })]);
+    renderWithRouter(<RecordReadingPage />, { initialEntries: ['/erfassen?mp=999'] });
+    expect(await screen.findByTestId('record-param-warning')).toHaveTextContent(/999/);
+    // Default-MP greift trotzdem.
+    expect(screen.getByText('Bezug')).toBeInTheDocument();
+  });
 });
