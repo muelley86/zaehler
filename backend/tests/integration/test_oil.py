@@ -3,6 +3,29 @@ from __future__ import annotations
 from typing import Any, cast
 
 from fastapi.testclient import TestClient
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from meters.models import MeasuringPoint, User, UserMeasuringPointAccess
+
+
+def _grant_recorder_access_to_first_mp(
+    db: Session, *, recorder: User, granted_by: User
+) -> None:
+    """Per-Recorder MP-Zugriff (Feature B): Recorder bekommt explizit
+    Zugriff auf alle vorhandenen MPs — analog zum gleichnamigen Helper
+    in test_readings.py."""
+    for mp_id in db.scalars(select(MeasuringPoint.id)):
+        if db.get(UserMeasuringPointAccess, (recorder.id, mp_id)) is not None:
+            continue
+        db.add(
+            UserMeasuringPointAccess(
+                user_id=recorder.id,
+                measuring_point_id=mp_id,
+                granted_by_user_id=granted_by.id,
+            )
+        )
+    db.commit()
 
 
 def _create_oil(client: TestClient) -> dict[str, Any]:
@@ -151,9 +174,14 @@ def test_oil_consumption_with_deliveries(admin_client: TestClient) -> None:
 
 
 def test_recorder_can_record_delivery(
-    admin_client: TestClient, recorder_client: TestClient
+    admin_client: TestClient,
+    recorder_client: TestClient,
+    db: Session,
+    admin_user: User,
+    recorder_user: User,
 ) -> None:
     mp = _create_oil(admin_client)
+    _grant_recorder_access_to_first_mp(db, recorder=recorder_user, granted_by=admin_user)
     tank_id = _tank_register(mp)["id"]
     resp = recorder_client.post(
         f"/api/v1/registers/{tank_id}/deliveries",

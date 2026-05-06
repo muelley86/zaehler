@@ -1,6 +1,10 @@
 from __future__ import annotations
 
 from fastapi.testclient import TestClient
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from meters.models import MeasuringPoint, User, UserMeasuringPointAccess
 
 
 def _setup_water_mp(admin_client: TestClient) -> int:
@@ -20,6 +24,28 @@ def _setup_water_mp(admin_client: TestClient) -> int:
     body: dict[str, object] = resp.json()
     register_id: int = body["physical_meters"][0]["registers"][0]["id"]  # type: ignore[index]
     return register_id
+
+
+def _grant_recorder_access_to_first_mp(
+    db: Session, *, recorder: User, granted_by: User
+) -> None:
+    """Per-Recorder MP-Zugriff (Feature B): seit 78f79fe haben Recorder
+    standardmäßig keinen MP-Zugriff. Diese Helper-Funktion vergibt der
+    Recorder-User Zugriff auf alle existierenden MPs — ausreichend für
+    die Reading-Lifecycle-Tests, die sich nicht für die Filter-Semantik
+    interessieren, sondern den Reading-Workflow als Recorder testen."""
+    for mp_id in db.scalars(select(MeasuringPoint.id)):
+        existing = db.get(UserMeasuringPointAccess, (recorder.id, mp_id))
+        if existing is not None:
+            continue
+        db.add(
+            UserMeasuringPointAccess(
+                user_id=recorder.id,
+                measuring_point_id=mp_id,
+                granted_by_user_id=granted_by.id,
+            )
+        )
+    db.commit()
 
 
 def test_create_reading(admin_client: TestClient) -> None:
@@ -51,9 +77,14 @@ def test_duplicate_date_returns_409_with_existing(admin_client: TestClient) -> N
 
 
 def test_recorder_can_create_but_only_edit_within_window(
-    admin_client: TestClient, recorder_client: TestClient
+    admin_client: TestClient,
+    recorder_client: TestClient,
+    db: Session,
+    admin_user: User,
+    recorder_user: User,
 ) -> None:
     register_id = _setup_water_mp(admin_client)
+    _grant_recorder_access_to_first_mp(db, recorder=recorder_user, granted_by=admin_user)
     create = recorder_client.post(
         "/api/v1/readings",
         json={"register_id": register_id, "value": "150.0", "reading_at": "2025-02-01T12:00:00"},
@@ -65,9 +96,14 @@ def test_recorder_can_create_but_only_edit_within_window(
 
 
 def test_recorder_cannot_edit_others_reading(
-    admin_client: TestClient, recorder_client: TestClient
+    admin_client: TestClient,
+    recorder_client: TestClient,
+    db: Session,
+    admin_user: User,
+    recorder_user: User,
 ) -> None:
     register_id = _setup_water_mp(admin_client)
+    _grant_recorder_access_to_first_mp(db, recorder=recorder_user, granted_by=admin_user)
     create = admin_client.post(
         "/api/v1/readings",
         json={"register_id": register_id, "value": "150.0", "reading_at": "2025-03-01T12:00:00"},
@@ -192,11 +228,16 @@ def test_filter_by_measuring_point(admin_client: TestClient) -> None:
 
 
 def test_409_includes_existing_creator(
-    admin_client: TestClient, recorder_client: TestClient
+    admin_client: TestClient,
+    recorder_client: TestClient,
+    db: Session,
+    admin_user: User,
+    recorder_user: User,
 ) -> None:
     """Audit 5.3: 409 Conflict bei doppeltem (register_id, reading_at) liefert
     den Ersteller-Hinweis (Vergleichsdialog im Frontend)."""
     register_id = _setup_water_mp(admin_client)
+    _grant_recorder_access_to_first_mp(db, recorder=recorder_user, granted_by=admin_user)
     first = admin_client.post(
         "/api/v1/readings",
         json={"register_id": register_id, "value": "300", "reading_at": "2025-07-01T12:00:00"},
@@ -282,22 +323,25 @@ def test_acknowledge_warnings_on_update(admin_client: TestClient) -> None:
     assert ok.status_code == 200
 
 
-def test_recorder_24h_boundary(admin_client: TestClient, recorder_user: object, db: object) -> None:
+def test_recorder_24h_boundary(
+    admin_client: TestClient,
+    recorder_user: User,
+    admin_user: User,
+    db: Session,
+) -> None:
     """Audit 5.6: nach Ablauf des 24h-Fensters ist PATCH/DELETE für recorder verboten."""
     from datetime import UTC, datetime, timedelta
-
-    from sqlalchemy.orm import Session
 
     from meters.models import Reading
 
     register_id = _setup_water_mp(admin_client)
+    _grant_recorder_access_to_first_mp(db, recorder=recorder_user, granted_by=admin_user)
     # Reading direkt in der DB anlegen mit künstlich altem created_at
-    assert isinstance(db, Session)
     reading = Reading(
         register_id=register_id,
         value=__import__("decimal").Decimal("250"),
         reading_at=datetime(2025, 6, 1, 12, 0, 0),
-        created_by_user_id=getattr(recorder_user, "id"),
+        created_by_user_id=recorder_user.id,
     )
     db.add(reading)
     db.flush()

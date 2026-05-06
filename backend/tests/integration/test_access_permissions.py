@@ -424,7 +424,14 @@ def test_admin_put_audit_log_records_grant_and_revoke(
     )
 
     log = admin_client.get("/api/v1/audit-log").json()
-    actions = [(e["action"], e["diff"].get("measuring_point_id")) for e in log]
+    # Audit-Log enthält auch Einträge ohne strukturierten diff (z.B.
+    # MP-Anlage hat ``diff=None``). Wir interessieren uns hier nur für die
+    # access_granted/access_revoked-Einträge mit measuring_point_id-Diff.
+    actions = [
+        (e["action"], (e["diff"] or {}).get("measuring_point_id"))
+        for e in log
+        if e["action"] in ("access_granted", "access_revoked")
+    ]
     assert ("access_granted", mp_b["id"]) in actions
     assert ("access_revoked", mp_a["id"]) in actions
 

@@ -7,6 +7,8 @@ Recorder mit Eintrag sieht genau die zugewiesenen MPs.
 
 from __future__ import annotations
 
+from datetime import date
+
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -62,7 +64,7 @@ def _mk_register(db: Session, *, mp: MeasuringPoint, obis: str = "water") -> Reg
     meter = PhysicalMeter(
         measuring_point_id=mp.id,
         serial_number=f"SN-{mp.id}-{obis}",
-        installed_at="2024-01-01",
+        installed_at=date(2024, 1, 1),
     )
     db.add(meter)
     db.flush()

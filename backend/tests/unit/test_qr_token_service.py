@@ -158,7 +158,17 @@ def test_find_by_token_returns_none_for_unknown(db: Session) -> None:
 
 
 def test_mp_delete_sets_token_unassigned(db: Session) -> None:
-    """ON DELETE SET NULL: Token bleibt erhalten, MP-FK wird genullt."""
+    """ON DELETE SET NULL: Token bleibt erhalten, MP-FK wird genullt.
+
+    SessionLocal nutzt ``expire_on_commit=False`` — das vermeidet
+    unnötige Reloads im Hot-Path, hat aber einen Side-Effect: wenn die
+    DB den FK durch das ON-DELETE-SET-NULL-Constraint NULLt, bekommt
+    die ORM-Identity-Map davon nichts mit. Wir müssen das gecachte
+    Token-Objekt deshalb explizit expire'n, sonst liefert ``db.get``
+    den veralteten In-Memory-Wert (verifizierbar über Direct-SQL: die
+    Zeile in der DB hat ``measuring_point_id=NULL``, das ORM-Objekt
+    aber noch die alte ID).
+    """
     admin = _admin(db)
     mp = _mp(db)
     token = create_token(db, created_by_user_id=admin.id)
@@ -168,6 +178,7 @@ def test_mp_delete_sets_token_unassigned(db: Session) -> None:
     db.delete(mp)
     db.commit()
 
+    db.expire(token)
     fresh = db.get(QrToken, token.id)
     assert fresh is not None
     assert fresh.measuring_point_id is None
