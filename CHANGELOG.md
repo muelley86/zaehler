@@ -10,6 +10,13 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.8.1](https://github.com/muelley86/zaehler/compare/v2.8.0...v2.8.1) (2026-05-06)
+
+
+### Fehlerbehebungen
+
+* **frontend:** pnpm-lock.yaml für html5-qrcode aktualisieren ([edd533c](https://github.com/muelley86/zaehler/commit/edd533c4278a40776c5b1b7cd33b0f9db5ba555f))
+
 ## [2.8.0](https://github.com/muelley86/zaehler/compare/v2.7.1...v2.8.0) (2026-05-06)
 
 
