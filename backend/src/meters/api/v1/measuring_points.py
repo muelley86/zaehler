@@ -32,14 +32,19 @@ from meters.models import (
     PhysicalMeter,
     Reading,
     Register,
+    User,
+    UserMeasuringPointAccess,
+    UserRole,
 )
 from meters.schemas import (
     MeasuringPointCreate,
     MeasuringPointRead,
     MeasuringPointUpdate,
+    MpAccessUserRead,
     RegisterStateRead,
     ReplaceMeterRequest,
 )
+from meters.services.access import assert_can_access_mp, restrict_mp_query
 from meters.services.audit import record
 from meters.services.meter_replacement import install_first_meter, replace_meter
 from meters.services.qr import build_measuring_point_url, qr_png_bytes, qr_svg_bytes
@@ -75,22 +80,23 @@ def _ensure_location(db: DbSession, location_id: int | None) -> None:
 
 
 @router.get("", response_model=list[MeasuringPointRead])
-def list_measuring_points(db: DbDep, _user: CurrentUser) -> list[MeasuringPointRead]:
-    items = list(
-        db.scalars(
-            select(MeasuringPoint)
-            .order_by(MeasuringPoint.name)
-            .options(
-                selectinload(MeasuringPoint.location),
-                selectinload(MeasuringPoint.physical_meters).selectinload(PhysicalMeter.registers),
-            )
+def list_measuring_points(db: DbDep, user: CurrentUser) -> list[MeasuringPointRead]:
+    stmt = (
+        select(MeasuringPoint)
+        .order_by(MeasuringPoint.name)
+        .options(
+            selectinload(MeasuringPoint.location),
+            selectinload(MeasuringPoint.physical_meters).selectinload(PhysicalMeter.registers),
         )
     )
+    stmt = restrict_mp_query(stmt, user, mp_id_column=MeasuringPoint.id)
+    items = list(db.scalars(stmt))
     return [_to_read(m) for m in items]
 
 
 @router.get("/{mp_id}", response_model=MeasuringPointRead)
-def get_measuring_point(mp_id: int, db: DbDep, _user: CurrentUser) -> MeasuringPointRead:
+def get_measuring_point(mp_id: int, db: DbDep, user: CurrentUser) -> MeasuringPointRead:
+    assert_can_access_mp(db, user, mp_id)
     mp = db.scalar(
         select(MeasuringPoint)
         .where(MeasuringPoint.id == mp_id)
@@ -343,8 +349,9 @@ def replace_meter_endpoint(
 def get_state(
     mp_id: int,
     db: DbDep,
-    _user: CurrentUser,
+    user: CurrentUser,
 ) -> list[RegisterStateRead]:
+    assert_can_access_mp(db, user, mp_id)
     if db.get(MeasuringPoint, mp_id) is None:
         raise ProblemError(status_code=404, title="Measuring point not found")
     states = state_for_measuring_point(db, measuring_point_id=mp_id)
@@ -364,6 +371,58 @@ def get_state(
         )
         for s in states
     ]
+
+
+@router.get("/{mp_id}/users", response_model=list[MpAccessUserRead])
+def get_mp_users(
+    mp_id: int,
+    db: DbDep,
+    _admin: AdminUser,
+) -> list[MpAccessUserRead]:
+    """Liste aller User mit Zugriff auf diese Messstelle.
+
+    Admins sind immer dabei (impliziter Vollzugriff). Recorder erscheinen,
+    wenn sie einen Eintrag in :class:`UserMeasuringPointAccess` haben.
+    """
+    if db.get(MeasuringPoint, mp_id) is None:
+        raise ProblemError(status_code=404, title="Measuring point not found")
+
+    admins = list(
+        db.scalars(
+            select(User)
+            .where(User.role == UserRole.ADMIN, User.is_active.is_(True))
+            .order_by(User.username)
+        )
+    )
+    granted_recorders = list(
+        db.scalars(
+            select(User)
+            .join(
+                UserMeasuringPointAccess,
+                UserMeasuringPointAccess.user_id == User.id,
+            )
+            .where(
+                UserMeasuringPointAccess.measuring_point_id == mp_id,
+                User.is_active.is_(True),
+            )
+            .order_by(User.username)
+        )
+    )
+
+    out: list[MpAccessUserRead] = []
+    for u in admins:
+        out.append(
+            MpAccessUserRead(
+                user_id=u.id, username=u.username, role=u.role.value, source="admin",
+            )
+        )
+    for u in granted_recorders:
+        out.append(
+            MpAccessUserRead(
+                user_id=u.id, username=u.username, role=u.role.value, source="grant",
+            )
+        )
+    return out
 
 
 @router.get(

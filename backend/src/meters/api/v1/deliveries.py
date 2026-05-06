@@ -21,8 +21,10 @@ from meters.models import (
     Delivery,
     PhysicalMeter,
     Register,
+    UserRole,
 )
 from meters.schemas import DeliveryCreate, DeliveryRead, DeliveryUpdate
+from meters.services.access import assert_can_access_register, restrict_mp_query
 from meters.services.audit import record
 
 router = APIRouter(tags=["deliveries"])
@@ -45,11 +47,12 @@ def _to_read(d: Delivery) -> DeliveryRead:
 def list_deliveries(
     register_id: int,
     db: DbDep,
-    _user: CurrentUser,
+    user: CurrentUser,
 ) -> list[DeliveryRead]:
     register = db.get(Register, register_id)
     if register is None:
         raise ProblemError(status_code=404, title="Register not found")
+    assert_can_access_register(db, user, register_id)
     rows = list(
         db.scalars(
             select(Delivery)
@@ -64,7 +67,7 @@ def list_deliveries(
 @router.get("/deliveries", response_model=list[DeliveryRead])
 def list_all_deliveries(
     db: DbDep,
-    _user: CurrentUser,
+    user: CurrentUser,
     register_id: int | None = Query(None),
     measuring_point_id: int | None = Query(None),
     from_date: date | None = Query(None),
@@ -77,14 +80,18 @@ def list_all_deliveries(
         .options(selectinload(Delivery.created_by))
         .order_by(Delivery.delivery_at.desc(), Delivery.id.desc())
     )
+    # Recorder: immer per Join filtern, damit nur Lieferungen auf
+    # zugänglichen MPs zurückkommen. Admin: Join nur bei expliziten Filter.
+    needs_mp_join = user.role is not UserRole.ADMIN or measuring_point_id is not None
+    if needs_mp_join:
+        stmt = stmt.join(Delivery.register).join(Register.physical_meter)
     if register_id is not None:
         stmt = stmt.where(Delivery.register_id == register_id)
     if measuring_point_id is not None:
-        stmt = (
-            stmt.join(Delivery.register)
-            .join(Register.physical_meter)
-            .where(PhysicalMeter.measuring_point_id == measuring_point_id)
-        )
+        stmt = stmt.where(PhysicalMeter.measuring_point_id == measuring_point_id)
+    stmt = restrict_mp_query(
+        stmt, user, mp_id_column=PhysicalMeter.measuring_point_id
+    )
     if from_date is not None:
         stmt = stmt.where(Delivery.delivery_at >= datetime.combine(from_date, time.min))
     if to_date is not None:
@@ -109,6 +116,7 @@ def create_delivery(
     register = db.get(Register, register_id)
     if register is None:
         raise ProblemError(status_code=404, title="Register not found")
+    assert_can_access_register(db, user, register_id)
     if not register.accepts_deliveries:
         raise ProblemError(
             status_code=400,

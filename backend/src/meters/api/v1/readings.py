@@ -31,6 +31,11 @@ from meters.models import (
     UserRole,
 )
 from meters.schemas import ConsumptionPoint, ReadingCreate, ReadingRead, ReadingUpdate
+from meters.services.access import (
+    assert_can_access_mp,
+    assert_can_access_register,
+    restrict_mp_query,
+)
 from meters.services.audit import record
 from meters.services.consumption import consumption_for_measuring_point
 
@@ -159,7 +164,7 @@ def _check_value_in_series(
 @router.get("/readings", response_model=list[ReadingRead])
 def list_readings(
     db: DbDep,
-    _user: CurrentUser,
+    user: CurrentUser,
     register_id: int | None = Query(None),
     measuring_point_id: int | None = Query(None),
     from_at: datetime | None = Query(None),
@@ -171,14 +176,19 @@ def list_readings(
         .options(selectinload(Reading.created_by))
         .order_by(Reading.reading_at.desc(), Reading.id.desc())
     )
+    # Recorder: immer per Join über Register/PhysicalMeter filtern, damit
+    # nur Readings auf zugänglichen MPs zurückkommen. Admin: Join nur
+    # nötig, wenn measuring_point_id explizit gefiltert wird.
+    needs_mp_join = user.role is not UserRole.ADMIN or measuring_point_id is not None
+    if needs_mp_join:
+        stmt = stmt.join(Reading.register).join(Register.physical_meter)
     if register_id is not None:
         stmt = stmt.where(Reading.register_id == register_id)
     if measuring_point_id is not None:
-        stmt = (
-            stmt.join(Reading.register)
-            .join(Register.physical_meter)
-            .where(PhysicalMeter.measuring_point_id == measuring_point_id)
-        )
+        stmt = stmt.where(PhysicalMeter.measuring_point_id == measuring_point_id)
+    stmt = restrict_mp_query(
+        stmt, user, mp_id_column=PhysicalMeter.measuring_point_id
+    )
     if from_at is not None:
         stmt = stmt.where(Reading.reading_at >= from_at)
     if to_at is not None:
@@ -198,6 +208,7 @@ def create_reading(
     register = db.get(Register, payload.register_id)
     if register is None or not register.is_active:
         raise ProblemError(status_code=404, title="Register not found or inactive")
+    assert_can_access_register(db, user, register.id)
 
     _check_value_in_series(
         db,
@@ -270,6 +281,10 @@ def update_reading(
     reading = db.get(Reading, reading_id)
     if reading is None:
         raise ProblemError(status_code=404, title="Reading not found")
+    # Zugriff auf die zugehörige Messstelle ist Vorbedingung — selbst wenn
+    # der Recorder Ersteller dieses Readings war, darf er es nach Entzug
+    # des MP-Zugriffs nicht mehr ändern.
+    assert_can_access_register(db, user, reading.register_id)
     if not _can_edit(user, reading):
         raise ProblemError(status_code=403, title="Cannot edit this reading")
 
@@ -331,6 +346,7 @@ def delete_reading(
     reading = db.get(Reading, reading_id)
     if reading is None:
         raise ProblemError(status_code=404, title="Reading not found")
+    assert_can_access_register(db, user, reading.register_id)
     if not _can_edit(user, reading):
         raise ProblemError(status_code=403, title="Cannot delete this reading")
 
@@ -358,8 +374,9 @@ def delete_reading(
 def consumption(
     mp_id: int,
     db: DbDep,
-    _user: CurrentUser,
+    user: CurrentUser,
 ) -> list[ConsumptionPoint]:
+    assert_can_access_mp(db, user, mp_id)
     points = consumption_for_measuring_point(db, measuring_point_id=mp_id)
     return [
         ConsumptionPoint(

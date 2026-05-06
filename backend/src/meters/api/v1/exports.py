@@ -18,13 +18,15 @@ from fastapi.responses import Response, StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
-from meters.api.deps import CurrentUser, DbDep
+from meters.api.deps import AdminUser, CurrentUser, DbDep
 from meters.models import (
     MeasuringPoint,
     PhysicalMeter,
     Reading,
     Register,
+    UserRole,
 )
+from meters.services.access import restrict_mp_query
 
 router = APIRouter(prefix="/export", tags=["export"])
 
@@ -41,17 +43,22 @@ def _format_de(dt: datetime, *, with_seconds: bool = False) -> str:
 
 
 @router.get("/readings.csv")
-def readings_csv(db: DbDep, _user: CurrentUser) -> StreamingResponse:
-    rows = list(
-        db.scalars(
-            select(Reading)
-            .options(
-                selectinload(Reading.register).selectinload(Register.physical_meter),
-                selectinload(Reading.created_by),
-            )
-            .order_by(Reading.reading_at, Reading.id)
+def readings_csv(db: DbDep, user: CurrentUser) -> StreamingResponse:
+    stmt = (
+        select(Reading)
+        .options(
+            selectinload(Reading.register).selectinload(Register.physical_meter),
+            selectinload(Reading.created_by),
         )
+        .order_by(Reading.reading_at, Reading.id)
     )
+    # Recorder bekommt nur Readings auf zugänglichen MPs — über Join.
+    if user.role is not UserRole.ADMIN:
+        stmt = stmt.join(Reading.register).join(Register.physical_meter)
+        stmt = restrict_mp_query(
+            stmt, user, mp_id_column=PhysicalMeter.measuring_point_id
+        )
+    rows = list(db.scalars(stmt))
 
     buffer = io.StringIO()
     writer = csv.writer(buffer, lineterminator="\n")
@@ -108,7 +115,11 @@ def _serialize(value: object) -> object:
 
 
 @router.get("/dump.json")
-def full_dump(db: DbDep, _user: CurrentUser) -> Response:
+def full_dump(db: DbDep, _admin: AdminUser) -> Response:
+    # Voll-Backup ist admin-only. Recorder-Filter wäre zwar machbar, aber
+    # ein "halber Dump" ist als Backup-Artefakt nutzlos und semantisch
+    # missverständlich. Wer Recorder-spezifische Daten exportieren will,
+    # nimmt /export/readings.csv.
     points = list(
         db.scalars(
             select(MeasuringPoint).options(
