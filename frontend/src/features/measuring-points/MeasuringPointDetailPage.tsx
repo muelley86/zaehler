@@ -35,6 +35,7 @@ import type {
   RegisterStateRead,
 } from '@/lib/types';
 import { describeMeterType } from '@/lib/meterLabels';
+import { MpAccessCard } from './MpAccessCard';
 import { QrCodeCard } from './QrCodeCard';
 
 // Konstante Chart-Margin als Modul-Const, damit Recharts keine neue
@@ -212,7 +213,10 @@ export function MeasuringPointDetailPage() {
 
       <RegisterTable mp={mp} states={states} />
 
-      <QrCodeCard mp={mp} />
+      <div className="grid gap-4 md:grid-cols-2">
+        <QrCodeCard mp={mp} />
+        <MpAccessCard mpId={mp.id} />
+      </div>
 
       {location && location.latitude !== null && location.longitude !== null ? (
         <LocationMapSheet
