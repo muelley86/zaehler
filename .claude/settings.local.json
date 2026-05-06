@@ -10,7 +10,30 @@
       "PowerShell(& 'C:\\\\Program Files\\\\nodejs\\\\npm.cmd' exec --offline -- pnpm --version 2>&1 | Select-Object -Last 5)",
       "PowerShell(git *)",
       "PowerShell(Get-ChildItem *)",
-      "PowerShell(git status *)"
+      "PowerShell(git status *)",
+      "PowerShell(git fetch *)",
+      "PowerShell(git status --short; \"---\"; git diff --stat)",
+      "Bash(grep -E \"\\\\.\\(tsx|ts\\)$\")",
+      "Bash(grep -v \":0$\")",
+      "Bash(xargs grep *)",
+      "Bash(xargs wc *)",
+      "Bash(pnpm tsc *)",
+      "PowerShell(python -m py_compile C:\\\\Users\\\\kmueller\\\\DEV\\\\zaehler\\\\backend\\\\src\\\\meters\\\\main.py 2>&1; if \\($LASTEXITCODE -eq 0\\) { Write-Host \"OK: main.py kompiliert syntaktisch\" -ForegroundColor Green } else { Write-Host \"FAIL: $LASTEXITCODE\" -ForegroundColor Red })",
+      "PowerShell(corepack pnpm *)",
+      "PowerShell(python -c \"import ast; ast.parse\\(open\\(r'C:\\\\Users\\\\kmueller\\\\DEV\\\\zaehler\\\\backend\\\\src\\\\meters\\\\main.py', encoding='utf-8'\\).read\\(\\)\\); print\\('AST: OK'\\)\")",
+      "Bash(git add *)",
+      "Bash(git commit -m 'perf: iOS-Layout, Eingabe-Performance, Asset-Compression & -Caching *)",
+      "Bash(grep -E \"^latin-\\(400|500|600|700\\)\\\\.css$\")",
+      "Bash(git commit -m 'perf: Memo-Layer, Search-Debounce, Vendor-Chunks, Latin-Fonts, Slow-Query-Log *)",
+      "Bash(git push *)",
+      "Bash(git fetch *)",
+      "Bash(git pull *)",
+      "Bash(git stash *)",
+      "Bash(pnpm vitest *)",
+      "PowerShell(where.exe node 2>&1; where.exe pnpm 2>&1; where.exe npm 2>&1; \"PATH:\"; $env:Path)",
+      "PowerShell(Get-ChildItem \"C:\\\\Users\\\\kmueller\\\\DEV\\\\zaehler\\\\backend\" -Filter \".venv\" -Directory; Get-ChildItem \"C:\\\\Users\\\\kmueller\\\\DEV\\\\zaehler\\\\backend\\\\.venv\\\\Scripts\" -ErrorAction SilentlyContinue | Where-Object { $_.Name -match \"python|pytest\" } | Select-Object Name)",
+      "Bash(git commit *)",
+      "Bash(pnpm --version)"
     ]
   }
 }
