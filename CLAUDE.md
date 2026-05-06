@@ -207,8 +207,15 @@ Atomar in einer Transaktion:
     (8-Zeichen Crockford-Base32, z.B. `K7MP3X9F`). Tokens werden in einer
     eigenen Tabelle `qr_token` verwaltet — nicht direkt aus der MP-ID
     abgeleitet.
-  - Bulk-Druck: ausgewählte Tokens werden auf einem A4-Bogen (2×4-Raster)
-    ausgedruckt, abgeschnitten und an die Zähler geklebt.
+  - Bulk-Druck: ausgewählte Tokens werden auf einem A4-Bogen ausgedruckt.
+    Drei Layouts wählbar (gespeichert in localStorage):
+    `cut-2x4` (Schnitt-Bogen 95×65 mm, 8/Bogen — Default, mit Token-Text
+    und MP-Namen), `avery-l4731rev` (25,4 × 10 mm, 7×27 = 189/Bogen) und
+    `avery-3320` (32 × 10 mm, 4×11 = 44/Bogen). Für die Avery-Bögen sind
+    Margin/Pitch in mm im UI feinjustierbar (Override pro Layout in
+    localStorage). Wichtig in `QrTokensPrintSheet.tsx`: `window.open` darf
+    NICHT mit `noopener` aufgerufen werden — sonst gibt der Browser `null`
+    zurück und das `document.write` greift nie (weiße Seite).
   - Vor Ort: Mitarbeiter scannt mit Smartphone-Kamera (oder In-App-Scanner
     `html5-qrcode`, lazy-loaded), landet auf `/erfassen?token=…`. Backend
     löst über `GET /api/v1/qr-tokens/{token}/resolve` auf:

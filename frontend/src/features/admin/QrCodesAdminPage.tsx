@@ -4,9 +4,10 @@
  * Workflow im Bürobetrieb:
  *  1. "Neue QR-Codes erzeugen": Anzahl wählen, Backend liefert Token-Liste
  *     zurück, alle erscheinen sofort als "frei" in der Liste.
- *  2. "Auswahl drucken": ausgewählte Tokens werden in einem A4-Druckblatt
- *     (2×4-Raster) ausgedruckt — dort lassen sie sich abschneiden und
- *     verkleben.
+ *  2. "Auswahl drucken": ausgewählte Tokens werden auf A4 ausgedruckt —
+ *     wahlweise als Schnitt-Bogen 2×4 (Default), Avery L4731REV (25,4 ×
+ *     10 mm, 189/Bogen) oder Avery 3320 / 32×10-R (32 × 10 mm, 44/Bogen).
+ *     Layout-Wahl und Druckparameter bleiben pro Browser in localStorage.
  *  3. Vor Ort: Mitarbeiter klebt einen Sticker auf den Zähler, scannt mit
  *     dem Smartphone und ordnet via /erfassen?token=… der MP zu.
  *  4. Hier in der Verwaltung sieht der Admin den Status und kann bei Bedarf
@@ -15,15 +16,81 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
-import { Link2, Plus, Printer, Trash2, Unlink } from 'lucide-react';
+import { Link2, Plus, Printer, Settings2, Trash2, Unlink } from 'lucide-react';
 
-import { Button, Card, EmptyState, LargeTitle, Pill, Section, TextField } from '@/components/ui';
+import {
+  Button,
+  Card,
+  EmptyState,
+  LargeTitle,
+  Pill,
+  Section,
+  Select,
+  TextField,
+} from '@/components/ui';
 import { PageGlows } from '@/components/PageGlows';
 import { ApiError, api } from '@/lib/api';
 import { formatDateTimeDe } from '@/lib/format';
 import type { QrTokenRead } from '@/lib/types';
 
-import { openTokensPrintWindow } from './QrTokensPrintSheet';
+import {
+  DEFAULT_LAYOUTS,
+  LAYOUT_ORDER,
+  openTokensPrintWindow,
+  type LabelLayout,
+  type LabelLayoutId,
+} from './QrTokensPrintSheet';
+
+/**
+ * Override-fähige Felder pro Layout — landen in localStorage, sodass der
+ * Admin die Avery-Bögen einmalig nach einem Testdruck einjustieren und
+ * danach vergessen kann.
+ */
+type LayoutOverride = Partial<
+  Pick<LabelLayout, 'marginTopMm' | 'marginLeftMm' | 'hPitchMm' | 'vPitchMm'>
+>;
+
+const STORAGE_KEY = 'qr-print-layout-v1';
+
+interface StoredPrefs {
+  selectedLayout: LabelLayoutId;
+  overrides: Partial<Record<LabelLayoutId, LayoutOverride>>;
+}
+
+function loadPrefs(): StoredPrefs {
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEY);
+    if (!raw) return { selectedLayout: 'cut-2x4', overrides: {} };
+    const parsed = JSON.parse(raw) as Partial<StoredPrefs>;
+    const selected = parsed.selectedLayout;
+    const valid = selected !== undefined && (LAYOUT_ORDER as string[]).includes(selected);
+    return {
+      selectedLayout: valid ? selected : 'cut-2x4',
+      overrides: parsed.overrides ?? {},
+    };
+  } catch {
+    return { selectedLayout: 'cut-2x4', overrides: {} };
+  }
+}
+
+function savePrefs(prefs: StoredPrefs): void {
+  try {
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(prefs));
+  } catch {
+    // Quota voll oder Privacy-Mode — egal, keine kritischen Daten.
+  }
+}
+
+function applyOverride(layout: LabelLayout, override: LayoutOverride | undefined): LabelLayout {
+  if (!override) return layout;
+  return {
+    ...layout,
+    marginTopMm: override.marginTopMm ?? layout.marginTopMm,
+    marginLeftMm: override.marginLeftMm ?? layout.marginLeftMm,
+    hPitchMm: override.hPitchMm ?? layout.hPitchMm,
+    vPitchMm: override.vPitchMm ?? layout.vPitchMm,
+  };
+}
 
 type Filter = 'all' | 'assigned' | 'unassigned';
 
@@ -33,6 +100,12 @@ export function QrCodesAdminPage() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
+  const [prefs, setPrefs] = useState<StoredPrefs>(() => loadPrefs());
+  const [paramsOpen, setParamsOpen] = useState(false);
+
+  useEffect(() => {
+    savePrefs(prefs);
+  }, [prefs]);
 
   useEffect(() => {
     api
@@ -87,8 +160,49 @@ export function QrCodesAdminPage() {
   function printSelected() {
     if (selected.size === 0) return;
     const list = visible.filter((t) => selected.has(t.token));
-    openTokensPrintWindow(list);
+    const baseLayout = DEFAULT_LAYOUTS[prefs.selectedLayout];
+    const layout = applyOverride(baseLayout, prefs.overrides[prefs.selectedLayout]);
+    const ok = openTokensPrintWindow(list, layout);
+    if (!ok) {
+      window.alert(
+        'Druckfenster konnte nicht geöffnet werden — bitte Pop-up-Blocker für diese Seite erlauben.',
+      );
+    }
   }
+
+  function setSelectedLayout(id: LabelLayoutId) {
+    setPrefs((p) => ({ ...p, selectedLayout: id }));
+  }
+
+  function setOverrideField(id: LabelLayoutId, field: keyof LayoutOverride, value: number | null) {
+    setPrefs((p) => {
+      const current = { ...(p.overrides[id] ?? {}) };
+      if (value === null) {
+        delete current[field];
+      } else {
+        current[field] = value;
+      }
+      const nextOverrides = { ...p.overrides };
+      if (Object.keys(current).length === 0) {
+        delete nextOverrides[id];
+      } else {
+        nextOverrides[id] = current;
+      }
+      return { ...p, overrides: nextOverrides };
+    });
+  }
+
+  function resetOverride(id: LabelLayoutId) {
+    setPrefs((p) => {
+      const next = { ...p.overrides };
+      delete next[id];
+      return { ...p, overrides: next };
+    });
+  }
+
+  const activeLayout = DEFAULT_LAYOUTS[prefs.selectedLayout];
+  const activeOverride = prefs.overrides[prefs.selectedLayout];
+  const supportsOverride = prefs.selectedLayout !== 'cut-2x4';
 
   return (
     <PageContainer>
@@ -101,6 +215,54 @@ export function QrCodesAdminPage() {
       ) : null}
 
       <CreateForm onCreated={refresh} />
+
+      <Section header="Druck-Layout">
+        <div className="space-y-3 p-5">
+          <div className="grid gap-3 md:grid-cols-[1fr_auto] md:items-end">
+            <Select
+              label="Bogenformat"
+              value={prefs.selectedLayout}
+              onChange={(e) => setSelectedLayout(e.target.value as LabelLayoutId)}
+              hint={activeLayout.description}
+            >
+              {LAYOUT_ORDER.map((id) => (
+                <option key={id} value={id}>
+                  {DEFAULT_LAYOUTS[id].name}
+                </option>
+              ))}
+            </Select>
+            {supportsOverride ? (
+              <Button
+                type="button"
+                variant="bordered"
+                size="sm"
+                leftIcon={<Settings2 size={14} />}
+                onClick={() => setParamsOpen((v) => !v)}
+              >
+                {paramsOpen ? 'Parameter verbergen' : 'Druckparameter anpassen'}
+              </Button>
+            ) : null}
+          </div>
+
+          {supportsOverride ? (
+            <p className="text-caption text-tertiary">
+              Die QR-Codes enthalten die volle URL (~50 Zeichen) — bei 10 mm Etikettenhöhe sind die
+              Module ca. 0,3 mm groß und damit grenzwertig scannbar. Vor dem ersten Echtdruck eine
+              Testseite auf Normalpapier ausgeben und gegen den Etikettenbogen halten; Margin/Pitch
+              ggf. unten korrigieren.
+            </p>
+          ) : null}
+
+          {supportsOverride && paramsOpen ? (
+            <PrintParamsPanel
+              layout={activeLayout}
+              override={activeOverride}
+              onChange={(field, value) => setOverrideField(prefs.selectedLayout, field, value)}
+              onReset={() => resetOverride(prefs.selectedLayout)}
+            />
+          ) : null}
+        </div>
+      </Section>
 
       <div className="flex flex-wrap items-center gap-1.5">
         <Pill active={filter === 'all'} onClick={() => setFilter('all')}>
@@ -240,6 +402,79 @@ function CreateForm({ onCreated }: { onCreated: () => void }) {
         </form>
       )}
     </Section>
+  );
+}
+
+function PrintParamsPanel({
+  layout,
+  override,
+  onChange,
+  onReset,
+}: {
+  layout: LabelLayout;
+  override: LayoutOverride | undefined;
+  onChange: (field: keyof LayoutOverride, value: number | null) => void;
+  onReset: () => void;
+}) {
+  const fields: { key: keyof LayoutOverride; label: string; hint: string }[] = [
+    { key: 'marginTopMm', label: 'Rand oben (mm)', hint: 'Blattkante → erstes Etikett' },
+    { key: 'marginLeftMm', label: 'Rand links (mm)', hint: 'Blattkante → erstes Etikett' },
+    { key: 'hPitchMm', label: 'Spalten-Pitch (mm)', hint: `Etikett-Breite ${layout.labelWidthMm} mm + Lücke` },
+    { key: 'vPitchMm', label: 'Zeilen-Pitch (mm)', hint: `Etikett-Höhe ${layout.labelHeightMm} mm + Lücke` },
+  ];
+
+  function valueFor(key: keyof LayoutOverride): number {
+    return override?.[key] ?? layout[key];
+  }
+
+  function handleChange(key: keyof LayoutOverride, raw: string) {
+    const trimmed = raw.trim();
+    if (trimmed === '') {
+      onChange(key, null);
+      return;
+    }
+    const parsed = Number(trimmed.replace(',', '.'));
+    if (!Number.isFinite(parsed) || parsed <= 0) return;
+    if (parsed === layout[key]) {
+      onChange(key, null); // Zurück zum Default — kein Override mehr
+    } else {
+      onChange(key, parsed);
+    }
+  }
+
+  return (
+    <div className="border-hairline rounded-card border-border bg-fill/40 p-4">
+      <div className="mb-3 flex items-center justify-between">
+        <span className="text-caption-bold uppercase text-tertiary">
+          Druckparameter — {layout.name}
+        </span>
+        {override ? (
+          <button
+            type="button"
+            onClick={onReset}
+            className="text-caption font-semibold text-primary-deep hover:underline"
+          >
+            Auf Standard zurücksetzen
+          </button>
+        ) : null}
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2">
+        {fields.map((f) => (
+          <TextField
+            key={f.key}
+            label={f.label}
+            type="number"
+            inputMode="decimal"
+            step="0.1"
+            min={0}
+            value={String(valueFor(f.key))}
+            onChange={(e) => handleChange(f.key, e.target.value)}
+            numeric
+            hint={f.hint}
+          />
+        ))}
+      </div>
+    </div>
   );
 }
 

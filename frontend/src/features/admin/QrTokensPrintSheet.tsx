@@ -1,19 +1,133 @@
 /**
  * Bulk-Druck für eine Auswahl an QR-Tokens.
  *
- * Layout: A4 hochkant, 2 Spalten × 4 Zeilen = 8 Etiketten pro Seite. Jedes
- * Feld ist 95×65 mm und enthält den großen QR-Code (SVG, verlustfrei
- * skaliert), den Token-Klartext sowie — falls zugeordnet — den
- * Messstellen-Namen.
+ * Drei Layouts werden unterstützt:
  *
- * Pattern analog zu :file:`features/measuring-points/QrPrintSheet.tsx`:
- * neues Fenster, HTML schreiben, ``window.print()`` triggern. Der Browser
- * macht den Rest.
+ * 1. ``cut-2x4`` — Schnitt-Bogen 2×4, 95×65 mm pro Feld inkl. Token-Text
+ *    und Messstellen-Namen. Default — die Etiketten werden ausgeschnitten
+ *    und auf den Zähler geklebt.
+ * 2. ``avery-l4731rev`` — Avery Zweckform L4731REV, 25,4 × 10 mm, 7×27
+ *    = 189 Etiketten pro Bogen.
+ * 3. ``avery-3320`` — Avery Zweckform 3320 / „32×10-R", 32 × 10 mm,
+ *    4×11 = 44 Etiketten pro Bogen.
+ *
+ * Pattern: neues Fenster, HTML schreiben, ``window.print()`` triggern.
+ * Wichtig: KEIN ``noopener`` beim ``window.open`` — sonst liefert der Call
+ * laut Spec ``null`` zurück, und das ``document.write`` greift nie. Genau
+ * das war der Grund, warum der Bulk-Druck zwischenzeitlich nur eine weiße
+ * Seite zeigte (siehe Issue zur QR-Druck-Funktion).
+ *
+ * Hinweis Scannbarkeit: Der QR-Code enthält die volle URL
+ * ``${origin}/erfassen?token=${token}`` (~50 Zeichen), das ergibt einen
+ * Version-3-Code (29×29 Module). Bei 10 mm Etikettenhöhe sind die Module
+ * ca. 0,3 mm groß — gerade noch scannbar mit modernen Smartphones, aber
+ * empfindlich gegen Druckunschärfe. Für absolut zuverlässiges Scannen
+ * weiterhin den Schnitt-Bogen 2×4 verwenden.
  */
 
 import type { QrTokenRead } from '@/lib/types';
 
 const PRINT_TIMEOUT_MS = 600;
+
+export type LabelLayoutId = 'cut-2x4' | 'avery-l4731rev' | 'avery-3320';
+
+/**
+ * Geometrie eines Etikettenbogens. Alle Werte in Millimetern, sodass das
+ * @page-Layout die exakten physischen Maße trifft.
+ */
+export interface LabelLayout {
+  id: LabelLayoutId;
+  name: string;
+  /** Kurzbeschreibung für die UI (z.B. „189 Etiketten/Bogen"). */
+  description: string;
+  /** A4 Hochkant ist überall fest verdrahtet. */
+  pageWidthMm: number;
+  pageHeightMm: number;
+  cols: number;
+  rows: number;
+  /** Abstand obere Blattkante → obere Kante des ersten Etiketts. */
+  marginTopMm: number;
+  /** Abstand linke Blattkante → linke Kante des ersten Etiketts. */
+  marginLeftMm: number;
+  /** Spaltenabstand (Etikett-Linke zu Etikett-Linke der nächsten Spalte). */
+  hPitchMm: number;
+  /** Zeilenabstand (Etikett-Oben zu Etikett-Oben der nächsten Zeile). */
+  vPitchMm: number;
+  labelWidthMm: number;
+  labelHeightMm: number;
+  /** Zeigt gestrichelten Rahmen zum Ausschneiden — nur für ``cut-2x4``. */
+  showCutBorder: boolean;
+  /** Zeigt Token-Text & Subline (MP-Name oder „frei"). */
+  showLabelText: boolean;
+  /** Anordnung des QR im Etikett: zentriert oder links mit Text rechts. */
+  qrPlacement: 'center-with-caption' | 'left-with-text-right' | 'center-only';
+}
+
+/**
+ * Default-Layout-Definitionen. Für Avery-Bögen sind die Margin/Pitch-Werte
+ * gute Startpunkte, können aber printerabhängig minimal abweichen — die
+ * Admin-UI erlaubt deshalb das Override pro Layout (siehe
+ * :file:`QrCodesAdminPage.tsx`).
+ */
+export const DEFAULT_LAYOUTS: Record<LabelLayoutId, LabelLayout> = {
+  'cut-2x4': {
+    id: 'cut-2x4',
+    name: 'Schnitt-Bogen 2 × 4',
+    description: '95 × 65 mm, 8/Bogen — mit Token-Text & MP-Namen',
+    pageWidthMm: 210,
+    pageHeightMm: 297,
+    cols: 2,
+    rows: 4,
+    marginTopMm: 8,
+    marginLeftMm: 8,
+    hPitchMm: 97, // 95 mm Etikett + 2 mm Lücke
+    vPitchMm: 67, // 65 mm Etikett + 2 mm Lücke
+    labelWidthMm: 95,
+    labelHeightMm: 65,
+    showCutBorder: true,
+    showLabelText: true,
+    qrPlacement: 'center-with-caption',
+  },
+  'avery-l4731rev': {
+    id: 'avery-l4731rev',
+    name: 'Avery L4731REV',
+    description: '25,4 × 10 mm, 7 × 27 = 189/Bogen',
+    pageWidthMm: 210,
+    pageHeightMm: 297,
+    cols: 7,
+    rows: 27,
+    marginTopMm: 13.5,
+    marginLeftMm: 8.6,
+    hPitchMm: 27.9, // 25,4 mm Etikett + 2,5 mm Lücke
+    vPitchMm: 10, // bündig — keine vertikale Lücke
+    labelWidthMm: 25.4,
+    labelHeightMm: 10,
+    showCutBorder: false,
+    showLabelText: true,
+    qrPlacement: 'left-with-text-right',
+  },
+  'avery-3320': {
+    id: 'avery-3320',
+    name: 'Avery 3320 / 32×10-R',
+    description: '32 × 10 mm, 4 × 11 = 44/Bogen',
+    pageWidthMm: 210,
+    pageHeightMm: 297,
+    cols: 4,
+    rows: 11,
+    // Best-Guess-Defaults — bei Bedarf in der UI feinjustieren.
+    marginTopMm: 13,
+    marginLeftMm: 8,
+    hPitchMm: 49, // 32 mm Etikett + 17 mm Lücke
+    vPitchMm: 25, // 10 mm Etikett + 15 mm Lücke
+    labelWidthMm: 32,
+    labelHeightMm: 10,
+    showCutBorder: false,
+    showLabelText: true,
+    qrPlacement: 'left-with-text-right',
+  },
+};
+
+export const LAYOUT_ORDER: LabelLayoutId[] = ['cut-2x4', 'avery-l4731rev', 'avery-3320'];
 
 function escapeHtml(value: string): string {
   return value
@@ -24,29 +138,76 @@ function escapeHtml(value: string): string {
     .replace(/'/g, '&#39;');
 }
 
-function buildPrintHtml(tokens: QrTokenRead[]): string {
-  const cells = tokens
-    .map((t) => {
-      const qrUrl = `/api/v1/qr-tokens/${t.token}/qr?format=svg&size=large`;
-      const subline = t.measuring_point_name
-        ? escapeHtml(t.measuring_point_name)
-        : 'Bereit zur Zuordnung';
-      return `
-        <div class="cell">
-          <div class="qr"><img src="${qrUrl}" alt="QR ${escapeHtml(t.token)}" /></div>
-          <div class="token">${escapeHtml(t.token)}</div>
-          <div class="sub">${subline}</div>
-        </div>`;
+function buildLabelInner(token: QrTokenRead, layout: LabelLayout): string {
+  const qrUrl = `/api/v1/qr-tokens/${token.token}/qr?format=svg&size=large`;
+  const subline = token.measuring_point_name
+    ? escapeHtml(token.measuring_point_name)
+    : 'Bereit zur Zuordnung';
+
+  if (layout.qrPlacement === 'center-with-caption' && layout.showLabelText) {
+    return `
+      <div class="qr-center"><img src="${qrUrl}" alt="QR ${escapeHtml(token.token)}" /></div>
+      <div class="token">${escapeHtml(token.token)}</div>
+      <div class="sub">${subline}</div>`;
+  }
+  if (layout.qrPlacement === 'left-with-text-right') {
+    const text = layout.showLabelText
+      ? `<div class="text-block">
+           <div class="token-small">${escapeHtml(token.token)}</div>
+         </div>`
+      : '';
+    return `
+      <div class="qr-square"><img src="${qrUrl}" alt="QR ${escapeHtml(token.token)}" /></div>
+      ${text}`;
+  }
+  // center-only
+  return `
+    <div class="qr-fill"><img src="${qrUrl}" alt="QR ${escapeHtml(token.token)}" /></div>`;
+}
+
+/**
+ * Verteilt die Tokens auf Seiten gemäß ``cols × rows`` des Layouts und
+ * erzeugt für jede Seite ein ``.page``-DIV mit absolut positionierten
+ * Etiketten. Das @page-CSS hat 0-Margin — alle physischen Abstände stehen
+ * im Layout selbst, sodass Avery-Bögen pixelgenau sitzen.
+ */
+function buildPagesHtml(tokens: QrTokenRead[], layout: LabelLayout): string {
+  const perPage = layout.cols * layout.rows;
+  const pages: QrTokenRead[][] = [];
+  for (let i = 0; i < tokens.length; i += perPage) {
+    pages.push(tokens.slice(i, i + perPage));
+  }
+
+  return pages
+    .map((pageTokens) => {
+      const labels = pageTokens
+        .map((token, idx) => {
+          const col = idx % layout.cols;
+          const row = Math.floor(idx / layout.cols);
+          const left = layout.marginLeftMm + col * layout.hPitchMm;
+          const top = layout.marginTopMm + row * layout.vPitchMm;
+          return `
+            <div class="label" style="left:${left}mm;top:${top}mm;width:${layout.labelWidthMm}mm;height:${layout.labelHeightMm}mm;">
+              ${buildLabelInner(token, layout)}
+            </div>`;
+        })
+        .join('');
+      return `<div class="page">${labels}</div>`;
     })
     .join('');
+}
+
+function buildPrintHtml(tokens: QrTokenRead[], layout: LabelLayout): string {
+  const pagesHtml = buildPagesHtml(tokens, layout);
+  const cutBorder = layout.showCutBorder ? '0.3mm dashed #999' : 'none';
 
   return `<!doctype html>
 <html lang="de">
 <head>
 <meta charset="utf-8" />
-<title>QR-Codes (${tokens.length})</title>
+<title>QR-Codes (${tokens.length}) — ${escapeHtml(layout.name)}</title>
 <style>
-  @page { size: A4 portrait; margin: 8mm; }
+  @page { size: ${layout.pageWidthMm}mm ${layout.pageHeightMm}mm; margin: 0; }
   * { box-sizing: border-box; }
   html, body {
     margin: 0;
@@ -55,43 +216,90 @@ function buildPrintHtml(tokens: QrTokenRead[]): string {
     color: #111;
     background: #fff;
   }
-  .grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    grid-auto-rows: 65mm;
-    gap: 2mm;
+  .page {
+    position: relative;
+    width: ${layout.pageWidthMm}mm;
+    height: ${layout.pageHeightMm}mm;
+    page-break-after: always;
+    overflow: hidden;
   }
-  .cell {
-    border: 0.3mm dashed #999;
-    padding: 4mm;
+  .page:last-child { page-break-after: auto; }
+  .label {
+    position: absolute;
+    border: ${cutBorder};
+    overflow: hidden;
     display: flex;
-    flex-direction: column;
     align-items: center;
     justify-content: center;
-    text-align: center;
     page-break-inside: avoid;
   }
-  .qr {
+
+  /* Layout: zentrierter QR + Token + MP-Name (Schnitt-Bogen) */
+  .label .qr-center {
     width: 38mm;
     height: 38mm;
   }
-  .qr img { width: 100%; height: 100%; display: block; }
-  .token {
-    margin-top: 2mm;
+  .label .qr-center img { width: 100%; height: 100%; display: block; }
+  .label > .token {
+    position: absolute;
+    bottom: 9mm;
+    left: 0; right: 0;
+    text-align: center;
     font-family: 'Courier New', ui-monospace, monospace;
     font-size: 14pt;
     font-weight: 700;
     letter-spacing: 0.05em;
   }
-  .sub {
-    margin-top: 1mm;
+  .label > .sub {
+    position: absolute;
+    bottom: 4mm;
+    left: 4mm; right: 4mm;
+    text-align: center;
     font-size: 9pt;
     color: #555;
-    max-width: 90%;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
+  /* Beim cut-Layout den QR nach oben rücken, Text bleibt unten */
+  .label:has(.qr-center) {
+    flex-direction: column;
+    justify-content: flex-start;
+    padding-top: 5mm;
+  }
+
+  /* Layout: QR links, Text rechts (Avery) */
+  .label .qr-square {
+    flex: 0 0 auto;
+    height: 100%;
+    aspect-ratio: 1 / 1;
+    padding: 0.4mm;
+  }
+  .label .qr-square img { width: 100%; height: 100%; display: block; }
+  .label .text-block {
+    flex: 1 1 auto;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 0 1mm;
+    overflow: hidden;
+  }
+  .label .text-block .token-small {
+    font-family: 'Courier New', ui-monospace, monospace;
+    font-size: 7pt;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    line-height: 1;
+    white-space: nowrap;
+  }
+
+  /* Layout: QR füllt das gesamte Etikett */
+  .label .qr-fill { width: 100%; height: 100%; }
+  .label .qr-fill img { width: 100%; height: 100%; display: block; }
+
+  /* Bedienleiste — nur am Bildschirm sichtbar */
   .controls {
     position: fixed;
     bottom: 12px;
@@ -105,6 +313,7 @@ function buildPrintHtml(tokens: QrTokenRead[]): string {
     padding: 6px 10px;
     box-shadow: 0 6px 20px rgba(0,0,0,0.15);
     font-size: 12px;
+    z-index: 9999;
   }
   .controls button {
     border: 0;
@@ -119,14 +328,19 @@ function buildPrintHtml(tokens: QrTokenRead[]): string {
     background: #efefef;
     color: #111;
   }
+  .controls .info {
+    color: #555;
+    padding: 4px 4px 4px 8px;
+  }
   @media print {
     .controls { display: none !important; }
   }
 </style>
 </head>
 <body>
-  <div class="grid">${cells}</div>
+  ${pagesHtml}
   <div class="controls">
+    <span class="info">${tokens.length} QR · ${escapeHtml(layout.name)}</span>
     <button onclick="window.print()">Drucken</button>
     <button class="secondary" onclick="window.close()">Schließen</button>
   </div>
@@ -156,13 +370,17 @@ function buildPrintHtml(tokens: QrTokenRead[]): string {
 /**
  * Öffnet ein neues Fenster mit dem Bulk-Druck-Layout für die übergebenen
  * Tokens. Liefert ``true``, wenn das Fenster geöffnet werden konnte.
+ *
+ * Wichtig: ``window.open`` ohne ``noopener`` aufrufen, sonst gibt der
+ * Browser ``null`` zurück und ``document.write`` läuft nicht. Same-origin,
+ * Inhalt komplett kontrolliert — kein Sicherheitsproblem.
  */
-export function openTokensPrintWindow(tokens: QrTokenRead[]): boolean {
+export function openTokensPrintWindow(tokens: QrTokenRead[], layout: LabelLayout): boolean {
   if (tokens.length === 0) return false;
-  const w = window.open('', '_blank', 'noopener,noreferrer,width=900,height=900');
+  const w = window.open('', '_blank', 'width=900,height=900');
   if (!w) return false;
   w.document.open();
-  w.document.write(buildPrintHtml(tokens));
+  w.document.write(buildPrintHtml(tokens, layout));
   w.document.close();
   return true;
 }
