@@ -77,6 +77,10 @@ export function DashboardPage() {
   const [readingsByMP, setReadingsByMP] = useState<ReadingsByMP>({});
   const [error, setError] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
+  // Wird `true`, sobald die zweite Lade-Welle (state/consumption/readings)
+  // fertig ist. Bis dahin zeigen wir Skeleton-Karten in derselben Hoehe wie
+  // die spaeteren echten Karten — so wandert beim Cutover nichts (CLS).
+  const [mpDataReady, setMpDataReady] = useState(false);
 
   // Stabile Refresh-Referenz für memoizierte Sub-Komponenten.
   const handleChanged = useCallback(() => setTick((t) => t + 1), []);
@@ -133,6 +137,7 @@ export function DashboardPage() {
       setConsumptions(cById);
       setStates(sById);
       setReadingsByMP(rById);
+      setMpDataReady(true);
     });
     return () => {
       cancelled = true;
@@ -345,11 +350,33 @@ export function DashboardPage() {
         </div>
       </Section>
 
-      <ConsumptionSummary points={filteredPoints} consumption={filteredConsumption} />
+      {/*
+        Atomares Cutover: solange die zweite Lade-Welle laeuft, halten wir die
+        Layout-Slots in identischer Hoehe wie spaeter — ConsumptionSummary
+        als Skeleton-Section, eine Card-Skeleton-Karte pro angekuendigter MP.
+        Erst wenn ALLE Sub-Daten da sind, switchen wir auf echte Cards. So
+        wandert beim Render-Switch nichts (kein DOM-Wachstum innerhalb der
+        Karte mehr — der Pill-Block, der bisher 0,13 CLS verursachte, hat
+        ueber dem nichts mehr, das nachwaechst).
+      */}
+      {!mpDataReady ? (
+        <>
+          <ConsumptionSummarySkeleton />
+          {(filteredPoints.length > 0 ? filteredPoints : points).map((mp) => (
+            <MeasuringPointCardSkeleton key={mp.id} />
+          ))}
+        </>
+      ) : null}
 
-      {filteredPoints.length === 0 ? (
+      {mpDataReady ? (
+        <ConsumptionSummary points={filteredPoints} consumption={filteredConsumption} />
+      ) : null}
+
+      {mpDataReady && filteredPoints.length === 0 ? (
         <EmptyState icon={<Filter size={32} />} title="Keine Messstellen entsprechen dem Filter" />
-      ) : (
+      ) : null}
+
+      {mpDataReady && filteredPoints.length > 0 ? (
         filteredPoints.map((mp) => (
           <MeasuringPointCard
             key={mp.id}
@@ -360,7 +387,7 @@ export function DashboardPage() {
             onChanged={handleChanged}
           />
         ))
-      )}
+      ) : null}
     </PageContainer>
   );
 }
@@ -526,7 +553,11 @@ const MeasuringPointCard = memo(function MeasuringPointCard({
   }
 
   return (
-    <Card>
+    // min-h-[640px] = gleiche Hoehe wie MeasuringPointCardSkeleton, damit
+    // der Cutover Skeleton -> echte Card NICHT shiftet. Echte Cards mit
+    // wenig Inhalt (z. B. Strom-MP ohne Verbrauchsdaten) tragen unten
+    // etwas Whitespace — bewusster Tausch fuer 0 CLS.
+    <Card className="min-h-[640px]">
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <TypeBadge type={mp.type} size="md" />
         <div className="min-w-0 flex-1">
@@ -929,10 +960,14 @@ function CurrentStateTile({ state }: { state: RegisterStateRead }) {
 }
 
 /**
- * Höhen-reservierter Skeleton während der initialen Daten-Loads.
- * Wichtig: jede Skeleton-Card hat exakt dieselbe Mindesthöhe wie eine
- * spätere echte Card (Header + Tank + Chart-Höhe 256 px). Sonst
+ * Höhen-reservierter Skeleton während der initialen Daten-Loads (vor
+ * `points`). Layout muss exakt zu der spaeteren Vollseite passen, sonst
  * springt das Layout beim Hydrieren — der CLS-Hauptverursacher.
+ *
+ * Reservierte Slots: Filter (188) → ConsumptionSummary (260) → 3 Karten
+ * à 640 px. Dieselben Höhen verwenden auch `MeasuringPointCardSkeleton`
+ * (Phase 2) und die echte `MeasuringPointCard` (`min-h-[640px]`) — so
+ * ist die Layout-Höhe in allen drei Phasen identisch.
  */
 function DashboardSkeleton() {
   return (
@@ -944,28 +979,67 @@ function DashboardSkeleton() {
         style={{ minHeight: 188 }}
       />
 
-      {/* 3 platzhalter-Cards in der gleichen Höhe wie eine echte
-          MeasuringPointCard (~ 480 px mit Header + Tank + Chart). */}
+      <ConsumptionSummarySkeleton />
+
       {[0, 1, 2].map((i) => (
-        <div
-          key={i}
-          aria-hidden
-          className="rounded-card border-hairline border-border bg-surface/50 glass"
-          style={{ minHeight: 480 }}
-        >
-          <div className="space-y-3 p-5">
-            <div className="h-7 w-2/3 rounded-pill bg-fill" />
-            <div className="h-4 w-1/3 rounded-pill bg-fill/60" />
-            <div className="mt-6 h-32 w-full rounded-card bg-fill/60" />
-            <div className="mt-4 h-64 w-full rounded-card bg-fill/40" />
-          </div>
-        </div>
+        <MeasuringPointCardSkeleton key={i} />
       ))}
 
       <span className="sr-only" role="status" aria-live="polite">
         Daten werden geladen
       </span>
     </>
+  );
+}
+
+/**
+ * Card-Slot waehrend `mpDataReady === false`. Selbe Hoehe (640 px) und
+ * dasselbe Compositing (`glass`) wie die echte `MeasuringPointCard`, sodass
+ * der Phase-2 → Phase-3-Switch ohne Y-Verschiebung ablaeuft. Innen kein
+ * MP-spezifischer Skeleton-Inhalt — aria-hidden, der sr-only-Text in
+ * `DashboardSkeleton` liefert die Live-Region.
+ */
+function MeasuringPointCardSkeleton() {
+  return (
+    <div
+      aria-hidden
+      className="glass rounded-card border-hairline border-border bg-surface/50 shadow-glass dark:shadow-glass-dark"
+      style={{ minHeight: 640 }}
+    >
+      <div className="space-y-3 p-5">
+        <div className="h-7 w-2/3 rounded-pill bg-fill" />
+        <div className="h-4 w-1/3 rounded-pill bg-fill/60" />
+        <div className="mt-6 h-32 w-full rounded-card bg-fill/60" />
+        <div className="mt-4 h-24 w-full rounded-card bg-fill/40" />
+        <div className="mt-4 h-64 w-full rounded-card bg-fill/40" />
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Slot fuer die `ConsumptionSummary` (Section "Verbrauch im gewaehlten
+ * Zeitraum"). Gleiche Höhe wie der typische echte Inhalt mit ~5 Buckets
+ * — schwankt in der Praxis zwischen 200 und 320 px, daher 260 px als
+ * Mittelweg. Echter Inhalt mit weniger Buckets fuellt den Slot ueber das
+ * Section-Padding nicht ganz; das ist der bewusste Tausch fuer 0 CLS.
+ */
+function ConsumptionSummarySkeleton() {
+  return (
+    <div
+      aria-hidden
+      className="rounded-card border-hairline border-border bg-surface/50 glass"
+      style={{ minHeight: 260 }}
+    >
+      <div className="border-b border-separator p-5">
+        <div className="h-5 w-1/2 rounded-pill bg-fill/60" />
+      </div>
+      <div className="space-y-3 p-5">
+        <div className="h-4 w-3/4 rounded-pill bg-fill/40" />
+        <div className="h-4 w-2/3 rounded-pill bg-fill/40" />
+        <div className="h-4 w-3/5 rounded-pill bg-fill/40" />
+      </div>
+    </div>
   );
 }
 
