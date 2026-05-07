@@ -10,6 +10,14 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.11.2](https://github.com/muelley86/zaehler/compare/v2.11.1...v2.11.2) (2026-05-07)
+
+
+### Performance
+
+* **dashboard:** Atomares Card-Cutover, fixe Card-Hoehe gegen Inner-Shift ([6c831f8](https://github.com/muelley86/zaehler/commit/6c831f805e222809ac3ac6be1df0218317759bc0))
+* **frontend:** [@fontsource](https://github.com/fontsource)-CSS-Imports streichen, fonts.css als alleinige Source ([bbd37c1](https://github.com/muelley86/zaehler/commit/bbd37c139b9ca31f66012e8acffc9bebc8f47188))
+
 ## [2.11.1](https://github.com/muelley86/zaehler/compare/v2.11.0...v2.11.1) (2026-05-07)
 
 
