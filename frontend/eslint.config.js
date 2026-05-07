@@ -29,6 +29,14 @@ export default tseslint.config(
         'error',
         { assertionStyle: 'as', objectLiteralTypeAssertions: 'never' },
       ],
+      // Underscore-Prefix als „bewusst unbenutzt"-Konvention anerkennen.
+      // Default `args: after-used` flaggte sonst inkonsistent: `_camera`
+      // vor einem benutzten Arg ging durch, `_onError` danach nicht — und
+      // einsame Argumente (Konstruktoren) immer.
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        { argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_' },
+      ],
     },
   },
 );

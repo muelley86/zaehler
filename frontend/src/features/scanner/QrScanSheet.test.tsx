@@ -24,19 +24,24 @@ vi.mock('html5-qrcode', () => {
       constructor(_id: string) {
         // ID wird nicht ausgewertet — Test rendert kein echtes <video>.
       }
-      async start(
+      // Bewusst kein `async`: ohne `await` würde `require-await` anschlagen,
+      // ein synchrones `throw` würde aber den Test crashen statt von der
+      // `.catch()`-Kette des Aufrufers gefangen zu werden. Daher explizites
+      // Promise — Reject-Pfad verhält sich identisch zur echten Implementierung.
+      start(
         _camera: unknown,
         _config: unknown,
         onSuccess: (decodedText: string) => void,
         _onError?: unknown,
       ): Promise<void> {
         if (_startBehavior === 'denied') {
-          throw new Error('NotAllowedError: Permission denied by user');
+          return Promise.reject(new Error('NotAllowedError: Permission denied by user'));
         }
         _capturedSuccess = onSuccess;
+        return Promise.resolve();
       }
-      async stop(): Promise<void> {
-        /* noop */
+      stop(): Promise<void> {
+        return Promise.resolve();
       }
       clear(): void {
         /* noop */
