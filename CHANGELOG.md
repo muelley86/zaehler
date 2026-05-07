@@ -10,6 +10,20 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.11.0](https://github.com/muelley86/zaehler/compare/v2.10.0...v2.11.0) (2026-05-06)
+
+
+### Funktionen
+
+* **qr-druck:** /q/&lt;token&gt;-Shortpath + Druck-Buttons reanimiert ([0f879a4](https://github.com/muelley86/zaehler/commit/0f879a42601010ebced1fdeec1e9b7b0070de8e3))
+* **qr-druck:** Avery-Etiketten ohne Beschriftung — nur QR ([4d08051](https://github.com/muelley86/zaehler/commit/4d0805101c5c365be18c3e1c36ef5fc5d0a84e97))
+* **qr-druck:** Avery-Layouts + Bugfix weiße Seite beim Bulk-Druck ([b9f33fa](https://github.com/muelley86/zaehler/commit/b9f33fa887fe5a4bfa09f4c2ca58f8935d772d3c))
+
+
+### Fehlerbehebungen
+
+* **routing:** SPA-Fallback antwortet auf unbekannte /api/-Pfade mit 404 ([dba50e5](https://github.com/muelley86/zaehler/commit/dba50e5b5e324727b256ab22e04eb3a7938f23bf))
+
 ## [2.10.0](https://github.com/muelley86/zaehler/compare/v2.9.0...v2.10.0) (2026-05-06)
 
 
