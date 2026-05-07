@@ -10,7 +10,9 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { DEFAULT_LAYOUTS, LAYOUT_ORDER } from './QrTokensPrintSheet';
+import type { QrTokenRead } from '@/lib/types';
+
+import { buildPrintHtml, DEFAULT_LAYOUTS, LAYOUT_ORDER } from './QrTokensPrintSheet';
 
 describe('Druck-Layouts', () => {
   it('listet alle drei Layouts in stabiler Reihenfolge', () => {
@@ -53,5 +55,43 @@ describe('Druck-Layouts', () => {
   it('Schnitt-Bogen 2×4 liefert 8 Etiketten pro Bogen', () => {
     const l = DEFAULT_LAYOUTS['cut-2x4'];
     expect(l.cols * l.rows).toBe(8);
+  });
+});
+
+describe('buildPrintHtml — Cross-Browser-Resolving relativer URLs', () => {
+  // Regression: In Firefox bleibt die Document-Base eines via
+  // ``window.open('') + document.write()`` befüllten Fensters
+  // ``about:blank``. Ohne explizites <base> laden weder die QR-SVGs
+  // (sichtbar als Alt-Text statt Bild) noch das Bootstrap-Script
+  // (Drucken-Button reagiert nicht). Chrome erbt die Opener-Origin
+  // automatisch — daher fällt der Bug nur in Firefox auf.
+  const tokens: QrTokenRead[] = [
+    {
+      id: 1,
+      token: 'K7MP3X9F',
+      measuring_point_id: 1,
+      measuring_point_name: 'Hauptzähler Strom',
+      created_at: '2026-01-01T00:00:00Z',
+      created_by_user_id: 1,
+      assigned_at: null,
+      assigned_by_user_id: null,
+    },
+  ];
+
+  it('schreibt ein <base href> mit Trailing-Slash auf Basis der Opener-Origin', () => {
+    const html = buildPrintHtml(tokens, DEFAULT_LAYOUTS['cut-2x4'], 'https://app.example.com');
+    expect(html).toContain('<base href="https://app.example.com/" />');
+  });
+
+  it('escapt die Origin im <base href> (defensiv gegen exotische Hostnamen)', () => {
+    const html = buildPrintHtml(tokens, DEFAULT_LAYOUTS['cut-2x4'], 'https://x.example.com/"><script>');
+    expect(html).not.toContain('"><script>');
+    expect(html).toContain('&quot;&gt;&lt;script&gt;');
+  });
+
+  it('nutzt weiterhin relative Pfade für QR-SVGs und Bootstrap (auflösen via <base>)', () => {
+    const html = buildPrintHtml(tokens, DEFAULT_LAYOUTS['cut-2x4'], 'https://app.example.com');
+    expect(html).toContain('src="/api/v1/qr-tokens/K7MP3X9F/qr?format=svg&size=large"');
+    expect(html).toContain('<script src="/api/v1/qr-tokens/print-bootstrap.js">');
   });
 });

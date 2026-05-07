@@ -30,6 +30,13 @@
  *     ``<script src="…">`` geladen (same-origin → erlaubt). Buttons tragen
  *     ``data-action="print|close"``, ein delegierter Handler im Bootstrap
  *     ruft ``window.print()`` bzw. ``window.close()``.
+ *  3. Firefox behält für ``window.open('') + document.write()``-Fenster
+ *     die Document-Base-URL als ``about:blank`` (Chrome erbt die Origin
+ *     des Openers). Ohne Gegenmaßnahme lösen sich relative Pfade wie
+ *     ``/api/v1/qr-tokens/…/qr`` gegen ``about:blank`` auf — die QR-SVGs
+ *     und das Bootstrap-Script laden nicht, sichtbar als „nur Alt-Text
+ *     statt QR" und „Drucken-Button reagiert nicht". Daher schreiben wir
+ *     ein explizites ``<base href="${origin}/">`` in den Head.
  *
  * Hinweis Scannbarkeit: Der QR-Code enthält die volle URL
  * ``${origin}/erfassen?token=${token}`` (~50 Zeichen), das ergibt einen
@@ -211,14 +218,21 @@ function buildPagesHtml(tokens: QrTokenRead[], layout: LabelLayout): string {
     .join('');
 }
 
-function buildPrintHtml(tokens: QrTokenRead[], layout: LabelLayout): string {
+/** @internal — exportiert für Tests; produktiv nur über ``openTokensPrintWindow``. */
+export function buildPrintHtml(tokens: QrTokenRead[], layout: LabelLayout, origin: string): string {
   const pagesHtml = buildPagesHtml(tokens, layout);
   const cutBorder = layout.showCutBorder ? '0.3mm dashed #999' : 'none';
+  // Pflicht für Firefox: ohne <base> bleibt die Doc-Base ``about:blank``
+  // und alle ``/api/v1/…``-Quellen laufen ins Leere (siehe Datei-Header
+  // Punkt 3). Mit Slash am Ende, damit ``/api/v1/…`` auf ``${origin}/api/v1/…``
+  // aufgelöst wird, nicht auf das Verzeichnis darüber.
+  const baseHref = `${origin}/`;
 
   return `<!doctype html>
 <html lang="de">
 <head>
 <meta charset="utf-8" />
+<base href="${escapeHtml(baseHref)}" />
 <title>QR-Codes (${tokens.length}) — ${escapeHtml(layout.name)}</title>
 <style>
   @page { size: ${layout.pageWidthMm}mm ${layout.pageHeightMm}mm; margin: 0; }
@@ -377,13 +391,17 @@ function buildPrintHtml(tokens: QrTokenRead[], layout: LabelLayout): string {
  * Wichtig: ``window.open`` ohne ``noopener`` aufrufen, sonst gibt der
  * Browser ``null`` zurück und ``document.write`` läuft nicht. Same-origin,
  * Inhalt komplett kontrolliert — kein Sicherheitsproblem.
+ *
+ * ``origin`` wird aus dem Opener entnommen und ins ``<base href>`` des
+ * Druck-Dokuments geschrieben — ohne das laden in Firefox weder die
+ * QR-SVGs noch das Bootstrap-Script (Doc-Base bleibt sonst about:blank).
  */
 export function openTokensPrintWindow(tokens: QrTokenRead[], layout: LabelLayout): boolean {
   if (tokens.length === 0) return false;
   const w = window.open('', '_blank', 'width=900,height=900');
   if (!w) return false;
   w.document.open();
-  w.document.write(buildPrintHtml(tokens, layout));
+  w.document.write(buildPrintHtml(tokens, layout, window.location.origin));
   w.document.close();
   return true;
 }
