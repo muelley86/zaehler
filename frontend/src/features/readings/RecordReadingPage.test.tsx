@@ -228,7 +228,7 @@ describe('RecordReadingPage', () => {
 
     // Default-MP (Strom) wird zuerst geladen.
     expect(await screen.findByText('Bezug')).toBeInTheDocument();
-    const select = screen.getByRole('combobox') as HTMLSelectElement;
+    const select = screen.getByRole<HTMLSelectElement>('combobox');
     expect(select.value).toBe('1');
 
     // Scan simulieren: navigate setzt ?mp=2.

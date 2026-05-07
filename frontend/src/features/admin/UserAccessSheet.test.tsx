@@ -95,8 +95,8 @@ describe('UserAccessSheet', () => {
     });
     renderWithRouter(<UserAccessSheet user={_RECORDER} onClose={() => {}} />);
 
-    const wasserBox = (await screen.findByLabelText('Zugriff auf Wasser')) as HTMLInputElement;
-    const stromBox = screen.getByLabelText('Zugriff auf Strom') as HTMLInputElement;
+    const wasserBox = await screen.findByLabelText<HTMLInputElement>('Zugriff auf Wasser');
+    const stromBox = screen.getByLabelText<HTMLInputElement>('Zugriff auf Strom');
     expect(wasserBox.checked).toBe(true);
     expect(stromBox.checked).toBe(false);
   });
@@ -137,14 +137,12 @@ describe('UserAccessSheet', () => {
     // Alle auswählen (gefilterte Sicht)
     await user.click(screen.getByRole('button', { name: 'Alle auswählen' }));
 
-    expect((screen.getByLabelText('Zugriff auf Strom-A') as HTMLInputElement).checked).toBe(true);
-    expect((screen.getByLabelText('Zugriff auf Strom-B') as HTMLInputElement).checked).toBe(true);
+    expect(screen.getByLabelText<HTMLInputElement>('Zugriff auf Strom-A').checked).toBe(true);
+    expect(screen.getByLabelText<HTMLInputElement>('Zugriff auf Strom-B').checked).toBe(true);
 
     // Wasser-1 darf NICHT mit-aktiviert worden sein → Filter zurücksetzen
     await user.click(screen.getByRole('button', { name: /^Alle · / }));
-    expect((screen.getByLabelText('Zugriff auf Wasser-1') as HTMLInputElement).checked).toBe(
-      false,
-    );
+    expect(screen.getByLabelText<HTMLInputElement>('Zugriff auf Wasser-1').checked).toBe(false);
   });
 
   it('Speichern schickt PUT mit vollständigem ID-Set', async () => {

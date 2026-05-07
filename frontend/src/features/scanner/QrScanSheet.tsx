@@ -144,7 +144,7 @@ export function QrScanSheet({ open, onClose }: QrScanSheetProps) {
     };
     // navigate und onClose absichtlich NICHT in den Deps — wir lesen sie
     // über die Refs und vermeiden dadurch unnötige Stream-Neustarts.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [open, teardown]);
 
   // Body-Scroll-Lock + ESC analog zur Sheet-Komponente. Der Scanner braucht
