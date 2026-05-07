@@ -50,6 +50,7 @@ data/*.db-shm
 .vscode/*
 !.vscode/extensions.json
 !.vscode/settings.shared.json
+.claude/
 .DS_Store
 Thumbs.db
 
