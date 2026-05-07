@@ -252,7 +252,7 @@ export function DashboardPage() {
     return (
       <PageContainer>
         <LargeTitle title="Dashboard" />
-        <div className="text-tertiary">Lade…</div>
+        <DashboardSkeleton />
       </PageContainer>
     );
   }
@@ -925,6 +925,47 @@ function CurrentStateTile({ state }: { state: RegisterStateRead }) {
           : ''}
       </div>
     </div>
+  );
+}
+
+/**
+ * Höhen-reservierter Skeleton während der initialen Daten-Loads.
+ * Wichtig: jede Skeleton-Card hat exakt dieselbe Mindesthöhe wie eine
+ * spätere echte Card (Header + Tank + Chart-Höhe 256 px). Sonst
+ * springt das Layout beim Hydrieren — der CLS-Hauptverursacher.
+ */
+function DashboardSkeleton() {
+  return (
+    <>
+      {/* Filter-Section */}
+      <div
+        aria-hidden
+        className="rounded-card border-hairline border-border bg-surface/50 glass"
+        style={{ minHeight: 188 }}
+      />
+
+      {/* 3 platzhalter-Cards in der gleichen Höhe wie eine echte
+          MeasuringPointCard (~ 480 px mit Header + Tank + Chart). */}
+      {[0, 1, 2].map((i) => (
+        <div
+          key={i}
+          aria-hidden
+          className="rounded-card border-hairline border-border bg-surface/50 glass"
+          style={{ minHeight: 480 }}
+        >
+          <div className="space-y-3 p-5">
+            <div className="h-7 w-2/3 rounded-pill bg-fill" />
+            <div className="h-4 w-1/3 rounded-pill bg-fill/60" />
+            <div className="mt-6 h-32 w-full rounded-card bg-fill/60" />
+            <div className="mt-4 h-64 w-full rounded-card bg-fill/40" />
+          </div>
+        </div>
+      ))}
+
+      <span className="sr-only" role="status" aria-live="polite">
+        Daten werden geladen
+      </span>
+    </>
   );
 }
 
