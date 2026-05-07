@@ -6,19 +6,13 @@ import { BrowserRouter } from 'react-router-dom';
 // `latin-`-Subset spart gegenüber dem Default-Import (alle Subsets) etwa
 // 80 % CSS- und Font-Bytes — wir brauchen für die deutsche Oberfläche
 // keine kyrillischen oder vietnamesischen Zeichen.
-import '@fontsource/inter-tight/latin-400.css';
-import '@fontsource/inter-tight/latin-500.css';
-import '@fontsource/inter-tight/latin-600.css';
-import '@fontsource/inter-tight/latin-700.css';
-import '@fontsource/jetbrains-mono/latin-400.css';
-import '@fontsource/jetbrains-mono/latin-500.css';
-import '@fontsource/jetbrains-mono/latin-600.css';
-import '@fontsource/jetbrains-mono/latin-700.css';
-
-// Override: font-display von 'swap' auf 'optional'. Verhindert das
-// FOUT-Re-Layout (CLS-Hauptursache lt. Lighthouse). 'optional' lässt
-// den Browser entscheiden — bei langsamer Verbindung wird der Fallback
-// gehalten, sonst ist der Custom-Font da, bevor der Text gemalt wird.
+//
+// WICHTIG: die @fontsource-CSS-Bundles importieren wir NICHT mehr — die
+// definieren ihre @font-face-Regeln mit font-display:swap und ueberlappen
+// dann mit unseren optional-Regeln, was Browser inkonsistent matchen.
+// fonts.css ist autark: ein @font-face pro (family, weight) mit
+// font-display:optional, src zeigt direkt auf @fontsource/.../files/*.woff2,
+// die Vite zur Hash-URL aufloest.
 import './styles/fonts.css';
 
 // Leaflet-Stylesheet für die Standort-Karte (LocationMap).
