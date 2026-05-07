@@ -15,6 +15,12 @@ import '@fontsource/jetbrains-mono/latin-500.css';
 import '@fontsource/jetbrains-mono/latin-600.css';
 import '@fontsource/jetbrains-mono/latin-700.css';
 
+// Override: font-display von 'swap' auf 'optional'. Verhindert das
+// FOUT-Re-Layout (CLS-Hauptursache lt. Lighthouse). 'optional' lässt
+// den Browser entscheiden — bei langsamer Verbindung wird der Fallback
+// gehalten, sonst ist der Custom-Font da, bevor der Text gemalt wird.
+import './styles/fonts.css';
+
 // Leaflet-Stylesheet für die Standort-Karte (LocationMap).
 import 'leaflet/dist/leaflet.css';
 

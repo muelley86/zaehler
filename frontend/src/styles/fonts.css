@@ -1,0 +1,71 @@
+/*
+ * Override für @fontsource: alle bereits definierten @font-face-Regeln
+ * mit font-display:optional re-deklarieren. Reihenfolge nach den
+ * @fontsource-Imports in main.tsx beachten — die letzte Deklaration
+ * pro (family, weight, style) gewinnt.
+ *
+ * Warum nicht 'swap'? swap zeigt erst den Fallback und tauscht hart auf
+ * die Webfont — das erzeugt den CLS, den Lighthouse sieht.
+ * 'optional' gibt dem Browser ein Zeitfenster (~100ms): kommt der Font
+ * rechtzeitig, wird er verwendet; sonst bleibt der Fallback bis zum
+ * nächsten Page-Load. Für eine PWA mit Service-Worker-Cache fast immer
+ * ein Cache-Hit ab dem zweiten Besuch.
+ */
+
+@font-face {
+  font-family: 'Inter Tight';
+  font-style: normal;
+  font-weight: 400;
+  font-display: optional;
+  src: url('@fontsource/inter-tight/files/inter-tight-latin-400-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Inter Tight';
+  font-style: normal;
+  font-weight: 500;
+  font-display: optional;
+  src: url('@fontsource/inter-tight/files/inter-tight-latin-500-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Inter Tight';
+  font-style: normal;
+  font-weight: 600;
+  font-display: optional;
+  src: url('@fontsource/inter-tight/files/inter-tight-latin-600-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Inter Tight';
+  font-style: normal;
+  font-weight: 700;
+  font-display: optional;
+  src: url('@fontsource/inter-tight/files/inter-tight-latin-700-normal.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: optional;
+  src: url('@fontsource/jetbrains-mono/files/jetbrains-mono-latin-400-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-style: normal;
+  font-weight: 500;
+  font-display: optional;
+  src: url('@fontsource/jetbrains-mono/files/jetbrains-mono-latin-500-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-style: normal;
+  font-weight: 600;
+  font-display: optional;
+  src: url('@fontsource/jetbrains-mono/files/jetbrains-mono-latin-600-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-style: normal;
+  font-weight: 700;
+  font-display: optional;
+  src: url('@fontsource/jetbrains-mono/files/jetbrains-mono-latin-700-normal.woff2') format('woff2');
+}
