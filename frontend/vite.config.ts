@@ -7,6 +7,30 @@ const BACKEND = process.env.VITE_DEV_API ?? 'http://localhost:8000';
 
 export default defineConfig({
   plugins: [
+    {
+      name: 'inject-font-preload',
+      // Nach build: in der erzeugten index.html die emittierten WOFF2-Hashes
+      // für inter-tight 400 + 600 als <link rel="preload"> in den <head>
+      // einsetzen. So bleibt der Hash auch nach Re-Builds korrekt.
+      transformIndexHtml: {
+        order: 'post' as const,
+        handler(html, ctx) {
+          if (!ctx.bundle) return html; // dev: kein Hash, skip
+          const fonts = Object.keys(ctx.bundle).filter(
+            (f) =>
+              f.includes('inter-tight-latin-400-normal') ||
+              f.includes('inter-tight-latin-600-normal'),
+          );
+          const tags = fonts
+            .map(
+              (f) =>
+                `    <link rel="preload" as="font" type="font/woff2" crossorigin href="/${f}" />`,
+            )
+            .join('\n');
+          return html.replace('</head>', `${tags}\n  </head>`);
+        },
+      },
+    },
     react(),
     VitePWA({
       registerType: 'autoUpdate',
