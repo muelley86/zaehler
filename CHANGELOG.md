@@ -10,6 +10,23 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.11.1](https://github.com/muelley86/zaehler/compare/v2.11.0...v2.11.1) (2026-05-07)
+
+
+### Fehlerbehebungen
+
+* **qr-druck:** Firefox rendert QR-Codes und loest Drucken-Button aus ([4f05184](https://github.com/muelley86/zaehler/commit/4f05184645e9518e17ff2d295094c6f9b850af60))
+* **qr-druck:** Firefox-Kompatibilitaet ueber Inline-SVG-Embedding ([991d12a](https://github.com/muelley86/zaehler/commit/991d12af472127d3136c7f92b05857dea11d42cc))
+* **qr-druck:** TS2322 unter noUncheckedIndexedAccess vermeiden ([29c2f1b](https://github.com/muelley86/zaehler/commit/29c2f1b33a0f1f810fe49624474502a76b625dec))
+* **vite:** Font-Preload nur fuer woff2, nicht woff-Fallback ([8f4a8d5](https://github.com/muelley86/zaehler/commit/8f4a8d5acc850daf595d435f66c75bc19c7560e3))
+
+
+### Performance
+
+* **dashboard:** Skeleton statt Lade-Text fuer initialen Load ([168fda2](https://github.com/muelley86/zaehler/commit/168fda2b5345f1bc10e391ede0c0eacdd17071da))
+* **frontend:** font-display: optional fuer alle Webfonts ([1fbb0e6](https://github.com/muelley86/zaehler/commit/1fbb0e6e4eb9e94161fb218a3fbe892d51552acf))
+* **frontend:** Font-Preload-Plugin fuer Above-the-Fold-Weights ([05fb6fd](https://github.com/muelley86/zaehler/commit/05fb6fd17ca36712f9d1db6d114c21c39e5356fa))
+
 ## [2.11.0](https://github.com/muelley86/zaehler/compare/v2.10.0...v2.11.0) (2026-05-06)
 
 
