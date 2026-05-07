@@ -16,10 +16,14 @@ export default defineConfig({
         order: 'post' as const,
         handler(html, ctx) {
           if (!ctx.bundle) return html; // dev: kein Hash, skip
+          // Nur .woff2 — der Filter im Patch matchte ueber includes() auch
+          // die .woff-Fallbacks und liess den Browser sie mit dem falschen
+          // type="font/woff2"-Hint laden (doppelte Bytes Above-the-Fold).
           const fonts = Object.keys(ctx.bundle).filter(
             (f) =>
-              f.includes('inter-tight-latin-400-normal') ||
-              f.includes('inter-tight-latin-600-normal'),
+              f.endsWith('.woff2') &&
+              (f.includes('inter-tight-latin-400-normal') ||
+                f.includes('inter-tight-latin-600-normal')),
           );
           const tags = fonts
             .map(
