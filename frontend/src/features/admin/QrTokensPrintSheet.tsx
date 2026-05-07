@@ -16,39 +16,39 @@
  * wird bewusst weggelassen — auf dieser Etikettengröße kostet sie Platz
  * ohne echten Mehrwert (zur Identifikation reicht der QR-Scan).
  *
- * Pattern: neues Fenster, HTML schreiben, externes Bootstrap-JS lädt das
- * Auto-Print- und Button-Verhalten. Zwei Stolpersteine, die hier bewusst
- * vermieden werden:
+ * Architektur des Druck-Fensters
+ * ------------------------------
+ * Wir öffnen ein ``about:blank``-Pop-up und schreiben das HTML per
+ * ``document.write``. Dabei sind drei Browser-Quirks zu beachten — alle
+ * drei zeigen sich primär in Firefox, weil Chrome an diesen Stellen
+ * großzügiger ist (was die ursprüngliche Implementierung „funktioniert
+ * doch in Chrome" verschleiert hat):
  *
  *  1. ``window.open(url, '_blank', 'noopener')`` liefert laut Spec ``null``
  *     zurück — damit greift das frühe return und das ``document.write``
  *     läuft nie (sichtbar als weiße Seite). Daher KEIN noopener.
- *  2. Das ``about:blank``-Fenster erbt die CSP des Openers. Die App setzt
- *     ``script-src 'self'``, das blockiert sowohl Inline-``<script>``-
- *     Blöcke als auch Inline-``onclick=""``-Handler. Druck-Logik liegt
- *     deshalb in ``GET /api/v1/qr-tokens/print-bootstrap.js`` und wird via
- *     ``<script src="…">`` geladen (same-origin → erlaubt). Buttons tragen
- *     ``data-action="print|close"``, ein delegierter Handler im Bootstrap
- *     ruft ``window.print()`` bzw. ``window.close()``.
- *  3. Firefox behält für ``window.open('') + document.write()``-Fenster
- *     die Document-Base-URL als ``about:blank`` (Chrome erbt die Origin
- *     des Openers). Ohne Gegenmaßnahme lösen sich relative Pfade wie
- *     ``/api/v1/qr-tokens/…/qr`` gegen ``about:blank`` auf — die QR-SVGs
- *     und das Bootstrap-Script laden nicht, sichtbar als „nur Alt-Text
- *     statt QR" und „Drucken-Button reagiert nicht". Daher schreiben wir
- *     ein explizites ``<base href="${origin}/">`` in den Head.
- *
- * Hinweis Scannbarkeit: Der QR-Code enthält die volle URL
- * ``${origin}/erfassen?token=${token}`` (~50 Zeichen), das ergibt einen
- * Version-3-Code (29×29 Module). Bei 10 mm Etikettenhöhe sind die Module
- * ca. 0,3 mm groß — gerade noch scannbar mit modernen Smartphones, aber
- * empfindlich gegen Druckunschärfe. Für absolut zuverlässiges Scannen
- * weiterhin den Schnitt-Bogen 2×4 verwenden.
+ *  2. Das ``about:blank``-Fenster erbt die CSP des Openers (``script-src
+ *     'self'``, ``img-src 'self'``). In Firefox matcht ``'self'`` für ein
+ *     Document mit URL ``about:blank`` nicht gegen die App-Origin —
+ *     externe ``<script src="/api/v1/...">`` und ``<img src="/api/v1/...">``
+ *     werden blockiert. Gleiches Problem auf der Cookie-Seite: das
+ *     Session-Cookie ist ``SameSite=Strict``, und Subresource-Requests aus
+ *     einem ``about:blank``-Fenster gelten in Firefox nicht als
+ *     same-site → 401 auf den Admin-Only QR-Endpoint.
+ *     **Konsequenz**: Das Druck-HTML referenziert KEINE App-Resources
+ *     mehr. Die QR-SVGs werden vorab im Opener-Kontext per ``fetch``
+ *     geladen (echte App-Origin → Cookies und CSP problemlos) und inline
+ *     ins HTML eingebettet. Klick-Handler werden vom Opener aus per
+ *     ``addEventListener`` an die Buttons gehängt — keine Inline-Scripts,
+ *     kein externes Bootstrap-Skript.
+ *  3. ``window.open`` darf in Firefox nur synchron aus einem
+ *     User-Gesture aufgerufen werden — nach einem ``await`` ist die
+ *     Activation aufgebraucht und Pop-ups werden geblockt. Wir öffnen
+ *     deshalb sofort beim Click ein leeres Fenster mit „lädt …"-Hinweis
+ *     und schreiben den finalen HTML-Body erst, nachdem die SVGs da sind.
  */
 
 import type { QrTokenRead } from '@/lib/types';
-
-const BOOTSTRAP_SRC = '/api/v1/qr-tokens/print-bootstrap.js';
 
 export type LabelLayoutId = 'cut-2x4' | 'avery-l4731rev' | 'avery-3320';
 
@@ -150,6 +150,16 @@ export const DEFAULT_LAYOUTS: Record<LabelLayoutId, LabelLayout> = {
 
 export const LAYOUT_ORDER: LabelLayoutId[] = ['cut-2x4', 'avery-l4731rev', 'avery-3320'];
 
+/**
+ * Token mit zugehörigem inline-SVG-String — interner Druck-Typ.
+ *
+ * @internal Exportiert NUR für die Test-Suite, produktiv landet er via
+ * ``openTokensPrintWindow`` automatisch im HTML-Generator.
+ */
+export interface TokenWithSvg extends QrTokenRead {
+  svg: string;
+}
+
 function escapeHtml(value: string): string {
   return value
     .replace(/&/g, '&amp;')
@@ -159,15 +169,48 @@ function escapeHtml(value: string): string {
     .replace(/'/g, '&#39;');
 }
 
-function buildLabelInner(token: QrTokenRead, layout: LabelLayout): string {
-  const qrUrl = `/api/v1/qr-tokens/${token.token}/qr?format=svg&size=large`;
+/**
+ * Bereinigt das vom Backend gelieferte SVG für die Inline-Einbettung:
+ *
+ * - XML-Prolog ``<?xml … ?>`` und ``<!DOCTYPE …>`` raus, weil ein Inline-SVG
+ *   in einer ``text/html``-Page keinen XML-Header haben darf (Firefox
+ *   meckert sonst mit „XML-Verarbeitungsanweisung an unzulässiger Stelle").
+ * - Feste ``width=""``/``height=""``-Attribute am ``<svg>``-Wurzelelement
+ *   raus, damit das CSS (``svg { width:100%; height:100%; }``) greift.
+ *   Das ``viewBox``-Attribut bleibt erhalten — ohne das könnte das SVG
+ *   nicht skalieren.
+ *
+ * Defensive Implementierung: kommt das Backend-Format mal ohne XML-Prolog
+ * oder ohne width/height, ist das auch ok (regex matcht dann nichts).
+ */
+function sanitizeSvgForInline(raw: string): string {
+  let svg = raw.replace(/<\?xml[^?]*\?>/g, '').replace(/<!DOCTYPE[^>]*>/gi, '').trim();
+  svg = svg.replace(/(<svg\b[^>]*?)\swidth="[^"]*"/i, '$1');
+  svg = svg.replace(/(<svg\b[^>]*?)\sheight="[^"]*"/i, '$1');
+  return svg;
+}
+
+async function fetchTokenSvg(tokenStr: string): Promise<string> {
+  // Same-origin-Fetch im Opener-Kontext — Cookies, CSP und Origin sind hier
+  // alle „normal", anders als später im about:blank-Fenster.
+  const r = await fetch(`/api/v1/qr-tokens/${encodeURIComponent(tokenStr)}/qr?format=svg&size=large`, {
+    credentials: 'same-origin',
+    headers: { Accept: 'image/svg+xml' },
+  });
+  if (!r.ok) {
+    throw new Error(`QR-SVG für ${tokenStr} konnte nicht geladen werden (HTTP ${r.status})`);
+  }
+  return sanitizeSvgForInline(await r.text());
+}
+
+function buildLabelInner(token: TokenWithSvg, layout: LabelLayout): string {
   const subline = token.measuring_point_name
     ? escapeHtml(token.measuring_point_name)
     : 'Bereit zur Zuordnung';
 
   if (layout.qrPlacement === 'center-with-caption' && layout.showLabelText) {
     return `
-      <div class="qr-center"><img src="${qrUrl}" alt="QR ${escapeHtml(token.token)}" /></div>
+      <div class="qr-center" role="img" aria-label="QR ${escapeHtml(token.token)}">${token.svg}</div>
       <div class="token">${escapeHtml(token.token)}</div>
       <div class="sub">${subline}</div>`;
   }
@@ -178,12 +221,12 @@ function buildLabelInner(token: QrTokenRead, layout: LabelLayout): string {
          </div>`
       : '';
     return `
-      <div class="qr-square"><img src="${qrUrl}" alt="QR ${escapeHtml(token.token)}" /></div>
+      <div class="qr-square" role="img" aria-label="QR ${escapeHtml(token.token)}">${token.svg}</div>
       ${text}`;
   }
   // center-only
   return `
-    <div class="qr-fill"><img src="${qrUrl}" alt="QR ${escapeHtml(token.token)}" /></div>`;
+    <div class="qr-fill" role="img" aria-label="QR ${escapeHtml(token.token)}">${token.svg}</div>`;
 }
 
 /**
@@ -192,9 +235,9 @@ function buildLabelInner(token: QrTokenRead, layout: LabelLayout): string {
  * Etiketten. Das @page-CSS hat 0-Margin — alle physischen Abstände stehen
  * im Layout selbst, sodass Avery-Bögen pixelgenau sitzen.
  */
-function buildPagesHtml(tokens: QrTokenRead[], layout: LabelLayout): string {
+function buildPagesHtml(tokens: TokenWithSvg[], layout: LabelLayout): string {
   const perPage = layout.cols * layout.rows;
-  const pages: QrTokenRead[][] = [];
+  const pages: TokenWithSvg[][] = [];
   for (let i = 0; i < tokens.length; i += perPage) {
     pages.push(tokens.slice(i, i + perPage));
   }
@@ -219,20 +262,14 @@ function buildPagesHtml(tokens: QrTokenRead[], layout: LabelLayout): string {
 }
 
 /** @internal — exportiert für Tests; produktiv nur über ``openTokensPrintWindow``. */
-export function buildPrintHtml(tokens: QrTokenRead[], layout: LabelLayout, origin: string): string {
+export function buildPrintHtml(tokens: TokenWithSvg[], layout: LabelLayout): string {
   const pagesHtml = buildPagesHtml(tokens, layout);
   const cutBorder = layout.showCutBorder ? '0.3mm dashed #999' : 'none';
-  // Pflicht für Firefox: ohne <base> bleibt die Doc-Base ``about:blank``
-  // und alle ``/api/v1/…``-Quellen laufen ins Leere (siehe Datei-Header
-  // Punkt 3). Mit Slash am Ende, damit ``/api/v1/…`` auf ``${origin}/api/v1/…``
-  // aufgelöst wird, nicht auf das Verzeichnis darüber.
-  const baseHref = `${origin}/`;
 
   return `<!doctype html>
 <html lang="de">
 <head>
 <meta charset="utf-8" />
-<base href="${escapeHtml(baseHref)}" />
 <title>QR-Codes (${tokens.length}) — ${escapeHtml(layout.name)}</title>
 <style>
   @page { size: ${layout.pageWidthMm}mm ${layout.pageHeightMm}mm; margin: 0; }
@@ -262,12 +299,17 @@ export function buildPrintHtml(tokens: QrTokenRead[], layout: LabelLayout, origi
     page-break-inside: avoid;
   }
 
+  /* Inline-SVGs füllen ihre Container vollständig — feste width/height am
+     <svg>-Element wurden in sanitizeSvgForInline() entfernt, sodass diese
+     CSS-Regel greift. !important wäre unnötig, ist aber gegen exotische
+     Browser-Defaults auf SVG-Wurzelelementen defensiv. */
+  .label svg { width: 100% !important; height: 100% !important; display: block; }
+
   /* Layout: zentrierter QR + Token + MP-Name (Schnitt-Bogen) */
   .label .qr-center {
     width: 38mm;
     height: 38mm;
   }
-  .label .qr-center img { width: 100%; height: 100%; display: block; }
   .label > .token {
     position: absolute;
     bottom: 9mm;
@@ -303,7 +345,6 @@ export function buildPrintHtml(tokens: QrTokenRead[], layout: LabelLayout, origi
     aspect-ratio: 1 / 1;
     padding: 0.4mm;
   }
-  .label .qr-square img { width: 100%; height: 100%; display: block; }
   .label .text-block {
     flex: 1 1 auto;
     height: 100%;
@@ -332,7 +373,6 @@ export function buildPrintHtml(tokens: QrTokenRead[], layout: LabelLayout, origi
     aspect-ratio: 1 / 1;
     width: auto;
   }
-  .label .qr-fill img { width: 100%; height: 100%; display: block; }
 
   /* Bedienleiste — nur am Bildschirm sichtbar */
   .controls {
@@ -379,29 +419,116 @@ export function buildPrintHtml(tokens: QrTokenRead[], layout: LabelLayout, origi
     <button type="button" data-action="print">Drucken</button>
     <button type="button" class="secondary" data-action="close">Schließen</button>
   </div>
-  <script src="${BOOTSTRAP_SRC}"></script>
 </body>
 </html>`;
 }
 
 /**
+ * HTML für das initial leere Fenster — wird sofort beim Click geschrieben,
+ * um die User-Activation für ``window.open`` nicht zu verbrauchen, während
+ * die SVGs asynchron geladen werden. Sobald die SVGs da sind, ersetzt der
+ * finale Body diesen Platzhalter.
+ */
+function buildLoadingHtml(count: number): string {
+  return `<!doctype html>
+<html lang="de">
+<head><meta charset="utf-8" /><title>QR-Codes werden vorbereitet …</title>
+<style>
+  body { font-family: -apple-system, 'Segoe UI', system-ui, sans-serif;
+         color: #555; padding: 2.5rem; line-height: 1.5; }
+  .spinner { display: inline-block; width: 14px; height: 14px;
+             border: 2px solid #ccc; border-top-color: #1463ff;
+             border-radius: 50%; animation: sp 0.8s linear infinite;
+             vertical-align: -2px; margin-right: 8px; }
+  @keyframes sp { to { transform: rotate(360deg); } }
+</style></head>
+<body><span class="spinner"></span>${count} QR-Code${count === 1 ? '' : 's'} werden vorbereitet …</body>
+</html>`;
+}
+
+function buildErrorHtml(message: string): string {
+  return `<!doctype html>
+<html lang="de">
+<head><meta charset="utf-8" /><title>Fehler beim Laden</title>
+<style>
+  body { font-family: -apple-system, 'Segoe UI', system-ui, sans-serif;
+         color: #b91c1c; padding: 2.5rem; line-height: 1.5; }
+</style></head>
+<body><strong>QR-Codes konnten nicht vorbereitet werden:</strong><br />${escapeHtml(message)}</body>
+</html>`;
+}
+
+/**
  * Öffnet ein neues Fenster mit dem Bulk-Druck-Layout für die übergebenen
- * Tokens. Liefert ``true``, wenn das Fenster geöffnet werden konnte.
+ * Tokens. Liefert ``true``, wenn das Pop-up geöffnet werden konnte (das ist
+ * die einzige synchrone Erfolgs-Indikation, die wir geben können — der
+ * eigentliche Druck-Workflow läuft danach asynchron im Pop-up).
  *
- * Wichtig: ``window.open`` ohne ``noopener`` aufrufen, sonst gibt der
- * Browser ``null`` zurück und ``document.write`` läuft nicht. Same-origin,
- * Inhalt komplett kontrolliert — kein Sicherheitsproblem.
+ * Wichtig:
  *
- * ``origin`` wird aus dem Opener entnommen und ins ``<base href>`` des
- * Druck-Dokuments geschrieben — ohne das laden in Firefox weder die
- * QR-SVGs noch das Bootstrap-Script (Doc-Base bleibt sonst about:blank).
+ * - ``window.open`` ohne ``noopener`` aufrufen, sonst gibt der Browser
+ *   ``null`` zurück und ``document.write`` läuft nicht. Same-origin,
+ *   Inhalt komplett kontrolliert — kein Sicherheitsproblem.
+ * - ``window.open`` MUSS synchron beim Click aufgerufen werden, sonst
+ *   greift der Pop-up-Blocker (besonders Firefox). Daher öffnen wir das
+ *   Fenster zuerst mit einem Lade-Platzhalter und holen die SVGs erst
+ *   danach asynchron — die User-Activation ist nach einem ``await`` weg.
  */
 export function openTokensPrintWindow(tokens: QrTokenRead[], layout: LabelLayout): boolean {
   if (tokens.length === 0) return false;
   const w = window.open('', '_blank', 'width=900,height=900');
   if (!w) return false;
+
+  // Sofort einen Lade-Platzhalter rendern, damit der User nicht in ein
+  // weißes Fenster starrt, während wir die SVGs holen.
   w.document.open();
-  w.document.write(buildPrintHtml(tokens, layout, window.location.origin));
+  w.document.write(buildLoadingHtml(tokens.length));
   w.document.close();
+
+  // Async-Pipeline: SVGs holen → finales HTML rendern → Click-Handler vom
+  // Opener aus an die Buttons hängen → Auto-Print. Klick-Handler werden
+  // bewusst NICHT als Inline-Script ausgeliefert, weil das about:blank-
+  // Fenster in Firefox die script-src 'self'-CSP nicht gegen die App-
+  // Origin matcht. Programmatische ``addEventListener`` aus dem Opener
+  // sind davon nicht betroffen — same-origin-Inheritance reicht hier.
+  void (async () => {
+    try {
+      const svgs = await Promise.all(tokens.map((t) => fetchTokenSvg(t.token)));
+      const tokensWithSvg: TokenWithSvg[] = tokens.map((t, i) => ({ ...t, svg: svgs[i] }));
+      const html = buildPrintHtml(tokensWithSvg, layout);
+      w.document.open();
+      w.document.write(html);
+      w.document.close();
+
+      const printBtn = w.document.querySelector<HTMLButtonElement>('[data-action="print"]');
+      const closeBtn = w.document.querySelector<HTMLButtonElement>('[data-action="close"]');
+      printBtn?.addEventListener('click', () => {
+        try {
+          w.focus();
+        } catch {
+          /* noop — focus() kann an Pop-up-Restrictions scheitern */
+        }
+        w.print();
+      });
+      closeBtn?.addEventListener('click', () => w.close());
+
+      // Auto-Print mit kurzer Verzögerung, damit Layout/Fonts gerendert sind.
+      // 600 ms hat sich in der ursprünglichen Implementierung bewährt.
+      window.setTimeout(() => {
+        try {
+          w.focus();
+        } catch {
+          /* noop */
+        }
+        w.print();
+      }, 600);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      w.document.open();
+      w.document.write(buildErrorHtml(msg));
+      w.document.close();
+    }
+  })();
+
   return true;
 }

@@ -1,18 +1,41 @@
 /**
- * Smoke-Tests für die Geometrie der drei Druck-Layouts.
+ * Smoke-Tests für die Geometrie der drei Druck-Layouts und für die
+ * Browser-Quirk-resistente HTML-Generierung.
  *
  * ``openTokensPrintWindow`` lässt sich in jsdom nicht sinnvoll testen
- * (kein realer Pop-up-Mechanismus, kein ``document.write``-Roundtrip),
- * deshalb decken wir das ab, was am ehesten still kaputtgeht: die
- * Default-Layout-Geometrien müssen rechnerisch auf die A4-Maße passen
- * und die Etiketten-Positionierung muss reproduzierbar sein.
+ * (kein realer Pop-up-Mechanismus, kein ``document.write``-Roundtrip,
+ * kein ``window.print``), deshalb decken wir das ab, was am ehesten still
+ * kaputtgeht: die Default-Layout-Geometrien müssen rechnerisch auf die
+ * A4-Maße passen, und die HTML-Ausgabe muss so beschaffen sein, dass sie
+ * im Firefox-about:blank-Fenster ohne externe Resource-Requests rendert.
  */
 
 import { describe, expect, it } from 'vitest';
 
-import type { QrTokenRead } from '@/lib/types';
+import {
+  buildPrintHtml,
+  DEFAULT_LAYOUTS,
+  LAYOUT_ORDER,
+  type TokenWithSvg,
+} from './QrTokensPrintSheet';
 
-import { buildPrintHtml, DEFAULT_LAYOUTS, LAYOUT_ORDER } from './QrTokensPrintSheet';
+const SAMPLE_SVG =
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><rect width="10" height="10" /></svg>';
+
+function makeToken(overrides: Partial<TokenWithSvg> = {}): TokenWithSvg {
+  return {
+    id: 1,
+    token: 'K7MP3X9F',
+    measuring_point_id: 1,
+    measuring_point_name: 'Hauptzähler Strom',
+    created_at: '2026-01-01T00:00:00Z',
+    created_by_user_id: 1,
+    assigned_at: null,
+    assigned_by_user_id: null,
+    svg: SAMPLE_SVG,
+    ...overrides,
+  };
+}
 
 describe('Druck-Layouts', () => {
   it('listet alle drei Layouts in stabiler Reihenfolge', () => {
@@ -58,40 +81,59 @@ describe('Druck-Layouts', () => {
   });
 });
 
-describe('buildPrintHtml — Cross-Browser-Resolving relativer URLs', () => {
-  // Regression: In Firefox bleibt die Document-Base eines via
-  // ``window.open('') + document.write()`` befüllten Fensters
-  // ``about:blank``. Ohne explizites <base> laden weder die QR-SVGs
-  // (sichtbar als Alt-Text statt Bild) noch das Bootstrap-Script
-  // (Drucken-Button reagiert nicht). Chrome erbt die Opener-Origin
-  // automatisch — daher fällt der Bug nur in Firefox auf.
-  const tokens: QrTokenRead[] = [
-    {
-      id: 1,
-      token: 'K7MP3X9F',
-      measuring_point_id: 1,
-      measuring_point_name: 'Hauptzähler Strom',
-      created_at: '2026-01-01T00:00:00Z',
-      created_by_user_id: 1,
-      assigned_at: null,
-      assigned_by_user_id: null,
-    },
-  ];
+describe('buildPrintHtml — Browser-Quirk-resistente Generierung', () => {
+  // Regression: Firefox blockiert in einem ``about:blank``-Pop-up sowohl
+  // ``<img src="/api/v1/...">`` als auch ``<script src="/api/v1/...">``,
+  // weil die CSP ``'self'`` nicht gegen die Opener-Origin matcht. Außerdem
+  // werden ``SameSite=Strict``-Cookies bei Subresource-Requests aus
+  // about:blank nicht mitgesendet → 401 auf Admin-Only-Endpoints.
+  // Konsequenz: Das Druck-HTML darf KEINE App-Resources mehr referenzieren.
+  // Die SVGs werden im Opener vorab gefetcht und inline eingebettet,
+  // Click-Handler werden vom Opener aus per addEventListener gesetzt.
 
-  it('schreibt ein <base href> mit Trailing-Slash auf Basis der Opener-Origin', () => {
-    const html = buildPrintHtml(tokens, DEFAULT_LAYOUTS['cut-2x4'], 'https://app.example.com');
-    expect(html).toContain('<base href="https://app.example.com/" />');
+  it('bettet das SVG inline ein — kein <img src> mehr', () => {
+    const html = buildPrintHtml([makeToken()], DEFAULT_LAYOUTS['cut-2x4']);
+    expect(html).toContain('<svg xmlns="http://www.w3.org/2000/svg"');
+    expect(html).not.toMatch(/<img[^>]*src=/i);
   });
 
-  it('escapt die Origin im <base href> (defensiv gegen exotische Hostnamen)', () => {
-    const html = buildPrintHtml(tokens, DEFAULT_LAYOUTS['cut-2x4'], 'https://x.example.com/"><script>');
-    expect(html).not.toContain('"><script>');
-    expect(html).toContain('&quot;&gt;&lt;script&gt;');
+  it('referenziert kein Bootstrap-Skript per <script src>', () => {
+    const html = buildPrintHtml([makeToken()], DEFAULT_LAYOUTS['cut-2x4']);
+    expect(html).not.toMatch(/<script\b[^>]*\bsrc=/i);
+    expect(html).not.toContain('print-bootstrap.js');
   });
 
-  it('nutzt weiterhin relative Pfade für QR-SVGs und Bootstrap (auflösen via <base>)', () => {
-    const html = buildPrintHtml(tokens, DEFAULT_LAYOUTS['cut-2x4'], 'https://app.example.com');
-    expect(html).toContain('src="/api/v1/qr-tokens/K7MP3X9F/qr?format=svg&size=large"');
-    expect(html).toContain('<script src="/api/v1/qr-tokens/print-bootstrap.js">');
+  it('referenziert keine /api/v1/-Endpoints (weder Bilder noch Skripte)', () => {
+    const html = buildPrintHtml([makeToken()], DEFAULT_LAYOUTS['avery-l4731rev']);
+    expect(html).not.toContain('/api/v1/');
+  });
+
+  it('schreibt die Buttons mit data-action für externe Click-Handler', () => {
+    const html = buildPrintHtml([makeToken()], DEFAULT_LAYOUTS['cut-2x4']);
+    expect(html).toContain('data-action="print"');
+    expect(html).toContain('data-action="close"');
+    // Defensive: keine Inline-onclick-Handler, die unter strikter CSP
+    // ohnehin blockiert würden.
+    expect(html).not.toMatch(/onclick=/i);
+  });
+
+  it('escapt Token und MP-Name im Output (kein HTML-Injection-Risiko)', () => {
+    const html = buildPrintHtml(
+      [makeToken({ token: '<script>X</script>', measuring_point_name: 'A & B' })],
+      DEFAULT_LAYOUTS['cut-2x4'],
+    );
+    expect(html).not.toContain('<script>X</script>');
+    expect(html).toContain('&lt;script&gt;X&lt;/script&gt;');
+    expect(html).toContain('A &amp; B');
+  });
+
+  it('verteilt Tokens über mehrere Seiten, sobald cols × rows überschritten ist', () => {
+    const layout = DEFAULT_LAYOUTS['cut-2x4']; // 8 pro Bogen
+    const tokens = Array.from({ length: 9 }, (_, i) =>
+      makeToken({ id: i, token: `T${i}`.padEnd(8, '0') }),
+    );
+    const html = buildPrintHtml(tokens, layout);
+    const pageMatches = html.match(/<div class="page">/g);
+    expect(pageMatches).toHaveLength(2);
   });
 });
