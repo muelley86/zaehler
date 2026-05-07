@@ -493,8 +493,12 @@ export function openTokensPrintWindow(tokens: QrTokenRead[], layout: LabelLayout
   // sind davon nicht betroffen — same-origin-Inheritance reicht hier.
   void (async () => {
     try {
-      const svgs = await Promise.all(tokens.map((t) => fetchTokenSvg(t.token)));
-      const tokensWithSvg: TokenWithSvg[] = tokens.map((t, i) => ({ ...t, svg: svgs[i] }));
+      // SVG direkt im map-Callback fetchen — vermeidet einen separaten
+      // Zip-Schritt mit Index-Zugriff (der unter noUncheckedIndexedAccess
+      // ein ``string | undefined`` ergeben würde).
+      const tokensWithSvg: TokenWithSvg[] = await Promise.all(
+        tokens.map(async (t) => ({ ...t, svg: await fetchTokenSvg(t.token) })),
+      );
       const html = buildPrintHtml(tokensWithSvg, layout);
       w.document.open();
       w.document.write(html);
