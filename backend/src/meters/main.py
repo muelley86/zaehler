@@ -23,7 +23,6 @@ from meters.core.logging import configure_logging
 from meters.core.middleware import install_origin_check, install_security_headers
 from meters.core.problem import ProblemError, install_problem_handlers
 
-
 # Cache-Header für die von Vite gehashten Bundle-Dateien unter /assets.
 # Dateinamen enthalten einen Content-Hash (z. B. ``index-a1b2c3d4.js``),
 # darum ist ``immutable`` sicher: bei Änderungen ändert sich der Name.
@@ -49,7 +48,7 @@ def create_app() -> FastAPI:
     assert_secure_secret_key()
     app = FastAPI(title=settings.app_name, debug=settings.debug)
     # GZip vor Routing aktivieren — komprimiert JSON-Responses und das
-    # gebaute JS/CSS um typischerweise 60–75 %. Schwelle 1024 B vermeidet
+    # gebaute JS/CSS um typischerweise 60-75 %. Schwelle 1024 B vermeidet
     # Overhead für kleine Antworten.
     app.add_middleware(GZipMiddleware, minimum_size=1024)
     install_security_headers(app)

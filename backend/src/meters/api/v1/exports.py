@@ -55,9 +55,7 @@ def readings_csv(db: DbDep, user: CurrentUser) -> StreamingResponse:
     # Recorder bekommt nur Readings auf zugänglichen MPs — über Join.
     if user.role is not UserRole.ADMIN:
         stmt = stmt.join(Reading.register).join(Register.physical_meter)
-        stmt = restrict_mp_query(
-            stmt, user, mp_id_column=PhysicalMeter.measuring_point_id
-        )
+        stmt = restrict_mp_query(stmt, user, mp_id_column=PhysicalMeter.measuring_point_id)
     rows = list(db.scalars(stmt))
 
     buffer = io.StringIO()

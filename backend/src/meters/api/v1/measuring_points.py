@@ -409,13 +409,19 @@ def get_mp_users(
     for u in admins:
         out.append(
             MpAccessUserRead(
-                user_id=u.id, username=u.username, role=u.role.value, source="admin",
+                user_id=u.id,
+                username=u.username,
+                role=u.role.value,
+                source="admin",
             )
         )
     for u in granted_recorders:
         out.append(
             MpAccessUserRead(
-                user_id=u.id, username=u.username, role=u.role.value, source="grant",
+                user_id=u.id,
+                username=u.username,
+                role=u.role.value,
+                source="grant",
             )
         )
     return out

@@ -93,9 +93,7 @@ def test_list_tokens_status_filters(admin_client: TestClient) -> None:
     # 2 Tokens erzeugen, davon einer assignen
     create = admin_client.post("/api/v1/qr-tokens", json={"count": 2}).json()
     t1, t2 = create[0]["token"], create[1]["token"]
-    admin_client.post(
-        f"/api/v1/qr-tokens/{t1}/assign", json={"measuring_point_id": mp["id"]}
-    )
+    admin_client.post(f"/api/v1/qr-tokens/{t1}/assign", json={"measuring_point_id": mp["id"]})
 
     all_tokens = admin_client.get("/api/v1/qr-tokens").json()
     assigned = admin_client.get("/api/v1/qr-tokens?status=assigned").json()
@@ -186,7 +184,7 @@ def test_qr_svg_encodes_short_q_path(admin_client: TestClient) -> None:
         "method": "GET",
         "client": ("127.0.0.1", 0),
     }
-    url = _build_token_url(StarletteRequest(fake_scope), token)  # type: ignore[arg-type]
+    url = _build_token_url(StarletteRequest(fake_scope), token)
     assert url == f"https://zaehler.example/q/{token}"
 
 
@@ -217,9 +215,7 @@ def test_print_bootstrap_js_is_public(admin_client: TestClient) -> None:
 def test_admin_can_assign_token(admin_client: TestClient) -> None:
     mp = _create_water_mp(admin_client, name="A", serial="SN-A")
     t = admin_client.post("/api/v1/qr-tokens", json={"count": 1}).json()[0]["token"]
-    resp = admin_client.post(
-        f"/api/v1/qr-tokens/{t}/assign", json={"measuring_point_id": mp["id"]}
-    )
+    resp = admin_client.post(f"/api/v1/qr-tokens/{t}/assign", json={"measuring_point_id": mp["id"]})
     assert resp.status_code == 200, resp.text
     assert resp.json()["measuring_point_id"] == mp["id"]
     assert resp.json()["assigned_at"] is not None
@@ -229,9 +225,7 @@ def test_assign_already_assigned_returns_409(admin_client: TestClient) -> None:
     mp_a = _create_water_mp(admin_client, name="A", serial="SN-A")
     mp_b = _create_water_mp(admin_client, name="B", serial="SN-B")
     t = admin_client.post("/api/v1/qr-tokens", json={"count": 1}).json()[0]["token"]
-    admin_client.post(
-        f"/api/v1/qr-tokens/{t}/assign", json={"measuring_point_id": mp_a["id"]}
-    )
+    admin_client.post(f"/api/v1/qr-tokens/{t}/assign", json={"measuring_point_id": mp_a["id"]})
     resp = admin_client.post(
         f"/api/v1/qr-tokens/{t}/assign", json={"measuring_point_id": mp_b["id"]}
     )
@@ -240,9 +234,7 @@ def test_assign_already_assigned_returns_409(admin_client: TestClient) -> None:
 
 def test_assign_unknown_mp_returns_404(admin_client: TestClient) -> None:
     t = admin_client.post("/api/v1/qr-tokens", json={"count": 1}).json()[0]["token"]
-    resp = admin_client.post(
-        f"/api/v1/qr-tokens/{t}/assign", json={"measuring_point_id": 99999}
-    )
+    resp = admin_client.post(f"/api/v1/qr-tokens/{t}/assign", json={"measuring_point_id": 99999})
     assert resp.status_code == 404
 
 
@@ -251,9 +243,7 @@ def test_admin_can_unassign_then_reassign(admin_client: TestClient) -> None:
     mp_b = _create_water_mp(admin_client, name="B", serial="SN-B")
     t = admin_client.post("/api/v1/qr-tokens", json={"count": 1}).json()[0]["token"]
 
-    admin_client.post(
-        f"/api/v1/qr-tokens/{t}/assign", json={"measuring_point_id": mp_a["id"]}
-    )
+    admin_client.post(f"/api/v1/qr-tokens/{t}/assign", json={"measuring_point_id": mp_a["id"]})
     unassign = admin_client.delete(f"/api/v1/qr-tokens/{t}/assign")
     assert unassign.status_code == 200
     assert unassign.json()["measuring_point_id"] is None
@@ -326,9 +316,7 @@ def test_recorder_cannot_unassign(
     mp = _create_water_mp(admin_client, name="A", serial="SN-A")
     _set_can_assign(db, recorder_user, True)
     t = admin_client.post("/api/v1/qr-tokens", json={"count": 1}).json()[0]["token"]
-    admin_client.post(
-        f"/api/v1/qr-tokens/{t}/assign", json={"measuring_point_id": mp["id"]}
-    )
+    admin_client.post(f"/api/v1/qr-tokens/{t}/assign", json={"measuring_point_id": mp["id"]})
     resp = recorder_client.delete(f"/api/v1/qr-tokens/{t}/assign")
     assert resp.status_code == 403
 
@@ -347,9 +335,7 @@ def test_unassign_already_unassigned_returns_409(admin_client: TestClient) -> No
 def test_resolve_assigned_token_for_admin(admin_client: TestClient) -> None:
     mp = _create_water_mp(admin_client, name="A", serial="SN-A")
     t = admin_client.post("/api/v1/qr-tokens", json={"count": 1}).json()[0]["token"]
-    admin_client.post(
-        f"/api/v1/qr-tokens/{t}/assign", json={"measuring_point_id": mp["id"]}
-    )
+    admin_client.post(f"/api/v1/qr-tokens/{t}/assign", json={"measuring_point_id": mp["id"]})
     resp = admin_client.get(f"/api/v1/qr-tokens/{t}/resolve")
     assert resp.status_code == 200
     body = resp.json()
@@ -380,9 +366,7 @@ def test_resolve_assigned_to_inaccessible_mp_returns_404(
     der Token einer (für ihn unsichtbaren) MP zugeordnet ist."""
     mp = _create_water_mp(admin_client, name="A", serial="SN-A")
     t = admin_client.post("/api/v1/qr-tokens", json={"count": 1}).json()[0]["token"]
-    admin_client.post(
-        f"/api/v1/qr-tokens/{t}/assign", json={"measuring_point_id": mp["id"]}
-    )
+    admin_client.post(f"/api/v1/qr-tokens/{t}/assign", json={"measuring_point_id": mp["id"]})
     resp = recorder_client.get(f"/api/v1/qr-tokens/{t}/resolve")
     assert resp.status_code == 404
 
@@ -421,15 +405,11 @@ def test_recorder_cannot_delete_token(
     assert resp.status_code == 403
 
 
-def test_mp_delete_does_not_remove_token(
-    admin_client: TestClient, db: Session
-) -> None:
+def test_mp_delete_does_not_remove_token(admin_client: TestClient, db: Session) -> None:
     """ON DELETE SET NULL: Token bleibt erhalten, MP-FK wird genullt."""
     mp = _create_water_mp(admin_client, name="A", serial="SN-A")
     t = admin_client.post("/api/v1/qr-tokens", json={"count": 1}).json()[0]["token"]
-    admin_client.post(
-        f"/api/v1/qr-tokens/{t}/assign", json={"measuring_point_id": mp["id"]}
-    )
+    admin_client.post(f"/api/v1/qr-tokens/{t}/assign", json={"measuring_point_id": mp["id"]})
     # MP löschen ist nur möglich, wenn keine Readings hängen — dieser MP hat
     # nur das initial_value-Reading, also nicht 0. Workaround: direkter
     # DB-Delete (Cascade testen wir separat im qr_token_service-Unit-Test).

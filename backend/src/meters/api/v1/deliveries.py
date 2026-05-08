@@ -89,9 +89,7 @@ def list_all_deliveries(
         stmt = stmt.where(Delivery.register_id == register_id)
     if measuring_point_id is not None:
         stmt = stmt.where(PhysicalMeter.measuring_point_id == measuring_point_id)
-    stmt = restrict_mp_query(
-        stmt, user, mp_id_column=PhysicalMeter.measuring_point_id
-    )
+    stmt = restrict_mp_query(stmt, user, mp_id_column=PhysicalMeter.measuring_point_id)
     if from_date is not None:
         stmt = stmt.where(Delivery.delivery_at >= datetime.combine(from_date, time.min))
     if to_date is not None:

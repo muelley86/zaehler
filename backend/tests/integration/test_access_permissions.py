@@ -17,7 +17,7 @@ from typing import Any, cast
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
-from meters.models import MeasuringPoint, User, UserMeasuringPointAccess
+from meters.models import User, UserMeasuringPointAccess
 
 
 def _grant(db: Session, *, user: User, mp_id: int, granted_by: User) -> None:

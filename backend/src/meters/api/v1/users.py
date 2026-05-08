@@ -245,9 +245,7 @@ def set_user_access(
     # Existenz aller MPs prüfen, bevor wir etwas ändern.
     if requested:
         existing_ids = set(
-            db.scalars(
-                select(MeasuringPoint.id).where(MeasuringPoint.id.in_(requested))
-            )
+            db.scalars(select(MeasuringPoint.id).where(MeasuringPoint.id.in_(requested)))
         )
         unknown = sorted(requested - existing_ids)
         if unknown:
