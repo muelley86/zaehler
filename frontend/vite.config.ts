@@ -123,5 +123,11 @@ export default defineConfig({
     globals: true,
     setupFiles: ['./src/tests/setup.ts'],
     css: true,
+    // pool=threads statt des Defaults forks: Tinypool 1.1 + Node 24 +
+    // jsdom crashen den fork-Worker beim Spinup mancher Komponenten
+    // (Detail-Page mit Recharts-Imports, mehrere vi.mock-Hoists). Threads
+    // umgehen das. Falls eine Test-Datei tatsaechlich Worker-Isolation
+    // braucht (rare), kann sie das per docblock-Kommentar beantragen.
+    pool: 'threads',
   },
 });
