@@ -4,6 +4,9 @@
  *  2. Nach Auswahl „Heizung" erscheint der Energieträger-Sub-Picker mit 5
  *     Optionen, und die Register-Liste wird mit dem Preset des gewählten
  *     Energieträgers vorbefüllt (Heizöl: Betriebsstunden + Tankstand).
+ *
+ * Plus ein Smoke-Test, dass jede MP-Card zur Detail-Page verlinkt
+ * (Stammdaten-Konsolidierung — alle Edits leben dort, nicht mehr inline).
  */
 
 import { http, HttpResponse } from 'msw';
@@ -90,6 +93,34 @@ describe('MeasuringPointsAdminPage Wizard', () => {
     const labelInputs = await screen.findAllByLabelText('Label');
     const labels = (labelInputs as HTMLInputElement[]).map((i) => i.value);
     expect(labels).toEqual(['Betriebsstunden', 'Vorrat']);
+  });
+
+  it('verlinkt jede MP-Card auf die Detail-Page', async () => {
+    server.use(
+      http.get('/api/v1/measuring-points', () =>
+        HttpResponse.json([
+          {
+            id: 7,
+            name: 'Hauptzähler Strom',
+            type: 'electricity',
+            heating_source: null,
+            location_id: null,
+            location_name: null,
+            is_bidirectional: false,
+            has_dual_tariff: false,
+            transformer_factor: null,
+            tank_capacity: null,
+            physical_meters: [],
+          },
+        ]),
+      ),
+      http.get('/api/v1/locations', () => HttpResponse.json([])),
+    );
+    renderWithRouter(<MeasuringPointsAdminPage />);
+    const link = await screen.findByRole('link', {
+      name: /Messstelle Hauptzähler Strom öffnen/i,
+    });
+    expect(link).toHaveAttribute('href', '/admin/messstellen/7');
   });
 
   it('zeigt den Wandlerfaktor-Eingabefeld nur bei Strom', async () => {
