@@ -2,7 +2,7 @@
  * Wiederverwendbare Platzhalter fuer Admin-Sub-Pages mit noch nicht
  * verfuegbarem Backend.
  *
- * Verwendet von SystemAdminPage / StatisticsAdminPage / SessionsAdminPage
+ * Verwendet von SystemAdminPage / SessionsAdminPage
  * waehrend der Backend-Endpoints noch ausstehen. Sobald ein Endpoint da
  * ist, wird die jeweilige Card durch echte Inhalte ersetzt — ein gutes
  * Suchsignal ist der Tag "TODO-BACKEND" im note-String.

@@ -48,10 +48,10 @@ const SECONDARY_NAV: NavItem[] = [
   { to: '/mehr', label: 'Einstellungen', icon: <Settings size={18} /> },
 ];
 
-// Top-Level-Admin-Eintrag: nur ein Link auf den Hub. Die acht Sub-Bereiche
-// (Messstellen, Standorte, Benutzer, QR-Codes, Audit, System, Statistiken,
-// Sessions) leben im AdminLayout selbst — Sub-Sidebar (Desktop) bzw.
-// horizontaler Tab-Strip (Mobile).
+// Top-Level-Admin-Eintrag: nur ein Link auf den Hub. Die sieben Sub-Bereiche
+// (Messstellen, Standorte, Benutzer, QR-Codes, Audit, System, Sessions)
+// leben im AdminLayout selbst — Sub-Sidebar (Desktop) bzw. horizontaler
+// Tab-Strip (Mobile).
 const ADMIN_NAV: NavItem[] = [{ to: '/admin', label: 'Verwaltung', icon: <Settings size={18} /> }];
 
 function LogoLockup({ size = 'md' }: { size?: 'sm' | 'md' }) {

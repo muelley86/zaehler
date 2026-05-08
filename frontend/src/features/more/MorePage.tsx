@@ -94,8 +94,8 @@ export function MorePage() {
         </Section>
 
         {/* Verwaltung — nur Admin. Bündelt Benutzer, Messstellen, Standorte,
-            QR-Codes, Audit sowie System / Statistiken / Sessions hinter der
-            zentralen Hub-Seite (/admin). */}
+            QR-Codes, Audit sowie System / Sessions hinter der zentralen
+            Hub-Seite (/admin). */}
         {isAdmin ? (
           <Section header="Verwaltung">
             <RowGroup>

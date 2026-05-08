@@ -65,11 +65,6 @@ const SystemAdminPage = lazy(() =>
     default: m.SystemAdminPage,
   })),
 );
-const StatisticsAdminPage = lazy(() =>
-  import('@/features/admin/statistics/StatisticsAdminPage').then((m) => ({
-    default: m.StatisticsAdminPage,
-  })),
-);
 const SessionsAdminPage = lazy(() =>
   import('@/features/admin/sessions/SessionsAdminPage').then((m) => ({
     default: m.SessionsAdminPage,
@@ -168,7 +163,6 @@ export function App() {
             <Route path="qr-codes" element={<QrCodesAdminPage />} />
             <Route path="audit" element={<AuditLogPage />} />
             <Route path="system" element={<SystemAdminPage />} />
-            <Route path="statistiken" element={<StatisticsAdminPage />} />
             <Route path="sessions" element={<SessionsAdminPage />} />
           </Route>
 

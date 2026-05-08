@@ -13,16 +13,7 @@
  */
 
 import type { ReactNode } from 'react';
-import {
-  BarChart3,
-  Database,
-  Gauge,
-  MapPin,
-  QrCode,
-  ScrollText,
-  Shield,
-  Users,
-} from 'lucide-react';
+import { Database, Gauge, MapPin, QrCode, ScrollText, Shield, Users } from 'lucide-react';
 import { createElement } from 'react';
 
 export type AdminSectionColor = 'primary' | 'electricity' | 'water' | 'heating';
@@ -84,14 +75,6 @@ export const ADMIN_SECTIONS: AdminNavItem[] = [
     icon: createElement(Database, { size: 18 }),
     description: 'Backup, Version, Wartung',
     color: 'heating',
-  },
-  {
-    to: '/admin/statistiken',
-    label: 'Statistiken',
-    short: 'Stats',
-    icon: createElement(BarChart3, { size: 18 }),
-    description: 'Erfassung, Aktivität',
-    color: 'electricity',
   },
   {
     to: '/admin/sessions',
