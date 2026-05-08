@@ -1,10 +1,10 @@
-#Requires -Version 5.1
+﻿#Requires -Version 5.1
 <#
 .SYNOPSIS
   One-Shot-Setup fuer lokales Testen der Zaehlerstand-App auf Windows.
 
 .DESCRIPTION
-  Idempotent — beim ersten Aufruf wird alles eingerichtet, bei jedem
+  Idempotent - beim ersten Aufruf wird alles eingerichtet, bei jedem
   weiteren Aufruf werden nur Backend + Frontend neu gestartet.
 
   Was passiert (in Reihenfolge):
@@ -14,14 +14,14 @@
    4. Frontend-Deps via "pnpm install".
    5. Backend-Deps via "uv sync" + Alembic-Migration "upgrade head".
    6. Admin-User "admin" / "admin12345678" wird angelegt
-      (idempotent — bestehende Admins werden nicht angefasst).
+      (idempotent - bestehende Admins werden nicht angefasst).
    7. Backend startet in eigenem PowerShell-Fenster (Port 8000).
    8. Skript wartet, bis das Backend antwortet.
    9. Frontend-Dev startet in eigenem PowerShell-Fenster (Port 5173).
   10. Browser oeffnet sich auf http://localhost:5173.
 
   Stop: einfach die zwei oeffnenden Fenster mit Strg+C oder dem
-  X-Symbol schliessen — die Server gehen mit ihnen aus.
+  X-Symbol schliessen - die Server gehen mit ihnen aus.
 
 .PARAMETER SkipBrowser
   Browser nicht automatisch oeffnen.
@@ -61,7 +61,7 @@ $FrontendDir = Join-Path $RepoRoot 'frontend'
 
 # Verhindert dass das Fenster bei Doppelklick / Fehler unbemerkt zugeht.
 # Wir merken uns, ob wir aus einer interaktiven Shell heraus gestartet
-# wurden — wenn nein, halten wir am Ende auf jeden Fall an.
+# wurden - wenn nein, halten wir am Ende auf jeden Fall an.
 $IsDoubleClicked = -not [Environment]::UserInteractive -or `
                    ($Host.Name -eq 'ConsoleHost' -and -not $psISE -and `
                     [Environment]::GetCommandLineArgs() -match 'dev-test\.ps1')
@@ -71,6 +71,28 @@ function Wait-ForKey {
   Write-Host ''
   Write-Host $Message -ForegroundColor Yellow
   try { [void][Console]::ReadKey($true) } catch { Read-Host | Out-Null }
+}
+
+# Wrapper fuer native exe-Aufrufe. PowerShell 5.1 wickelt stderr-Zeilen in
+# ErrorRecords ein, sobald 2>&1 im Spiel ist - uv schreibt z.B. den
+# Python-Download-Fortschritt auf stderr, was dann faelschlicherweise als
+# Fehler hochgeworfen wird. Wir schalten ErrorActionPreference fuer den
+# Aufruf temporaer aus und lesen stattdessen $LASTEXITCODE.
+function Invoke-Native {
+  param(
+    [Parameter(Mandatory)] [string]$Description,
+    [Parameter(Mandatory)] [scriptblock]$Block
+  )
+  $prev = $ErrorActionPreference
+  $ErrorActionPreference = 'Continue'
+  try {
+    & $Block
+    if ($LASTEXITCODE -ne 0) {
+      throw "$Description fehlgeschlagen (Exit-Code $LASTEXITCODE)"
+    }
+  } finally {
+    $ErrorActionPreference = $prev
+  }
 }
 
 function Write-Step($n, $text) {
@@ -117,7 +139,7 @@ Write-Ok "Python $pyV"
 Write-Step 2 'pnpm bereitstellen'
 if (-not (Test-Command pnpm)) {
   Write-Host '      installiere pnpm via "npm install -g pnpm" ...'
-  npm install -g pnpm 2>&1 | ForEach-Object { Write-Host "      $_" }
+  Invoke-Native 'npm install -g pnpm' { npm install -g pnpm }
   Refresh-PathFromUser
   if (-not (Test-Command pnpm)) {
     Write-Fail 'pnpm konnte nicht installiert werden. Versuche manuell: npm install -g pnpm'
@@ -133,11 +155,11 @@ if (-not (Test-Command uv)) {
   try {
     Invoke-RestMethod 'https://astral.sh/uv/install.ps1' | Invoke-Expression
   } catch {
-    Write-Fail "uv-Installer fehlgeschlagen: $($_.Exception.Message)"
+    Write-Warn2 "uv-Installer fehlgeschlagen: $($_.Exception.Message)"
     Write-Warn2 'Fallback: python -m pip install --user uv'
-    python -m pip install --user uv 2>&1 | ForEach-Object { Write-Host "      $_" }
+    Invoke-Native 'pip install uv' { python -m pip install --user uv }
   }
-  # Astral-Installer schreibt in %USERPROFILE%\.local\bin — ggf. PATH ergaenzen.
+  # Astral-Installer schreibt in %USERPROFILE%\.local\bin - ggf. PATH ergaenzen.
   $localBin = Join-Path $env:USERPROFILE '.local\bin'
   if ((Test-Path $localBin) -and ($env:Path -notlike "*$localBin*")) {
     $env:Path = "$localBin;$env:Path"
@@ -154,7 +176,7 @@ Write-Ok "uv $((uv --version) -replace 'uv ', '')"
 Write-Step 4 'Frontend-Dependencies (pnpm install)'
 Push-Location $FrontendDir
 try {
-  pnpm install --silent
+  Invoke-Native 'pnpm install' { pnpm install --silent }
   Write-Ok 'Frontend-Module bereit'
 } finally {
   Pop-Location
@@ -162,10 +184,11 @@ try {
 
 # ---- 5. Backend-Deps + DB --------------------------------------------------
 Write-Step 5 'Backend-Dependencies (uv sync) + DB-Migration'
+Write-Host '      uv laedt beim ersten Lauf evtl. Python 3.12 nach (~ 20 MiB) - ein paar Sekunden Geduld.'
 Push-Location $BackendDir
 try {
-  uv sync 2>&1 | Where-Object { $_ -notmatch '^\s*$' } | Select-Object -Last 5 | ForEach-Object { Write-Host "      $_" }
-  uv run alembic upgrade head 2>&1 | Where-Object { $_ -notmatch '^\s*$' } | Select-Object -Last 3 | ForEach-Object { Write-Host "      $_" }
+  Invoke-Native 'uv sync'             { uv sync }
+  Invoke-Native 'alembic upgrade head' { uv run alembic upgrade head }
   Write-Ok 'Backend-Module + DB-Schema auf head'
 } finally {
   Pop-Location
@@ -175,25 +198,29 @@ try {
 Write-Step 6 "Admin-User 'admin' anlegen (falls noch nicht vorhanden)"
 Push-Location $BackendDir
 try {
-  $createOut = uv run python -m meters.cli create-admin --username admin --password $AdminPassword 2>&1
-  if ($LASTEXITCODE -eq 0) {
+  # stdout in Variable, stderr direkt zur Console - kein 2>&1 (siehe
+  # Invoke-Native-Kommentar). $LASTEXITCODE statt ErrorRecord pruefen.
+  $prev = $ErrorActionPreference
+  $ErrorActionPreference = 'Continue'
+  $createOut = & uv run python -m meters.cli create-admin --username admin --password $AdminPassword
+  $createExit = $LASTEXITCODE
+  $ErrorActionPreference = $prev
+
+  if ($createExit -eq 0) {
     Write-Ok "Admin angelegt: admin / $AdminPassword (beim ersten Login Passwort-Wechsel erzwungen)"
+  } elseif ($createOut -match 'already exists|UNIQUE constraint|existiert bereits') {
+    Write-Ok 'Admin existiert bereits - unveraendert gelassen'
   } else {
-    # Fehlerzeile auf "already exists" pruefen
-    if ($createOut -match 'already exists|UNIQUE constraint') {
-      Write-Ok "Admin existiert bereits — unveraendert gelassen"
-    } else {
-      Write-Warn2 "create-admin Exit $LASTEXITCODE — Output:"
-      $createOut | ForEach-Object { Write-Host "      $_" }
-      Write-Warn2 "Login-Daten muesstest du manuell pruefen."
-    }
+    Write-Warn2 "create-admin Exit $createExit - Output:"
+    if ($createOut) { $createOut | ForEach-Object { Write-Host "      $_" } }
+    Write-Warn2 'Login-Daten musst du manuell pruefen.'
   }
 } finally {
   Pop-Location
 }
 
 # ---- 7. Backend starten ----------------------------------------------------
-Write-Step 7 'Backend starten (Port 8000) — eigenes Fenster'
+Write-Step 7 'Backend starten (Port 8000) - eigenes Fenster'
 # Cmd-String mit Pause am Ende: wenn der Server crashed oder beendet wird,
 # bleibt das Fenster offen damit du den Fehler lesen kannst.
 $backendCmd = @"
@@ -226,11 +253,11 @@ if ($ready) {
   Write-Ok 'Backend antwortet auf http://localhost:8000'
 } else {
   Write-Warn2 'Backend hat innerhalb 60s nicht geantwortet. Skript laeuft trotzdem weiter.'
-  Write-Warn2 'Pruefe das Backend-Fenster — moeglicherweise ein Port-Konflikt oder Migrationsfehler.'
+  Write-Warn2 'Pruefe das Backend-Fenster - moeglicherweise ein Port-Konflikt oder Migrationsfehler.'
 }
 
 # ---- 9. Frontend starten ---------------------------------------------------
-Write-Step 9 'Frontend-Dev starten (Port 5173) — eigenes Fenster'
+Write-Step 9 'Frontend-Dev starten (Port 5173) - eigenes Fenster'
 $frontendCmd = @"
 Set-Location '$FrontendDir'
 Write-Host '== Zaehler Frontend (Strg+C zum Beenden) ==' -ForegroundColor Cyan
@@ -299,7 +326,7 @@ Write-Host ''
 }
 
 # Skript hat erfolgreich durchgelaufen. Wenn das Fenster per Doppelklick
-# oder ohne offene Shell gestartet wurde, halten wir auf jeden Fall an —
+# oder ohne offene Shell gestartet wurde, halten wir auf jeden Fall an -
 # sonst sehen wir die Erfolgsmeldung nie.
 if ($IsDoubleClicked) {
   Wait-ForKey 'Setup fertig. Backend + Frontend laufen in den anderen Fenstern. Enter um dieses hier zu schliessen.'
