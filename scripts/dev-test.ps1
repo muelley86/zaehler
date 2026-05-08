@@ -59,6 +59,20 @@ $RepoRoot    = Split-Path -Parent $PSScriptRoot
 $BackendDir  = Join-Path $RepoRoot 'backend'
 $FrontendDir = Join-Path $RepoRoot 'frontend'
 
+# Verhindert dass das Fenster bei Doppelklick / Fehler unbemerkt zugeht.
+# Wir merken uns, ob wir aus einer interaktiven Shell heraus gestartet
+# wurden — wenn nein, halten wir am Ende auf jeden Fall an.
+$IsDoubleClicked = -not [Environment]::UserInteractive -or `
+                   ($Host.Name -eq 'ConsoleHost' -and -not $psISE -and `
+                    [Environment]::GetCommandLineArgs() -match 'dev-test\.ps1')
+
+function Wait-ForKey {
+  param([string]$Message = 'Druecke Enter zum Schliessen ...')
+  Write-Host ''
+  Write-Host $Message -ForegroundColor Yellow
+  try { [void][Console]::ReadKey($true) } catch { Read-Host | Out-Null }
+}
+
 function Write-Step($n, $text) {
   Write-Host ''
   Write-Host "[$n/10] $text" -ForegroundColor Cyan
@@ -81,6 +95,8 @@ function Refresh-PathFromUser {
 Write-Host ''
 Write-Host '=== Zaehlerstand-App: lokaler Dev-Setup ===' -ForegroundColor Cyan
 Write-Host "Repo: $RepoRoot"
+
+try {
 
 # ---- 1. Pre-Flight ---------------------------------------------------------
 Write-Step 1 'Pre-Flight: Node.js + Python pruefen'
@@ -178,7 +194,16 @@ try {
 
 # ---- 7. Backend starten ----------------------------------------------------
 Write-Step 7 'Backend starten (Port 8000) — eigenes Fenster'
-$backendCmd = "Set-Location '$BackendDir'; Write-Host '== Zaehler Backend (Strg+C zum Beenden) ==' -ForegroundColor Cyan; uv run uvicorn meters.main:app --reload"
+# Cmd-String mit Pause am Ende: wenn der Server crashed oder beendet wird,
+# bleibt das Fenster offen damit du den Fehler lesen kannst.
+$backendCmd = @"
+Set-Location '$BackendDir'
+Write-Host '== Zaehler Backend (Strg+C zum Beenden) ==' -ForegroundColor Cyan
+try { uv run uvicorn meters.main:app --reload } catch { Write-Host \$_.Exception.Message -ForegroundColor Red }
+Write-Host ''
+Write-Host 'Backend-Prozess beendet. Druecke Enter um dieses Fenster zu schliessen.' -ForegroundColor Yellow
+[void][Console]::ReadKey(\$true)
+"@
 $backendProc = Start-Process powershell -ArgumentList '-NoExit', '-NoProfile', '-Command', $backendCmd -PassThru
 Write-Ok "Backend-Fenster gestartet (PID $($backendProc.Id))"
 
@@ -206,7 +231,14 @@ if ($ready) {
 
 # ---- 9. Frontend starten ---------------------------------------------------
 Write-Step 9 'Frontend-Dev starten (Port 5173) — eigenes Fenster'
-$frontendCmd = "Set-Location '$FrontendDir'; Write-Host '== Zaehler Frontend (Strg+C zum Beenden) ==' -ForegroundColor Cyan; pnpm dev"
+$frontendCmd = @"
+Set-Location '$FrontendDir'
+Write-Host '== Zaehler Frontend (Strg+C zum Beenden) ==' -ForegroundColor Cyan
+try { pnpm dev } catch { Write-Host \$_.Exception.Message -ForegroundColor Red }
+Write-Host ''
+Write-Host 'Frontend-Prozess beendet. Druecke Enter um dieses Fenster zu schliessen.' -ForegroundColor Yellow
+[void][Console]::ReadKey(\$true)
+"@
 $frontendProc = Start-Process powershell -ArgumentList '-NoExit', '-NoProfile', '-Command', $frontendCmd -PassThru
 Write-Ok "Frontend-Fenster gestartet (PID $($frontendProc.Id))"
 
@@ -251,3 +283,24 @@ Write-Host '  - /admin -> Card-Grid mit 8 Sektionen + Counter'
 Write-Host '  - URL /messstellen direkt eingeben -> Auto-Redirect auf /admin/messstellen'
 Write-Host '  - F12 + Strg+Shift+M -> Mobile-Ansicht: Mehr -> Verwaltung -> Hub'
 Write-Host ''
+
+} catch {
+  Write-Host ''
+  Write-Host '=== FEHLER ===' -ForegroundColor Red
+  Write-Host "Schritt: $($_.InvocationInfo.ScriptLineNumber)" -ForegroundColor Red
+  Write-Host "Meldung: $($_.Exception.Message)" -ForegroundColor Red
+  if ($_.ScriptStackTrace) {
+    Write-Host ''
+    Write-Host 'Stack-Trace:' -ForegroundColor Red
+    Write-Host $_.ScriptStackTrace
+  }
+  Wait-ForKey 'Druecke Enter um dieses Fenster zu schliessen ...'
+  exit 1
+}
+
+# Skript hat erfolgreich durchgelaufen. Wenn das Fenster per Doppelklick
+# oder ohne offene Shell gestartet wurde, halten wir auf jeden Fall an —
+# sonst sehen wir die Erfolgsmeldung nie.
+if ($IsDoubleClicked) {
+  Wait-ForKey 'Setup fertig. Backend + Frontend laufen in den anderen Fenstern. Enter um dieses hier zu schliessen.'
+}
