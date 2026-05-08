@@ -97,7 +97,7 @@ function Invoke-Native {
 
 function Write-Step($n, $text) {
   Write-Host ''
-  Write-Host "[$n/10] $text" -ForegroundColor Cyan
+  Write-Host "[$n/11] $text" -ForegroundColor Cyan
 }
 function Write-Ok($text)   { Write-Host "      OK $text" -ForegroundColor Green }
 function Write-Warn2($t)   { Write-Host "      !! $t"    -ForegroundColor Yellow }
@@ -194,8 +194,38 @@ try {
   Pop-Location
 }
 
-# ---- 6. Admin-User ---------------------------------------------------------
-Write-Step 6 "Admin-User 'admin' anlegen (falls noch nicht vorhanden)"
+# ---- 6. .env mit Secret-Key ------------------------------------------------
+Write-Step 6 'Backend-.env mit METERS_SECRET_KEY sicherstellen'
+$envPath = Join-Path $BackendDir '.env'
+if (-not (Test-Path $envPath)) {
+  # Zufaelligen Key generieren - Python ist bereits da (Schritt 1).
+  $secret = (python -c "import secrets; print(secrets.token_urlsafe(48))").Trim()
+  if ([string]::IsNullOrWhiteSpace($secret)) {
+    Write-Fail 'Konnte keinen Secret-Key generieren.'
+    exit 1
+  }
+  $envContent = @"
+# Lokale Dev-Konfiguration (von scripts/dev-test.ps1 angelegt).
+# Diese Datei ist gitignoriert (.env). Die Container-Konfig liegt in
+# /opt/zaehler/data/meters.env und ist davon getrennt.
+METERS_SECRET_KEY=$secret
+METERS_DEBUG=true
+METERS_COOKIE_SECURE=false
+"@
+  Set-Content -Path $envPath -Value $envContent -Encoding utf8
+  Write-Ok ".env angelegt mit zufaelligem Secret-Key (gitignoriert)"
+} else {
+  if (Select-String -Path $envPath -Pattern '^METERS_SECRET_KEY=' -Quiet) {
+    Write-Ok ".env existiert bereits mit METERS_SECRET_KEY - unveraendert"
+  } else {
+    $secret = (python -c "import secrets; print(secrets.token_urlsafe(48))").Trim()
+    Add-Content -Path $envPath -Value "METERS_SECRET_KEY=$secret"
+    Write-Ok 'METERS_SECRET_KEY in bestehende .env ergaenzt'
+  }
+}
+
+# ---- 7. Admin-User ---------------------------------------------------------
+Write-Step 7 "Admin-User 'admin' anlegen (falls noch nicht vorhanden)"
 Push-Location $BackendDir
 try {
   # stdout in Variable, stderr direkt zur Console - kein 2>&1 (siehe
@@ -219,8 +249,8 @@ try {
   Pop-Location
 }
 
-# ---- 7. Backend starten ----------------------------------------------------
-Write-Step 7 'Backend starten (Port 8000) - eigenes Fenster'
+# ---- 8. Backend starten ----------------------------------------------------
+Write-Step 8 'Backend starten (Port 8000) - eigenes Fenster'
 # Cmd-String mit Pause am Ende: wenn der Server crashed oder beendet wird,
 # bleibt das Fenster offen damit du den Fehler lesen kannst.
 $backendCmd = @"
@@ -234,8 +264,8 @@ Write-Host 'Backend-Prozess beendet. Druecke Enter um dieses Fenster zu schliess
 $backendProc = Start-Process powershell -ArgumentList '-NoExit', '-NoProfile', '-Command', $backendCmd -PassThru
 Write-Ok "Backend-Fenster gestartet (PID $($backendProc.Id))"
 
-# ---- 8. Auf Backend warten -------------------------------------------------
-Write-Step 8 'Auf Backend warten (max 60s)'
+# ---- 9. Auf Backend warten -------------------------------------------------
+Write-Step 9 'Auf Backend warten (max 60s)'
 $ready = $false
 for ($i = 0; $i -lt 60; $i++) {
   try {
@@ -256,8 +286,8 @@ if ($ready) {
   Write-Warn2 'Pruefe das Backend-Fenster - moeglicherweise ein Port-Konflikt oder Migrationsfehler.'
 }
 
-# ---- 9. Frontend starten ---------------------------------------------------
-Write-Step 9 'Frontend-Dev starten (Port 5173) - eigenes Fenster'
+# ---- 10. Frontend starten --------------------------------------------------
+Write-Step 10 'Frontend-Dev starten (Port 5173) - eigenes Fenster'
 $frontendCmd = @"
 Set-Location '$FrontendDir'
 Write-Host '== Zaehler Frontend (Strg+C zum Beenden) ==' -ForegroundColor Cyan
@@ -280,11 +310,11 @@ for ($i = 0; $i -lt 30; $i++) {
   }
 }
 
-# ---- 10. Browser -----------------------------------------------------------
+# ---- 11. Browser -----------------------------------------------------------
 if ($SkipBrowser) {
-  Write-Step 10 'Browser-Auto-Open uebersprungen (-SkipBrowser)'
+  Write-Step 11 'Browser-Auto-Open uebersprungen (-SkipBrowser)'
 } else {
-  Write-Step 10 'Browser oeffnen'
+  Write-Step 11 'Browser oeffnen'
   Start-Process 'http://localhost:5173'
   Write-Ok 'Browser auf http://localhost:5173 gestartet'
 }
