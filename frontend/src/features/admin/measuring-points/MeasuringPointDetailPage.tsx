@@ -12,7 +12,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
-import { ArrowLeft, ChevronRight, Map as MapIcon, Pencil, Plus, X } from 'lucide-react';
+import { ArrowLeft, ChevronRight, Droplet, Map as MapIcon, Pencil, Plus, Trash2, X } from 'lucide-react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
   Area,
@@ -44,13 +44,17 @@ import { formatDateTickDe, formatDateTimeDe, formatDe, parseDe } from '@/lib/for
 import { useChartTheme } from '@/lib/useChartTheme';
 import type {
   ConsumptionPoint,
+  HeatingUnit,
   LocationRead,
   MeasuringPointRead,
   PhysicalMeterRead,
+  RegisterRead,
   RegisterStateRead,
 } from '@/lib/types';
+import { HEATING_UNITS } from '@/lib/types';
 import { describeMeterType } from '@/lib/meterLabels';
 import { cx } from '@/components/ui/cx';
+import { DeliveriesSheet } from './DeliveriesSheet';
 import { MpAccessCard } from './MpAccessCard';
 import { QrCodeCard } from './QrCodeCard';
 
@@ -159,7 +163,7 @@ export function MeasuringPointDetailPage() {
 
       <ConsumptionChart consumption={consumption} mp={mp} />
 
-      <RegisterTable mp={mp} states={states} />
+      <RegisterTable mp={mp} states={states} onChanged={refresh} />
 
       <div className="grid gap-4 md:grid-cols-2">
         <QrCodeCard mp={mp} />
@@ -1056,7 +1060,39 @@ function ConsumptionChart({
   );
 }
 
-function RegisterTable({ mp, states }: { mp: MeasuringPointRead; states: RegisterStateRead[] }) {
+/**
+ * Read-only-Liste aller Register dieser Messstelle, plus zwei
+ * Edit-Triggers:
+ *
+ * - Pro Register mit ``accepts_deliveries=true`` (Heizoel-Tank,
+ *   Holzvorrat, ...) ein "Befüllungen"-Knopf, der das ``DeliveriesSheet``
+ *   öffnet.
+ * - Für Heizung: ein "Bearbeiten"-Knopf im Section-Header, der den
+ *   ``HeatingRegisterEditor`` für den aktiven Zähler zeigt
+ *   (Add/Remove Register).
+ *
+ * Edit-Modus ist nur für Heizung sinnvoll; Strom/Wasser haben fixe
+ * OBIS-Register, die nicht verändert werden.
+ */
+function RegisterTable({
+  mp,
+  states,
+  onChanged,
+}: {
+  mp: MeasuringPointRead;
+  states: RegisterStateRead[];
+  onChanged: () => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [deliveriesFor, setDeliveriesFor] = useState<RegisterRead | null>(null);
+
+  const activeMeter = useMemo(
+    () => mp.physical_meters.find((m) => m.removed_at === null) ?? null,
+    [mp.physical_meters],
+  );
+  const isHeating = mp.type === 'heating';
+  const canEditRegisters = isHeating && activeMeter !== null;
+
   const stateByRegister = new Map(states.map((s) => [s.register_id, s]));
   const allRegisters = mp.physical_meters
     .flatMap((meter) =>
@@ -1068,54 +1104,274 @@ function RegisterTable({ mp, states }: { mp: MeasuringPointRead; states: Registe
     )
     .sort((a, b) => a.register.obis_code.localeCompare(b.register.obis_code));
 
-  if (allRegisters.length === 0) {
-    return <EmptyState title="Keine Register" />;
+  return (
+    <Section
+      header={
+        <div className="flex items-center justify-between gap-2">
+          <span>Register</span>
+          {canEditRegisters && !editing ? (
+            <Button
+              type="button"
+              variant="bordered"
+              size="sm"
+              leftIcon={<Pencil size={14} />}
+              onClick={() => setEditing(true)}
+            >
+              Bearbeiten
+            </Button>
+          ) : null}
+        </div>
+      }
+    >
+      {editing && activeMeter ? (
+        <div className="p-5">
+          <HeatingRegisterEditor
+            meter={activeMeter}
+            onClose={() => setEditing(false)}
+            onChanged={onChanged}
+          />
+        </div>
+      ) : allRegisters.length === 0 ? (
+        <EmptyState title="Keine Register" />
+      ) : (
+        <ul className="divide-y divide-separator">
+          {allRegisters.map(({ register, meterSerial, meterRemovedAt }) => {
+            const state = stateByRegister.get(register.id);
+            return (
+              <li
+                key={register.id}
+                className={cx(
+                  'grid grid-cols-1 gap-2 px-5 py-4',
+                  'md:grid-cols-[110px_1.4fr_1fr_1fr_auto] md:items-center md:gap-4',
+                )}
+              >
+                <div>
+                  <code className="num inline-block rounded-badge bg-primary-soft px-2 py-1 text-caption font-semibold text-primary-deep">
+                    {register.obis_code}
+                  </code>
+                </div>
+                <div className="min-w-0">
+                  <div className="truncate text-body font-semibold text-label">{register.label}</div>
+                  <div className="num truncate text-caption text-tertiary">
+                    SN {meterSerial}
+                    {meterRemovedAt ? ` · entfernt ${meterRemovedAt}` : ''}
+                    {!register.is_active ? ' · inaktiv' : ''}
+                  </div>
+                </div>
+                <div>
+                  {state?.current_value !== null && state?.current_value !== undefined ? (
+                    <div className="num text-headline text-label">
+                      {formatDe(state.current_value)}{' '}
+                      <span className="text-caption text-tertiary">{register.unit}</span>
+                    </div>
+                  ) : (
+                    <div className="text-caption text-tertiary">noch keine Erfassung</div>
+                  )}
+                </div>
+                <div className="num text-caption text-tertiary">
+                  {state?.last_reading_at ? formatDateTimeDe(state.last_reading_at) : '—'}
+                </div>
+                {register.accepts_deliveries ? (
+                  <Button
+                    type="button"
+                    variant="plain"
+                    size="sm"
+                    leftIcon={<Droplet size={14} />}
+                    onClick={() => setDeliveriesFor(register)}
+                  >
+                    Befüllungen
+                  </Button>
+                ) : (
+                  <ChevronRight size={16} className="hidden text-tertiary md:block" />
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+
+      {deliveriesFor ? (
+        <DeliveriesSheet
+          open={true}
+          onClose={() => setDeliveriesFor(null)}
+          register={deliveriesFor}
+        />
+      ) : null}
+    </Section>
+  );
+}
+
+/**
+ * Heizungs-Register-Editor für den aktiven Zähler. Listet alle Register
+ * mit Lösch-Knopf und bietet ein "Register hinzufügen"-Formular.
+ *
+ * 1:1 von der alten ``MeasuringPointsAdminPage`` übernommen — Backend-
+ * Endpoints (`POST /physical-meters/{id}/registers`,
+ * `DELETE /registers/{id}`) sind unverändert.
+ */
+function HeatingRegisterEditor({
+  meter,
+  onClose,
+  onChanged,
+}: {
+  meter: PhysicalMeterRead;
+  onClose: () => void;
+  onChanged: () => void;
+}) {
+  const [adding, setAdding] = useState(false);
+  const [draft, setDraft] = useState({
+    label: '',
+    unit: 'kWh' as HeatingUnit,
+    accepts_deliveries: false,
+    initial_value: '',
+    max_value: '',
+  });
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function add() {
+    setBusy(true);
+    setError(null);
+    try {
+      const body: Record<string, unknown> = {
+        label: draft.label,
+        unit: draft.unit,
+        accepts_deliveries: draft.accepts_deliveries,
+      };
+      if (draft.initial_value.trim()) body['initial_value'] = parseDe(draft.initial_value);
+      if (draft.max_value.trim()) body['max_value'] = parseDe(draft.max_value);
+      await api.post(`/physical-meters/${meter.id}/registers`, body);
+      setDraft({
+        label: '',
+        unit: 'kWh',
+        accepts_deliveries: false,
+        initial_value: '',
+        max_value: '',
+      });
+      setAdding(false);
+      onChanged();
+    } catch (err) {
+      if (err instanceof ApiError) setError(err.problem.detail ?? err.problem.title);
+      else setError('Hinzufügen fehlgeschlagen.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function remove(id: number, label: string) {
+    if (!window.confirm(`Register "${label}" wirklich löschen?`)) return;
+    try {
+      await api.delete(`/registers/${id}`);
+      onChanged();
+    } catch (err) {
+      if (err instanceof ApiError) window.alert(err.problem.detail ?? err.problem.title);
+    }
   }
 
   return (
-    <Section header="Register">
-      <ul className="divide-y divide-separator">
-        {allRegisters.map(({ register, meterSerial, meterRemovedAt }) => {
-          const state = stateByRegister.get(register.id);
-          return (
-            <li
-              key={register.id}
-              className={cx(
-                'grid grid-cols-1 gap-2 px-5 py-4',
-                'md:grid-cols-[110px_1.4fr_1fr_1fr_24px] md:items-center md:gap-4',
-              )}
+    <div className="space-y-3">
+      <div className="flex items-center justify-between gap-2">
+        <div className="text-caption-bold uppercase text-tertiary">
+          Register am aktiven Zähler verwalten
+        </div>
+        <Button
+          type="button"
+          variant="plain"
+          size="sm"
+          leftIcon={<X size={14} />}
+          onClick={onClose}
+        >
+          Schließen
+        </Button>
+      </div>
+      <ul className="space-y-1.5">
+        {meter.registers.map((r) => (
+          <li
+            key={r.id}
+            className="flex items-center gap-2 rounded-card border-hairline border-border bg-fill px-3 py-2"
+          >
+            <span className="flex-1 text-body-sm text-label">
+              {r.label} <span className="text-tertiary">({r.unit})</span>
+              {r.accepts_deliveries ? (
+                <span className="ml-2 rounded-full bg-primary-soft px-2 py-0.5 text-caption text-primary-deep">
+                  Lieferungen
+                </span>
+              ) : null}
+            </span>
+            <button
+              type="button"
+              onClick={() => void remove(r.id, r.label)}
+              aria-label="Register löschen"
+              className="hover:bg-danger/10 flex h-7 w-7 items-center justify-center rounded-full text-danger transition-colors"
             >
-              <div>
-                <code className="num inline-block rounded-badge bg-primary-soft px-2 py-1 text-caption font-semibold text-primary-deep">
-                  {register.obis_code}
-                </code>
-              </div>
-              <div className="min-w-0">
-                <div className="truncate text-body font-semibold text-label">{register.label}</div>
-                <div className="num truncate text-caption text-tertiary">
-                  SN {meterSerial}
-                  {meterRemovedAt ? ` · entfernt ${meterRemovedAt}` : ''}
-                  {!register.is_active ? ' · inaktiv' : ''}
-                </div>
-              </div>
-              <div>
-                {state?.current_value !== null && state?.current_value !== undefined ? (
-                  <div className="num text-headline text-label">
-                    {formatDe(state.current_value)}{' '}
-                    <span className="text-caption text-tertiary">{register.unit}</span>
-                  </div>
-                ) : (
-                  <div className="text-caption text-tertiary">noch keine Erfassung</div>
-                )}
-              </div>
-              <div className="num text-caption text-tertiary">
-                {state?.last_reading_at ? formatDateTimeDe(state.last_reading_at) : '—'}
-              </div>
-              <ChevronRight size={16} className="hidden text-tertiary md:block" />
-            </li>
-          );
-        })}
+              <Trash2 size={13} />
+            </button>
+          </li>
+        ))}
       </ul>
-    </Section>
+      {adding ? (
+        <div className="space-y-2 rounded-card border-hairline border-border bg-fill p-3">
+          <TextField
+            label="Label"
+            value={draft.label}
+            onChange={(e) => setDraft((d) => ({ ...d, label: e.target.value }))}
+            required
+          />
+          <Select
+            label="Einheit"
+            value={draft.unit}
+            onChange={(e) => setDraft((d) => ({ ...d, unit: e.target.value as HeatingUnit }))}
+          >
+            {HEATING_UNITS.map((u) => (
+              <option key={u} value={u}>
+                {u}
+              </option>
+            ))}
+          </Select>
+          <ToggleRow
+            label="Nachfüllbar (Lieferungen)"
+            checked={draft.accepts_deliveries}
+            onChange={(v) => setDraft((d) => ({ ...d, accepts_deliveries: v }))}
+          />
+          <TextField
+            label="Anfangsstand (optional)"
+            inputMode="decimal"
+            value={draft.initial_value}
+            onChange={(e) => setDraft((d) => ({ ...d, initial_value: e.target.value }))}
+            numeric
+          />
+          {error ? (
+            <div className="border-danger/40 bg-danger/10 rounded-card border-hairline p-2 text-caption text-danger">
+              {error}
+            </div>
+          ) : null}
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant="filled"
+              size="sm"
+              fullWidth
+              onClick={() => void add()}
+              disabled={busy || !draft.label.trim()}
+            >
+              {busy ? 'Speichere…' : 'Register hinzufügen'}
+            </Button>
+            <Button type="button" variant="bordered" size="sm" onClick={() => setAdding(false)}>
+              Abbrechen
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <Button
+          type="button"
+          variant="bordered"
+          size="sm"
+          leftIcon={<Plus size={14} />}
+          onClick={() => setAdding(true)}
+        >
+          Register hinzufügen
+        </Button>
+      )}
+    </div>
   );
 }
