@@ -41,5 +41,24 @@ jobs:
       - name: Mypy (strict)
         run: uv run mypy
 
+      # SPA-Fallback-Tests in test_spa_fallback.py setzen voraus, dass
+      # backend/src/meters/static/index.html existiert. Das Verzeichnis ist
+      # gitignored — CI muss das Frontend selber bauen, sonst 5 rote Tests.
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - name: Frontend-Deps + Build (fuer SPA-Fallback-Tests)
+        working-directory: frontend
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm build
+
       - name: Pytest
         run: uv run pytest
