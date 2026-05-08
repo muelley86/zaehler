@@ -8,8 +8,8 @@
  * blendet die jeweilige Card den Counter einfach aus, der Rest
  * funktioniert weiter.
  *
- * Audit / System / Statistiken / Sessions zeigen keinen Counter:
- * Audit waere uninformativ ("200 Eintraege"), die anderen drei sind in
+ * Audit / System / Sessions zeigen keinen Counter:
+ * Audit waere uninformativ ("200 Eintraege"), die anderen beiden sind in
  * PR 4 noch Skelette.
  */
 
