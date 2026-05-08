@@ -1,6 +1,18 @@
+/**
+ * Detail-Seite einer Messstelle. Zentraler Ort für die Stammdaten-Pflege.
+ *
+ * Layout (von oben nach unten):
+ *  1. BackLink + Title (Name editierbar via Pencil-Icon)
+ *  2. Stammdaten-Card (ganzer Edit-Modus via "Bearbeiten"-Knopf)
+ *  3. Physische Zähler (alle Zähler, Edit pro Zähler, "Tauschen"-CTA)
+ *  4. Verbrauchskurve (read-only Chart)
+ *  5. Register (read-only; Heizung-Spezifika in Folge-Commit)
+ *  6. QR-Codes + Zugriff (Cards aus separaten Modulen)
+ */
+
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
-import { ArrowLeft, ChevronRight, Map as MapIcon, Pencil } from 'lucide-react';
+import { ArrowLeft, ChevronRight, Map as MapIcon, Pencil, Plus, X } from 'lucide-react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
   Area,
@@ -19,21 +31,26 @@ import {
   EmptyState,
   LargeTitle,
   Section,
+  Select,
+  Sheet,
+  Switch,
   TextField,
   TypeBadge,
 } from '@/components/ui';
 import { LocationMapSheet } from '@/components/LocationMapSheet';
 import { useAuth } from '@/features/auth/auth-context';
 import { ApiError, api } from '@/lib/api';
-import { formatDateTickDe, formatDateTimeDe, formatDe } from '@/lib/format';
+import { formatDateTickDe, formatDateTimeDe, formatDe, parseDe } from '@/lib/format';
 import { useChartTheme } from '@/lib/useChartTheme';
 import type {
   ConsumptionPoint,
   LocationRead,
   MeasuringPointRead,
+  PhysicalMeterRead,
   RegisterStateRead,
 } from '@/lib/types';
 import { describeMeterType } from '@/lib/meterLabels';
+import { cx } from '@/components/ui/cx';
 import { MpAccessCard } from './MpAccessCard';
 import { QrCodeCard } from './QrCodeCard';
 
@@ -47,18 +64,22 @@ export function MeasuringPointDetailPage() {
   const mpId = id ? Number(id) : NaN;
 
   const [mp, setMp] = useState<MeasuringPointRead | null>(null);
+  const [locations, setLocations] = useState<LocationRead[]>([]);
   const [location, setLocation] = useState<LocationRead | null>(null);
   const [consumption, setConsumption] = useState<ConsumptionPoint[]>([]);
   const [states, setStates] = useState<RegisterStateRead[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [mapOpen, setMapOpen] = useState(false);
+  const [tick, setTick] = useState(0);
+
+  const refresh = useCallback(() => setTick((t) => t + 1), []);
 
   useEffect(() => {
     if (!Number.isFinite(mpId)) {
       navigate('/admin/messstellen', { replace: true });
       return;
     }
-    // Drei Endpoints parallel — keine Cascade. Location wird in einem
+    // Vier Endpoints parallel - keine Cascade. Location wird in einem
     // separaten useEffect anhand von mp.location_id nachgeladen.
     api
       .get<MeasuringPointRead>(`/measuring-points/${mpId}`)
@@ -66,6 +87,12 @@ export function MeasuringPointDetailPage() {
       .catch((err: unknown) => {
         if (err instanceof ApiError) setError(err.problem.detail ?? err.problem.title);
         else setError('Konnte Messstelle nicht laden.');
+      });
+    api
+      .get<LocationRead[]>('/locations')
+      .then(setLocations)
+      .catch(() => {
+        /* nicht kritisch - der Edit-Modus zeigt dann eine leere Auswahl */
       });
     api
       .get<ConsumptionPoint[]>(`/measuring-points/${mpId}/consumption`)
@@ -79,7 +106,7 @@ export function MeasuringPointDetailPage() {
       .catch(() => {
         /* nicht kritisch */
       });
-  }, [mpId, navigate]);
+  }, [mpId, navigate, tick]);
 
   // Standort-Detail nur laden, wenn die MP einen hat. Optional, daher
   // schluckt der Catch leise.
@@ -92,7 +119,7 @@ export function MeasuringPointDetailPage() {
       .get<LocationRead>(`/locations/${mp.location_id}`)
       .then(setLocation)
       .catch(() => {
-        /* nicht kritisch — Standort-Detail optional */
+        /* nicht kritisch - Standort-Detail optional */
       });
   }, [mp?.location_id]);
 
@@ -115,98 +142,20 @@ export function MeasuringPointDetailPage() {
     );
   }
 
-  const activeMeter = mp.physical_meters.find((m) => m.removed_at === null);
-
   return (
     <>
       <BackLink />
       <MeasuringPointTitle mp={mp} onRenamed={(updated) => setMp(updated)} />
 
-      <div className="grid gap-4 md:grid-cols-[1.4fr_1fr]">
-        <Card>
-          <div className="text-caption-bold uppercase text-tertiary">Stammdaten</div>
-          <div className="mt-3 grid grid-cols-2 gap-4">
-            <FieldRow k="Typ" v={describeMeterType(mp.type, mp.heating_source)} />
-            <FieldRow
-              k="Standort"
-              v={
-                mp.location_name ? (
-                  location && location.latitude !== null && location.longitude !== null ? (
-                    <button
-                      type="button"
-                      onClick={() => setMapOpen(true)}
-                      className="hover:bg-primary/20 inline-flex items-center gap-1.5 rounded-pill bg-primary-soft px-2 py-0.5 font-semibold text-primary-deep transition-colors"
-                    >
-                      <MapIcon size={14} />
-                      {mp.location_name}
-                    </button>
-                  ) : (
-                    <Link
-                      to="/admin/standorte"
-                      className="font-semibold text-primary-deep underline-offset-2 hover:underline"
-                    >
-                      {mp.location_name}
-                    </Link>
-                  )
-                ) : (
-                  '—'
-                )
-              }
-            />
-            {mp.type === 'electricity' ? (
-              <>
-                <FieldRow k="Doppeltarif" v={mp.has_dual_tariff ? 'Ja' : 'Nein'} />
-                <FieldRow k="Bidirektional" v={mp.is_bidirectional ? 'Ja' : 'Nein'} />
-                <FieldRow
-                  k="Wandlerfaktor"
-                  v={mp.transformer_factor !== null ? `×${mp.transformer_factor}` : '—'}
-                />
-              </>
-            ) : null}
-            {mp.type === 'heating' && mp.tank_capacity ? (
-              <FieldRow
-                k="Tankvolumen"
-                v={
-                  <span className="num">
-                    {formatDe(mp.tank_capacity)} <span className="text-tertiary">L</span>
-                  </span>
-                }
-              />
-            ) : null}
-            <FieldRow k="Aktive Register" v={String(activeMeter?.registers.length ?? 0)} />
-            <FieldRow k="Physische Zähler" v={String(mp.physical_meters.length)} />
-          </div>
-        </Card>
+      <StammdatenCard
+        mp={mp}
+        locations={locations}
+        location={location}
+        onMapOpen={() => setMapOpen(true)}
+        onUpdated={(updated) => setMp(updated)}
+      />
 
-        <Card>
-          <div className="flex items-start justify-between">
-            <div>
-              <div className="text-caption-bold uppercase text-tertiary">Aktiver Zähler</div>
-              {activeMeter ? (
-                <div className="num mt-1 text-headline tracking-tight text-label">
-                  {activeMeter.serial_number}
-                </div>
-              ) : (
-                <div className="mt-1 text-body text-tertiary">Kein aktiver Zähler.</div>
-              )}
-            </div>
-            {activeMeter ? (
-              <span className="bg-success/15 rounded-full px-2 py-0.5 text-caption font-semibold text-success">
-                aktiv
-              </span>
-            ) : null}
-          </div>
-          {activeMeter ? (
-            <div className="mt-3 text-body-sm text-secondary">
-              Eingebaut <span className="num text-label">{activeMeter.installed_at}</span>
-            </div>
-          ) : null}
-          <div className="mt-4 rounded-card border-hairline border-border bg-fill p-3 text-caption text-tertiary">
-            Beim Zählertausch wird das aktuelle Gerät mit Datum „entfernt" markiert. Alle
-            Erfassungen bleiben erhalten und werden weiterhin diesem Zähler zugeordnet.
-          </div>
-        </Card>
-      </div>
+      <PhysicalMetersCard mp={mp} onChanged={refresh} />
 
       <ConsumptionChart consumption={consumption} mp={mp} />
 
@@ -229,6 +178,10 @@ export function MeasuringPointDetailPage() {
     </>
   );
 }
+
+// ---------------------------------------------------------------------------
+// Title (mit Name-Edit via Pencil)
+// ---------------------------------------------------------------------------
 
 function MeasuringPointTitle({
   mp,
@@ -322,6 +275,615 @@ function MeasuringPointTitle({
   );
 }
 
+// ---------------------------------------------------------------------------
+// Stammdaten (Card mit Bearbeiten-Knopf)
+// ---------------------------------------------------------------------------
+
+/**
+ * Stammdaten der Messstelle. Default zeigt eine Read-Only-Kacheltafel,
+ * der "Bearbeiten"-Knopf oben rechts schaltet die ganze Card in einen
+ * Form-Modus (zentral pro Card, nicht pro Feld).
+ *
+ * Editierbare Felder: Standort, Doppeltarif, Bidirektional, Wandlerfaktor
+ * (Strom), Tankvolumen (Heizung). Typ ist fundamental und bleibt
+ * read-only — wer den Typ ändern will, legt eine neue Messstelle an.
+ */
+function StammdatenCard({
+  mp,
+  locations,
+  location,
+  onMapOpen,
+  onUpdated,
+}: {
+  mp: MeasuringPointRead;
+  locations: LocationRead[];
+  location: LocationRead | null;
+  onMapOpen: () => void;
+  onUpdated: (updated: MeasuringPointRead) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+
+  return (
+    <Card>
+      <div className="flex items-start justify-between gap-2">
+        <div className="text-caption-bold uppercase text-tertiary">Stammdaten</div>
+        {!editing ? (
+          <Button
+            type="button"
+            variant="bordered"
+            size="sm"
+            leftIcon={<Pencil size={14} />}
+            onClick={() => setEditing(true)}
+          >
+            Bearbeiten
+          </Button>
+        ) : null}
+      </div>
+
+      {editing ? (
+        <StammdatenEditForm
+          mp={mp}
+          locations={locations}
+          onCancel={() => setEditing(false)}
+          onSaved={(updated) => {
+            onUpdated(updated);
+            setEditing(false);
+          }}
+        />
+      ) : (
+        <StammdatenReadView mp={mp} location={location} onMapOpen={onMapOpen} />
+      )}
+    </Card>
+  );
+}
+
+function StammdatenReadView({
+  mp,
+  location,
+  onMapOpen,
+}: {
+  mp: MeasuringPointRead;
+  location: LocationRead | null;
+  onMapOpen: () => void;
+}) {
+  const activeMeter = mp.physical_meters.find((m) => m.removed_at === null);
+  return (
+    <div className="mt-3 grid grid-cols-2 gap-4">
+      <FieldRow k="Typ" v={describeMeterType(mp.type, mp.heating_source)} />
+      <FieldRow
+        k="Standort"
+        v={
+          mp.location_name ? (
+            location && location.latitude !== null && location.longitude !== null ? (
+              <button
+                type="button"
+                onClick={onMapOpen}
+                className="hover:bg-primary/20 inline-flex items-center gap-1.5 rounded-pill bg-primary-soft px-2 py-0.5 font-semibold text-primary-deep transition-colors"
+              >
+                <MapIcon size={14} />
+                {mp.location_name}
+              </button>
+            ) : (
+              <Link
+                to="/admin/standorte"
+                className="font-semibold text-primary-deep underline-offset-2 hover:underline"
+              >
+                {mp.location_name}
+              </Link>
+            )
+          ) : (
+            '—'
+          )
+        }
+      />
+      {mp.type === 'electricity' ? (
+        <>
+          <FieldRow k="Doppeltarif" v={mp.has_dual_tariff ? 'Ja' : 'Nein'} />
+          <FieldRow k="Bidirektional" v={mp.is_bidirectional ? 'Ja' : 'Nein'} />
+          <FieldRow
+            k="Wandlerfaktor"
+            v={mp.transformer_factor !== null ? `×${mp.transformer_factor}` : '—'}
+          />
+        </>
+      ) : null}
+      {mp.type === 'heating' && mp.tank_capacity ? (
+        <FieldRow
+          k="Tankvolumen"
+          v={
+            <span className="num">
+              {formatDe(mp.tank_capacity)} <span className="text-tertiary">L</span>
+            </span>
+          }
+        />
+      ) : null}
+      <FieldRow k="Aktive Register" v={String(activeMeter?.registers.length ?? 0)} />
+      <FieldRow k="Physische Zähler" v={String(mp.physical_meters.length)} />
+    </div>
+  );
+}
+
+function StammdatenEditForm({
+  mp,
+  locations,
+  onCancel,
+  onSaved,
+}: {
+  mp: MeasuringPointRead;
+  locations: LocationRead[];
+  onCancel: () => void;
+  onSaved: (updated: MeasuringPointRead) => void;
+}) {
+  const [locationId, setLocationId] = useState<number | null>(mp.location_id);
+  const [bidi, setBidi] = useState(mp.is_bidirectional);
+  const [dual, setDual] = useState(mp.has_dual_tariff);
+  const [tankCapacity, setTankCapacity] = useState(
+    mp.tank_capacity ? String(mp.tank_capacity).replace('.', ',') : '',
+  );
+  const [transformerFactor, setTransformerFactor] = useState(
+    mp.transformer_factor !== null ? String(mp.transformer_factor) : '',
+  );
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleSubmit(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setBusy(true);
+    setError(null);
+    try {
+      const body: Record<string, unknown> = {
+        location_id: locationId,
+        clear_location: locationId === null,
+        is_bidirectional: bidi,
+        has_dual_tariff: dual,
+      };
+      if (mp.type === 'heating') {
+        if (tankCapacity.trim() === '') {
+          body['clear_tank_capacity'] = true;
+        } else {
+          body['tank_capacity'] = parseDe(tankCapacity);
+        }
+      }
+      if (mp.type === 'electricity') {
+        const trimmed = transformerFactor.trim();
+        if (trimmed === '') {
+          body['clear_transformer_factor'] = true;
+        } else {
+          const parsed = Number(trimmed);
+          if (!Number.isInteger(parsed) || parsed <= 0) {
+            throw new RangeError('Wandlerfaktor muss eine positive Ganzzahl sein.');
+          }
+          body['transformer_factor'] = parsed;
+        }
+      }
+      const updated = await api.patch<MeasuringPointRead>(`/measuring-points/${mp.id}`, body);
+      onSaved(updated);
+    } catch (err) {
+      if (err instanceof ApiError) setError(err.problem.detail ?? err.problem.title);
+      else if (err instanceof RangeError) setError(err.message);
+      else setError('Speichern fehlgeschlagen.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <form onSubmit={(e) => void handleSubmit(e)} className="mt-3 space-y-3">
+      {/* Typ ist read-only — fundamental für die MP, Wechsel nicht supported. */}
+      <div className="text-caption text-tertiary">
+        Typ: <span className="font-semibold text-label">{describeMeterType(mp.type, mp.heating_source)}</span>
+      </div>
+      <Select
+        label="Standort"
+        value={locationId ?? ''}
+        onChange={(e) => setLocationId(e.target.value ? Number(e.target.value) : null)}
+      >
+        <option value="">— kein Standort —</option>
+        {locations.map((loc) => (
+          <option key={loc.id} value={loc.id}>
+            {loc.name}
+          </option>
+        ))}
+      </Select>
+      {mp.type === 'electricity' ? (
+        <>
+          <ToggleRow label="Bidirektional (Einspeisung)" checked={bidi} onChange={setBidi} />
+          <ToggleRow label="Doppeltarif (HT/NT)" checked={dual} onChange={setDual} />
+          <TextField
+            label="Wandlerfaktor (optional)"
+            inputMode="numeric"
+            pattern="[0-9]*"
+            value={transformerFactor}
+            onChange={(e) => setTransformerFactor(e.target.value)}
+            hint="leer = kein Wandler; ganzzahlig (z. B. 20, 50, 100). Verbräuche werden mit dem Faktor multipliziert."
+            numeric
+          />
+          <div className="text-caption text-tertiary">
+            Hinweis: Register werden nicht automatisch angepasst — beim nächsten Zählerwechsel
+            wirken sich die Flags auf den neuen Zähler aus.
+          </div>
+        </>
+      ) : null}
+      {mp.type === 'heating' ? (
+        <TextField
+          label="Tankvolumen / Vorratsmenge (optional)"
+          inputMode="decimal"
+          value={tankCapacity}
+          onChange={(e) => setTankCapacity(e.target.value)}
+          hint="leer = nicht gesetzt; wird für die Prozent-Anzeige des Vorrats genutzt"
+          numeric
+        />
+      ) : null}
+      {error ? (
+        <div className="border-danger/40 bg-danger/10 rounded-card border-hairline p-3 text-caption text-danger">
+          {error}
+        </div>
+      ) : null}
+      <div className="flex gap-2">
+        <Button type="submit" variant="filled" disabled={busy} fullWidth>
+          {busy ? 'Speichere…' : 'Speichern'}
+        </Button>
+        <Button type="button" variant="bordered" onClick={onCancel} disabled={busy}>
+          Abbrechen
+        </Button>
+      </div>
+    </form>
+  );
+}
+
+function ToggleRow({
+  label,
+  checked,
+  onChange,
+}: {
+  label: string;
+  checked: boolean;
+  onChange: (v: boolean) => void;
+}) {
+  return (
+    <div className="flex items-center justify-between rounded-pill border-hairline border-border bg-fill px-3.5 py-2.5">
+      <span className="text-body text-label">{label}</span>
+      <Switch checked={checked} onChange={onChange} ariaLabel={label} />
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Physische Zähler (alle Zähler, Edit pro Zähler, Tauschen-Sheet)
+// ---------------------------------------------------------------------------
+
+/**
+ * Card mit allen physischen Zählern dieser Messstelle.
+ *
+ * - Aktive Zähler oben (mit "aktiv"-Badge), ausgebaute darunter.
+ * - Pro Zähler ein "Bearbeiten"-Knopf für Seriennummer/installed_at/removed_at.
+ * - "Zähler tauschen"-CTA im Card-Header öffnet die ReplaceMeterForm im Sheet.
+ *   Tausch-CTA nur sichtbar, wenn ein aktiver Zähler existiert (sonst gibt es
+ *   nichts zu tauschen).
+ */
+function PhysicalMetersCard({
+  mp,
+  onChanged,
+}: {
+  mp: MeasuringPointRead;
+  onChanged: () => void;
+}) {
+  const [replaceOpen, setReplaceOpen] = useState(false);
+  const sortedMeters = useMemo(() => {
+    return [...mp.physical_meters].sort((a, b) => {
+      // Aktive Zähler (removed_at === null) zuerst, dann nach installed_at desc.
+      if (a.removed_at === null && b.removed_at !== null) return -1;
+      if (a.removed_at !== null && b.removed_at === null) return 1;
+      return b.installed_at.localeCompare(a.installed_at);
+    });
+  }, [mp.physical_meters]);
+  const hasActive = sortedMeters.some((m) => m.removed_at === null);
+
+  return (
+    <Section
+      header={
+        <div className="flex items-center justify-between gap-2">
+          <span>Physische Zähler</span>
+          {hasActive ? (
+            <Button
+              type="button"
+              variant="bordered"
+              size="sm"
+              leftIcon={<Plus size={14} />}
+              onClick={() => setReplaceOpen(true)}
+            >
+              Zähler tauschen
+            </Button>
+          ) : null}
+        </div>
+      }
+    >
+      {sortedMeters.length === 0 ? (
+        <div className="p-5 text-caption text-tertiary">Keine physischen Zähler.</div>
+      ) : (
+        <ul className="divide-y divide-separator">
+          {sortedMeters.map((meter) => (
+            <li key={meter.id} className="px-5 py-4">
+              <PhysicalMeterRow meter={meter} onChanged={onChanged} />
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <Sheet open={replaceOpen} onClose={() => setReplaceOpen(false)} title="Zähler tauschen">
+        <ReplaceMeterForm
+          mp={mp}
+          onClose={() => setReplaceOpen(false)}
+          onReplaced={() => {
+            setReplaceOpen(false);
+            onChanged();
+          }}
+        />
+      </Sheet>
+    </Section>
+  );
+}
+
+function PhysicalMeterRow({
+  meter,
+  onChanged,
+}: {
+  meter: PhysicalMeterRead;
+  onChanged: () => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const isActive = meter.removed_at === null;
+
+  if (editing) {
+    return (
+      <PhysicalMeterEditForm
+        meter={meter}
+        onCancel={() => setEditing(false)}
+        onSaved={() => {
+          setEditing(false);
+          onChanged();
+        }}
+      />
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-3">
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2">
+          <span className="num text-headline tracking-tight text-label">
+            SN {meter.serial_number}
+          </span>
+          {isActive ? (
+            <span className="bg-success/15 rounded-full px-2 py-0.5 text-caption font-semibold text-success">
+              aktiv
+            </span>
+          ) : (
+            <span className="rounded-full bg-fill px-2 py-0.5 text-caption font-semibold text-tertiary">
+              ausgebaut
+            </span>
+          )}
+        </div>
+        <div className="num mt-0.5 text-caption text-tertiary">
+          {meter.installed_at} – {meter.removed_at ?? 'aktiv'}
+          <span className="ml-2 text-quaternary">
+            · {meter.registers.length}{' '}
+            {meter.registers.length === 1 ? 'Register' : 'Register'}
+          </span>
+        </div>
+      </div>
+      <Button
+        type="button"
+        variant="plain"
+        size="sm"
+        leftIcon={<Pencil size={14} />}
+        onClick={() => setEditing(true)}
+      >
+        Bearbeiten
+      </Button>
+    </div>
+  );
+}
+
+function PhysicalMeterEditForm({
+  meter,
+  onCancel,
+  onSaved,
+}: {
+  meter: PhysicalMeterRead;
+  onCancel: () => void;
+  onSaved: () => void;
+}) {
+  const [serial, setSerial] = useState(meter.serial_number);
+  const [installedAt, setInstalledAt] = useState(meter.installed_at);
+  const [removedAt, setRemovedAt] = useState(meter.removed_at ?? '');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function save(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setBusy(true);
+    setError(null);
+    try {
+      await api.patch(`/physical-meters/${meter.id}`, {
+        serial_number: serial,
+        installed_at: installedAt,
+        removed_at: removedAt || null,
+        clear_removed_at: removedAt === '',
+      });
+      onSaved();
+    } catch (err) {
+      if (err instanceof ApiError) setError(err.problem.detail ?? err.problem.title);
+      else setError('Speichern fehlgeschlagen.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <form onSubmit={(e) => void save(e)} className="space-y-3">
+      <TextField label="Seriennummer" value={serial} onChange={(e) => setSerial(e.target.value)} />
+      <TextField
+        label="Eingebaut am"
+        type="date"
+        value={installedAt}
+        onChange={(e) => setInstalledAt(e.target.value)}
+      />
+      <TextField
+        label="Ausgebaut am (leer = aktiv)"
+        type="date"
+        value={removedAt}
+        onChange={(e) => setRemovedAt(e.target.value)}
+      />
+      {error ? (
+        <div className="border-danger/40 bg-danger/10 rounded-card border-hairline p-3 text-caption text-danger">
+          {error}
+        </div>
+      ) : null}
+      <div className="flex gap-2">
+        <Button type="submit" variant="filled" size="sm" disabled={busy} fullWidth>
+          {busy ? 'Speichere…' : 'Speichern'}
+        </Button>
+        <Button
+          type="button"
+          variant="bordered"
+          size="sm"
+          onClick={onCancel}
+          disabled={busy}
+          leftIcon={<X size={14} />}
+        >
+          Abbrechen
+        </Button>
+      </div>
+    </form>
+  );
+}
+
+function ReplaceMeterForm({
+  mp,
+  onClose,
+  onReplaced,
+}: {
+  mp: MeasuringPointRead;
+  onClose: () => void;
+  onReplaced: () => void;
+}) {
+  const active = mp.physical_meters.find((m) => m.removed_at === null);
+  const obis = active?.registers.filter((r) => r.is_active).map((r) => r.obis_code) ?? [];
+  const today = new Date().toISOString().slice(0, 10);
+
+  const [removedAt, setRemovedAt] = useState(today);
+  const [installedAt, setInstalledAt] = useState(today);
+  const [serial, setSerial] = useState('');
+  const [final, setFinal] = useState<Record<string, string>>(() =>
+    Object.fromEntries(obis.map((c) => [c, ''])),
+  );
+  const [initial, setInitial] = useState<Record<string, string>>(() =>
+    Object.fromEntries(obis.map((c) => [c, '0'])),
+  );
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function handleSubmit(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setBusy(true);
+    setError(null);
+    try {
+      const finalParsed: Record<string, string> = {};
+      const initialParsed: Record<string, string> = {};
+      for (const code of obis) {
+        finalParsed[code] = parseDe(final[code] ?? '');
+        initialParsed[code] = parseDe(initial[code] ?? '0');
+      }
+      await api.post(`/measuring-points/${mp.id}/replace-meter`, {
+        final_readings: finalParsed,
+        removed_at: removedAt,
+        new_serial_number: serial,
+        installed_at: installedAt,
+        initial_readings: initialParsed,
+      });
+      onReplaced();
+      onClose();
+    } catch (err) {
+      if (err instanceof ApiError) setError(err.problem.detail ?? err.problem.title);
+      else if (err instanceof RangeError) setError(err.message);
+      else setError('Tausch fehlgeschlagen.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <form onSubmit={(e) => void handleSubmit(e)} className="space-y-4">
+      <TextField
+        label="Ausgebaut am"
+        type="date"
+        value={removedAt}
+        onChange={(e) => setRemovedAt(e.target.value)}
+      />
+      <TextField
+        label="Eingebaut am"
+        type="date"
+        value={installedAt}
+        onChange={(e) => setInstalledAt(e.target.value)}
+      />
+      <TextField
+        label="Neue Seriennummer"
+        value={serial}
+        onChange={(e) => setSerial(e.target.value)}
+        required
+      />
+      <div>
+        <div className="mb-2 text-caption-bold uppercase text-tertiary">Endstände (alt)</div>
+        <div className="space-y-2">
+          {obis.map((code) => (
+            <TextField
+              key={`f-${code}`}
+              label={code}
+              inputMode="decimal"
+              value={final[code] ?? ''}
+              onChange={(e) => setFinal((s) => ({ ...s, [code]: e.target.value }))}
+              required
+              numeric
+            />
+          ))}
+        </div>
+      </div>
+      <div>
+        <div className="mb-2 text-caption-bold uppercase text-tertiary">Anfangsstände (neu)</div>
+        <div className="space-y-2">
+          {obis.map((code) => (
+            <TextField
+              key={`i-${code}`}
+              label={code}
+              inputMode="decimal"
+              value={initial[code] ?? ''}
+              onChange={(e) => setInitial((s) => ({ ...s, [code]: e.target.value }))}
+              numeric
+            />
+          ))}
+        </div>
+      </div>
+      {error ? (
+        <div className="border-danger/40 bg-danger/10 rounded-card border-hairline p-3 text-caption text-danger">
+          {error}
+        </div>
+      ) : null}
+      <div className="flex gap-2">
+        <Button type="submit" variant="filled" disabled={busy} fullWidth>
+          {busy ? 'Tausche…' : 'Tausch durchführen'}
+        </Button>
+        <Button type="button" variant="bordered" onClick={onClose}>
+          Abbrechen
+        </Button>
+      </div>
+    </form>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Helpers + read-only Inhalte (Title-BackLink, Verbrauchskurve, Register-Tabelle)
+// ---------------------------------------------------------------------------
+
 function BackLink() {
   return (
     <Link
@@ -352,7 +914,7 @@ function ConsumptionChart({
 }) {
   const theme = useChartTheme();
 
-  // Alle Hooks vor dem early return — Rules of Hooks.
+  // Alle Hooks vor dem early return - Rules of Hooks.
   // Pro period_end ein Punkt mit allen OBIS-Codes daneben.
   const { series, obisCodes } = useMemo(() => {
     const merged = new Map<string, Record<string, number | string>>();
@@ -518,7 +1080,10 @@ function RegisterTable({ mp, states }: { mp: MeasuringPointRead; states: Registe
           return (
             <li
               key={register.id}
-              className="grid grid-cols-1 gap-2 px-5 py-4 md:grid-cols-[110px_1.4fr_1fr_1fr_24px] md:items-center md:gap-4"
+              className={cx(
+                'grid grid-cols-1 gap-2 px-5 py-4',
+                'md:grid-cols-[110px_1.4fr_1fr_1fr_24px] md:items-center md:gap-4',
+              )}
             >
               <div>
                 <code className="num inline-block rounded-badge bg-primary-soft px-2 py-1 text-caption font-semibold text-primary-deep">
