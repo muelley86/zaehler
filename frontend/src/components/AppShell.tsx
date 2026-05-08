@@ -52,9 +52,7 @@ const SECONDARY_NAV: NavItem[] = [
 // (Messstellen, Standorte, Benutzer, QR-Codes, Audit, System, Statistiken,
 // Sessions) leben im AdminLayout selbst — Sub-Sidebar (Desktop) bzw.
 // horizontaler Tab-Strip (Mobile).
-const ADMIN_NAV: NavItem[] = [
-  { to: '/admin', label: 'Verwaltung', icon: <Settings size={18} /> },
-];
+const ADMIN_NAV: NavItem[] = [{ to: '/admin', label: 'Verwaltung', icon: <Settings size={18} /> }];
 
 function LogoLockup({ size = 'md' }: { size?: 'sm' | 'md' }) {
   const square = size === 'sm' ? 'h-7 w-7' : 'h-8 w-8';

@@ -164,9 +164,7 @@ describe('UserAccessSheet', () => {
     const onSaved = vi.fn();
     const onClose = vi.fn();
     const user = userEvent.setup();
-    renderWithRouter(
-      <UserAccessSheet user={_RECORDER} onClose={onClose} onSaved={onSaved} />,
-    );
+    renderWithRouter(<UserAccessSheet user={_RECORDER} onClose={onClose} onSaved={onSaved} />);
 
     await screen.findByLabelText('Zugriff auf Strom');
     // Wasser zusätzlich aktivieren

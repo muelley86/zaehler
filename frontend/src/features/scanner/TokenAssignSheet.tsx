@@ -56,8 +56,8 @@ export function TokenAssignSheet({
       <Sheet open onClose={onClose} title="QR-Code zuordnen">
         <div className="space-y-4">
           <div className="text-body-sm text-secondary">
-            Du hast aktuell keine Messstellen zugeordnet, denen du diesen QR-Code zuweisen
-            könntest. Bitte den Admin um die Zuordnung.
+            Du hast aktuell keine Messstellen zugeordnet, denen du diesen QR-Code zuweisen könntest.
+            Bitte den Admin um die Zuordnung.
           </div>
           <Button type="button" variant="filled" fullWidth onClick={onClose}>
             Schließen

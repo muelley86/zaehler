@@ -27,7 +27,7 @@ interface BackendPlaceholderProps {
 export function BackendPlaceholder({ label, note }: BackendPlaceholderProps) {
   return (
     <div className="flex items-start gap-3 px-5 py-4 first:pt-5 last:pb-5 [&+&]:border-t-hairline [&+&]:border-separator">
-      <div className="bg-fill flex h-8 w-8 shrink-0 items-center justify-center rounded-card text-tertiary">
+      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-card bg-fill text-tertiary">
         <Wrench size={14} />
       </div>
       <div className="min-w-0 flex-1">

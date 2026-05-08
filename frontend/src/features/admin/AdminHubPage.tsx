@@ -18,12 +18,7 @@ import { Link } from 'react-router-dom';
 
 import { LargeTitle } from '@/components/ui';
 import { api } from '@/lib/api';
-import type {
-  LocationRead,
-  MeasuringPointRead,
-  QrTokenRead,
-  UserRead,
-} from '@/lib/types';
+import type { LocationRead, MeasuringPointRead, QrTokenRead, UserRead } from '@/lib/types';
 import { cx } from '@/components/ui/cx';
 
 import { ADMIN_SECTIONS, type AdminNavItem, type AdminSectionColor } from './adminNav';
@@ -70,16 +65,9 @@ export function AdminHubPage() {
     <>
       <LargeTitle title="Verwaltung" subtitle="Konten, Daten, System" />
 
-      <div
-        className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3"
-        data-testid="admin-hub-grid"
-      >
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3" data-testid="admin-hub-grid">
         {ADMIN_SECTIONS.map((s) => (
-          <HubCard
-            key={s.to}
-            section={s}
-            counter={counts[s.to as keyof Counts]}
-          />
+          <HubCard key={s.to} section={s} counter={counts[s.to as keyof Counts]} />
         ))}
       </div>
     </>
@@ -91,7 +79,7 @@ function HubCard({ section, counter }: { section: AdminNavItem; counter: number 
     <Link
       to={section.to}
       data-testid={`admin-hub-card-${section.to}`}
-      className="group rounded-card border-hairline border-border bg-surface p-5 transition-shadow hover:shadow-glow-primary"
+      className="hover:shadow-glow-primary group rounded-card border-hairline border-border bg-surface p-5 transition-shadow"
     >
       <div className="flex items-start justify-between">
         <div
