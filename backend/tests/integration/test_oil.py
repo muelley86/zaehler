@@ -9,9 +9,7 @@ from sqlalchemy.orm import Session
 from meters.models import MeasuringPoint, User, UserMeasuringPointAccess
 
 
-def _grant_recorder_access_to_first_mp(
-    db: Session, *, recorder: User, granted_by: User
-) -> None:
+def _grant_recorder_access_to_first_mp(db: Session, *, recorder: User, granted_by: User) -> None:
     """Per-Recorder MP-Zugriff (Feature B): Recorder bekommt explizit
     Zugriff auf alle vorhandenen MPs — analog zum gleichnamigen Helper
     in test_readings.py."""

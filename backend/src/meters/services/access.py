@@ -18,7 +18,10 @@ genau das in einer Query.
 
 from __future__ import annotations
 
+from typing import Any
+
 from sqlalchemy import Select, select
+from sqlalchemy.orm import InstrumentedAttribute
 from sqlalchemy.orm import Session as DbSession
 
 from meters.core.problem import ProblemError
@@ -96,7 +99,12 @@ def assert_can_access_register(db: DbSession, user: User, register_id: int) -> N
     assert_can_access_mp(db, user, mp_id)
 
 
-def restrict_mp_query(query: Select, user: User, *, mp_id_column) -> Select:
+def restrict_mp_query(
+    query: Select[Any],
+    user: User,
+    *,
+    mp_id_column: InstrumentedAttribute[int],
+) -> Select[Any]:
     """Hängt eine WHERE-Klausel an, die ``mp_id_column`` auf zugängliche
     MPs einschränkt.
 

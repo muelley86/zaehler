@@ -6,7 +6,7 @@ Wasserzählerständen für einen Privathaushalt. Läuft in einem LXC-Container
 auf eigener Hardware. Keine Cloud, keine externen Abhängigkeiten zur Laufzeit.
 
 ## Tech-Stack
-- Backend: Python 3.12, FastAPI, SQLAlchemy 2.x, Alembic, Pydantic v2
+- Backend: Python 3.13, FastAPI, SQLAlchemy 2.x, Alembic, Pydantic v2
 - DB: SQLite (Datei unter ./data/meters.db)
 - Frontend: React 18 + Vite + TypeScript, Tailwind CSS
 - Charts: Recharts

@@ -186,9 +186,7 @@ def list_readings(
         stmt = stmt.where(Reading.register_id == register_id)
     if measuring_point_id is not None:
         stmt = stmt.where(PhysicalMeter.measuring_point_id == measuring_point_id)
-    stmt = restrict_mp_query(
-        stmt, user, mp_id_column=PhysicalMeter.measuring_point_id
-    )
+    stmt = restrict_mp_query(stmt, user, mp_id_column=PhysicalMeter.measuring_point_id)
     if from_at is not None:
         stmt = stmt.where(Reading.reading_at >= from_at)
     if to_at is not None:

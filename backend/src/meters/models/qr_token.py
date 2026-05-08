@@ -42,10 +42,12 @@ class QrToken(Base):
     # Erstellung — created_by ist nicht-nullable, damit Audit-Trail
     # rückwirkend lesbar bleibt. RESTRICT, kein Cascade.
     created_at: Mapped[datetime] = mapped_column(
-        server_default=func.current_timestamp(), nullable=False,
+        server_default=func.current_timestamp(),
+        nullable=False,
     )
     created_by_user_id: Mapped[int] = mapped_column(
-        ForeignKey("user.id"), nullable=False,
+        ForeignKey("user.id"),
+        nullable=False,
     )
     # Zuweisung — beide nullable, da unzugewiesene Tokens existieren.
     assigned_at: Mapped[datetime | None] = mapped_column()

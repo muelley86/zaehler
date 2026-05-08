@@ -26,9 +26,7 @@ def _setup_water_mp(admin_client: TestClient) -> int:
     return register_id
 
 
-def _grant_recorder_access_to_first_mp(
-    db: Session, *, recorder: User, granted_by: User
-) -> None:
+def _grant_recorder_access_to_first_mp(db: Session, *, recorder: User, granted_by: User) -> None:
     """Per-Recorder MP-Zugriff (Feature B): seit 78f79fe haben Recorder
     standardmäßig keinen MP-Zugriff. Diese Helper-Funktion vergibt der
     Recorder-User Zugriff auf alle existierenden MPs — ausreichend für

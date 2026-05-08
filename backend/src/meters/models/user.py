@@ -50,7 +50,10 @@ class User(Base, TimestampMixin):
     # Für Admins ist der Wert irrelevant, da sie die Berechtigung implizit
     # haben.
     can_assign_qr_tokens: Mapped[bool] = mapped_column(
-        Boolean, default=False, nullable=False, server_default="0",
+        Boolean,
+        default=False,
+        nullable=False,
+        server_default="0",
     )
 
     sessions: Mapped[list[Session]] = relationship(

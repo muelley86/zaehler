@@ -297,7 +297,9 @@ def assign(
         raise ProblemError(
             status_code=403,
             title="Forbidden",
-            detail="Diese Aktion erfordert Admin-Rechte oder die Berechtigung zur QR-Code-Zuweisung.",
+            detail=(
+                "Diese Aktion erfordert Admin-Rechte oder die Berechtigung zur QR-Code-Zuweisung."
+            ),
         )
 
     token = _load_or_404(db, token_str)

@@ -2,7 +2,7 @@
 
 Erzeugung, Zuweisung und Auflösung von Tokens. Token-IDs sind 8 Zeichen
 Crockford-Base32 — ein Alphabet mit 32 Symbolen ohne visuell mehrdeutige
-Zeichen (kein I/L/O/U, kein 0/1). Damit sind 32^8 ≈ 1,1 × 10^12
+Zeichen (kein I/L/O/U, kein 0/1). Damit sind 32^8 ≈ 1,1 x 10^12
 Möglichkeiten erreichbar.
 
 Bei Bulk-Erzeugung versuchen wir bis zu :data:`_MAX_RETRIES` mal pro
@@ -101,10 +101,7 @@ def assign_token(
     """Setzt die MP-Zuweisung. Idempotent für identische Zuweisungen,
     verändert aber ``assigned_at``/``assigned_by_user_id`` nicht erneut,
     wenn der Token bereits genau dieser MP zugeordnet ist."""
-    if (
-        token.measuring_point_id == measuring_point_id
-        and token.assigned_at is not None
-    ):
+    if token.measuring_point_id == measuring_point_id and token.assigned_at is not None:
         return
     token.measuring_point_id = measuring_point_id
     token.assigned_at = _utcnow()

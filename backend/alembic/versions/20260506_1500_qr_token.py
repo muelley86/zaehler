@@ -56,11 +56,16 @@ def upgrade() -> None:
         ),
     )
     op.create_index(
-        "ix_qr_token_token", "qr_token", ["token"], unique=True,
+        "ix_qr_token_token",
+        "qr_token",
+        ["token"],
+        unique=True,
     )
     # Sekundärer Index für die häufige Filter-Query "alle Tokens dieser MP"
     op.create_index(
-        "ix_qr_token_measuring_point_id", "qr_token", ["measuring_point_id"],
+        "ix_qr_token_measuring_point_id",
+        "qr_token",
+        ["measuring_point_id"],
     )
 
 

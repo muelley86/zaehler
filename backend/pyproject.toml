@@ -3,7 +3,7 @@ name = "meters"
 version = "0.1.0"
 description = "Self-hosted meter-reading webapp (electricity / gas / water)."
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.13"
 license = { text = "Proprietary" }
 authors = [{ name = "Kmueller" }]
 
@@ -49,7 +49,7 @@ package = true
 # ---------------------------------------------------------------------------
 [tool.ruff]
 line-length = 100
-target-version = "py312"
+target-version = "py313"
 src = ["src", "tests"]
 
 [tool.ruff.lint]
@@ -87,7 +87,7 @@ line-ending = "lf"
 # Mypy
 # ---------------------------------------------------------------------------
 [tool.mypy]
-python_version = "3.12"
+python_version = "3.13"
 strict = true
 plugins = ["pydantic.mypy"]
 mypy_path = "src"
