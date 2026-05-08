@@ -6,8 +6,9 @@
  * Desktop (>= md): 240-px-Sidebar links mit Logo, primären Routen,
  * Admin-Sektion und Profil-Footer.
  *
- * Admin-Routen (Messstellen, Standorte, Benutzer, Audit) sind nur für
- * Admin-User sichtbar.
+ * Die Admin-Sektion enthält nur einen Eintrag "Verwaltung" auf den Hub
+ * (/admin); die acht Sub-Bereiche werden im AdminLayout selber per
+ * Sub-Sidebar bzw. Tab-Strip angezeigt.
  */
 
 import type { ReactNode } from 'react';
@@ -16,14 +17,10 @@ import {
   Gauge,
   LayoutDashboard,
   LogOut,
-  MapPin,
   MoreHorizontal,
   PencilLine,
   Plus,
-  QrCode,
-  ScrollText,
   Settings,
-  Users,
 } from 'lucide-react';
 import { NavLink, useNavigate } from 'react-router-dom';
 
@@ -51,13 +48,11 @@ const SECONDARY_NAV: NavItem[] = [
   { to: '/mehr', label: 'Einstellungen', icon: <Settings size={18} /> },
 ];
 
-const ADMIN_NAV: NavItem[] = [
-  { to: '/messstellen', label: 'Messstellen', icon: <Gauge size={18} /> },
-  { to: '/standorte', label: 'Standorte', icon: <MapPin size={18} /> },
-  { to: '/benutzer', label: 'Benutzer', icon: <Users size={18} /> },
-  { to: '/qr-codes', label: 'QR-Codes', icon: <QrCode size={18} /> },
-  { to: '/audit', label: 'Audit', icon: <ScrollText size={18} /> },
-];
+// Top-Level-Admin-Eintrag: nur ein Link auf den Hub. Die acht Sub-Bereiche
+// (Messstellen, Standorte, Benutzer, QR-Codes, Audit, System, Statistiken,
+// Sessions) leben im AdminLayout selbst — Sub-Sidebar (Desktop) bzw.
+// horizontaler Tab-Strip (Mobile).
+const ADMIN_NAV: NavItem[] = [{ to: '/admin', label: 'Verwaltung', icon: <Settings size={18} /> }];
 
 function LogoLockup({ size = 'md' }: { size?: 'sm' | 'md' }) {
   const square = size === 'sm' ? 'h-7 w-7' : 'h-8 w-8';

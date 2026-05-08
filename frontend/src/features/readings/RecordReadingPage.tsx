@@ -150,8 +150,9 @@ export function RecordReadingPage() {
     const mpParam = searchParams.get('mp');
     if (mpParam !== null) {
       const parsed = Number.parseInt(mpParam, 10);
-      const target =
-        Number.isFinite(parsed) ? points.find((mp) => mp.id === parsed) ?? null : null;
+      const target = Number.isFinite(parsed)
+        ? (points.find((mp) => mp.id === parsed) ?? null)
+        : null;
       if (target && activeRegistersOf(target).length > 0) {
         setMpId(target.id);
       } else {
@@ -305,9 +306,7 @@ export function RecordReadingPage() {
         ) : null}
 
         <Suspense fallback={null}>
-          {scannerOpen ? (
-            <QrScanSheet open={scannerOpen} onClose={handleScannerClose} />
-          ) : null}
+          {scannerOpen ? <QrScanSheet open={scannerOpen} onClose={handleScannerClose} /> : null}
         </Suspense>
         <Suspense fallback={null}>
           {assignToken !== null ? (

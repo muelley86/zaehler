@@ -3,7 +3,6 @@ import type { FormEvent } from 'react';
 import { Crosshair, Map as MapIcon, MapPin, Pencil, Trash2 } from 'lucide-react';
 
 import { Button, Card, EmptyState, LargeTitle, Section, Sheet, TextField } from '@/components/ui';
-import { PageGlows } from '@/components/PageGlows';
 import { LocationMap } from '@/components/LocationMap';
 import { LocationMapSheet } from '@/components/LocationMapSheet';
 import { ApiError, api } from '@/lib/api';
@@ -48,7 +47,7 @@ export function LocationsAdminPage() {
   }, [points]);
 
   return (
-    <PageContainer>
+    <>
       <LargeTitle title="Standorte" />
       {error ? (
         <div className="border-danger/40 bg-danger/10 rounded-card border-hairline p-3 text-danger">
@@ -101,16 +100,7 @@ export function LocationsAdminPage() {
           name={mapTarget.name}
         />
       ) : null}
-    </PageContainer>
-  );
-}
-
-function PageContainer({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="relative min-h-full overflow-hidden bg-bg">
-      <PageGlows accent="electricity" />
-      <div className="relative z-10 space-y-5 p-4 pb-12 md:p-7">{children}</div>
-    </div>
+    </>
   );
 }
 

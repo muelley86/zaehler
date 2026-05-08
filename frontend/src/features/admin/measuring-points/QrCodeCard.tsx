@@ -6,7 +6,7 @@
  * Tokens, die dieser MP zugeordnet sind, mit Vorschau und Lösen-Button.
  *
  * Wenn noch kein Token zugeordnet ist, leitet ein Hinweis-CTA in die
- * /qr-codes-Verwaltung. Dort werden Tokens auf Vorrat angelegt und
+ * /admin/qr-codes-Verwaltung. Dort werden Tokens auf Vorrat angelegt und
  * gedruckt; die Zuordnung passiert dann beim Scan vor Ort.
  */
 
@@ -55,10 +55,7 @@ export function QrCodeCard({ mp }: QrCodeCardProps) {
   }
 
   function printSingle(token: string) {
-    const w = window.open(
-      `/api/v1/qr-tokens/${token}/qr?format=svg&size=large`,
-      '_blank',
-    );
+    const w = window.open(`/api/v1/qr-tokens/${token}/qr?format=svg&size=large`, '_blank');
     if (w) w.focus();
   }
 
@@ -67,7 +64,7 @@ export function QrCodeCard({ mp }: QrCodeCardProps) {
       <div className="flex items-center justify-between">
         <div className="text-caption-bold uppercase text-tertiary">QR-Codes</div>
         <Link
-          to="/qr-codes"
+          to="/admin/qr-codes"
           className="inline-flex items-center gap-1 text-caption font-semibold text-primary-deep hover:underline"
         >
           Verwaltung
@@ -83,16 +80,14 @@ export function QrCodeCard({ mp }: QrCodeCardProps) {
         <div className="mt-3 text-body-sm text-tertiary">Lade…</div>
       ) : tokens.length === 0 ? (
         <div className="mt-3 space-y-2 text-body-sm">
-          <div className="text-secondary">
-            Dieser Messstelle ist noch kein QR-Code zugeordnet.
-          </div>
+          <div className="text-secondary">Dieser Messstelle ist noch kein QR-Code zugeordnet.</div>
           <div className="text-caption text-tertiary">
             Tokens werden in der QR-Code-Verwaltung auf Vorrat angelegt und beim Scannen vor Ort
             zugeordnet — oder direkt dort über „Drucken“ ausgedruckt und verklebt.
           </div>
           <Link
-            to="/qr-codes"
-            className="inline-flex h-8 items-center gap-2 rounded-pill bg-gradient-primary px-3 text-caption font-semibold text-white shadow-glow-primary transition-[filter] hover:brightness-105"
+            to="/admin/qr-codes"
+            className="bg-gradient-primary shadow-glow-primary inline-flex h-8 items-center gap-2 rounded-pill px-3 text-caption font-semibold text-white transition-[filter] hover:brightness-105"
           >
             <QrCode size={14} />
             Zur QR-Code-Verwaltung
@@ -113,9 +108,7 @@ export function QrCodeCard({ mp }: QrCodeCardProps) {
                   loading="lazy"
                 />
               </div>
-              <div className="num min-w-0 flex-1 text-body font-semibold text-label">
-                {t.token}
-              </div>
+              <div className="num min-w-0 flex-1 text-body font-semibold text-label">{t.token}</div>
               <Button
                 type="button"
                 variant="plain"

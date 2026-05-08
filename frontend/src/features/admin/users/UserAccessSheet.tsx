@@ -78,8 +78,7 @@ export function UserAccessSheet({ user, onClose, onSaved }: UserAccessSheetProps
   }, [allMps, typeFilter, search]);
 
   const filteredIds = useMemo(() => filtered.map((mp) => mp.id), [filtered]);
-  const allFilteredSelected =
-    filteredIds.length > 0 && filteredIds.every((id) => selected.has(id));
+  const allFilteredSelected = filteredIds.length > 0 && filteredIds.every((id) => selected.has(id));
 
   function toggle(id: number) {
     setSelected((prev) => {
@@ -141,9 +140,7 @@ export function UserAccessSheet({ user, onClose, onSaved }: UserAccessSheetProps
         </div>
       ) : null}
 
-      {allMps === null && !loadingError ? (
-        <div className="text-tertiary">Lade…</div>
-      ) : null}
+      {allMps === null && !loadingError ? <div className="text-tertiary">Lade…</div> : null}
 
       {allMps !== null ? (
         <div className="space-y-4">

@@ -1,4 +1,4 @@
-import { Gauge, KeyRound, LogOut, MapPin, Moon, ScrollText, Sun, Users } from 'lucide-react';
+import { KeyRound, LayoutGrid, LogOut, Moon, Sun } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
@@ -93,14 +93,18 @@ export function MorePage() {
           </RowGroup>
         </Section>
 
-        {/* Daten / Verwaltung — nur Admin */}
+        {/* Verwaltung — nur Admin. Bündelt Benutzer, Messstellen, Standorte,
+            QR-Codes, Audit sowie System / Statistiken / Sessions hinter der
+            zentralen Hub-Seite (/admin). */}
         {isAdmin ? (
-          <Section header="Daten">
+          <Section header="Verwaltung">
             <RowGroup>
-              <Row to="/messstellen" icon={<Gauge size={20} />} label="Messstellen" />
-              <Row to="/standorte" icon={<MapPin size={20} />} label="Standorte" />
-              <Row to="/benutzer" icon={<Users size={20} />} label="Benutzer" />
-              <Row to="/audit" icon={<ScrollText size={20} />} label="Audit-Log" />
+              <Row
+                to="/admin"
+                icon={<LayoutGrid size={20} />}
+                label="Verwaltung"
+                sublabel="Benutzer, Messstellen, System …"
+              />
             </RowGroup>
           </Section>
         ) : null}

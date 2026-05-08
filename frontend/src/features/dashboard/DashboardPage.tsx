@@ -270,7 +270,7 @@ export function DashboardPage() {
           title="Noch keine Messstellen"
           description="Lege deine erste Strom-, Gas- oder Wasser-Messstelle an."
           action={
-            <Link to="/messstellen">
+            <Link to="/admin/messstellen">
               <Button variant="filled" leftIcon={<Plus size={16} />}>
                 Messstelle anlegen
               </Button>
@@ -376,18 +376,18 @@ export function DashboardPage() {
         <EmptyState icon={<Filter size={32} />} title="Keine Messstellen entsprechen dem Filter" />
       ) : null}
 
-      {mpDataReady && filteredPoints.length > 0 ? (
-        filteredPoints.map((mp) => (
-          <MeasuringPointCard
-            key={mp.id}
-            mp={mp}
-            consumption={consumptionByMp.get(mp.id) ?? EMPTY_CONSUMPTION}
-            readings={readingsFilteredByMp.get(mp.id) ?? EMPTY_READINGS}
-            state={states[mp.id] ?? EMPTY_STATES}
-            onChanged={handleChanged}
-          />
-        ))
-      ) : null}
+      {mpDataReady && filteredPoints.length > 0
+        ? filteredPoints.map((mp) => (
+            <MeasuringPointCard
+              key={mp.id}
+              mp={mp}
+              consumption={consumptionByMp.get(mp.id) ?? EMPTY_CONSUMPTION}
+              readings={readingsFilteredByMp.get(mp.id) ?? EMPTY_READINGS}
+              state={states[mp.id] ?? EMPTY_STATES}
+              onChanged={handleChanged}
+            />
+          ))
+        : null}
     </PageContainer>
   );
 }
@@ -975,7 +975,7 @@ function DashboardSkeleton() {
       {/* Filter-Section */}
       <div
         aria-hidden
-        className="rounded-card border-hairline border-border bg-surface/50 glass"
+        className="bg-surface/50 glass rounded-card border-hairline border-border"
         style={{ minHeight: 188 }}
       />
 
@@ -1003,15 +1003,15 @@ function MeasuringPointCardSkeleton() {
   return (
     <div
       aria-hidden
-      className="glass rounded-card border-hairline border-border bg-surface/50 shadow-glass dark:shadow-glass-dark"
+      className="glass bg-surface/50 rounded-card border-hairline border-border shadow-glass dark:shadow-glass-dark"
       style={{ minHeight: 640 }}
     >
       <div className="space-y-3 p-5">
         <div className="h-7 w-2/3 rounded-pill bg-fill" />
-        <div className="h-4 w-1/3 rounded-pill bg-fill/60" />
-        <div className="mt-6 h-32 w-full rounded-card bg-fill/60" />
-        <div className="mt-4 h-24 w-full rounded-card bg-fill/40" />
-        <div className="mt-4 h-64 w-full rounded-card bg-fill/40" />
+        <div className="bg-fill/60 h-4 w-1/3 rounded-pill" />
+        <div className="bg-fill/60 mt-6 h-32 w-full rounded-card" />
+        <div className="bg-fill/40 mt-4 h-24 w-full rounded-card" />
+        <div className="bg-fill/40 mt-4 h-64 w-full rounded-card" />
       </div>
     </div>
   );
@@ -1028,16 +1028,16 @@ function ConsumptionSummarySkeleton() {
   return (
     <div
       aria-hidden
-      className="rounded-card border-hairline border-border bg-surface/50 glass"
+      className="bg-surface/50 glass rounded-card border-hairline border-border"
       style={{ minHeight: 260 }}
     >
       <div className="border-b border-separator p-5">
-        <div className="h-5 w-1/2 rounded-pill bg-fill/60" />
+        <div className="bg-fill/60 h-5 w-1/2 rounded-pill" />
       </div>
       <div className="space-y-3 p-5">
-        <div className="h-4 w-3/4 rounded-pill bg-fill/40" />
-        <div className="h-4 w-2/3 rounded-pill bg-fill/40" />
-        <div className="h-4 w-3/5 rounded-pill bg-fill/40" />
+        <div className="bg-fill/40 h-4 w-3/4 rounded-pill" />
+        <div className="bg-fill/40 h-4 w-2/3 rounded-pill" />
+        <div className="bg-fill/40 h-4 w-3/5 rounded-pill" />
       </div>
     </div>
   );

@@ -184,7 +184,10 @@ function escapeHtml(value: string): string {
  * oder ohne width/height, ist das auch ok (regex matcht dann nichts).
  */
 function sanitizeSvgForInline(raw: string): string {
-  let svg = raw.replace(/<\?xml[^?]*\?>/g, '').replace(/<!DOCTYPE[^>]*>/gi, '').trim();
+  let svg = raw
+    .replace(/<\?xml[^?]*\?>/g, '')
+    .replace(/<!DOCTYPE[^>]*>/gi, '')
+    .trim();
   svg = svg.replace(/(<svg\b[^>]*?)\swidth="[^"]*"/i, '$1');
   svg = svg.replace(/(<svg\b[^>]*?)\sheight="[^"]*"/i, '$1');
   return svg;
@@ -193,10 +196,13 @@ function sanitizeSvgForInline(raw: string): string {
 async function fetchTokenSvg(tokenStr: string): Promise<string> {
   // Same-origin-Fetch im Opener-Kontext — Cookies, CSP und Origin sind hier
   // alle „normal", anders als später im about:blank-Fenster.
-  const r = await fetch(`/api/v1/qr-tokens/${encodeURIComponent(tokenStr)}/qr?format=svg&size=large`, {
-    credentials: 'same-origin',
-    headers: { Accept: 'image/svg+xml' },
-  });
+  const r = await fetch(
+    `/api/v1/qr-tokens/${encodeURIComponent(tokenStr)}/qr?format=svg&size=large`,
+    {
+      credentials: 'same-origin',
+      headers: { Accept: 'image/svg+xml' },
+    },
+  );
   if (!r.ok) {
     throw new Error(`QR-SVG für ${tokenStr} konnte nicht geladen werden (HTTP ${r.status})`);
   }
