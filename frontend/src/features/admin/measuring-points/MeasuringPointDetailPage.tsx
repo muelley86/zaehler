@@ -12,7 +12,16 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
-import { ArrowLeft, ChevronRight, Droplet, Map as MapIcon, Pencil, Plus, Trash2, X } from 'lucide-react';
+import {
+  ArrowLeft,
+  ChevronRight,
+  Droplet,
+  Map as MapIcon,
+  Pencil,
+  Plus,
+  Trash2,
+  X,
+} from 'lucide-react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
   Area,
@@ -474,7 +483,10 @@ function StammdatenEditForm({
     <form onSubmit={(e) => void handleSubmit(e)} className="mt-3 space-y-3">
       {/* Typ ist read-only — fundamental für die MP, Wechsel nicht supported. */}
       <div className="text-caption text-tertiary">
-        Typ: <span className="font-semibold text-label">{describeMeterType(mp.type, mp.heating_source)}</span>
+        Typ:{' '}
+        <span className="font-semibold text-label">
+          {describeMeterType(mp.type, mp.heating_source)}
+        </span>
       </div>
       <Select
         label="Standort"
@@ -564,13 +576,7 @@ function ToggleRow({
  *   Tausch-CTA nur sichtbar, wenn ein aktiver Zähler existiert (sonst gibt es
  *   nichts zu tauschen).
  */
-function PhysicalMetersCard({
-  mp,
-  onChanged,
-}: {
-  mp: MeasuringPointRead;
-  onChanged: () => void;
-}) {
+function PhysicalMetersCard({ mp, onChanged }: { mp: MeasuringPointRead; onChanged: () => void }) {
   const [replaceOpen, setReplaceOpen] = useState(false);
   const sortedMeters = useMemo(() => {
     return [...mp.physical_meters].sort((a, b) => {
@@ -670,8 +676,7 @@ function PhysicalMeterRow({
         <div className="num mt-0.5 text-caption text-tertiary">
           {meter.installed_at} – {meter.removed_at ?? 'aktiv'}
           <span className="ml-2 text-quaternary">
-            · {meter.registers.length}{' '}
-            {meter.registers.length === 1 ? 'Register' : 'Register'}
+            · {meter.registers.length} {meter.registers.length === 1 ? 'Register' : 'Register'}
           </span>
         </div>
       </div>
@@ -1151,7 +1156,9 @@ function RegisterTable({
                   </code>
                 </div>
                 <div className="min-w-0">
-                  <div className="truncate text-body font-semibold text-label">{register.label}</div>
+                  <div className="truncate text-body font-semibold text-label">
+                    {register.label}
+                  </div>
                   <div className="num truncate text-caption text-tertiary">
                     SN {meterSerial}
                     {meterRemovedAt ? ` · entfernt ${meterRemovedAt}` : ''}

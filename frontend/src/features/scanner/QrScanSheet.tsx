@@ -144,7 +144,6 @@ export function QrScanSheet({ open, onClose }: QrScanSheetProps) {
     };
     // navigate und onClose absichtlich NICHT in den Deps — wir lesen sie
     // über die Refs und vermeiden dadurch unnötige Stream-Neustarts.
-     
   }, [open, teardown]);
 
   // Body-Scroll-Lock + ESC analog zur Sheet-Komponente. Der Scanner braucht

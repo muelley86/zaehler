@@ -185,7 +185,7 @@ function MPCard({ mp, onChanged }: { mp: MeasuringPointRead; onChanged: () => vo
     <Card padded={false}>
       <Link
         to={`/admin/messstellen/${mp.id}`}
-        className="flex items-center gap-2 px-5 py-4 transition-colors hover:bg-fill/40"
+        className="hover:bg-fill/40 flex items-center gap-2 px-5 py-4 transition-colors"
         aria-label={`Messstelle ${mp.name} öffnen`}
       >
         <TypeBadge type={mp.type} size="sm" />

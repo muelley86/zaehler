@@ -112,17 +112,13 @@ describe('formatDateDe', () => {
 describe('formatDateTimeDe', () => {
   it('liefert DD.MM.YYYY, HH:MM mit 4-stelligem Jahr', () => {
     // ISO mit lokaler Zeit (kein Z), damit das Ergebnis Zeitzonen-frei stabil ist.
-    expect(formatDateTimeDe('2026-05-06T14:30:00')).toMatch(
-      /^06\.05\.2026,? 14:30$/,
-    );
+    expect(formatDateTimeDe('2026-05-06T14:30:00')).toMatch(/^06\.05\.2026,? 14:30$/);
   });
 });
 
 describe('formatDateTimeSecDe', () => {
   it('inkludiert Sekunden für CSV-Exports', () => {
-    expect(formatDateTimeSecDe('2026-05-06T14:30:45')).toMatch(
-      /^06\.05\.2026,? 14:30:45$/,
-    );
+    expect(formatDateTimeSecDe('2026-05-06T14:30:45')).toMatch(/^06\.05\.2026,? 14:30:45$/);
   });
 });
 

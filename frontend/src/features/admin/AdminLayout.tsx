@@ -28,9 +28,7 @@ const subNavLink = ({ isActive }: { isActive: boolean }) =>
 const chipLink = ({ isActive }: { isActive: boolean }) =>
   cx(
     'shrink-0 rounded-pill px-3 py-1.5 text-caption font-semibold tracking-tight transition-colors',
-    isActive
-      ? 'bg-surface-solid text-label shadow-glass'
-      : 'text-tertiary hover:text-secondary',
+    isActive ? 'bg-surface-solid text-label shadow-glass' : 'text-tertiary hover:text-secondary',
   );
 
 export function AdminLayout() {
@@ -61,7 +59,7 @@ export function AdminLayout() {
         {/* Mobile/schmal: horizontaler Tab-Strip oben (sticky, scrollbar) */}
         <div
           data-testid="admin-tab-strip"
-          className="sticky top-0 z-10 mb-1 overflow-x-auto border-b-hairline border-border bg-surface/80 backdrop-blur md:hidden"
+          className="bg-surface/80 sticky top-0 z-10 mb-1 overflow-x-auto border-b-hairline border-border backdrop-blur md:hidden"
         >
           <nav className="flex gap-1 px-4 py-2">
             <NavLink to="/admin" end className={chipLink}>

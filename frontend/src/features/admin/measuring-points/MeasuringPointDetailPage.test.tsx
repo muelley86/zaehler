@@ -67,12 +67,11 @@ vi.mock('./MpAccessCard', () => ({
 }));
 
 if (!('ResizeObserver' in globalThis)) {
-  (globalThis as unknown as { ResizeObserver: unknown }).ResizeObserver =
-    class ResizeObserverStub {
-      observe(): void {}
-      unobserve(): void {}
-      disconnect(): void {}
-    };
+  (globalThis as unknown as { ResizeObserver: unknown }).ResizeObserver = class ResizeObserverStub {
+    observe(): void {}
+    unobserve(): void {}
+    disconnect(): void {}
+  };
 }
 
 import { MeasuringPointDetailPage } from './MeasuringPointDetailPage';
@@ -113,9 +112,7 @@ const _strom: MeasuringPointRead = {
       serial_number: 'SN-1',
       installed_at: '2025-01-15',
       removed_at: null,
-      registers: [
-        { id: 100, obis_code: '1.8.0', label: 'Bezug', unit: 'kWh', ..._baseRegister },
-      ],
+      registers: [{ id: 100, obis_code: '1.8.0', label: 'Bezug', unit: 'kWh', ..._baseRegister }],
     },
   ],
 };
@@ -199,9 +196,7 @@ describe('MeasuringPointDetailPage Physische Zähler', () => {
     renderWithRouter(<MeasuringPointDetailPage />, {
       initialEntries: ['/admin/messstellen/1'],
     });
-    expect(
-      await screen.findByRole('button', { name: /Zähler tauschen/i }),
-    ).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: /Zähler tauschen/i })).toBeInTheDocument();
   });
 
   it('öffnet das Tausch-Sheet bei Klick auf "Zähler tauschen"', async () => {
@@ -210,9 +205,7 @@ describe('MeasuringPointDetailPage Physische Zähler', () => {
       initialEntries: ['/admin/messstellen/1'],
     });
     fireEvent.click(await screen.findByRole('button', { name: /Zähler tauschen/i }));
-    expect(
-      await screen.findByRole('button', { name: /Tausch durchführen/i }),
-    ).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: /Tausch durchführen/i })).toBeInTheDocument();
     expect(screen.getByLabelText(/Neue Seriennummer/i)).toBeInTheDocument();
   });
 });

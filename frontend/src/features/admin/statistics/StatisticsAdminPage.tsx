@@ -14,10 +14,7 @@ import { BackendPlaceholder } from '../_placeholders';
 export function StatisticsAdminPage() {
   return (
     <>
-      <LargeTitle
-        title="Statistiken"
-        subtitle="Erfassungs-Aktivität und Datenstand"
-      />
+      <LargeTitle title="Statistiken" subtitle="Erfassungs-Aktivität und Datenstand" />
 
       <Section header="Erfassung">
         <Card padded={false}>

@@ -408,8 +408,16 @@ function PrintParamsPanel({
   const fields: { key: keyof LayoutOverride; label: string; hint: string }[] = [
     { key: 'marginTopMm', label: 'Rand oben (mm)', hint: 'Blattkante → erstes Etikett' },
     { key: 'marginLeftMm', label: 'Rand links (mm)', hint: 'Blattkante → erstes Etikett' },
-    { key: 'hPitchMm', label: 'Spalten-Pitch (mm)', hint: `Etikett-Breite ${layout.labelWidthMm} mm + Lücke` },
-    { key: 'vPitchMm', label: 'Zeilen-Pitch (mm)', hint: `Etikett-Höhe ${layout.labelHeightMm} mm + Lücke` },
+    {
+      key: 'hPitchMm',
+      label: 'Spalten-Pitch (mm)',
+      hint: `Etikett-Breite ${layout.labelWidthMm} mm + Lücke`,
+    },
+    {
+      key: 'vPitchMm',
+      label: 'Zeilen-Pitch (mm)',
+      hint: `Etikett-Höhe ${layout.labelHeightMm} mm + Lücke`,
+    },
   ];
 
   function valueFor(key: keyof LayoutOverride): number {
@@ -432,7 +440,7 @@ function PrintParamsPanel({
   }
 
   return (
-    <div className="border-hairline rounded-card border-border bg-fill/40 p-4">
+    <div className="bg-fill/40 rounded-card border-hairline border-border p-4">
       <div className="mb-3 flex items-center justify-between">
         <span className="text-caption-bold uppercase text-tertiary">
           Druckparameter — {layout.name}
@@ -513,10 +521,7 @@ function TokenRow({
   }
 
   function printSingle() {
-    const w = window.open(
-      `/api/v1/qr-tokens/${token.token}/qr?format=svg&size=large`,
-      '_blank',
-    );
+    const w = window.open(`/api/v1/qr-tokens/${token.token}/qr?format=svg&size=large`, '_blank');
     if (w) {
       // Browser zeigt das SVG — User druckt mit Strg/Cmd-P selbst.
       w.focus();
@@ -533,7 +538,12 @@ function TokenRow({
         aria-label={`Token ${token.token} zur Auswahl hinzufügen`}
       />
       <div className="rounded-card border-hairline border-border bg-white p-1.5 shadow-glass">
-        <img src={previewUrl} alt={`QR ${token.token}`} className="block h-12 w-12" loading="lazy" />
+        <img
+          src={previewUrl}
+          alt={`QR ${token.token}`}
+          className="block h-12 w-12"
+          loading="lazy"
+        />
       </div>
       <div className="min-w-0 flex-1">
         <div className="num text-body font-semibold text-label">{token.token}</div>
