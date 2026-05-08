@@ -22,7 +22,6 @@ import {
   TextField,
   TypeBadge,
 } from '@/components/ui';
-import { PageGlows } from '@/components/PageGlows';
 import { LocationMapSheet } from '@/components/LocationMapSheet';
 import { useAuth } from '@/features/auth/auth-context';
 import { ApiError, api } from '@/lib/api';
@@ -56,7 +55,7 @@ export function MeasuringPointDetailPage() {
 
   useEffect(() => {
     if (!Number.isFinite(mpId)) {
-      navigate('/messstellen', { replace: true });
+      navigate('/admin/messstellen', { replace: true });
       return;
     }
     // Drei Endpoints parallel — keine Cascade. Location wird in einem
@@ -99,27 +98,27 @@ export function MeasuringPointDetailPage() {
 
   if (error) {
     return (
-      <PageContainer>
+      <>
         <BackLink />
         <div className="border-danger/40 bg-danger/10 rounded-card border-hairline p-3 text-danger">
           {error}
         </div>
-      </PageContainer>
+      </>
     );
   }
   if (!mp) {
     return (
-      <PageContainer>
+      <>
         <BackLink />
         <div className="text-tertiary">Lade…</div>
-      </PageContainer>
+      </>
     );
   }
 
   const activeMeter = mp.physical_meters.find((m) => m.removed_at === null);
 
   return (
-    <PageContainer>
+    <>
       <BackLink />
       <MeasuringPointTitle mp={mp} onRenamed={(updated) => setMp(updated)} />
 
@@ -143,7 +142,7 @@ export function MeasuringPointDetailPage() {
                     </button>
                   ) : (
                     <Link
-                      to="/standorte"
+                      to="/admin/standorte"
                       className="font-semibold text-primary-deep underline-offset-2 hover:underline"
                     >
                       {mp.location_name}
@@ -227,7 +226,7 @@ export function MeasuringPointDetailPage() {
           name={location.name}
         />
       ) : null}
-    </PageContainer>
+    </>
   );
 }
 
@@ -323,19 +322,10 @@ function MeasuringPointTitle({
   );
 }
 
-function PageContainer({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="relative min-h-full overflow-hidden bg-bg">
-      <PageGlows accent="electricity" />
-      <div className="relative z-10 space-y-5 p-4 pb-12 md:p-7">{children}</div>
-    </div>
-  );
-}
-
 function BackLink() {
   return (
     <Link
-      to="/messstellen"
+      to="/admin/messstellen"
       className="inline-flex items-center gap-1 text-caption font-semibold text-primary-deep transition-colors hover:text-primary"
     >
       <ArrowLeft size={14} />

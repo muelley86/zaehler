@@ -6,7 +6,7 @@
  * Tokens, die dieser MP zugeordnet sind, mit Vorschau und Lösen-Button.
  *
  * Wenn noch kein Token zugeordnet ist, leitet ein Hinweis-CTA in die
- * /qr-codes-Verwaltung. Dort werden Tokens auf Vorrat angelegt und
+ * /admin/qr-codes-Verwaltung. Dort werden Tokens auf Vorrat angelegt und
  * gedruckt; die Zuordnung passiert dann beim Scan vor Ort.
  */
 
@@ -67,7 +67,7 @@ export function QrCodeCard({ mp }: QrCodeCardProps) {
       <div className="flex items-center justify-between">
         <div className="text-caption-bold uppercase text-tertiary">QR-Codes</div>
         <Link
-          to="/qr-codes"
+          to="/admin/qr-codes"
           className="inline-flex items-center gap-1 text-caption font-semibold text-primary-deep hover:underline"
         >
           Verwaltung
@@ -91,7 +91,7 @@ export function QrCodeCard({ mp }: QrCodeCardProps) {
             zugeordnet — oder direkt dort über „Drucken“ ausgedruckt und verklebt.
           </div>
           <Link
-            to="/qr-codes"
+            to="/admin/qr-codes"
             className="inline-flex h-8 items-center gap-2 rounded-pill bg-gradient-primary px-3 text-caption font-semibold text-white shadow-glow-primary transition-[filter] hover:brightness-105"
           >
             <QrCode size={14} />

@@ -14,7 +14,6 @@ import {
   TextField,
   TypeBadge,
 } from '@/components/ui';
-import { PageGlows } from '@/components/PageGlows';
 import { DeliveriesSheet } from './DeliveriesSheet';
 import { ApiError, api } from '@/lib/api';
 import { parseDe } from '@/lib/format';
@@ -124,7 +123,7 @@ export function MeasuringPointsAdminPage() {
   const refresh = () => setTick((t) => t + 1);
 
   return (
-    <PageContainer>
+    <>
       <LargeTitle title="Messstellen" />
       {error ? (
         <div className="border-danger/40 bg-danger/10 rounded-card border-hairline p-3 text-danger">
@@ -139,16 +138,7 @@ export function MeasuringPointsAdminPage() {
           <MPCard key={mp.id} mp={mp} locations={locations} onChanged={refresh} />
         ))}
       </div>
-    </PageContainer>
-  );
-}
-
-function PageContainer({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="relative min-h-full overflow-hidden bg-bg">
-      <PageGlows accent="electricity" />
-      <div className="relative z-10 space-y-5 p-4 pb-12 md:p-7">{children}</div>
-    </div>
+    </>
   );
 }
 
@@ -206,7 +196,7 @@ function MPCard({
           )}
         </button>
         <Link
-          to={`/messstellen/${mp.id}`}
+          to={`/admin/messstellen/${mp.id}`}
           className="rounded-pill border-hairline border-border bg-fill p-2 text-tertiary transition-colors hover:bg-fill-strong hover:text-label"
           aria-label="Detail-Ansicht öffnen"
           title="Detail-Ansicht"

@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 
 import { EmptyState, LargeTitle, Section } from '@/components/ui';
-import { PageGlows } from '@/components/PageGlows';
 import { ApiError, api } from '@/lib/api';
 import { formatDateDe } from '@/lib/format';
 import type { AuditLogRead } from '@/lib/types';
@@ -70,25 +69,25 @@ export function AuditLogPage() {
 
   if (error) {
     return (
-      <PageContainer>
+      <>
         <LargeTitle title="Audit-Log" />
         <div className="border-danger/40 bg-danger/10 rounded-card border-hairline p-3 text-danger">
           {error}
         </div>
-      </PageContainer>
+      </>
     );
   }
   if (!rows) {
     return (
-      <PageContainer>
+      <>
         <LargeTitle title="Audit-Log" />
         <div className="text-tertiary">Lade…</div>
-      </PageContainer>
+      </>
     );
   }
 
   return (
-    <PageContainer>
+    <>
       <LargeTitle title="Audit-Log" subtitle={`${rows.length} Einträge gesamt`} />
       {rows.length === 0 ? (
         <EmptyState title="Keine Einträge" />
@@ -133,15 +132,7 @@ export function AuditLogPage() {
           ))}
         </div>
       )}
-    </PageContainer>
+    </>
   );
 }
 
-function PageContainer({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="relative min-h-full overflow-hidden bg-bg">
-      <PageGlows accent="electricity" />
-      <div className="relative z-10 space-y-5 p-4 pb-12 md:p-7">{children}</div>
-    </div>
-  );
-}

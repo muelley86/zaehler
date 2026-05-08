@@ -270,7 +270,7 @@ export function DashboardPage() {
           title="Noch keine Messstellen"
           description="Lege deine erste Strom-, Gas- oder Wasser-Messstelle an."
           action={
-            <Link to="/messstellen">
+            <Link to="/admin/messstellen">
               <Button variant="filled" leftIcon={<Plus size={16} />}>
                 Messstelle anlegen
               </Button>

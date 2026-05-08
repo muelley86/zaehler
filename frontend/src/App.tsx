@@ -20,6 +20,7 @@ import { AppShell } from '@/components/AppShell';
 import { useAuth } from '@/features/auth/auth-context';
 import { ChangePasswordPage } from '@/features/auth/ChangePasswordPage';
 import { LoginPage } from '@/features/auth/LoginPage';
+import { AdminLayout } from '@/features/admin/AdminLayout';
 
 const DashboardPage = lazy(() =>
   import('@/features/dashboard/DashboardPage').then((m) => ({ default: m.DashboardPage })),
@@ -83,6 +84,15 @@ function QrShortRedirect(): JSX.Element {
   return <Navigate to={`/erfassen?token=${token.toUpperCase()}`} replace />;
 }
 
+/**
+ * Legacy-Redirect für die alte ``/messstellen/:id``-Detail-URL. Erhält
+ * den ``id``-Parameter und schickt auf ``/admin/messstellen/:id``.
+ */
+function LegacyMpDetailRedirect(): JSX.Element {
+  const { id } = useParams<{ id: string }>();
+  return <Navigate to={`/admin/messstellen/${id ?? ''}`} replace />;
+}
+
 export function App() {
   const { me, loading } = useAuth();
   const location = useLocation();
@@ -122,54 +132,36 @@ export function App() {
           <Route path="/erfassungen" element={<ReadingsListPage />} />
           <Route path="/mehr" element={<MorePage />} />
           <Route path="/passwort-aendern" element={<ChangePasswordPage />} />
+
+          {/* Admin-Bereich. Sub-Pages rendern unter dem AdminLayout-Outlet. */}
           <Route
-            path="/messstellen"
+            path="/admin"
             element={
               <AdminOnly>
-                <MeasuringPointsAdminPage />
+                <AdminLayout />
               </AdminOnly>
             }
-          />
-          <Route
-            path="/messstellen/:id"
-            element={
-              <AdminOnly>
-                <MeasuringPointDetailPage />
-              </AdminOnly>
-            }
-          />
-          <Route
-            path="/standorte"
-            element={
-              <AdminOnly>
-                <LocationsAdminPage />
-              </AdminOnly>
-            }
-          />
-          <Route
-            path="/benutzer"
-            element={
-              <AdminOnly>
-                <UsersAdminPage />
-              </AdminOnly>
-            }
-          />
-          <Route
-            path="/audit"
-            element={
-              <AdminOnly>
-                <AuditLogPage />
-              </AdminOnly>
-            }
-          />
-          <Route
-            path="/qr-codes"
-            element={
-              <AdminOnly>
-                <QrCodesAdminPage />
-              </AdminOnly>
-            }
-          />
+          >
+            {/* Bis PR 3 die AdminHubPage liefert: leitet die Index-Route auf
+                eine sinnvolle Default-Sektion um. */}
+            <Route index element={<Navigate to="/admin/messstellen" replace />} />
+            <Route path="messstellen" element={<MeasuringPointsAdminPage />} />
+            <Route path="messstellen/:id" element={<MeasuringPointDetailPage />} />
+            <Route path="standorte" element={<LocationsAdminPage />} />
+            <Route path="benutzer" element={<UsersAdminPage />} />
+            <Route path="qr-codes" element={<QrCodesAdminPage />} />
+            <Route path="audit" element={<AuditLogPage />} />
+          </Route>
+
+          {/* Legacy-Redirects: alte Top-Level-Admin-URLs leben als
+              clientseitige 301-Hops weiter. */}
+          <Route path="/messstellen" element={<Navigate to="/admin/messstellen" replace />} />
+          <Route path="/messstellen/:id" element={<LegacyMpDetailRedirect />} />
+          <Route path="/standorte" element={<Navigate to="/admin/standorte" replace />} />
+          <Route path="/benutzer" element={<Navigate to="/admin/benutzer" replace />} />
+          <Route path="/qr-codes" element={<Navigate to="/admin/qr-codes" replace />} />
+          <Route path="/audit" element={<Navigate to="/admin/audit" replace />} />
+
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Suspense>

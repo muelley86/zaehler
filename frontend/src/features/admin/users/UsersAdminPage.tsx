@@ -13,7 +13,6 @@ import {
   Switch,
   TextField,
 } from '@/components/ui';
-import { PageGlows } from '@/components/PageGlows';
 import { ApiError, api } from '@/lib/api';
 import { formatDateTimeDe } from '@/lib/format';
 import type { UserRead, UserRole } from '@/lib/types';
@@ -61,7 +60,7 @@ export function UsersAdminPage() {
   }, [users, filter]);
 
   return (
-    <PageContainer>
+    <>
       <LargeTitle title="Benutzer" />
       {error ? (
         <div className="border-danger/40 bg-danger/10 rounded-card border-hairline p-3 text-danger">
@@ -116,16 +115,7 @@ export function UsersAdminPage() {
           </ul>
         </Card>
       )}
-    </PageContainer>
-  );
-}
-
-function PageContainer({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="relative min-h-full overflow-hidden bg-bg">
-      <PageGlows accent="electricity" />
-      <div className="relative z-10 space-y-5 p-4 pb-12 md:p-7">{children}</div>
-    </div>
+    </>
   );
 }
 
