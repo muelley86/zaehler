@@ -47,7 +47,7 @@ export function AdminHubPage() {
 
   useEffect(() => {
     let cancelled = false;
-    Promise.allSettled([
+    void Promise.allSettled([
       api.get<UserRead[]>('/users'),
       api.get<MeasuringPointRead[]>('/measuring-points'),
       api.get<LocationRead[]>('/locations'),
