@@ -31,26 +31,30 @@ const ReadingsListPage = lazy(() =>
   import('@/features/readings/ReadingsListPage').then((m) => ({ default: m.ReadingsListPage })),
 );
 const MeasuringPointsAdminPage = lazy(() =>
-  import('@/features/measuring-points/MeasuringPointsAdminPage').then((m) => ({
+  import('@/features/admin/measuring-points/MeasuringPointsAdminPage').then((m) => ({
     default: m.MeasuringPointsAdminPage,
   })),
 );
 const MeasuringPointDetailPage = lazy(() =>
-  import('@/features/measuring-points/MeasuringPointDetailPage').then((m) => ({
+  import('@/features/admin/measuring-points/MeasuringPointDetailPage').then((m) => ({
     default: m.MeasuringPointDetailPage,
   })),
 );
 const UsersAdminPage = lazy(() =>
-  import('@/features/admin/UsersAdminPage').then((m) => ({ default: m.UsersAdminPage })),
+  import('@/features/admin/users/UsersAdminPage').then((m) => ({ default: m.UsersAdminPage })),
 );
 const LocationsAdminPage = lazy(() =>
-  import('@/features/admin/LocationsAdminPage').then((m) => ({ default: m.LocationsAdminPage })),
+  import('@/features/admin/locations/LocationsAdminPage').then((m) => ({
+    default: m.LocationsAdminPage,
+  })),
 );
 const AuditLogPage = lazy(() =>
-  import('@/features/admin/AuditLogPage').then((m) => ({ default: m.AuditLogPage })),
+  import('@/features/admin/audit/AuditLogPage').then((m) => ({ default: m.AuditLogPage })),
 );
 const QrCodesAdminPage = lazy(() =>
-  import('@/features/admin/QrCodesAdminPage').then((m) => ({ default: m.QrCodesAdminPage })),
+  import('@/features/admin/qr-codes/QrCodesAdminPage').then((m) => ({
+    default: m.QrCodesAdminPage,
+  })),
 );
 const MorePage = lazy(() =>
   import('@/features/more/MorePage').then((m) => ({ default: m.MorePage })),
