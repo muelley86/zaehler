@@ -57,6 +57,9 @@ const QrCodesAdminPage = lazy(() =>
     default: m.QrCodesAdminPage,
   })),
 );
+const AdminHubPage = lazy(() =>
+  import('@/features/admin/AdminHubPage').then((m) => ({ default: m.AdminHubPage })),
+);
 const MorePage = lazy(() =>
   import('@/features/more/MorePage').then((m) => ({ default: m.MorePage })),
 );
@@ -142,9 +145,7 @@ export function App() {
               </AdminOnly>
             }
           >
-            {/* Bis PR 3 die AdminHubPage liefert: leitet die Index-Route auf
-                eine sinnvolle Default-Sektion um. */}
-            <Route index element={<Navigate to="/admin/messstellen" replace />} />
+            <Route index element={<AdminHubPage />} />
             <Route path="messstellen" element={<MeasuringPointsAdminPage />} />
             <Route path="messstellen/:id" element={<MeasuringPointDetailPage />} />
             <Route path="standorte" element={<LocationsAdminPage />} />
