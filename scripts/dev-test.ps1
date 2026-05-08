@@ -226,10 +226,10 @@ Write-Step 7 'Backend starten (Port 8000) - eigenes Fenster'
 $backendCmd = @"
 Set-Location '$BackendDir'
 Write-Host '== Zaehler Backend (Strg+C zum Beenden) ==' -ForegroundColor Cyan
-try { uv run uvicorn meters.main:app --reload } catch { Write-Host \$_.Exception.Message -ForegroundColor Red }
+try { uv run uvicorn meters.main:app --reload } catch { Write-Host `$_.Exception.Message -ForegroundColor Red }
 Write-Host ''
 Write-Host 'Backend-Prozess beendet. Druecke Enter um dieses Fenster zu schliessen.' -ForegroundColor Yellow
-[void][Console]::ReadKey(\$true)
+[void][Console]::ReadKey(`$true)
 "@
 $backendProc = Start-Process powershell -ArgumentList '-NoExit', '-NoProfile', '-Command', $backendCmd -PassThru
 Write-Ok "Backend-Fenster gestartet (PID $($backendProc.Id))"
@@ -261,10 +261,10 @@ Write-Step 9 'Frontend-Dev starten (Port 5173) - eigenes Fenster'
 $frontendCmd = @"
 Set-Location '$FrontendDir'
 Write-Host '== Zaehler Frontend (Strg+C zum Beenden) ==' -ForegroundColor Cyan
-try { pnpm dev } catch { Write-Host \$_.Exception.Message -ForegroundColor Red }
+try { pnpm dev } catch { Write-Host `$_.Exception.Message -ForegroundColor Red }
 Write-Host ''
 Write-Host 'Frontend-Prozess beendet. Druecke Enter um dieses Fenster zu schliessen.' -ForegroundColor Yellow
-[void][Console]::ReadKey(\$true)
+[void][Console]::ReadKey(`$true)
 "@
 $frontendProc = Start-Process powershell -ArgumentList '-NoExit', '-NoProfile', '-Command', $frontendCmd -PassThru
 Write-Ok "Frontend-Fenster gestartet (PID $($frontendProc.Id))"
