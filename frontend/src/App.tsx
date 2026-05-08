@@ -60,6 +60,21 @@ const QrCodesAdminPage = lazy(() =>
 const AdminHubPage = lazy(() =>
   import('@/features/admin/AdminHubPage').then((m) => ({ default: m.AdminHubPage })),
 );
+const SystemAdminPage = lazy(() =>
+  import('@/features/admin/system/SystemAdminPage').then((m) => ({
+    default: m.SystemAdminPage,
+  })),
+);
+const StatisticsAdminPage = lazy(() =>
+  import('@/features/admin/statistics/StatisticsAdminPage').then((m) => ({
+    default: m.StatisticsAdminPage,
+  })),
+);
+const SessionsAdminPage = lazy(() =>
+  import('@/features/admin/sessions/SessionsAdminPage').then((m) => ({
+    default: m.SessionsAdminPage,
+  })),
+);
 const MorePage = lazy(() =>
   import('@/features/more/MorePage').then((m) => ({ default: m.MorePage })),
 );
@@ -152,6 +167,9 @@ export function App() {
             <Route path="benutzer" element={<UsersAdminPage />} />
             <Route path="qr-codes" element={<QrCodesAdminPage />} />
             <Route path="audit" element={<AuditLogPage />} />
+            <Route path="system" element={<SystemAdminPage />} />
+            <Route path="statistiken" element={<StatisticsAdminPage />} />
+            <Route path="sessions" element={<SessionsAdminPage />} />
           </Route>
 
           {/* Legacy-Redirects: alte Top-Level-Admin-URLs leben als
