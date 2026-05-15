@@ -65,6 +65,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await api.post('/auth/logout');
     } finally {
       setMe(null);
+      // SW-Cache leeren — sonst serviert der NetworkFirst-Cache
+      // beim nächsten Login auf demselben Gerät noch alte API-Antworten
+      // des vorherigen Users (Same-Origin, gleiches Cookie-Bucket).
+      if (typeof caches !== 'undefined') {
+        try {
+          await caches.delete('api-get');
+        } catch {
+          /* Cache-API fehlt (Test/SSR/HTTP) — egal. */
+        }
+      }
     }
   }, []);
 
