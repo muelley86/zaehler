@@ -1,3 +1,7 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
 # Zählerstand-App
 
 ## Zweck
@@ -15,6 +19,31 @@ auf eigener Hardware. Keine Cloud, keine externen Abhängigkeiten zur Laufzeit.
 - Linting/Format: ruff, mypy --strict, eslint, prettier
 - Package-Manager: uv (Python), pnpm (JS)
 
+## Entwicklungs-Befehle
+
+Repo-Root hat ein Makefile, das Backend- und Frontend-Checks bündelt:
+
+- `make lint` — ruff + mypy + eslint + prettier + tsc
+- `make test` — pytest + vitest
+- `make format` — Auto-Fix Backend + Frontend
+- Granular: `make {lint,test,format}-{backend,frontend}`
+
+Backend (in `backend/`, via `uv`):
+
+- Erststart:   `uv sync && uv run alembic upgrade head`
+- Admin anlegen: `uv run python -m meters.cli create-admin --username admin --password '...'`
+- Server (dev): `uv run uvicorn meters.main:app --reload`
+- Einzelner Test: `uv run pytest tests/integration/test_readings.py::test_create_reading -x`
+- Neue Migration: `uv run alembic revision --autogenerate -m "<beschreibung>"`
+
+Frontend (in `frontend/`, via `pnpm`):
+
+- Dev-Server:    `pnpm dev` (Port 5173, proxyt `/api/*` → `http://localhost:8000`)
+- Einzelner Test: `pnpm exec vitest run src/features/readings/ReadingsList.test.tsx`
+- Build:         `pnpm build` (schreibt nach `backend/src/meters/static/`)
+
+Windows-One-Shot-Setup: `scripts/dev-test.ps1` (idempotent, startet beide Server in eigenen Fenstern).
+
 ## Architektur
 - Monorepo: /backend, /frontend, /docs, /deploy
 - Frontend wird gebaut und vom FastAPI als Static Files ausgeliefert
@@ -23,6 +52,29 @@ auf eigener Hardware. Keine Cloud, keine externen Abhängigkeiten zur Laufzeit.
 - Multi-User mit gemeinsamem Datenbestand (alle Nutzer sehen dieselben Zähler)
 - Rollen: admin und recorder (siehe Sektion Auth & Benutzer)
 - PWA-fähig (Manifest + Service Worker, offline-tauglich für Erfassung)
+
+## Code-Layout
+
+Backend (`backend/src/meters/`):
+- `main.py` — FastAPI-App-Factory, Static-Mount, SPA-Fallback (`/api/*` → 404, alles andere → `index.html`)
+- `api/v1/` — Router pro Ressource (auth, readings, measuring_points, qr_tokens, …); `api/deps.py` hält die Auth-/Session-Dependencies
+- `models/` — SQLAlchemy-2.x-Modelle (eine Datei pro Entität)
+- `schemas/` — Pydantic-v2-DTOs (Request/Response)
+- `services/` — Business-Logik (consumption, meter_replacement, access, audit, qr_token, totp, rate_limit)
+- `core/` — Config (`pydantic-settings`, Präfix `METERS_`), Logging, Middleware (Security-Header + Origin-Check), RFC-7807-Problem-Handler, OBIS-Konstanten, bcrypt-Helper
+- `db/` — Engine, `SessionLocal`, Type-Helper (Decimal-as-String etc.)
+- `cli.py` — `python -m meters.cli` für Admin-Anlage / Passwort-Reset
+- `static/` — kompiliertes Frontend (von `pnpm build` befüllt, nicht im Repo)
+
+Frontend (`frontend/src/`):
+- `App.tsx` + `main.tsx` — Router-Wiring, Layout-Shells (Bottom-Tab mobile / Sidebar desktop)
+- `features/{auth,dashboard,readings,scanner,admin,export,more}` — vertikale Slices, jeweils Routes + Components + Tests beieinander
+- `components/` — geteilte UI-Bausteine
+- `lib/` — API-Client, Hooks, Utilities
+- `styles/` — Tailwind-Layer + OKLCH-Tokens (Light/Dark)
+- `tests/setup.ts` — Vitest-Setup (jsdom, MSW)
+
+Tests (`backend/tests/`): `unit/` (reine Service-Logik) vs. `integration/` (FastAPI-TestClient + echte SQLite-DB pro Test).
 
 ## Datenmodell
 
@@ -236,6 +288,12 @@ Atomar in einer Transaktion:
   - Permissions-Policy: `camera=(self)` für Same-Origin-Kamera-Zugriff.
   - Der frühere Endpoint `GET /api/v1/measuring-points/{id}/qr` ist
     entfernt (Direkt-URL-Druck wird nicht mehr unterstützt).
+
+## Weitere Features (über die Spec hinaus implementiert)
+
+- **Heizöl-Tank** (`models/delivery.py`, `api/v1/deliveries.py`): MeasuringPoint-Type `oil` mit Tankstand + Betriebsstunden + Lieferungen, eigene Bestandskorrektur. Berechtigungs-Filter wie für andere MPs.
+- **2FA / TOTP** (`services/totp.py`, `models/backup_code.py`): pro User aktivierbar, 10 Single-Use-Backup-Codes, AuditLog-Events.
+- **Locations** (`models/location.py`, `api/v1/locations.py`): zentral verwaltet, MeasuringPoint hat optionale `location_id` (ersetzt das frühere freie `location`-String-Feld der Spec).
 
 ## Konventionen
 - Python: ruff (lint+format), mypy strict, type hints überall

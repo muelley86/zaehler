@@ -27,9 +27,19 @@ def _utcnow() -> datetime:
     return datetime.now(UTC)
 
 
+# Pre-computed bcrypt-Hash für nicht existierende User — verhindert
+# Username-Enumeration via Timing-Differenz (User-existiert vs. nicht).
+# Hash eines unwahrscheinlichen Wertes; der bcrypt-Vergleich schlägt
+# garantiert fehl, frisst aber dieselben ~100ms wie ein echter Vergleich.
+_DUMMY_PASSWORD_HASH = "$2b$12$CpzXrqkqXsoG2hIYM0jQu.vL5yu8Md.bN6S5JqIaA4zDqZBL3v9P."
+
+
 def authenticate(db: DbSession, *, username: str, password: str) -> User | None:
     user = db.scalar(select(User).where(User.username == username))
     if user is None or not user.is_active:
+        # Konstanter bcrypt-Vergleich, damit die Antwortzeit nicht verrät,
+        # ob der Username existiert. Ergebnis wird verworfen.
+        verify_password(password, _DUMMY_PASSWORD_HASH)
         return None
     if not verify_password(password, user.password_hash):
         return None

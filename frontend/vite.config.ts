@@ -66,8 +66,14 @@ export default defineConfig({
             },
           },
           {
+            // Auth-Endpoints (/api/v1/auth/...) explizit AUSSCHLIESSEN —
+            // sonst kann der SW nach Logout/Session-Wechsel veraltete
+            // /auth/me-Antworten aus dem Cache liefern und den User
+            // fälschlich als angemeldet ausgeben.
             urlPattern: ({ url, request }) =>
-              url.pathname.startsWith('/api/') && request.method === 'GET',
+              url.pathname.startsWith('/api/') &&
+              !url.pathname.startsWith('/api/v1/auth/') &&
+              request.method === 'GET',
             handler: 'NetworkFirst',
             options: {
               cacheName: 'api-get',
