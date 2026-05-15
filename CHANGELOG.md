@@ -10,6 +10,18 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.11.3](https://github.com/muelley86/zaehler/compare/v2.11.2...v2.11.3) (2026-05-15)
+
+
+### Fehlerbehebungen
+
+* **security:** Timing-Attack, Future-Date, SW-Cache fuer Auth ([#54](https://github.com/muelley86/zaehler/issues/54)) ([28b879b](https://github.com/muelley86/zaehler/commit/28b879b19866792bb87c01891c4bd6ce2a1b6bc8))
+
+
+### Refactoring
+
+* **frontend:** Zentrale Admin-Verwaltung unter /admin/* ([#50](https://github.com/muelley86/zaehler/issues/50)) ([ed962bd](https://github.com/muelley86/zaehler/commit/ed962bdefde01b07ca7005cde0645c238055bcec))
+
 ## [2.11.2](https://github.com/muelley86/zaehler/compare/v2.11.1...v2.11.2) (2026-05-07)
 
 
