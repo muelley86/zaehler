@@ -10,6 +10,13 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.14.1](https://github.com/muelley86/zaehler/compare/v2.14.0...v2.14.1) (2026-05-27)
+
+
+### Fehlerbehebungen
+
+* **readings:** GPS-Bar der Lightbox im mobilen Hochformat reparieren ([#67](https://github.com/muelley86/zaehler/issues/67)) ([20a079a](https://github.com/muelley86/zaehler/commit/20a079adf3fbecbd7453e4779fc789e5aa8fc509))
+
 ## [2.14.0](https://github.com/muelley86/zaehler/compare/v2.13.0...v2.14.0) (2026-05-27)
 
 
