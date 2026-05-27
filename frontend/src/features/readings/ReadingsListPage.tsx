@@ -21,6 +21,7 @@ import {
   formatDateTimeDe,
   formatDateTimeSecDe,
   formatDe,
+  localInputToIso,
   parseDe,
   toInputDateTime,
 } from '@/lib/format';
@@ -853,7 +854,7 @@ function EditForm({
 
   async function patchOnce(acknowledge: boolean) {
     const body: Record<string, unknown> = {
-      reading_at: readingAt,
+      reading_at: localInputToIso(readingAt),
       note: note || null,
       acknowledge_warnings: acknowledge,
     };
@@ -1133,7 +1134,7 @@ function DeliveryEditForm({
     setError(null);
     try {
       const body: Record<string, unknown> = {
-        delivery_at: deliveryAt,
+        delivery_at: localInputToIso(deliveryAt),
         note: note || null,
       };
       if (amount !== delivery.amount.replace('.', ',')) {

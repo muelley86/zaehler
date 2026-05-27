@@ -187,9 +187,12 @@ describe('RecordReadingPage', () => {
   it('haengt ein Foto an erfolgreiche Readings an und meldet Erfolg', async () => {
     _mockListEndpoints([_mp()]);
     const photoCalls: { url: string }[] = [];
+    const readingBodies: { reading_at: string }[] = [];
     server.use(
-      http.post('/api/v1/readings', () =>
-        HttpResponse.json(
+      http.post('/api/v1/readings', async ({ request }) => {
+        const body = (await request.json()) as { reading_at: string };
+        readingBodies.push(body);
+        return HttpResponse.json(
           {
             id: 555,
             register_id: 100,
@@ -202,8 +205,8 @@ describe('RecordReadingPage', () => {
             has_photo: false,
           },
           { status: 201 },
-        ),
-      ),
+        );
+      }),
       http.put('/api/v1/readings/:id/photo', ({ params }) => {
         // Body nicht lesen — request.arrayBuffer()/formData() ist mit
         // FormData in jsdom flaky (haengt CI gelegentlich). Es reicht
@@ -252,6 +255,11 @@ describe('RecordReadingPage', () => {
       { timeout: 5000 },
     );
     expect(photoCalls).toEqual([{ url: '555' }]);
+    // Regression: reading_at muss als aware ISO mit Z gesendet werden,
+    // sonst lehnt das Backend lokale Zeiten aus Zonen oestlich von UTC
+    // mit 422 ("reading_at darf nicht in der Zukunft liegen") ab.
+    expect(readingBodies).toHaveLength(1);
+    expect(readingBodies[0]?.reading_at).toMatch(/Z$/);
   });
 
   it('zeigt eine Warnung, wenn der Foto-Upload scheitert (Reading bleibt erhalten)', async () => {
