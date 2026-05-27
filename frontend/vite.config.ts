@@ -1,11 +1,31 @@
 import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
+import fs from 'node:fs';
 import path from 'node:path';
 
 const BACKEND = process.env.VITE_DEV_API ?? 'http://localhost:8000';
 
+// Kanonische Versions-Quelle ist ``.release-please-manifest.json`` im
+// Repo-Root (von release-please gepflegt). frontend/package.json wird
+// NICHT gebumpt und taugt deshalb nicht. Fallback auf "dev", falls die
+// Datei in einem ungewoehnlichen Setup fehlt — kein Build-Fail.
+function readAppVersion(): string {
+  try {
+    const manifest = JSON.parse(
+      fs.readFileSync(path.resolve(__dirname, '../.release-please-manifest.json'), 'utf-8'),
+    ) as Record<string, string>;
+    return manifest['.'] ?? 'dev';
+  } catch {
+    return 'dev';
+  }
+}
+const APP_VERSION = readAppVersion();
+
 export default defineConfig({
+  define: {
+    __APP_VERSION__: JSON.stringify(APP_VERSION),
+  },
   plugins: [
     {
       name: 'inject-font-preload',
