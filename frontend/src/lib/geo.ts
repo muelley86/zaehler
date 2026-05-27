@@ -17,7 +17,7 @@ export interface DeviceLocation {
   lon: number;
 }
 
-export async function tryGetDeviceLocation(timeoutMs = 5000): Promise<DeviceLocation | null> {
+export async function tryGetDeviceLocation(timeoutMs = 15_000): Promise<DeviceLocation | null> {
   if (typeof navigator === 'undefined' || !navigator.geolocation) {
     return null;
   }
@@ -25,7 +25,12 @@ export async function tryGetDeviceLocation(timeoutMs = 5000): Promise<DeviceLoca
     navigator.geolocation.getCurrentPosition(
       (pos) => resolve({ lat: pos.coords.latitude, lon: pos.coords.longitude }),
       () => resolve(null),
-      { timeout: timeoutMs, maximumAge: 60_000, enableHighAccuracy: false },
+      // 15 s Timeout — iOS-Standalone-PWAs zeigen den Permission-Prompt
+      // teils mit mehreren Sekunden Verzoegerung; bei 5 s griff der
+      // Timeout BEVOR der User antworten konnte, und wir bekamen ein
+      // stummes ``null``. maximumAge 5 min spart bei mehreren Uploads
+      // hintereinander den zweiten Roundtrip.
+      { timeout: timeoutMs, maximumAge: 5 * 60_000, enableHighAccuracy: false },
     );
   });
 }

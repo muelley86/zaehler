@@ -1008,7 +1008,11 @@ function PhotoEditField({
   onRemove: () => void;
   onUndo: () => void;
 }) {
-  const inputRef = useRef<HTMLInputElement>(null);
+  // Zwei separate Inputs: ``capture`` zwingt iOS in die Kamera, ohne
+  // ``capture`` greift der System-Picker — auf iOS-PWAs ist nur eine
+  // explizite Trennung verlaesslich.
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const galleryInputRef = useRef<HTMLInputElement>(null);
   const [pendingUrl, setPendingUrl] = useState<string | null>(null);
 
   useEffect(() => {
@@ -1024,16 +1028,21 @@ function PhotoEditField({
   function onFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (file) onPick(file);
-    // Reset des Inputs erfolgt erst kurz vor dem naechsten Click — wenn er
-    // direkt hier passiert, koppelt iOS Safari den Blob-Storage des frisch
-    // ausgewaehlten File-Objekts ab und der FormData-Upload sendet einen
-    // leeren Part (Backend antwortet 422).
+    // Reset des Inputs erfolgt erst beim naechsten Click — direkt nach
+    // onChange wuerde iOS Safari den Blob-Storage des frisch gewaehlten
+    // Files abkoppeln und der Upload waere leer (422).
   }
 
-  function pick() {
-    if (!inputRef.current) return;
-    inputRef.current.value = '';
-    inputRef.current.click();
+  function openCamera() {
+    if (!cameraInputRef.current) return;
+    cameraInputRef.current.value = '';
+    cameraInputRef.current.click();
+  }
+
+  function openGallery() {
+    if (!galleryInputRef.current) return;
+    galleryInputRef.current.value = '';
+    galleryInputRef.current.click();
   }
 
   const showPending = pending !== null;
@@ -1045,12 +1054,21 @@ function PhotoEditField({
     <div className="space-y-2">
       <div className="text-caption-bold uppercase text-tertiary">Foto</div>
       <input
-        ref={inputRef}
+        ref={cameraInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        onChange={onFileChange}
+        className="hidden"
+        data-testid="edit-photo-camera-input"
+      />
+      <input
+        ref={galleryInputRef}
         type="file"
         accept="image/*"
         onChange={onFileChange}
         className="hidden"
-        data-testid="edit-photo-input"
+        data-testid="edit-photo-gallery-input"
       />
       {showExisting ? (
         <div className="flex items-center gap-3">
@@ -1065,9 +1083,18 @@ function PhotoEditField({
               variant="bordered"
               size="sm"
               leftIcon={<Camera size={14} />}
-              onClick={pick}
+              onClick={openCamera}
             >
-              Ersetzen
+              Neu aufnehmen
+            </Button>
+            <Button
+              type="button"
+              variant="bordered"
+              size="sm"
+              leftIcon={<ImageIcon size={14} />}
+              onClick={openGallery}
+            >
+              Aus Galerie
             </Button>
             <Button
               type="button"
@@ -1095,9 +1122,18 @@ function PhotoEditField({
               variant="bordered"
               size="sm"
               leftIcon={<Camera size={14} />}
-              onClick={pick}
+              onClick={openCamera}
             >
-              Anderes Foto
+              Neu aufnehmen
+            </Button>
+            <Button
+              type="button"
+              variant="bordered"
+              size="sm"
+              leftIcon={<ImageIcon size={14} />}
+              onClick={openGallery}
+            >
+              Aus Galerie
             </Button>
             <Button
               type="button"
@@ -1120,15 +1156,26 @@ function PhotoEditField({
         </div>
       ) : null}
       {showAddCta ? (
-        <Button
-          type="button"
-          variant="bordered"
-          size="sm"
-          leftIcon={<Camera size={14} />}
-          onClick={pick}
-        >
-          Foto hinzufügen
-        </Button>
+        <div className="flex flex-wrap gap-1.5">
+          <Button
+            type="button"
+            variant="bordered"
+            size="sm"
+            leftIcon={<Camera size={14} />}
+            onClick={openCamera}
+          >
+            Foto aufnehmen
+          </Button>
+          <Button
+            type="button"
+            variant="bordered"
+            size="sm"
+            leftIcon={<ImageIcon size={14} />}
+            onClick={openGallery}
+          >
+            Aus Galerie
+          </Button>
+        </div>
       ) : null}
     </div>
   );

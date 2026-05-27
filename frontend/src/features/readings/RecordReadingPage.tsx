@@ -1,7 +1,7 @@
 import { lazy, memo, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Camera, Check, Gauge, QrCode, X } from 'lucide-react';
+import { Camera, Check, Gauge, ImageIcon, QrCode, X } from 'lucide-react';
 
 import {
   Button,
@@ -438,11 +438,13 @@ function ReadingsForm({
       // wenn das Foto scheitert, bleibt der Stand erhalten, der User
       // bekommt eine separate Warnung.
       let photoUploaded = 0;
+      let gpsWasMissing = false;
       if (photo && savedIds.length > 0) {
         // Browser-Position einmalig als Fallback holen — Backend
         // bevorzugt EXIF-GPS und nutzt diese Werte nur, wenn das Foto
         // keine GPS-Tags hat (typisch fuer iOS-capture-Aufnahmen).
         const fallbackGps = await tryGetDeviceLocation();
+        if (!fallbackGps) gpsWasMissing = true;
         for (const id of savedIds) {
           const fd = new FormData();
           fd.append('photo', photo);
@@ -469,6 +471,14 @@ function ReadingsForm({
             ? '1 Stand gespeichert.'
             : `${savedCount} Stände gespeichert (${formatDateTimeDe(readingAt)}).`;
         setSuccess(photoUploaded > 0 ? `${baseMsg} Foto angehängt.` : baseMsg);
+        // Hinweis, wenn der Standort weder per EXIF noch ueber das Geraet
+        // bestimmt werden konnte — z.B. weil der User Standort-Zugriff
+        // verweigert hat. Der Upload selbst war erfolgreich.
+        if (photoUploaded > 0 && gpsWasMissing) {
+          setPhotoWarning(
+            'Foto hochgeladen, aber kein Standort verfügbar (Browser-Standort verweigert oder kein GPS im Foto).',
+          );
+        }
         setValues({});
         setNote('');
         setPhoto(null);
@@ -566,7 +576,13 @@ function PhotoPicker({
   photo: File | null;
   onChange: (file: File | null) => void;
 }) {
-  const inputRef = useRef<HTMLInputElement>(null);
+  // Zwei separate Inputs: Kamera mit ``capture``, Galerie ohne. Auf
+  // iOS-Standalone-PWAs faellt der Picker ohne ``capture`` oft trotzdem
+  // direkt auf die Kamera zurueck, statt eine Galerie-Auswahl
+  // anzubieten. Mit zwei Inputs entscheidet der User schon per
+  // Button-Klick eindeutig.
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const galleryInputRef = useRef<HTMLInputElement>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
   useEffect(() => {
@@ -582,30 +598,41 @@ function PhotoPicker({
   function onFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0] ?? null;
     onChange(file);
-    // Kein "e.target.value = ''" direkt nach onChange — iOS Safari koppelt
-    // dabei den Blob-Storage des frisch ausgewaehlten File-Objekts ab, der
-    // anschliessende FormData-Upload sendet einen leeren Multipart-Part und
-    // das Backend antwortet mit 422 ("Field required"). Stattdessen wird
-    // der Input erst direkt vor dem naechsten Picker-Aufruf zurueckgesetzt
-    // (siehe ``pick`` unten) — damit kann der User auch dieselbe Datei
-    // erneut waehlen.
+    // Kein "e.target.value = ''" hier — iOS Safari koppelt dann den
+    // Blob-Storage des frisch gewaehlten Files ab. Reset erfolgt erst
+    // beim naechsten Picker-Aufruf (siehe ``openCamera``/``openGallery``).
   }
 
-  function pick() {
-    if (!inputRef.current) return;
-    inputRef.current.value = '';
-    inputRef.current.click();
+  function openCamera() {
+    if (!cameraInputRef.current) return;
+    cameraInputRef.current.value = '';
+    cameraInputRef.current.click();
+  }
+
+  function openGallery() {
+    if (!galleryInputRef.current) return;
+    galleryInputRef.current.value = '';
+    galleryInputRef.current.click();
   }
 
   return (
     <div className="space-y-3">
       <input
-        ref={inputRef}
+        ref={cameraInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        onChange={onFileChange}
+        className="hidden"
+        data-testid="record-photo-camera-input"
+      />
+      <input
+        ref={galleryInputRef}
         type="file"
         accept="image/*"
         onChange={onFileChange}
         className="hidden"
-        data-testid="record-photo-input"
+        data-testid="record-photo-gallery-input"
       />
       {previewUrl ? (
         <div className="flex items-center gap-3">
@@ -624,9 +651,18 @@ function PhotoPicker({
                 variant="bordered"
                 size="sm"
                 leftIcon={<Camera size={14} />}
-                onClick={pick}
+                onClick={openCamera}
               >
-                Anderes Foto
+                Neu aufnehmen
+              </Button>
+              <Button
+                type="button"
+                variant="bordered"
+                size="sm"
+                leftIcon={<ImageIcon size={14} />}
+                onClick={openGallery}
+              >
+                Aus Galerie
               </Button>
               <Button
                 type="button"
@@ -642,9 +678,24 @@ function PhotoPicker({
           </div>
         </div>
       ) : (
-        <Button type="button" variant="bordered" leftIcon={<Camera size={16} />} onClick={pick}>
-          Foto aufnehmen
-        </Button>
+        <div className="flex flex-wrap gap-1.5">
+          <Button
+            type="button"
+            variant="bordered"
+            leftIcon={<Camera size={16} />}
+            onClick={openCamera}
+          >
+            Foto aufnehmen
+          </Button>
+          <Button
+            type="button"
+            variant="bordered"
+            leftIcon={<ImageIcon size={16} />}
+            onClick={openGallery}
+          >
+            Aus Galerie
+          </Button>
+        </div>
       )}
     </div>
   );
