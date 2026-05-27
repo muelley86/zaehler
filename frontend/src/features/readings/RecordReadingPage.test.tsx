@@ -11,7 +11,7 @@
 
 import { http, HttpResponse } from 'msw';
 import { describe, expect, it, vi } from 'vitest';
-import { screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useNavigate } from 'react-router-dom';
 
@@ -182,6 +182,126 @@ describe('RecordReadingPage', () => {
     expect(await screen.findByTestId('record-param-warning')).toHaveTextContent(/999/);
     // Default-MP greift trotzdem.
     expect(screen.getByText('Bezug')).toBeInTheDocument();
+  });
+
+  it('haengt ein Foto an erfolgreiche Readings an und meldet Erfolg', async () => {
+    _mockListEndpoints([_mp()]);
+    const photoCalls: { url: string; hasFile: boolean }[] = [];
+    server.use(
+      http.post('/api/v1/readings', () =>
+        HttpResponse.json(
+          {
+            id: 555,
+            register_id: 100,
+            value: '123',
+            reading_at: '2025-07-01T10:00:00',
+            note: null,
+            created_at: '2025-07-01T10:00:00Z',
+            created_by_user_id: 1,
+            created_by_username: 'admin',
+            has_photo: false,
+          },
+          { status: 201 },
+        ),
+      ),
+      http.put('/api/v1/readings/:id/photo', async ({ params, request }) => {
+        // request.formData() ist in jsdom/MSW fragil — wir pruefen
+        // stattdessen nur, dass ein Body angekommen ist. Browser setzt den
+        // Content-Type automatisch (in jsdom nicht zuverlaessig).
+        const buf = await request.arrayBuffer();
+        photoCalls.push({
+          url: String(params['id']),
+          hasFile: buf.byteLength > 0,
+        });
+        return HttpResponse.json({
+          id: Number(params['id']),
+          register_id: 100,
+          value: '123',
+          reading_at: '2025-07-01T10:00:00',
+          note: null,
+          created_at: '2025-07-01T10:00:00Z',
+          created_by_user_id: 1,
+          created_by_username: 'admin',
+          has_photo: true,
+        });
+      }),
+    );
+
+    const user = userEvent.setup();
+    renderWithRouter(<RecordReadingPage />);
+    await screen.findByText('Bezug');
+
+    const input = screen.getByPlaceholderText(/leer = nicht erfassen/i);
+    await user.type(input, '123');
+
+    const fileInput = screen.getByTestId('record-photo-input');
+    const file = new File([new Uint8Array([0xff, 0xd8, 0xff])], 'meter.jpg', {
+      type: 'image/jpeg',
+    });
+    // fireEvent.change statt user.upload: user.upload prueft Sichtbarkeit
+    // des Inputs, unser File-Input ist aber per Design "display: none".
+    fireEvent.change(fileInput, { target: { files: [file] } });
+    await waitFor(() => expect(screen.getByAltText('Vorschau')).toBeInTheDocument());
+
+    await user.click(screen.getByRole('button', { name: /^Speichern$/i }));
+
+    await waitFor(
+      () => {
+        const err = screen.queryByTestId('record-error');
+        if (err) throw new Error(`record-error: ${err.textContent}`);
+        const success = screen.queryByTestId('record-success');
+        if (!success) throw new Error('still busy');
+        expect(success).toHaveTextContent(/Foto angehängt/);
+      },
+      { timeout: 2000 },
+    );
+    expect(photoCalls).toEqual([{ url: '555', hasFile: true }]);
+  });
+
+  it('zeigt eine Warnung, wenn der Foto-Upload scheitert (Reading bleibt erhalten)', async () => {
+    _mockListEndpoints([_mp()]);
+    server.use(
+      http.post('/api/v1/readings', () =>
+        HttpResponse.json(
+          {
+            id: 777,
+            register_id: 100,
+            value: '123',
+            reading_at: '2025-07-01T10:00:00',
+            note: null,
+            created_at: '2025-07-01T10:00:00Z',
+            created_by_user_id: 1,
+            created_by_username: 'admin',
+            has_photo: false,
+          },
+          { status: 201 },
+        ),
+      ),
+      http.put('/api/v1/readings/:id/photo', () =>
+        HttpResponse.json(
+          { title: 'Unsupported image format', status: 415, detail: 'HEIC nicht erlaubt.' },
+          { status: 415 },
+        ),
+      ),
+    );
+
+    const user = userEvent.setup();
+    renderWithRouter(<RecordReadingPage />);
+    await screen.findByText('Bezug');
+    await user.type(screen.getByPlaceholderText(/leer = nicht erfassen/i), '123');
+    const fileInput = screen.getByTestId('record-photo-input');
+    fireEvent.change(fileInput, {
+      target: { files: [new File([new Uint8Array([0])], 'x.heic', { type: 'image/heic' })] },
+    });
+    await waitFor(() => expect(screen.getByAltText('Vorschau')).toBeInTheDocument());
+    await user.click(screen.getByRole('button', { name: /^Speichern$/i }));
+
+    await waitFor(() =>
+      expect(screen.getByTestId('record-photo-warning')).toHaveTextContent(/HEIC/),
+    );
+    // Reading-Erfolg trotzdem da, aber ohne "Foto angehängt".
+    expect(screen.getByTestId('record-success')).toBeInTheDocument();
+    expect(screen.getByTestId('record-success')).not.toHaveTextContent(/Foto angehängt/);
   });
 
   // Regression: Bug "QR-Scan navigiert nicht zur richtigen MP". Ein per

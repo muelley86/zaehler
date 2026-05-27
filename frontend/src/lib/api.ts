@@ -56,12 +56,36 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   return data as T;
 }
 
+async function upload<T>(path: string, method: 'PUT' | 'POST', formData: FormData): Promise<T> {
+  // Multipart-Upload: kein Content-Type setzen — der Browser muss den
+  // ``multipart/form-data; boundary=…`` selbst generieren.
+  const resp = await fetch(`${API_BASE}${path}`, {
+    method,
+    credentials: 'same-origin',
+    headers: { Accept: 'application/json' },
+    body: formData,
+  });
+  if (resp.status === 204) return undefined as T;
+  const text = await resp.text();
+  const data: unknown = text ? JSON.parse(text) : null;
+  if (!resp.ok) {
+    const problem: ProblemDetails =
+      data && typeof data === 'object'
+        ? (data as ProblemDetails)
+        : { title: resp.statusText, status: resp.status };
+    throw new ApiError(problem);
+  }
+  return data as T;
+}
+
 export const api = {
   get: <T>(path: string, signal?: AbortSignal) => request<T>(path, signal ? { signal } : {}),
   post: <T>(path: string, body?: unknown) => request<T>(path, { method: 'POST', body }),
   patch: <T>(path: string, body?: unknown) => request<T>(path, { method: 'PATCH', body }),
   put: <T>(path: string, body?: unknown) => request<T>(path, { method: 'PUT', body }),
   delete: <T>(path: string) => request<T>(path, { method: 'DELETE' }),
+  upload: <T>(path: string, formData: FormData, method: 'PUT' | 'POST' = 'PUT') =>
+    upload<T>(path, method, formData),
 };
 
 /**

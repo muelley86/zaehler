@@ -19,6 +19,7 @@ umask 0077
 
 DB_FILE="${DB_FILE:-/opt/zaehler/data/meters.db}"
 BACKUP_DIR="${BACKUP_DIR:-/opt/zaehler/backups}"
+PHOTO_DIR="${PHOTO_DIR:-/opt/zaehler/data/media/photos}"
 KEEP="${KEEP:-30}"
 
 if [ ! -f "$DB_FILE" ]; then
@@ -40,12 +41,28 @@ gzip "$target"
 chmod 0600 "${target}.gz"
 echo "Backup erstellt: ${target}.gz"
 
-# Aufräumen: alte Backups nach Anzahl behalten
-find "$BACKUP_DIR" -maxdepth 1 -name 'meters-*.db.gz' -type f -printf '%T@ %p\n' \
-    | sort -nr \
-    | tail -n +"$((KEEP + 1))" \
-    | awk '{ $1=""; sub(/^ /, ""); print }' \
-    | while read -r old; do
-        echo "Lösche altes Backup: $old"
-        rm -f -- "$old"
-      done
+# Foto-Verzeichnis mitsichern, falls vorhanden. Eigenes Archiv — vereinfacht
+# selektives Restore (DB-only oder Photos-only).
+if [ -d "$PHOTO_DIR" ]; then
+    photo_target="$BACKUP_DIR/photos-$stamp.tar.gz"
+    tar -C "$(dirname "$PHOTO_DIR")" -czf "$photo_target" "$(basename "$PHOTO_DIR")"
+    chmod 0600 "$photo_target"
+    echo "Foto-Backup erstellt: $photo_target"
+fi
+
+# Aufräumen: alte Backups nach Anzahl behalten — pro Pattern separat,
+# damit Foto- und DB-Backups unabhängig altern.
+prune_pattern() {
+    local pattern="$1"
+    find "$BACKUP_DIR" -maxdepth 1 -name "$pattern" -type f -printf '%T@ %p\n' \
+        | sort -nr \
+        | tail -n +"$((KEEP + 1))" \
+        | awk '{ $1=""; sub(/^ /, ""); print }' \
+        | while read -r old; do
+            echo "Lösche altes Backup: $old"
+            rm -f -- "$old"
+          done
+}
+
+prune_pattern 'meters-*.db.gz'
+prune_pattern 'photos-*.tar.gz'

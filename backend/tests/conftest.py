@@ -13,10 +13,14 @@ from pathlib import Path
 
 import pytest
 
-_TMP_DB = Path(tempfile.mkdtemp(prefix="meters-test-")) / "test.db"
+_TMP_ROOT = Path(tempfile.mkdtemp(prefix="meters-test-"))
+_TMP_DB = _TMP_ROOT / "test.db"
+_TMP_MEDIA = _TMP_ROOT / "media" / "photos"
+_TMP_MEDIA.mkdir(parents=True, exist_ok=True)
 os.environ["METERS_DATABASE_URL"] = f"sqlite:///{_TMP_DB}"
 os.environ["METERS_SECRET_KEY"] = "test-secret-do-not-use-in-prod"
 os.environ["METERS_BCRYPT_ROUNDS"] = "4"
+os.environ["METERS_MEDIA_DIR"] = str(_TMP_MEDIA)
 
 from fastapi.testclient import TestClient  # noqa: E402
 from sqlalchemy.orm import Session  # noqa: E402

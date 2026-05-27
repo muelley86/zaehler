@@ -75,6 +75,16 @@ class Settings(BaseSettings):
 
     static_dir: Path = Path(__file__).resolve().parent.parent / "static"
 
+    # Ablage für Foto-Uploads an Readings. Liegt unter ``DATA_DIR``, damit
+    # systemd's ``ReadWritePaths=/opt/zaehler`` und das Backup-Skript es
+    # automatisch erfassen. Override via ``METERS_MEDIA_DIR``.
+    media_dir: Path = DATA_DIR / "media" / "photos"
+
+    # Max Upload-Größe für ein Foto vor Reencode (Roh-Datei). 20 MB deckt
+    # auch hochauflösende Smartphone-JPEGs ab; alles darüber lehnen wir mit
+    # 413 ab, bevor Pillow den Decode startet.
+    photo_max_upload_bytes: int = 20 * 1024 * 1024
+
 
 settings = Settings()
 

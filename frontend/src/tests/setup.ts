@@ -4,6 +4,13 @@ import { afterAll, afterEach, beforeAll, vi } from 'vitest';
 
 import { server } from './server';
 
+// jsdom hat kein URL.createObjectURL / revokeObjectURL — beide werden vom
+// Foto-Picker für die lokale Vorschau benutzt.
+if (typeof URL.createObjectURL !== 'function') {
+  URL.createObjectURL = vi.fn(() => 'blob:mock-preview');
+  URL.revokeObjectURL = vi.fn();
+}
+
 // jsdom hat kein window.matchMedia. useChartTheme.ts nutzt es zum
 // Erkennen des System-Themes — wir mocken es als no-op, damit
 // MutationObserver/Eventlistener-Setup nicht crasht.

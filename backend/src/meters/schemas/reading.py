@@ -66,6 +66,7 @@ class ReadingRead(APIModel):
     created_at: datetime
     created_by_user_id: int | None
     created_by_username: str | None = None
+    has_photo: bool = False
 
 
 class ConsumptionPoint(APIModel):
