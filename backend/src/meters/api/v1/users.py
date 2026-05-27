@@ -9,7 +9,7 @@ Benutzer muss beim ersten Login ein eigenes Passwort vergeben.
 from __future__ import annotations
 
 from fastapi import APIRouter, Request, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from meters.api.deps import AdminUser, DbDep, client_ip
 from meters.core.problem import ProblemError
@@ -17,7 +17,9 @@ from meters.core.security import hash_password
 from meters.models import (
     AuditAction,
     AuditEntityType,
+    Delivery,
     MeasuringPoint,
+    Reading,
     User,
     UserMeasuringPointAccess,
     UserRole,
@@ -33,6 +35,7 @@ from meters.schemas import (
 )
 from meters.services import auth as auth_service
 from meters.services.audit import record
+from meters.services.user_guard import assert_not_last_active_admin, assert_not_self
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -90,6 +93,23 @@ def update_user(
     user = db.get(User, user_id)
     if user is None:
         raise ProblemError(status_code=404, title="User not found")
+
+    # Schutz: Self-Action verbieten (Rolle/Status), Last-Admin nicht
+    # entfernen. E-Mail- und can_assign_qr_tokens-Aenderungen am eigenen
+    # Konto bleiben erlaubt.
+    role_change_requested = payload.role is not None and payload.role is not user.role
+    deactivation_requested = (
+        payload.is_active is not None
+        and payload.is_active != user.is_active
+        and payload.is_active is False
+    )
+    if role_change_requested:
+        assert_not_self(actor_user_id=admin.id, target_user_id=user.id, action="change-role")
+        if user.role is UserRole.ADMIN and payload.role is UserRole.RECORDER:
+            assert_not_last_active_admin(db, user, action="demote")
+    if deactivation_requested:
+        assert_not_self(actor_user_id=admin.id, target_user_id=user.id, action="deactivate")
+        assert_not_last_active_admin(db, user, action="deactivate")
 
     diff: dict[str, object] = {}
     if payload.email is not None and payload.email != user.email:
@@ -173,6 +193,72 @@ def revoke_sessions(
         diff={"forced": True},
         ip_address=client_ip(request),
     )
+    db.commit()
+
+
+@router.delete("/{user_id}", status_code=204)
+def delete_user(
+    user_id: int,
+    request: Request,
+    db: DbDep,
+    admin: AdminUser,
+) -> None:
+    """Hard-Delete eines Benutzers.
+
+    Lehnt 409 ab, wenn der User noch Daten erfasst hat (Readings, Lieferungen
+    oder als Erteiler von MP-Zugriffen). In dem Fall ist die einzige saubere
+    Aktion ``Deaktivieren`` (PATCH ``is_active=false``), damit die fachliche
+    Zuordnung der bestehenden Eintraege erhalten bleibt.
+
+    Sessions des Users werden via FK-CASCADE entfernt. AuditLog-Eintraege des
+    Users bleiben dank ``ondelete=SET NULL`` erhalten — der Username wird im
+    Diff des Loesch-Events gesichert, damit das Audit nachvollziehbar bleibt.
+    """
+    user = db.get(User, user_id)
+    if user is None:
+        raise ProblemError(status_code=404, title="User not found")
+    assert_not_self(actor_user_id=admin.id, target_user_id=user.id, action="delete")
+    assert_not_last_active_admin(db, user, action="delete")
+
+    counts = {
+        "readings": db.scalar(
+            select(func.count(Reading.id)).where(Reading.created_by_user_id == user.id)
+        )
+        or 0,
+        "deliveries": db.scalar(
+            select(func.count(Delivery.id)).where(Delivery.created_by_user_id == user.id)
+        )
+        or 0,
+        "granted_accesses": db.scalar(
+            select(func.count(UserMeasuringPointAccess.user_id)).where(
+                UserMeasuringPointAccess.granted_by_user_id == user.id
+            )
+        )
+        or 0,
+    }
+    if any(counts.values()):
+        raise ProblemError(
+            status_code=409,
+            title="User has data references",
+            detail=(
+                "Benutzer hat noch erfasste Daten oder erteilte Zugriffe. "
+                "Bitte stattdessen deaktivieren."
+            ),
+            extra={"references": counts},
+        )
+
+    # Audit VOR dem Delete schreiben — sonst koennten wir Username/Rolle
+    # nicht mehr fuer den Eintrag rekonstruieren.
+    record(
+        db,
+        user_id=admin.id,
+        action=AuditAction.DELETE,
+        entity_type=AuditEntityType.USER,
+        entity_id=user.id,
+        diff={"username": user.username, "role": user.role.value},
+        ip_address=client_ip(request),
+    )
+    db.delete(user)
     db.commit()
 
 

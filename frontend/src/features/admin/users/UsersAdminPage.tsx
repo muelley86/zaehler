@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
-import { KeyRound, ListChecks, Plus } from 'lucide-react';
+import { KeyRound, ListChecks, Pencil, Plus } from 'lucide-react';
 
+import { useAuth } from '@/features/auth/auth-context';
 import {
   Button,
   Card,
@@ -15,14 +16,16 @@ import {
 } from '@/components/ui';
 import { ApiError, api } from '@/lib/api';
 import { formatDateTimeDe } from '@/lib/format';
-import type { UserRead, UserRole } from '@/lib/types';
+import type { Me, UserRead, UserRole } from '@/lib/types';
 import { cx } from '@/components/ui/cx';
 
 import { UserAccessSheet } from './UserAccessSheet';
+import { UserEditSheet } from './UserEditSheet';
 
 type Filter = 'all' | UserRole | 'inactive';
 
 export function UsersAdminPage() {
+  const { me } = useAuth();
   const [users, setUsers] = useState<UserRead[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
@@ -91,7 +94,7 @@ export function UsersAdminPage() {
         <Card padded={false}>
           {/* Desktop-Tabelle */}
           <div className="hidden md:block">
-            <div className="grid grid-cols-[40px_1.4fr_1.6fr_1fr_1fr_1.1fr_88px] items-center gap-3 border-b-hairline border-separator px-5 py-3 text-micro uppercase text-tertiary">
+            <div className="grid grid-cols-[40px_1.4fr_1.6fr_1fr_1fr_1.1fr_120px] items-center gap-3 border-b-hairline border-separator px-5 py-3 text-micro uppercase text-tertiary">
               <div />
               <div>Benutzer</div>
               <div>E-Mail</div>
@@ -102,7 +105,7 @@ export function UsersAdminPage() {
             </div>
             <ul className="divide-y divide-separator">
               {visible.map((u) => (
-                <UserRow key={u.id} user={u} onChanged={refresh} />
+                <UserRow key={u.id} user={u} me={me} onChanged={refresh} />
               ))}
             </ul>
           </div>
@@ -110,7 +113,7 @@ export function UsersAdminPage() {
           {/* Mobile-Liste */}
           <ul className="divide-y divide-separator md:hidden">
             {visible.map((u) => (
-              <UserListItem key={u.id} user={u} onChanged={refresh} />
+              <UserListItem key={u.id} user={u} me={me} onChanged={refresh} />
             ))}
           </ul>
         </Card>
@@ -160,9 +163,19 @@ function RoleBadge({ role }: { role: UserRole }) {
   );
 }
 
-function UserRow({ user, onChanged }: { user: UserRead; onChanged: () => void }) {
+function UserRow({
+  user,
+  me,
+  onChanged,
+}: {
+  user: UserRead;
+  me: Me | null;
+  onChanged: () => void;
+}) {
+  const isSelf = me?.id === user.id;
   const [busy, setBusy] = useState(false);
   const [accessOpen, setAccessOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
 
   async function toggleActive() {
     setBusy(true);
@@ -193,13 +206,20 @@ function UserRow({ user, onChanged }: { user: UserRead; onChanged: () => void })
     <>
       <li
         className={cx(
-          'grid grid-cols-[40px_1.4fr_1.6fr_1fr_1fr_1.1fr_88px] items-center gap-3 px-5 py-3.5',
+          'grid grid-cols-[40px_1.4fr_1.6fr_1fr_1fr_1.1fr_120px] items-center gap-3 px-5 py-3.5',
           !user.is_active && 'opacity-60',
         )}
       >
         <UserAvatar user={user} />
         <div className="min-w-0">
-          <div className="truncate text-body font-semibold text-label">{user.username}</div>
+          <div className="flex items-baseline gap-2">
+            <span className="truncate text-body font-semibold text-label">{user.username}</span>
+            {isSelf ? (
+              <span className="rounded-badge bg-primary-soft px-1.5 py-0.5 text-micro font-semibold uppercase text-primary-deep">
+                Du
+              </span>
+            ) : null}
+          </div>
           {user.force_password_change ? (
             <div className="text-caption font-semibold text-danger">
               Passwortwechsel erforderlich
@@ -221,7 +241,7 @@ function UserRow({ user, onChanged }: { user: UserRead; onChanged: () => void })
           <Switch
             checked={user.is_active}
             onChange={() => void toggleActive()}
-            disabled={busy}
+            disabled={busy || isSelf}
             ariaLabel={`Aktiv: ${user.is_active}`}
           />
           <span className="text-body-sm text-secondary">
@@ -232,6 +252,16 @@ function UserRow({ user, onChanged }: { user: UserRead; onChanged: () => void })
           {user.last_login_at ? formatDateTimeDe(user.last_login_at) : '—'}
         </div>
         <div className="flex items-center justify-end gap-1">
+          <Button
+            variant="plain"
+            size="sm"
+            leftIcon={<Pencil size={14} />}
+            onClick={() => setEditOpen(true)}
+            disabled={busy}
+            title="Bearbeiten"
+          >
+            <span className="sr-only">Bearbeiten</span>
+          </Button>
           {showAccessButton ? (
             <Button
               variant="plain"
@@ -259,13 +289,26 @@ function UserRow({ user, onChanged }: { user: UserRead; onChanged: () => void })
       {accessOpen ? (
         <UserAccessSheet user={user} onClose={() => setAccessOpen(false)} onSaved={onChanged} />
       ) : null}
+      {editOpen ? (
+        <UserEditSheet user={user} me={me} onClose={() => setEditOpen(false)} onSaved={onChanged} />
+      ) : null}
     </>
   );
 }
 
-function UserListItem({ user, onChanged }: { user: UserRead; onChanged: () => void }) {
+function UserListItem({
+  user,
+  me,
+  onChanged,
+}: {
+  user: UserRead;
+  me: Me | null;
+  onChanged: () => void;
+}) {
+  const isSelf = me?.id === user.id;
   const [busy, setBusy] = useState(false);
   const [accessOpen, setAccessOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
   async function toggleActive() {
     setBusy(true);
     try {
@@ -295,6 +338,11 @@ function UserListItem({ user, onChanged }: { user: UserRead; onChanged: () => vo
           <div className="flex flex-wrap items-baseline gap-2">
             <span className="truncate text-body font-semibold text-label">{user.username}</span>
             <RoleBadge role={user.role} />
+            {isSelf ? (
+              <span className="rounded-badge bg-primary-soft px-1.5 py-0.5 text-micro font-semibold uppercase text-primary-deep">
+                Du
+              </span>
+            ) : null}
           </div>
           {user.email ? (
             <div className="truncate text-caption text-tertiary">{user.email}</div>
@@ -314,11 +362,20 @@ function UserListItem({ user, onChanged }: { user: UserRead; onChanged: () => vo
         <Switch
           checked={user.is_active}
           onChange={() => void toggleActive()}
-          disabled={busy}
+          disabled={busy || isSelf}
           ariaLabel={`Aktiv: ${user.is_active}`}
         />
       </div>
       <div className="mt-2 flex flex-wrap justify-end gap-1">
+        <Button
+          variant="plain"
+          size="sm"
+          leftIcon={<Pencil size={14} />}
+          onClick={() => setEditOpen(true)}
+          disabled={busy}
+        >
+          Bearbeiten
+        </Button>
         {showAccessButton ? (
           <Button
             variant="plain"
@@ -342,6 +399,9 @@ function UserListItem({ user, onChanged }: { user: UserRead; onChanged: () => vo
       </div>
       {accessOpen ? (
         <UserAccessSheet user={user} onClose={() => setAccessOpen(false)} onSaved={onChanged} />
+      ) : null}
+      {editOpen ? (
+        <UserEditSheet user={user} me={me} onClose={() => setEditOpen(false)} onSaved={onChanged} />
       ) : null}
     </li>
   );
