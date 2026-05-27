@@ -10,6 +10,13 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.12.1](https://github.com/muelley86/zaehler/compare/v2.12.0...v2.12.1) (2026-05-27)
+
+
+### Fehlerbehebungen
+
+* **readings:** reading_at/delivery_at als UTC-ISO senden ([#60](https://github.com/muelley86/zaehler/issues/60)) ([54d66ad](https://github.com/muelley86/zaehler/commit/54d66adc8f33e40943d1a642e92cb0fcf68eb7eb))
+
 ## [2.12.0](https://github.com/muelley86/zaehler/compare/v2.11.3...v2.12.0) (2026-05-27)
 
 
