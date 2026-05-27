@@ -383,6 +383,57 @@ def test_replacing_photo_updates_gps_fields(admin_client: TestClient) -> None:
     assert body["photo_lon"] is None
 
 
+def test_form_gps_used_when_exif_missing(admin_client: TestClient) -> None:
+    """Foto OHNE EXIF-GPS + Form-Felder gps_lat/gps_lon → Form-Werte landen
+    in der DB (Fallback fuer iOS-Strip-Verhalten)."""
+    register_id = _setup_water_mp(admin_client)
+    rid = _create_reading(admin_client, register_id, at="2025-08-01T10:00:00")
+    resp = admin_client.put(
+        f"/api/v1/readings/{rid}/photo",
+        files={"photo": ("no-gps.jpg", _make_jpeg(with_exif=False), "image/jpeg")},
+        data={"gps_lat": "48.137154", "gps_lon": "11.576124"},
+    )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["photo_lat"] is not None
+    assert body["photo_lon"] is not None
+    assert abs(body["photo_lat"] - 48.137154) < 1e-6
+    assert abs(body["photo_lon"] - 11.576124) < 1e-6
+
+
+def test_exif_gps_wins_over_form_gps(admin_client: TestClient) -> None:
+    """Foto MIT EXIF-GPS (Berlin) + abweichende Form-Felder (Muenchen) →
+    EXIF gewinnt, Form-Werte werden ignoriert."""
+    register_id = _setup_water_mp(admin_client)
+    rid = _create_reading(admin_client, register_id, at="2025-08-01T11:00:00")
+    resp = admin_client.put(
+        f"/api/v1/readings/{rid}/photo",
+        files={"photo": ("berlin.jpg", _make_jpeg(with_exif=True), "image/jpeg")},
+        data={"gps_lat": "48.137154", "gps_lon": "11.576124"},
+    )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    # Test-Fixture EXIF: ~52.5 / 13.4 (Berlin), nicht 48.1 / 11.5 (Muenchen).
+    assert abs(body["photo_lat"] - 52.5) < 1e-4
+    assert abs(body["photo_lon"] - 13.4) < 1e-4
+
+
+def test_invalid_form_gps_is_ignored(admin_client: TestClient) -> None:
+    """Foto ohne EXIF + Form-Werte ausserhalb [-90,90]/[-180,180] →
+    photo_lat/photo_lon bleiben None."""
+    register_id = _setup_water_mp(admin_client)
+    rid = _create_reading(admin_client, register_id, at="2025-08-01T12:00:00")
+    resp = admin_client.put(
+        f"/api/v1/readings/{rid}/photo",
+        files={"photo": ("no-gps.jpg", _make_jpeg(with_exif=False), "image/jpeg")},
+        data={"gps_lat": "200", "gps_lon": "11.5"},
+    )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["photo_lat"] is None
+    assert body["photo_lon"] is None
+
+
 def test_delete_photo_clears_gps_fields(admin_client: TestClient, db: Session) -> None:
     register_id = _setup_water_mp(admin_client)
     rid = _create_reading(admin_client, register_id, at="2025-07-01T14:00:00")

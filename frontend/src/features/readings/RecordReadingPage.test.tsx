@@ -262,6 +262,81 @@ describe('RecordReadingPage', () => {
     expect(readingBodies[0]?.reading_at).toMatch(/Z$/);
   });
 
+  it('haengt gps_lat/gps_lon an das Foto-Upload, wenn der Browser eine Position liefert', async () => {
+    _mockListEndpoints([_mp()]);
+    // navigator.geolocation in jsdom mocken — der Helper ruft
+    // getCurrentPosition mit einem Success-Callback auf.
+    const geoMock = {
+      getCurrentPosition: (
+        success: (pos: { coords: { latitude: number; longitude: number } }) => void,
+      ) => {
+        success({ coords: { latitude: 48.137154, longitude: 11.576124 } });
+      },
+    };
+    Object.defineProperty(global.navigator, 'geolocation', {
+      configurable: true,
+      value: geoMock,
+    });
+
+    const photoFormSizes: number[] = [];
+    server.use(
+      http.post('/api/v1/readings', () =>
+        HttpResponse.json(
+          {
+            id: 888,
+            register_id: 100,
+            value: '123',
+            reading_at: '2025-07-01T10:00:00',
+            note: null,
+            created_at: '2025-07-01T10:00:00Z',
+            created_by_user_id: 1,
+            created_by_username: 'admin',
+            has_photo: false,
+            photo_lat: null,
+            photo_lon: null,
+          },
+          { status: 201 },
+        ),
+      ),
+      http.put('/api/v1/readings/:id/photo', async ({ request }) => {
+        // Body lesen, nach gps_lat-Marker suchen (FormData-Boundary).
+        const buf = await request.arrayBuffer();
+        photoFormSizes.push(buf.byteLength);
+        const text = new TextDecoder().decode(buf);
+        expect(text).toContain('gps_lat');
+        expect(text).toContain('48.137154');
+        expect(text).toContain('gps_lon');
+        expect(text).toContain('11.576124');
+        return HttpResponse.json({
+          id: 888,
+          register_id: 100,
+          value: '123',
+          reading_at: '2025-07-01T10:00:00',
+          note: null,
+          created_at: '2025-07-01T10:00:00Z',
+          created_by_user_id: 1,
+          created_by_username: 'admin',
+          has_photo: true,
+          photo_lat: 48.137154,
+          photo_lon: 11.576124,
+        });
+      }),
+    );
+
+    const user = userEvent.setup();
+    renderWithRouter(<RecordReadingPage />);
+    await screen.findByText('Bezug');
+    await user.type(screen.getByPlaceholderText(/leer = nicht erfassen/i), '123');
+    const fileInput = screen.getByTestId('record-photo-input');
+    fireEvent.change(fileInput, {
+      target: { files: [new File([new Uint8Array([0xff])], 'a.jpg', { type: 'image/jpeg' })] },
+    });
+    await waitFor(() => expect(screen.getByAltText('Vorschau')).toBeInTheDocument());
+    await user.click(screen.getByRole('button', { name: /^Speichern$/i }));
+
+    await waitFor(() => expect(photoFormSizes).toHaveLength(1), { timeout: 5000 });
+  });
+
   it('zeigt eine Warnung, wenn der Foto-Upload scheitert (Reading bleibt erhalten)', async () => {
     _mockListEndpoints([_mp()]);
     server.use(

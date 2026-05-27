@@ -71,6 +71,22 @@ def _dms_to_decimal(dms: object) -> float | None:
     return deg + minutes / 60.0 + seconds / 3600.0
 
 
+def validate_gps(lat: float | None, lon: float | None) -> tuple[float, float] | None:
+    """Pruefe ein Lat/Lon-Paar gegen die zulaessigen Bereiche.
+
+    Gibt das Tupel zurueck, wenn beide Werte gesetzt und in Range
+    (Lat ∈ [-90, 90], Lon ∈ [-180, 180]) sind — sonst ``None``. Wird
+    von ``extract_gps`` (EXIF-Pfad) und vom Form-Fallback im Endpoint
+    gemeinsam genutzt, damit beide Pfade dieselben Plausibilitaets-
+    Grenzen anwenden.
+    """
+    if lat is None or lon is None:
+        return None
+    if not (-90.0 <= lat <= 90.0) or not (-180.0 <= lon <= 180.0):
+        return None
+    return (lat, lon)
+
+
 def extract_gps(img: Image.Image) -> tuple[float, float] | None:
     """Liest Latitude/Longitude aus dem GPS-Sub-IFD des Bildes.
 
@@ -97,9 +113,7 @@ def extract_gps(img: Image.Image) -> tuple[float, float] | None:
         lat = -lat
     if str(lon_ref).upper().startswith("W"):
         lon = -lon
-    if not (-90.0 <= lat <= 90.0) or not (-180.0 <= lon <= 180.0):
-        return None
-    return (lat, lon)
+    return validate_gps(lat, lon)
 
 
 def save_photo(reading_id: int, upload: UploadFile) -> tuple[str, tuple[float, float] | None]:

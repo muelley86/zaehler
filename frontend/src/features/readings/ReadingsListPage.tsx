@@ -25,6 +25,7 @@ import {
   parseDe,
   toInputDateTime,
 } from '@/lib/format';
+import { tryGetDeviceLocation } from '@/lib/geo';
 import type { DeliveryRead, Me, MeasuringPointRead, MeterType, ReadingRead } from '@/lib/types';
 import { cx } from '@/components/ui/cx';
 
@@ -883,6 +884,13 @@ function EditForm({
     if (pendingPhoto) {
       const fd = new FormData();
       fd.append('photo', pendingPhoto);
+      // Fallback fuer EXIF-Strip auf iOS: Browser-Position mitsenden.
+      // Backend nutzt sie nur, wenn das EXIF kein GPS hat.
+      const fallbackGps = await tryGetDeviceLocation();
+      if (fallbackGps) {
+        fd.append('gps_lat', String(fallbackGps.lat));
+        fd.append('gps_lon', String(fallbackGps.lon));
+      }
       await api.upload<ReadingRead>(`/readings/${reading.id}/photo`, fd);
     } else if (removePhoto && reading.has_photo) {
       await api.delete(`/readings/${reading.id}/photo`);
@@ -1040,7 +1048,6 @@ function PhotoEditField({
         ref={inputRef}
         type="file"
         accept="image/*"
-        capture="environment"
         onChange={onFileChange}
         className="hidden"
         data-testid="edit-photo-input"

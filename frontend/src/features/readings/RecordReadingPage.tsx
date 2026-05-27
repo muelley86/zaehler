@@ -16,6 +16,7 @@ import {
 import { PageGlows } from '@/components/PageGlows';
 import { ApiError, api, isPlausibilityWarning } from '@/lib/api';
 import { formatDateTimeDe, formatDe, localInputToIso, nowForInput, parseDe } from '@/lib/format';
+import { tryGetDeviceLocation } from '@/lib/geo';
 import { describeMeterType } from '@/lib/meterLabels';
 import type {
   DeliveryRead,
@@ -438,9 +439,17 @@ function ReadingsForm({
       // bekommt eine separate Warnung.
       let photoUploaded = 0;
       if (photo && savedIds.length > 0) {
+        // Browser-Position einmalig als Fallback holen — Backend
+        // bevorzugt EXIF-GPS und nutzt diese Werte nur, wenn das Foto
+        // keine GPS-Tags hat (typisch fuer iOS-capture-Aufnahmen).
+        const fallbackGps = await tryGetDeviceLocation();
         for (const id of savedIds) {
           const fd = new FormData();
           fd.append('photo', photo);
+          if (fallbackGps) {
+            fd.append('gps_lat', String(fallbackGps.lat));
+            fd.append('gps_lon', String(fallbackGps.lon));
+          }
           try {
             await api.upload<ReadingRead>(`/readings/${id}/photo`, fd);
             photoUploaded += 1;
@@ -594,7 +603,6 @@ function PhotoPicker({
         ref={inputRef}
         type="file"
         accept="image/*"
-        capture="environment"
         onChange={onFileChange}
         className="hidden"
         data-testid="record-photo-input"

@@ -15,7 +15,7 @@ from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import Annotated
 
-from fastapi import APIRouter, File, Query, Request, UploadFile, status
+from fastapi import APIRouter, File, Form, Query, Request, UploadFile, status
 from fastapi.responses import FileResponse, Response
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -44,6 +44,7 @@ from meters.services.reading_photo import (
     delete_photo,
     photo_full_path,
     save_photo,
+    validate_gps,
 )
 
 router = APIRouter(tags=["readings"])
@@ -386,6 +387,8 @@ def upload_reading_photo(
     db: DbDep,
     user: CurrentUser,
     photo: Annotated[UploadFile, File()],
+    gps_lat: Annotated[float | None, Form()] = None,
+    gps_lon: Annotated[float | None, Form()] = None,
 ) -> ReadingRead:
     reading = db.get(Reading, reading_id)
     if reading is None:
@@ -396,6 +399,12 @@ def upload_reading_photo(
 
     previous = reading.photo_path
     new_basename, gps = save_photo(reading.id, photo)
+    # Fallback: wenn das EXIF keine GPS-Tags hatte, akzeptiere die vom
+    # Client (Browser-Geolocation) mitgegebenen Koordinaten — mobile
+    # Safari strippt EXIF-GPS aus per ``capture``-Input aufgenommenen
+    # Fotos, deshalb braucht der Client einen Zweitkanal.
+    if gps is None:
+        gps = validate_gps(gps_lat, gps_lon)
     reading.photo_path = new_basename
     reading.photo_lat = gps[0] if gps is not None else None
     reading.photo_lon = gps[1] if gps is not None else None
