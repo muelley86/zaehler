@@ -1000,7 +1000,16 @@ function PhotoEditField({
   function onFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (file) onPick(file);
-    e.target.value = '';
+    // Reset des Inputs erfolgt erst kurz vor dem naechsten Click — wenn er
+    // direkt hier passiert, koppelt iOS Safari den Blob-Storage des frisch
+    // ausgewaehlten File-Objekts ab und der FormData-Upload sendet einen
+    // leeren Part (Backend antwortet 422).
+  }
+
+  function pick() {
+    if (!inputRef.current) return;
+    inputRef.current.value = '';
+    inputRef.current.click();
   }
 
   const showPending = pending !== null;
@@ -1033,7 +1042,7 @@ function PhotoEditField({
               variant="bordered"
               size="sm"
               leftIcon={<Camera size={14} />}
-              onClick={() => inputRef.current?.click()}
+              onClick={pick}
             >
               Ersetzen
             </Button>
@@ -1063,7 +1072,7 @@ function PhotoEditField({
               variant="bordered"
               size="sm"
               leftIcon={<Camera size={14} />}
-              onClick={() => inputRef.current?.click()}
+              onClick={pick}
             >
               Anderes Foto
             </Button>
@@ -1093,7 +1102,7 @@ function PhotoEditField({
           variant="bordered"
           size="sm"
           leftIcon={<Camera size={14} />}
-          onClick={() => inputRef.current?.click()}
+          onClick={pick}
         >
           Foto hinzufügen
         </Button>
