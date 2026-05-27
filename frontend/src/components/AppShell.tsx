@@ -188,6 +188,12 @@ export function AppShell({ children }: { children: ReactNode }) {
         </nav>
 
         <div className="mt-auto border-t-hairline border-separator px-1 pt-3">
+          <div
+            data-testid="sidebar-version"
+            className="px-1 pb-2 text-micro uppercase tracking-tight text-quaternary"
+          >
+            v{__APP_VERSION__}
+          </div>
           <div className="flex items-center gap-2 px-1">
             <NavLink
               to="/mehr"
