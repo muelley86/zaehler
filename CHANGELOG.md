@@ -10,6 +10,18 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.12.0](https://github.com/muelley86/zaehler/compare/v2.11.3...v2.12.0) (2026-05-27)
+
+
+### Funktionen
+
+* **users:** Rolle aendern + Benutzer loeschen in der Admin-UI ([#56](https://github.com/muelley86/zaehler/issues/56)) ([4f8b7aa](https://github.com/muelley86/zaehler/commit/4f8b7aaa4bc35e38cbeaa22d315a39ecd0329a3d))
+
+
+### Fehlerbehebungen
+
+* **readings:** Foto-Upload 422 auf iOS Safari ([#58](https://github.com/muelley86/zaehler/issues/58)) ([0967e9f](https://github.com/muelley86/zaehler/commit/0967e9fee7b5ade76299416850b5e6a99e85063c))
+
 ## [2.11.3](https://github.com/muelley86/zaehler/compare/v2.11.2...v2.11.3) (2026-05-15)
 
 
