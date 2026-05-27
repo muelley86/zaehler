@@ -13,8 +13,10 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
+from typing import Annotated
 
-from fastapi import APIRouter, Query, Request, status
+from fastapi import APIRouter, File, Query, Request, UploadFile, status
+from fastapi.responses import FileResponse, Response
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import selectinload
@@ -38,6 +40,11 @@ from meters.services.access import (
 )
 from meters.services.audit import record
 from meters.services.consumption import consumption_for_measuring_point
+from meters.services.reading_photo import (
+    delete_photo,
+    photo_full_path,
+    save_photo,
+)
 
 router = APIRouter(tags=["readings"])
 
@@ -60,6 +67,7 @@ def _to_read(reading: Reading) -> ReadingRead:
         created_at=reading.created_at,
         created_by_user_id=reading.created_by_user_id,
         created_by_username=reading.created_by.username if reading.created_by else None,
+        has_photo=reading.photo_path is not None,
     )
 
 
@@ -361,8 +369,109 @@ def delete_reading(
         },
         ip_address=client_ip(request),
     )
+    photo_basename = reading.photo_path
     db.delete(reading)
     db.commit()
+    # Datei erst nach erfolgreichem DB-Commit löschen — andernfalls wäre
+    # das Foto weg, das Reading aber noch da.
+    delete_photo(photo_basename)
+
+
+@router.put("/readings/{reading_id}/photo", response_model=ReadingRead)
+def upload_reading_photo(
+    reading_id: int,
+    request: Request,
+    db: DbDep,
+    user: CurrentUser,
+    photo: Annotated[UploadFile, File()],
+) -> ReadingRead:
+    reading = db.get(Reading, reading_id)
+    if reading is None:
+        raise ProblemError(status_code=404, title="Reading not found")
+    assert_can_access_register(db, user, reading.register_id)
+    if not _can_edit(user, reading):
+        raise ProblemError(status_code=403, title="Cannot edit this reading")
+
+    previous = reading.photo_path
+    new_basename = save_photo(reading.id, photo)
+    reading.photo_path = new_basename
+    record(
+        db,
+        user_id=user.id,
+        action=AuditAction.UPDATE,
+        entity_type=AuditEntityType.READING,
+        entity_id=reading.id,
+        diff={"photo": {"action": "replaced" if previous else "set"}},
+        ip_address=client_ip(request),
+    )
+    db.commit()
+    db.refresh(reading)
+    # Altes Foto erst nach DB-Commit entfernen — vermeidet Daten-Verlust,
+    # falls das Commit fehlschlägt.
+    if previous and previous != new_basename:
+        delete_photo(previous)
+    return _to_read(reading)
+
+
+@router.delete("/readings/{reading_id}/photo", status_code=204)
+def delete_reading_photo(
+    reading_id: int,
+    request: Request,
+    db: DbDep,
+    user: CurrentUser,
+) -> None:
+    reading = db.get(Reading, reading_id)
+    if reading is None:
+        raise ProblemError(status_code=404, title="Reading not found")
+    assert_can_access_register(db, user, reading.register_id)
+    if not _can_edit(user, reading):
+        raise ProblemError(status_code=403, title="Cannot edit this reading")
+    if reading.photo_path is None:
+        # Kein Foto vorhanden — idempotent als 204 zurückgeben.
+        return
+    previous = reading.photo_path
+    reading.photo_path = None
+    record(
+        db,
+        user_id=user.id,
+        action=AuditAction.UPDATE,
+        entity_type=AuditEntityType.READING,
+        entity_id=reading.id,
+        diff={"photo": {"action": "removed"}},
+        ip_address=client_ip(request),
+    )
+    db.commit()
+    delete_photo(previous)
+
+
+@router.get("/readings/{reading_id}/photo")
+def get_reading_photo(
+    reading_id: int,
+    db: DbDep,
+    user: CurrentUser,
+) -> Response:
+    reading = db.get(Reading, reading_id)
+    if reading is None:
+        raise ProblemError(status_code=404, title="Reading not found")
+    # Auslieferung läuft über die API (nicht StaticFiles), damit der
+    # Recorder-MP-Filter greift — sonst könnten User mit der URL fremde
+    # Fotos laden.
+    assert_can_access_register(db, user, reading.register_id)
+    if reading.photo_path is None:
+        raise ProblemError(status_code=404, title="No photo for this reading")
+    try:
+        path = photo_full_path(reading.photo_path)
+    except ValueError as exc:
+        raise ProblemError(status_code=404, title="Photo file not found") from exc
+    if not path.is_file():
+        raise ProblemError(status_code=404, title="Photo file not found")
+    # ``no-store`` verhindert, dass der Service Worker (VitePWA, NetworkFirst)
+    # nach einem Ersetzen das alte Bild aus dem Cache liefert.
+    return FileResponse(
+        path,
+        media_type="image/jpeg",
+        headers={"Cache-Control": "private, no-store"},
+    )
 
 
 @router.get(

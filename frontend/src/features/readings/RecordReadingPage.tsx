@@ -1,7 +1,7 @@
-import { lazy, memo, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
+import { lazy, memo, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Check, Gauge, QrCode } from 'lucide-react';
+import { Camera, Check, Gauge, QrCode, X } from 'lucide-react';
 
 import {
   Button,
@@ -345,17 +345,21 @@ function ReadingsForm({
   const [values, setValues] = useState<Record<number, string>>({});
   const [readingAt, setReadingAt] = useState(nowForInput());
   const [note, setNote] = useState('');
+  const [photo, setPhoto] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [photoWarning, setPhotoWarning] = useState<string | null>(null);
 
   // Reset, wenn die MP wechselt.
   useEffect(() => {
     setValues({});
     setReadingAt(nowForInput());
     setNote('');
+    setPhoto(null);
     setSuccess(null);
     setError(null);
+    setPhotoWarning(null);
   }, [mp.id]);
 
   // Stabile Referenz, damit React.memo in RegisterRow greift und nur die
@@ -382,6 +386,7 @@ function ReadingsForm({
     e.preventDefault();
     setError(null);
     setSuccess(null);
+    setPhotoWarning(null);
     const filled = registers
       .map((ar) => ({
         ar,
@@ -394,6 +399,7 @@ function ReadingsForm({
     }
     setBusy(true);
     let savedCount = 0;
+    const savedIds: number[] = [];
     try {
       for (const { ar, raw } of filled) {
         let numeric: string;
@@ -405,8 +411,9 @@ function ReadingsForm({
           }
           throw err;
         }
+        let saved: ReadingRead | null = null;
         try {
-          await postOne(ar.register.id, numeric, false);
+          saved = await postOne(ar.register.id, numeric, false);
         } catch (err) {
           if (err instanceof ApiError && isPlausibilityWarning(err)) {
             const detail = err.problem.detail ?? err.problem.title;
@@ -414,21 +421,48 @@ function ReadingsForm({
               `${ar.register.label} (${ar.register.obis_code}): ${detail}\n\nTrotzdem speichern?`,
             );
             if (!ok) continue;
-            await postOne(ar.register.id, numeric, true);
+            saved = await postOne(ar.register.id, numeric, true);
           } else {
             throw err;
           }
         }
-        savedCount += 1;
+        if (saved !== null) {
+          savedCount += 1;
+          savedIds.push(saved.id);
+        }
+      }
+      // Foto-Upload für alle erfolgreich gespeicherten Readings dieses
+      // Submits. Läuft NACH den Reading-POSTs (CLAUDE.md: "Foto-Uploads
+      // NICHT in der DB-Transaktion"), und blockt nicht den Erfolgs-Toast:
+      // wenn das Foto scheitert, bleibt der Stand erhalten, der User
+      // bekommt eine separate Warnung.
+      let photoUploaded = 0;
+      if (photo && savedIds.length > 0) {
+        for (const id of savedIds) {
+          const fd = new FormData();
+          fd.append('photo', photo);
+          try {
+            await api.upload<ReadingRead>(`/readings/${id}/photo`, fd);
+            photoUploaded += 1;
+          } catch (err) {
+            const reason =
+              err instanceof ApiError ? (err.problem.detail ?? err.problem.title) : 'unbekannt';
+            setPhotoWarning(
+              `Foto konnte nicht hochgeladen werden (${reason}). Du kannst es später im Bearbeiten-Dialog nachreichen.`,
+            );
+            break;
+          }
+        }
       }
       if (savedCount > 0) {
-        setSuccess(
+        const baseMsg =
           savedCount === 1
             ? '1 Stand gespeichert.'
-            : `${savedCount} Stände gespeichert (${formatDateTimeDe(readingAt)}).`,
-        );
+            : `${savedCount} Stände gespeichert (${formatDateTimeDe(readingAt)}).`;
+        setSuccess(photoUploaded > 0 ? `${baseMsg} Foto angehängt.` : baseMsg);
         setValues({});
         setNote('');
+        setPhoto(null);
         onSaved();
       }
     } catch (err) {
@@ -479,12 +513,27 @@ function ReadingsForm({
         </div>
       </Section>
 
+      <Section header="Foto (optional)">
+        <div className="p-5">
+          <PhotoPicker photo={photo} onChange={setPhoto} />
+        </div>
+      </Section>
+
       {error ? (
         <div
           data-testid="record-error"
           className="border-danger/40 bg-danger/10 rounded-card border-hairline p-3 text-caption text-danger"
         >
           {error}
+        </div>
+      ) : null}
+      {photoWarning ? (
+        <div
+          data-testid="record-photo-warning"
+          className="border-warning/40 bg-warning/10 rounded-card border-hairline p-3 text-caption text-secondary"
+          style={{ borderColor: 'var(--gas)' }}
+        >
+          {photoWarning}
         </div>
       ) : null}
       {success ? (
@@ -498,6 +547,92 @@ function ReadingsForm({
 
       <StickySave busy={busy} disabled={registers.length === 0} />
     </form>
+  );
+}
+
+function PhotoPicker({
+  photo,
+  onChange,
+}: {
+  photo: File | null;
+  onChange: (file: File | null) => void;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!photo) {
+      setPreviewUrl(null);
+      return;
+    }
+    const url = URL.createObjectURL(photo);
+    setPreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [photo]);
+
+  function onFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0] ?? null;
+    onChange(file);
+    // Reset, damit dieselbe Datei nach "Entfernen" erneut wählbar ist.
+    e.target.value = '';
+  }
+
+  return (
+    <div className="space-y-3">
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        onChange={onFileChange}
+        className="hidden"
+        data-testid="record-photo-input"
+      />
+      {previewUrl ? (
+        <div className="flex items-center gap-3">
+          <img
+            src={previewUrl}
+            alt="Vorschau"
+            className="h-24 w-24 rounded-card border-hairline border-border object-cover"
+          />
+          <div className="flex flex-1 flex-col gap-2">
+            <div className="text-caption text-tertiary">
+              {photo?.name} · {photo ? Math.round(photo.size / 1024) : 0} KB
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              <Button
+                type="button"
+                variant="bordered"
+                size="sm"
+                leftIcon={<Camera size={14} />}
+                onClick={() => inputRef.current?.click()}
+              >
+                Anderes Foto
+              </Button>
+              <Button
+                type="button"
+                variant="plain"
+                size="sm"
+                leftIcon={<X size={14} />}
+                onClick={() => onChange(null)}
+                className="text-danger"
+              >
+                Entfernen
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <Button
+          type="button"
+          variant="bordered"
+          leftIcon={<Camera size={16} />}
+          onClick={() => inputRef.current?.click()}
+        >
+          Foto aufnehmen
+        </Button>
+      )}
+    </div>
   );
 }
 

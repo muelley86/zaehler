@@ -124,6 +124,7 @@ export interface ReadingRead {
   created_at: string;
   created_by_user_id: number | null;
   created_by_username: string | null;
+  has_photo: boolean;
 }
 
 export interface ConsumptionPoint {

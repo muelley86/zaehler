@@ -1,8 +1,9 @@
-import { memo, useCallback, useEffect, useMemo, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
-import { Download, Pencil, Search, Trash2 } from 'lucide-react';
+import { Camera, Download, ImageIcon, Pencil, Search, Trash2, X } from 'lucide-react';
 
 import { useAuth } from '@/features/auth/auth-context';
+import { PhotoLightbox } from '@/features/readings/PhotoLightbox';
 import {
   Button,
   EmptyState,
@@ -77,6 +78,7 @@ export function ReadingsListPage() {
   const [tick, setTick] = useState(0);
 
   const [editTarget, setEditTarget] = useState<EditTarget | null>(null);
+  const [lightboxReadingId, setLightboxReadingId] = useState<number | null>(null);
 
   const [locationFilter, setLocationFilter] = useState<Set<number | null>>(new Set());
   const [typeFilter, setTypeFilter] = useState<Set<MeterType>>(new Set());
@@ -524,6 +526,7 @@ export function ReadingsListPage() {
                       me={me}
                       setEditTarget={setEditTarget}
                       onChanged={refresh}
+                      onOpenPhoto={setLightboxReadingId}
                     />
                   ),
                 )}
@@ -560,6 +563,10 @@ export function ReadingsListPage() {
           />
         ) : null}
       </Sheet>
+
+      {lightboxReadingId !== null ? (
+        <PhotoLightbox readingId={lightboxReadingId} onClose={() => setLightboxReadingId(null)} />
+      ) : null}
     </PageContainer>
   );
 }
@@ -604,6 +611,7 @@ const ReadingItem = memo(function ReadingItem({
   me,
   setEditTarget,
   onChanged,
+  onOpenPhoto,
 }: {
   reading: ReadingRead;
   info: RegisterIndex;
@@ -612,6 +620,7 @@ const ReadingItem = memo(function ReadingItem({
   me: Me | null;
   setEditTarget: (target: EditTarget) => void;
   onChanged: () => void;
+  onOpenPhoto: (id: number) => void;
 }) {
   const editable = me ? canEdit(me, reading) : false;
   const correction = kind === 'correction';
@@ -661,6 +670,19 @@ const ReadingItem = memo(function ReadingItem({
               <span className="rounded-full bg-[color-mix(in_oklch,var(--gas),transparent_82%)] px-2 py-0.5 text-caption font-semibold text-gas">
                 Korrektur
               </span>
+            ) : null}
+            {reading.has_photo ? (
+              <button
+                type="button"
+                onClick={() => onOpenPhoto(reading.id)}
+                aria-label="Foto anzeigen"
+                title="Foto anzeigen"
+                data-testid="reading-photo-indicator"
+                className="inline-flex items-center gap-1 rounded-full bg-fill px-2 py-0.5 text-caption text-primary hover:bg-fill-strong"
+              >
+                <ImageIcon size={12} />
+                Foto
+              </button>
             ) : null}
           </div>
           <div className="num text-caption text-tertiary">
@@ -824,6 +846,8 @@ function EditForm({
   const [value, setValue] = useState(reading.value.replace('.', ','));
   const [readingAt, setReadingAt] = useState(toInputDateTime(reading.reading_at));
   const [note, setNote] = useState(reading.note ?? '');
+  const [pendingPhoto, setPendingPhoto] = useState<File | null>(null);
+  const [removePhoto, setRemovePhoto] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -839,12 +863,23 @@ function EditForm({
     await api.patch(`/readings/${reading.id}`, body);
   }
 
+  async function applyPhotoChange(): Promise<void> {
+    if (pendingPhoto) {
+      const fd = new FormData();
+      fd.append('photo', pendingPhoto);
+      await api.upload<ReadingRead>(`/readings/${reading.id}/photo`, fd);
+    } else if (removePhoto && reading.has_photo) {
+      await api.delete(`/readings/${reading.id}/photo`);
+    }
+  }
+
   async function save(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setBusy(true);
     setError(null);
     try {
       await patchOnce(false);
+      await applyPhotoChange();
       onSaved();
     } catch (err) {
       if (err instanceof ApiError && isPlausibilityWarning(err)) {
@@ -852,6 +887,7 @@ function EditForm({
         if (window.confirm(`${detail}\n\nTrotzdem speichern?`)) {
           try {
             await patchOnce(true);
+            await applyPhotoChange();
             onSaved();
           } catch (retryErr) {
             if (retryErr instanceof ApiError) {
@@ -899,6 +935,26 @@ function EditForm({
         onChange={(e) => setNote(e.target.value)}
         error={error}
       />
+
+      <PhotoEditField
+        readingId={reading.id}
+        hasExisting={reading.has_photo}
+        pending={pendingPhoto}
+        removeExisting={removePhoto}
+        onPick={(file) => {
+          setPendingPhoto(file);
+          setRemovePhoto(false);
+        }}
+        onRemove={() => {
+          setPendingPhoto(null);
+          setRemovePhoto(true);
+        }}
+        onUndo={() => {
+          setPendingPhoto(null);
+          setRemovePhoto(false);
+        }}
+      />
+
       <div className="flex gap-2">
         <Button type="submit" variant="filled" disabled={busy} fullWidth>
           {busy ? 'Speichere…' : 'Speichern'}
@@ -908,6 +964,141 @@ function EditForm({
         </Button>
       </div>
     </form>
+  );
+}
+
+function PhotoEditField({
+  readingId,
+  hasExisting,
+  pending,
+  removeExisting,
+  onPick,
+  onRemove,
+  onUndo,
+}: {
+  readingId: number;
+  hasExisting: boolean;
+  pending: File | null;
+  removeExisting: boolean;
+  onPick: (file: File) => void;
+  onRemove: () => void;
+  onUndo: () => void;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [pendingUrl, setPendingUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!pending) {
+      setPendingUrl(null);
+      return;
+    }
+    const url = URL.createObjectURL(pending);
+    setPendingUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [pending]);
+
+  function onFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (file) onPick(file);
+    e.target.value = '';
+  }
+
+  const showPending = pending !== null;
+  const showRemovedHint = !showPending && removeExisting;
+  const showExisting = !showPending && !removeExisting && hasExisting;
+  const showAddCta = !showPending && !removeExisting && !hasExisting;
+
+  return (
+    <div className="space-y-2">
+      <div className="text-caption-bold uppercase text-tertiary">Foto</div>
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        onChange={onFileChange}
+        className="hidden"
+        data-testid="edit-photo-input"
+      />
+      {showExisting ? (
+        <div className="flex items-center gap-3">
+          <img
+            src={`/api/v1/readings/${readingId}/photo`}
+            alt="Aktuelles Foto"
+            className="h-24 w-24 rounded-card border-hairline border-border object-cover"
+          />
+          <div className="flex flex-wrap gap-1.5">
+            <Button
+              type="button"
+              variant="bordered"
+              size="sm"
+              leftIcon={<Camera size={14} />}
+              onClick={() => inputRef.current?.click()}
+            >
+              Ersetzen
+            </Button>
+            <Button
+              type="button"
+              variant="plain"
+              size="sm"
+              leftIcon={<X size={14} />}
+              onClick={onRemove}
+              className="text-danger"
+            >
+              Entfernen
+            </Button>
+          </div>
+        </div>
+      ) : null}
+      {showPending && pendingUrl ? (
+        <div className="flex items-center gap-3">
+          <img
+            src={pendingUrl}
+            alt="Neue Vorschau"
+            className="h-24 w-24 rounded-card border-hairline border-border object-cover"
+          />
+          <div className="flex flex-wrap gap-1.5">
+            <Button
+              type="button"
+              variant="bordered"
+              size="sm"
+              leftIcon={<Camera size={14} />}
+              onClick={() => inputRef.current?.click()}
+            >
+              Anderes Foto
+            </Button>
+            <Button
+              type="button"
+              variant="plain"
+              size="sm"
+              leftIcon={<X size={14} />}
+              onClick={onUndo}
+            >
+              Verwerfen
+            </Button>
+          </div>
+        </div>
+      ) : null}
+      {showRemovedHint ? (
+        <div className="flex items-center justify-between gap-3 rounded-card border-hairline border-border bg-fill p-3 text-caption text-secondary">
+          <span>Foto wird beim Speichern entfernt.</span>
+          <Button type="button" variant="plain" size="sm" onClick={onUndo}>
+            Doch behalten
+          </Button>
+        </div>
+      ) : null}
+      {showAddCta ? (
+        <Button
+          type="button"
+          variant="bordered"
+          size="sm"
+          leftIcon={<Camera size={14} />}
+          onClick={() => inputRef.current?.click()}
+        >
+          Foto hinzufügen
+        </Button>
+      ) : null}
+    </div>
   );
 }
 

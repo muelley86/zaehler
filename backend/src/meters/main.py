@@ -54,6 +54,10 @@ def create_app() -> FastAPI:
     install_security_headers(app)
     install_origin_check(app)
     install_problem_handlers(app)
+    # Foto-Verzeichnis bei Bedarf anlegen — kein Boot-Fail, falls das
+    # Volume noch nicht existiert (erster Container-Start). Pillow-Save
+    # würde sonst FileNotFoundError werfen.
+    settings.media_dir.mkdir(parents=True, exist_ok=True)
     app.include_router(api_router)
 
     @app.get("/api/v1/health", tags=["health"])
