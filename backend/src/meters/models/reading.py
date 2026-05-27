@@ -36,6 +36,12 @@ class Reading(Base, TimestampMixin):
     reading_at: Mapped[datetime] = mapped_column(nullable=False, index=True)
     note: Mapped[str | None] = mapped_column(String(500))
     photo_path: Mapped[str | None] = mapped_column(String(255))
+    # GPS-Koordinaten aus dem EXIF des Fotos. Werden beim Upload einmal
+    # extrahiert und in der DB abgelegt, damit das Anzeige-UI sie ohne
+    # Re-Parsen des Bildes anzeigen kann. Beide NULL = kein Foto oder
+    # Foto ohne GPS-Tags.
+    photo_lat: Mapped[float | None] = mapped_column(nullable=True)
+    photo_lon: Mapped[float | None] = mapped_column(nullable=True)
     # NOT NULL erzwingt CLAUDE.md-Invariante "wird IMMER gesetzt".
     # ondelete=SET NULL kombiniert mit NOT NULL ist effektives RESTRICT:
     # ein User-Hard-Delete scheitert, solange noch Readings dranhängen.

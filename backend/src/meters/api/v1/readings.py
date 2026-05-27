@@ -68,6 +68,8 @@ def _to_read(reading: Reading) -> ReadingRead:
         created_by_user_id=reading.created_by_user_id,
         created_by_username=reading.created_by.username if reading.created_by else None,
         has_photo=reading.photo_path is not None,
+        photo_lat=reading.photo_lat,
+        photo_lon=reading.photo_lon,
     )
 
 
@@ -393,8 +395,10 @@ def upload_reading_photo(
         raise ProblemError(status_code=403, title="Cannot edit this reading")
 
     previous = reading.photo_path
-    new_basename = save_photo(reading.id, photo)
+    new_basename, gps = save_photo(reading.id, photo)
     reading.photo_path = new_basename
+    reading.photo_lat = gps[0] if gps is not None else None
+    reading.photo_lon = gps[1] if gps is not None else None
     record(
         db,
         user_id=user.id,
@@ -431,6 +435,8 @@ def delete_reading_photo(
         return
     previous = reading.photo_path
     reading.photo_path = None
+    reading.photo_lat = None
+    reading.photo_lon = None
     record(
         db,
         user_id=user.id,

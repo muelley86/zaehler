@@ -79,7 +79,11 @@ export function ReadingsListPage() {
   const [tick, setTick] = useState(0);
 
   const [editTarget, setEditTarget] = useState<EditTarget | null>(null);
-  const [lightboxReadingId, setLightboxReadingId] = useState<number | null>(null);
+  const [lightboxPhoto, setLightboxPhoto] = useState<{
+    id: number;
+    lat: number | null;
+    lon: number | null;
+  } | null>(null);
 
   const [locationFilter, setLocationFilter] = useState<Set<number | null>>(new Set());
   const [typeFilter, setTypeFilter] = useState<Set<MeterType>>(new Set());
@@ -527,7 +531,7 @@ export function ReadingsListPage() {
                       me={me}
                       setEditTarget={setEditTarget}
                       onChanged={refresh}
-                      onOpenPhoto={setLightboxReadingId}
+                      onOpenPhoto={setLightboxPhoto}
                     />
                   ),
                 )}
@@ -565,8 +569,13 @@ export function ReadingsListPage() {
         ) : null}
       </Sheet>
 
-      {lightboxReadingId !== null ? (
-        <PhotoLightbox readingId={lightboxReadingId} onClose={() => setLightboxReadingId(null)} />
+      {lightboxPhoto !== null ? (
+        <PhotoLightbox
+          readingId={lightboxPhoto.id}
+          lat={lightboxPhoto.lat}
+          lon={lightboxPhoto.lon}
+          onClose={() => setLightboxPhoto(null)}
+        />
       ) : null}
     </PageContainer>
   );
@@ -621,7 +630,7 @@ const ReadingItem = memo(function ReadingItem({
   me: Me | null;
   setEditTarget: (target: EditTarget) => void;
   onChanged: () => void;
-  onOpenPhoto: (id: number) => void;
+  onOpenPhoto: (photo: { id: number; lat: number | null; lon: number | null }) => void;
 }) {
   const editable = me ? canEdit(me, reading) : false;
   const correction = kind === 'correction';
@@ -675,7 +684,13 @@ const ReadingItem = memo(function ReadingItem({
             {reading.has_photo ? (
               <button
                 type="button"
-                onClick={() => onOpenPhoto(reading.id)}
+                onClick={() =>
+                  onOpenPhoto({
+                    id: reading.id,
+                    lat: reading.photo_lat,
+                    lon: reading.photo_lon,
+                  })
+                }
                 aria-label="Foto anzeigen"
                 title="Foto anzeigen"
                 data-testid="reading-photo-indicator"
