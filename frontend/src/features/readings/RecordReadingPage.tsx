@@ -573,8 +573,19 @@ function PhotoPicker({
   function onFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0] ?? null;
     onChange(file);
-    // Reset, damit dieselbe Datei nach "Entfernen" erneut wählbar ist.
-    e.target.value = '';
+    // Kein "e.target.value = ''" direkt nach onChange — iOS Safari koppelt
+    // dabei den Blob-Storage des frisch ausgewaehlten File-Objekts ab, der
+    // anschliessende FormData-Upload sendet einen leeren Multipart-Part und
+    // das Backend antwortet mit 422 ("Field required"). Stattdessen wird
+    // der Input erst direkt vor dem naechsten Picker-Aufruf zurueckgesetzt
+    // (siehe ``pick`` unten) — damit kann der User auch dieselbe Datei
+    // erneut waehlen.
+  }
+
+  function pick() {
+    if (!inputRef.current) return;
+    inputRef.current.value = '';
+    inputRef.current.click();
   }
 
   return (
@@ -605,7 +616,7 @@ function PhotoPicker({
                 variant="bordered"
                 size="sm"
                 leftIcon={<Camera size={14} />}
-                onClick={() => inputRef.current?.click()}
+                onClick={pick}
               >
                 Anderes Foto
               </Button>
@@ -623,12 +634,7 @@ function PhotoPicker({
           </div>
         </div>
       ) : (
-        <Button
-          type="button"
-          variant="bordered"
-          leftIcon={<Camera size={16} />}
-          onClick={() => inputRef.current?.click()}
-        >
+        <Button type="button" variant="bordered" leftIcon={<Camera size={16} />} onClick={pick}>
           Foto aufnehmen
         </Button>
       )}
