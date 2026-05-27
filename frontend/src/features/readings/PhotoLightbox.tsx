@@ -60,27 +60,27 @@ export function PhotoLightbox({
       {hasGps ? (
         <div
           data-testid="photo-lightbox-gps"
-          className="absolute bottom-4 left-1/2 flex max-w-full -translate-x-1/2 flex-wrap items-center gap-3 rounded-card bg-black/70 px-4 py-3 text-caption text-white backdrop-blur"
+          className="absolute bottom-[calc(env(safe-area-inset-bottom)+1rem)] left-1/2 flex max-w-[calc(100%-1rem)] -translate-x-1/2 flex-wrap items-center justify-center gap-2 rounded-card bg-black/70 px-4 py-3 text-caption text-white backdrop-blur"
           onClick={(e) => e.stopPropagation()}
         >
-          <MapPin size={14} aria-hidden />
-          <span className="num">
-            {lat.toFixed(6)}, {lon.toFixed(6)}
+          <span className="flex items-center gap-1.5">
+            <MapPin size={14} aria-hidden />
+            <span className="num">
+              {lat.toFixed(6)}, {lon.toFixed(6)}
+            </span>
           </span>
-          <div className="flex flex-wrap gap-2">
-            {MAP_PROVIDERS.map((p) => (
-              <a
-                key={p.id}
-                href={p.url(lat, lon)}
-                target="_blank"
-                rel="noopener noreferrer"
-                data-testid={`photo-lightbox-map-${p.id}`}
-                className="rounded-pill bg-white/15 px-3 py-1 font-semibold text-white hover:bg-white/25"
-              >
-                {p.label}
-              </a>
-            ))}
-          </div>
+          {MAP_PROVIDERS.map((p) => (
+            <a
+              key={p.id}
+              href={p.url(lat, lon)}
+              target="_blank"
+              rel="noopener noreferrer"
+              data-testid={`photo-lightbox-map-${p.id}`}
+              className="rounded-pill bg-white/15 px-3 py-1 font-semibold text-white hover:bg-white/25"
+            >
+              {p.label}
+            </a>
+          ))}
         </div>
       ) : null}
     </div>
