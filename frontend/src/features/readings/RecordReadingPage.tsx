@@ -15,7 +15,7 @@ import {
 } from '@/components/ui';
 import { PageGlows } from '@/components/PageGlows';
 import { ApiError, api, isPlausibilityWarning } from '@/lib/api';
-import { formatDateTimeDe, formatDe, nowForInput, parseDe } from '@/lib/format';
+import { formatDateTimeDe, formatDe, localInputToIso, nowForInput, parseDe } from '@/lib/format';
 import { describeMeterType } from '@/lib/meterLabels';
 import type {
   DeliveryRead,
@@ -376,7 +376,7 @@ function ReadingsForm({
     return api.post<ReadingRead>('/readings', {
       register_id: registerId,
       value: numeric,
-      reading_at: readingAt,
+      reading_at: localInputToIso(readingAt),
       note: note || null,
       acknowledge_warnings: acknowledge,
     });
@@ -438,9 +438,6 @@ function ReadingsForm({
       // bekommt eine separate Warnung.
       let photoUploaded = 0;
       if (photo && savedIds.length > 0) {
-        // DIAGNOSE (temporaer): Trace-String vorbereiten, damit wir bei
-        // einem 422 auf dem iPhone sehen, was tatsaechlich rausging.
-        const trace = `name="${photo.name || '(leer)'}" size=${photo.size} type="${photo.type || '(leer)'}"`;
         for (const id of savedIds) {
           const fd = new FormData();
           fd.append('photo', photo);
@@ -450,7 +447,9 @@ function ReadingsForm({
           } catch (err) {
             const reason =
               err instanceof ApiError ? (err.problem.detail ?? err.problem.title) : 'unbekannt';
-            setPhotoWarning(`Foto-Upload fehlgeschlagen (${reason}). [DIAG: ${trace}]`);
+            setPhotoWarning(
+              `Foto konnte nicht hochgeladen werden (${reason}). Du kannst es später im Bearbeiten-Dialog nachreichen.`,
+            );
             break;
           }
         }
@@ -589,13 +588,6 @@ function PhotoPicker({
     inputRef.current.click();
   }
 
-  // DIAGNOSE (temporaer): zeigt den photo-State + Preview-URL-Status auch
-  // ohne sichtbare Vorschau an. Auf iOS-PWA gibt es keinen Web-Inspector;
-  // dieser Bereich macht den State-Lauf des Pickers sichtbar.
-  const debugLine = photo
-    ? `File: ${photo.name || '(ohne Name)'} · ${photo.size} bytes · type="${photo.type || '(leer)'}" · preview=${previewUrl ? 'ok' : 'fehlt'}`
-    : 'Kein Foto gewählt.';
-
   return (
     <div className="space-y-3">
       <input
@@ -607,12 +599,6 @@ function PhotoPicker({
         className="hidden"
         data-testid="record-photo-input"
       />
-      <div
-        data-testid="record-photo-debug"
-        className="rounded-card border-hairline border-border bg-fill p-2 text-caption text-tertiary"
-      >
-        {debugLine}
-      </div>
       {previewUrl ? (
         <div className="flex items-center gap-3">
           <img
@@ -777,7 +763,7 @@ function DeliveryForm({
       const numeric = parseDe(amount);
       const created = await api.post<DeliveryRead>(`/registers/${registerId}/deliveries`, {
         amount: numeric,
-        delivery_at: deliveryAt,
+        delivery_at: localInputToIso(deliveryAt),
         note: note || null,
       });
       setSuccess(

@@ -123,6 +123,22 @@ export function nowForInput(): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
+/**
+ * Wandelt einen lokalen `<input type="datetime-local">`-String
+ * (z. B. ``"2026-05-27T22:00"``) in einen UTC-ISO-String mit Z-Suffix um.
+ *
+ * Hintergrund: Das Backend interpretiert naive Datetime-Strings als UTC
+ * (siehe ``_reject_future_timestamp`` in ``schemas/reading.py``). Wenn das
+ * Frontend lokale Zeiten direkt sendet, sind sie aus Backend-Sicht um den
+ * lokalen UTC-Offset in der Zukunft — der Future-Reject-Validator
+ * antwortet dann mit 422. Diese Konvertierung schließt diesen Mismatch.
+ */
+export function localInputToIso(local: string): string {
+  if (!local) return local;
+  const d = new Date(local);
+  return Number.isNaN(d.getTime()) ? local : d.toISOString();
+}
+
 /** Wandelt ISO-DateTime-String aus Backend in datetime-local-Form für `<input>`. */
 export function toInputDateTime(iso: string | null | undefined): string {
   if (!iso) return '';

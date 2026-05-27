@@ -357,3 +357,46 @@ def test_recorder_24h_boundary(
         assert login.status_code == 200
         edit = recorder.patch(f"/api/v1/readings/{rid}", json={"note": "spät"})
         assert edit.status_code == 403
+
+
+def test_reading_at_now_with_z_suffix_is_accepted(admin_client: TestClient) -> None:
+    """Frontend muss aware ISO mit Z senden — sonst wuerde der Backend-
+    Future-Validator naive Strings als UTC interpretieren und lokale
+    Zeiten aus Zonen oestlich von UTC als Zukunft verwerfen.
+
+    Dokumentiert, dass das Backend "jetzt" als aware ISO-Z akzeptiert.
+    """
+    from datetime import UTC, datetime
+
+    register_id = _setup_water_mp(admin_client)
+    now_z = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+    resp = admin_client.post(
+        "/api/v1/readings",
+        json={"register_id": register_id, "value": "200.0", "reading_at": now_z},
+    )
+    assert resp.status_code == 201, resp.text
+
+
+def test_reading_at_naive_local_time_two_hours_ahead_rejected(
+    admin_client: TestClient,
+) -> None:
+    """Negativ-Doku: ein naiver String, der als UTC um den lokalen Offset
+    in der Zukunft liegt (z. B. CEST-User sendet 22:00 ohne Z, Backend
+    liest 22:00 UTC waehrend echtes Jetzt 20:00 UTC ist), wird vom
+    Future-Validator mit 422 abgelehnt. Genau dieser Pfad war der Bug
+    vor dem ``localInputToIso``-Frontend-Fix.
+    """
+    from datetime import UTC, datetime, timedelta
+
+    register_id = _setup_water_mp(admin_client)
+    # +2h naiv (kein Z, keine Offset-Angabe) simuliert lokale CEST-Zeit,
+    # die das Backend irrtuemlich als UTC liest.
+    future_naive = (datetime.now(UTC) + timedelta(hours=2)).strftime("%Y-%m-%dT%H:%M:%S")
+    resp = admin_client.post(
+        "/api/v1/readings",
+        json={"register_id": register_id, "value": "200.0", "reading_at": future_naive},
+    )
+    assert resp.status_code == 422
+    body = resp.json()
+    assert "errors" in body
+    assert any("Zukunft" in str(e) for e in body["errors"])

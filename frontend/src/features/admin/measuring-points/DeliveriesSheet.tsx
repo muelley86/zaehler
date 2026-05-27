@@ -4,7 +4,7 @@ import { Trash2 } from 'lucide-react';
 
 import { Button, Sheet, TextField } from '@/components/ui';
 import { ApiError, api } from '@/lib/api';
-import { formatDateTimeDe, formatDe, nowForInput, parseDe } from '@/lib/format';
+import { formatDateTimeDe, formatDe, localInputToIso, nowForInput, parseDe } from '@/lib/format';
 import type { DeliveryRead, RegisterRead } from '@/lib/types';
 
 export function DeliveriesSheet({
@@ -42,7 +42,7 @@ export function DeliveriesSheet({
     try {
       const numeric = parseDe(amount);
       await api.post(`/registers/${register.id}/deliveries`, {
-        delivery_at: deliveryAt,
+        delivery_at: localInputToIso(deliveryAt),
         amount: numeric,
         note: note || null,
       });
