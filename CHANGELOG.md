@@ -10,6 +10,14 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.14.0](https://github.com/muelley86/zaehler/compare/v2.13.0...v2.14.0) (2026-05-27)
+
+
+### Funktionen
+
+* **readings:** Galerie-Upload + Browser-Geolocation als GPS-Fallback ([#64](https://github.com/muelley86/zaehler/issues/64)) ([4e23007](https://github.com/muelley86/zaehler/commit/4e230076062d29dc56a9bb0f70e71eea9a8859a0))
+* **ui:** App-Version im Sidebar-Footer ueber dem Profil anzeigen ([#65](https://github.com/muelley86/zaehler/issues/65)) ([922403a](https://github.com/muelley86/zaehler/commit/922403a6d5cd03ff66bffb52763154b01f0ce5e5))
+
 ## [2.13.0](https://github.com/muelley86/zaehler/compare/v2.12.1...v2.13.0) (2026-05-27)
 
 
