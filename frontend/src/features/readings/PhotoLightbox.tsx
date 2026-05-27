@@ -1,14 +1,29 @@
 import { useEffect } from 'react';
-import { X } from 'lucide-react';
+import { MapPin, X } from 'lucide-react';
+
+import { MAP_PROVIDERS } from '@/components/LocationMapSheet';
 
 /**
  * Vollbild-Anzeige des an einem Reading hängenden Fotos.
  *
  * Das Bild kommt direkt vom Backend (``/api/v1/readings/{id}/photo``);
  * der Browser schickt das Session-Cookie automatisch mit (Same-Origin).
- * Schließt auf Klick außerhalb des Bildes oder ESC.
+ * Schließt auf Klick außerhalb des Bildes oder ESC. Wenn das Foto im EXIF
+ * GPS-Koordinaten hatte (Backend hat sie beim Upload extrahiert), wird am
+ * unteren Rand eine Info-Bar mit Koordinaten + Links auf OSM/Google/Apple
+ * Maps eingeblendet.
  */
-export function PhotoLightbox({ readingId, onClose }: { readingId: number; onClose: () => void }) {
+export function PhotoLightbox({
+  readingId,
+  lat,
+  lon,
+  onClose,
+}: {
+  readingId: number;
+  lat: number | null;
+  lon: number | null;
+  onClose: () => void;
+}) {
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.key === 'Escape') onClose();
@@ -16,6 +31,8 @@ export function PhotoLightbox({ readingId, onClose }: { readingId: number; onClo
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
   }, [onClose]);
+
+  const hasGps = lat !== null && lon !== null;
 
   return (
     <div
@@ -40,6 +57,32 @@ export function PhotoLightbox({ readingId, onClose }: { readingId: number; onClo
         className="max-h-full max-w-full object-contain"
         onClick={(e) => e.stopPropagation()}
       />
+      {hasGps ? (
+        <div
+          data-testid="photo-lightbox-gps"
+          className="absolute bottom-4 left-1/2 flex max-w-full -translate-x-1/2 flex-wrap items-center gap-3 rounded-card bg-black/70 px-4 py-3 text-caption text-white backdrop-blur"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <MapPin size={14} aria-hidden />
+          <span className="num">
+            {lat.toFixed(6)}, {lon.toFixed(6)}
+          </span>
+          <div className="flex flex-wrap gap-2">
+            {MAP_PROVIDERS.map((p) => (
+              <a
+                key={p.id}
+                href={p.url(lat, lon)}
+                target="_blank"
+                rel="noopener noreferrer"
+                data-testid={`photo-lightbox-map-${p.id}`}
+                className="rounded-pill bg-white/15 px-3 py-1 font-semibold text-white hover:bg-white/25"
+              >
+                {p.label}
+              </a>
+            ))}
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

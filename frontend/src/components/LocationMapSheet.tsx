@@ -21,13 +21,18 @@ interface Props {
   name?: string;
 }
 
-interface Provider {
+export interface MapProvider {
   id: 'osm' | 'google' | 'apple';
   label: string;
   url: (lat: number, lon: number, name?: string) => string;
 }
 
-const PROVIDERS: Provider[] = [
+/**
+ * Externe Karten-Dienste, die zu einem Lat/Lon-Paar einen Link anbieten.
+ * Wird sowohl von {@link LocationMapSheet} als auch von der Foto-Lightbox
+ * verwendet — gleiche Buttons-Reihenfolge, gleiches Linkformat.
+ */
+export const MAP_PROVIDERS: MapProvider[] = [
   {
     id: 'osm',
     label: 'OpenStreetMap',
@@ -49,6 +54,9 @@ const PROVIDERS: Provider[] = [
     },
   },
 ];
+
+// Backwards-compat-Alias fuer die lokalen Verwendungen in dieser Datei.
+const PROVIDERS = MAP_PROVIDERS;
 
 export function LocationMapSheet({ open, onClose, latitude, longitude, name }: Props) {
   return (

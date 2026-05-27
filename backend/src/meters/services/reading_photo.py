@@ -51,8 +51,63 @@ _JPEG_QUALITY = 85
 _ORIENTATION_TAG = 0x0112
 
 
-def save_photo(reading_id: int, upload: UploadFile) -> str:
-    """Validiert, reencodiert und speichert das Foto. Liefert den Basename."""
+# GPS-Sub-IFD im EXIF (PIL.ExifTags.IFD.GPSInfo). Tag-IDs innerhalb des
+# Sub-IFD: 1=GPSLatitudeRef, 2=GPSLatitude, 3=GPSLongitudeRef, 4=GPSLongitude.
+_GPS_IFD_TAG = 0x8825
+
+
+def _dms_to_decimal(dms: object) -> float | None:
+    """Konvertiert ein GPS-Koordinaten-Tupel (Grad, Minute, Sekunde) in
+    Dezimalgrad. Pillow liefert die Werte meist als ``tuple`` von
+    ``IFDRational`` oder als ``tuple[float, float, float]``. Bei
+    unerwarteten Typen geben wir ``None`` zurueck statt zu crashen.
+    """
+    try:
+        if not isinstance(dms, tuple | list) or len(dms) != 3:
+            return None
+        deg, minutes, seconds = (float(v) for v in dms)
+    except (TypeError, ValueError):
+        return None
+    return deg + minutes / 60.0 + seconds / 3600.0
+
+
+def extract_gps(img: Image.Image) -> tuple[float, float] | None:
+    """Liest Latitude/Longitude aus dem GPS-Sub-IFD des Bildes.
+
+    Gibt ``None`` zurueck, wenn das Bild keinen GPS-Tag hat oder die
+    Werte nicht plausibel sind (z. B. ausserhalb [-90, 90] / [-180, 180]).
+    """
+    try:
+        gps = img.getexif().get_ifd(_GPS_IFD_TAG)
+    except (AttributeError, KeyError):
+        return None
+    if not gps:
+        return None
+    lat_ref = gps.get(1)
+    lat_raw = gps.get(2)
+    lon_ref = gps.get(3)
+    lon_raw = gps.get(4)
+    if lat_ref is None or lat_raw is None or lon_ref is None or lon_raw is None:
+        return None
+    lat = _dms_to_decimal(lat_raw)
+    lon = _dms_to_decimal(lon_raw)
+    if lat is None or lon is None:
+        return None
+    if str(lat_ref).upper().startswith("S"):
+        lat = -lat
+    if str(lon_ref).upper().startswith("W"):
+        lon = -lon
+    if not (-90.0 <= lat <= 90.0) or not (-180.0 <= lon <= 180.0):
+        return None
+    return (lat, lon)
+
+
+def save_photo(reading_id: int, upload: UploadFile) -> tuple[str, tuple[float, float] | None]:
+    """Validiert, reencodiert und speichert das Foto.
+
+    Liefert ``(basename, gps_or_None)``. ``gps`` ist das ``(lat, lon)``-Tupel
+    aus dem EXIF (falls vorhanden), sonst ``None``.
+    """
     content_type = (upload.content_type or "").lower()
     if content_type == "image/heic" or content_type == "image/heif":
         raise ProblemError(
@@ -97,6 +152,10 @@ def save_photo(reading_id: int, upload: UploadFile) -> str:
         del exif_obj[_ORIENTATION_TAG]
     exif_bytes = exif_obj.tobytes() if len(exif_obj) > 0 else b""
 
+    # GPS-Koordinaten VOR dem Resize/Convert lesen — beides aendert das
+    # EXIF nicht, aber so haben wir den Zustand des Original-Bilds.
+    gps = extract_gps(img)
+
     img.thumbnail((MAX_DIMENSION, MAX_DIMENSION), Image.Resampling.LANCZOS)
 
     if img.mode not in ("RGB", "L"):
@@ -120,7 +179,7 @@ def save_photo(reading_id: int, upload: UploadFile) -> str:
             title="Photo storage failed",
             detail="Foto konnte nicht gespeichert werden.",
         ) from exc
-    return basename
+    return basename, gps
 
 
 def photo_full_path(basename: str) -> Path:
