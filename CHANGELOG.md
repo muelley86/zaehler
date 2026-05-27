@@ -10,6 +10,13 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.13.0](https://github.com/muelley86/zaehler/compare/v2.12.1...v2.13.0) (2026-05-27)
+
+
+### Funktionen
+
+* **readings:** GPS aus Foto-EXIF + Karten-Link in der Lightbox ([#62](https://github.com/muelley86/zaehler/issues/62)) ([dfe3c0e](https://github.com/muelley86/zaehler/commit/dfe3c0e9db97f9ebcc3f926d16c6d1818b4b4fd2))
+
 ## [2.12.1](https://github.com/muelley86/zaehler/compare/v2.12.0...v2.12.1) (2026-05-27)
 
 
