@@ -10,6 +10,13 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.17.0](https://github.com/muelley86/zaehler/compare/v2.16.5...v2.17.0) (2026-05-28)
+
+
+### Funktionen
+
+* **dashboard:** Default-Datumsbereich auf aktuelles Jahr, „Zaehlerstand"-Prefix vor Bezugs-Label ([#93](https://github.com/muelley86/zaehler/issues/93)) ([f3d4e3b](https://github.com/muelley86/zaehler/commit/f3d4e3b9ceee41a9e7e155e5df7b71eef04f7988))
+
 ## [2.16.5](https://github.com/muelley86/zaehler/compare/v2.16.4...v2.16.5) (2026-05-28)
 
 
