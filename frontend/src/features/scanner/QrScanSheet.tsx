@@ -229,8 +229,7 @@ export function QrScanSheet({ open, onClose }: QrScanSheetProps) {
         try {
           const reader = document.getElementById(READER_ID);
           const video = reader?.querySelector('video') ?? null;
-          const stream =
-            video && video.srcObject instanceof MediaStream ? video.srcObject : null;
+          const stream = video && video.srcObject instanceof MediaStream ? video.srcObject : null;
           const track = stream?.getVideoTracks()[0] ?? null;
           if (track) {
             console.info('[QrScanSheet] track settings', track.getSettings());
@@ -247,9 +246,7 @@ export function QrScanSheet({ open, onClose }: QrScanSheetProps) {
             };
             await track
               .applyConstraints(focusConstraints)
-              .catch((e: unknown) =>
-                console.info('[QrScanSheet] focusMode set failed', e),
-              );
+              .catch((e: unknown) => console.info('[QrScanSheet] focusMode set failed', e));
           }
         } catch (e) {
           console.info('[QrScanSheet] post-start diagnostics failed', e);
