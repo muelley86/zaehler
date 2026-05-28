@@ -10,6 +10,13 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.15.2](https://github.com/muelley86/zaehler/compare/v2.15.1...v2.15.2) (2026-05-28)
+
+
+### Fehlerbehebungen
+
+* **perf:** Backend-Hang dauerhaft entlasten + Scanner-Diagnose-Toast ([#75](https://github.com/muelley86/zaehler/issues/75)) ([30879c0](https://github.com/muelley86/zaehler/commit/30879c00adc506a6450ebfef219185f96599006e))
+
 ## [2.15.1](https://github.com/muelley86/zaehler/compare/v2.15.0...v2.15.1) (2026-05-28)
 
 
