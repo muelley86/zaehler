@@ -24,11 +24,19 @@ import { Camera, X } from 'lucide-react';
 import { parseScannedUrl } from './parseScannedUrl';
 
 /** Minimaler Subtype der ``html5-qrcode``-API, damit der dynamische Import
- *  TypeScript-strikt bleibt. Wir nutzen nur den Konstruktor + start/stop. */
+ *  TypeScript-strikt bleibt. Wir nutzen nur den Konstruktor + start/stop.
+ *  ``qrbox`` darf eine Funktion sein — dann wird sie pro Viewport-Aenderung
+ *  aufgerufen und liefert die aktuelle Erkennungsbox in Stream-Pixeln. */
+type QrBoxSize = number | { width: number; height: number };
+type QrBoxFn = (viewW: number, viewH: number) => QrBoxSize;
 interface Html5QrcodeInstance {
   start(
     cameraConfig: { facingMode: string } | string,
-    config: { fps: number; qrbox?: number | { width: number; height: number } },
+    config: {
+      fps: number;
+      qrbox?: QrBoxSize | QrBoxFn;
+      aspectRatio?: number;
+    },
     onSuccess: (decodedText: string) => void,
     onError?: (errorMessage: string) => void,
   ): Promise<void>;
@@ -103,7 +111,23 @@ export function QrScanSheet({ open, onClose }: QrScanSheetProps) {
 
         await instance.start(
           { facingMode: 'environment' },
-          { fps: 10, qrbox: { width: 240, height: 240 } },
+          {
+            // 25 fps statt 10 — bei 10 fps decodiert die Library nur
+            // jeden 100-ms-Frame; verwackelte Frames blockieren die
+            // Erkennung dann oft mehrere Sekunden. 25 fps ist der
+            // html5-qrcode-Praxis-Standard.
+            fps: 25,
+            // qrbox als Funktion liefert eine Box, die relativ zur
+            // tatsaechlichen Stream-Groesse skaliert: 70 % der kuerzeren
+            // Kante. Bei einem 1080-px-iPhone-Stream ist die feste
+            // 240-px-Box nur ~22 % breit — der User muss den QR exakt
+            // in die kleine Mitte halten, sonst geht nichts.
+            qrbox: (viewW, viewH) => {
+              const side = Math.floor(Math.min(viewW, viewH) * 0.7);
+              return { width: side, height: side };
+            },
+            aspectRatio: 1.0,
+          },
           (decodedText) => {
             const result = parseScannedUrl(decodedText);
             if (!result) {
@@ -150,7 +174,7 @@ export function QrScanSheet({ open, onClose }: QrScanSheetProps) {
         setStarting(false);
         const msg =
           err instanceof Error && /permission|denied|notallowed/i.test(err.message)
-            ? 'Kamerazugriff verweigert. Bitte in den Browser-Einstellungen freigeben.'
+            ? 'Kamerazugriff verweigert. Auf iPhone: Einstellungen → Apps → Browser (Safari/Chrome) → Kamera aktivieren. Sonst: in den Browser-Einstellungen freigeben.'
             : err instanceof Error && /notfound|no.*camera/i.test(err.message)
               ? 'Keine Kamera erkannt. Bitte Messstelle manuell auswählen.'
               : 'Scanner konnte nicht gestartet werden. Bitte Messstelle manuell auswählen.';
