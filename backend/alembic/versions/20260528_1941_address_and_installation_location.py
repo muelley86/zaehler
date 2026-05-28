@@ -26,15 +26,9 @@ depends_on: str | Sequence[str] | None = None
 
 def upgrade() -> None:
     with op.batch_alter_table("location", schema=None) as batch_op:
-        batch_op.add_column(
-            sa.Column("address_street", sa.String(length=200), nullable=True)
-        )
-        batch_op.add_column(
-            sa.Column("address_postcode", sa.String(length=20), nullable=True)
-        )
-        batch_op.add_column(
-            sa.Column("address_city", sa.String(length=120), nullable=True)
-        )
+        batch_op.add_column(sa.Column("address_street", sa.String(length=200), nullable=True))
+        batch_op.add_column(sa.Column("address_postcode", sa.String(length=20), nullable=True))
+        batch_op.add_column(sa.Column("address_city", sa.String(length=120), nullable=True))
     with op.batch_alter_table("measuring_point", schema=None) as batch_op:
         batch_op.add_column(
             sa.Column("installation_location", sa.String(length=200), nullable=True)
