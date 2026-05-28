@@ -10,6 +10,13 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.16.0](https://github.com/muelley86/zaehler/compare/v2.15.3...v2.16.0) (2026-05-28)
+
+
+### Funktionen
+
+* **scanner+qr-admin:** HD-Aufloesung, iOS-Chrome-Hinweis, Pagination + 4 Druck-Modi ([#79](https://github.com/muelley86/zaehler/issues/79)) ([d08ddff](https://github.com/muelley86/zaehler/commit/d08ddffff3f2c451560d799093576aede9ad5c40))
+
 ## [2.15.3](https://github.com/muelley86/zaehler/compare/v2.15.2...v2.15.3) (2026-05-28)
 
 
