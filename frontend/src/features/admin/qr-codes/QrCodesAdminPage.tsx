@@ -114,9 +114,14 @@ function applyOverride(layout: LabelLayout, override: LayoutOverride | undefined
 
 type Filter = 'all' | 'assigned' | 'unassigned';
 
+// Anzahl Tokens pro Seite. Bei groesseren Bestaenden ist das die zentrale
+// Bremse gegen DOM-Render-Flackern und ueberladene Listen-UI.
+const PAGE_SIZE = 20;
+
 export function QrCodesAdminPage() {
   const [tokens, setTokens] = useState<QrTokenRead[] | null>(null);
   const [filter, setFilter] = useState<Filter>('all');
+  const [page, setPage] = useState(0);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
@@ -126,6 +131,13 @@ export function QrCodesAdminPage() {
   useEffect(() => {
     savePrefs(prefs);
   }, [prefs]);
+
+  // Filter-Wechsel resetet die Pagination auf Seite 0 — sonst koennte der
+  // User auf einer leeren Seite landen, wenn der neue Filter weniger
+  // Tokens hat.
+  useEffect(() => {
+    setPage(0);
+  }, [filter]);
 
   useEffect(() => {
     api
@@ -150,6 +162,16 @@ export function QrCodesAdminPage() {
     });
   }, [tokens, filter]);
 
+  const totalPages = Math.max(1, Math.ceil(visible.length / PAGE_SIZE));
+  // Schutz: falls visible nach einer Aenderung kuerzer geworden ist und
+  // ``page`` auf eine nicht mehr existierende Seite zeigt — auf die
+  // letzte gueltige Seite klemmen.
+  const safePage = Math.min(page, totalPages - 1);
+  const pageItems = useMemo(
+    () => visible.slice(safePage * PAGE_SIZE, (safePage + 1) * PAGE_SIZE),
+    [visible, safePage],
+  );
+
   const counts = useMemo(() => {
     const c = { all: 0, assigned: 0, unassigned: 0 };
     tokens?.forEach((t) => {
@@ -169,17 +191,23 @@ export function QrCodesAdminPage() {
     });
   }
 
-  function selectAllVisible() {
-    setSelected(new Set(visible.map((t) => t.token)));
+  function selectVisible() {
+    // Operiert auf der aktuellen Seite — sonst waere der UX-Sprung
+    // „alle paar Hundert Tokens markiert" verwirrend. Wer wirklich
+    // alle markieren will, nutzt „Gefiltert drucken" oder „Alle drucken".
+    setSelected((prev) => {
+      const next = new Set(prev);
+      for (const t of pageItems) next.add(t.token);
+      return next;
+    });
   }
 
   function deselectAll() {
     setSelected(new Set());
   }
 
-  function printSelected() {
-    if (selected.size === 0) return;
-    const list = visible.filter((t) => selected.has(t.token));
+  function printList(list: QrTokenRead[]) {
+    if (list.length === 0) return;
     const baseLayout = DEFAULT_LAYOUTS[prefs.selectedLayout];
     const layout = applyOverride(baseLayout, prefs.overrides[prefs.selectedLayout]);
     const ok = openTokensPrintWindow(list, layout);
@@ -188,6 +216,19 @@ export function QrCodesAdminPage() {
         'Druckfenster konnte nicht geöffnet werden — bitte Pop-up-Blocker für diese Seite erlauben.',
       );
     }
+  }
+
+  function printSelected() {
+    printList(visible.filter((t) => selected.has(t.token)));
+  }
+  function printCurrentPage() {
+    printList(pageItems);
+  }
+  function printFiltered() {
+    printList(visible);
+  }
+  function printAll() {
+    printList(tokens ?? []);
   }
 
   function setSelectedLayout(id: LabelLayoutId) {
@@ -294,17 +335,15 @@ export function QrCodesAdminPage() {
           Frei · {counts.unassigned}
         </Pill>
 
-        <div className="ml-auto flex gap-2">
+        <div className="ml-auto flex flex-wrap gap-2">
           <Button
             type="button"
             variant="bordered"
             size="sm"
-            onClick={selected.size === visible.length ? deselectAll : selectAllVisible}
-            disabled={visible.length === 0}
+            onClick={selected.size > 0 ? deselectAll : selectVisible}
+            disabled={pageItems.length === 0}
           >
-            {selected.size === visible.length && visible.length > 0
-              ? 'Auswahl aufheben'
-              : 'Alle wählen'}
+            {selected.size > 0 ? `Auswahl aufheben (${selected.size})` : 'Sichtbare wählen'}
           </Button>
           <Button
             type="button"
@@ -315,6 +354,39 @@ export function QrCodesAdminPage() {
             disabled={selected.size === 0}
           >
             Auswahl drucken ({selected.size})
+          </Button>
+          <Button
+            type="button"
+            variant="bordered"
+            size="sm"
+            leftIcon={<Printer size={14} />}
+            onClick={printCurrentPage}
+            disabled={pageItems.length === 0}
+            title="Druckt nur die aktuell sichtbare Seite (max. 20 QR-Codes)."
+          >
+            Aktuelle Seite drucken
+          </Button>
+          <Button
+            type="button"
+            variant="bordered"
+            size="sm"
+            leftIcon={<Printer size={14} />}
+            onClick={printFiltered}
+            disabled={visible.length === 0}
+            title="Druckt alle QR-Codes des aktiven Status-Filters, über alle Seiten hinweg."
+          >
+            Gefiltert drucken ({visible.length})
+          </Button>
+          <Button
+            type="button"
+            variant="bordered"
+            size="sm"
+            leftIcon={<Printer size={14} />}
+            onClick={printAll}
+            disabled={(tokens?.length ?? 0) === 0}
+            title="Druckt alle QR-Codes in der Datenbank, unabhängig vom Filter."
+          >
+            Alle drucken ({tokens?.length ?? 0})
           </Button>
         </div>
       </div>
@@ -333,19 +405,51 @@ export function QrCodesAdminPage() {
           description={'Mit „Neue QR-Codes erzeugen" oben anlegen.'}
         />
       ) : (
-        <Card padded={false}>
-          <ul className="divide-y divide-separator">
-            {visible.map((t) => (
-              <TokenRow
-                key={t.id}
-                token={t}
-                selected={selected.has(t.token)}
-                onToggleSelect={() => toggleSelected(t.token)}
-                onChanged={refresh}
-              />
-            ))}
-          </ul>
-        </Card>
+        <>
+          <Card padded={false}>
+            <ul className="divide-y divide-separator">
+              {pageItems.map((t) => (
+                <TokenRow
+                  key={t.id}
+                  token={t}
+                  selected={selected.has(t.token)}
+                  onToggleSelect={() => toggleSelected(t.token)}
+                  onChanged={refresh}
+                />
+              ))}
+            </ul>
+          </Card>
+          {totalPages > 1 ? (
+            <div
+              data-testid="qr-pagination"
+              className="flex flex-wrap items-center justify-between gap-2 px-1 py-1"
+            >
+              <div className="text-caption text-tertiary">
+                Seite {safePage + 1} von {totalPages} · {visible.length} QR-Codes
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant="bordered"
+                  size="sm"
+                  onClick={() => setPage((p) => Math.max(0, p - 1))}
+                  disabled={safePage === 0}
+                >
+                  ← Zurück
+                </Button>
+                <Button
+                  type="button"
+                  variant="bordered"
+                  size="sm"
+                  onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+                  disabled={safePage >= totalPages - 1}
+                >
+                  Weiter →
+                </Button>
+              </div>
+            </div>
+          ) : null}
+        </>
       )}
     </>
   );
