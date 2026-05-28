@@ -10,6 +10,13 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.15.3](https://github.com/muelley86/zaehler/compare/v2.15.2...v2.15.3) (2026-05-28)
+
+
+### Fehlerbehebungen
+
+* **scanner:** fps + qrbox-Konfig fuer iPhone-Erkennung + iOS-Permission-Hinweis ([#77](https://github.com/muelley86/zaehler/issues/77)) ([696b4f3](https://github.com/muelley86/zaehler/commit/696b4f3b1cb9ba5c04ad103295b69ee38bcc340c))
+
 ## [2.15.2](https://github.com/muelley86/zaehler/compare/v2.15.1...v2.15.2) (2026-05-28)
 
 
