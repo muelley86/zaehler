@@ -409,7 +409,20 @@ function StammdatenReadView({
       {mp.type === 'electricity' && mp.market_location ? (
         <FieldRow k="Marktlokation" v={mp.market_location} />
       ) : null}
+      {mp.installation_location ? <FieldRow k="Einbauort" v={mp.installation_location} /> : null}
       <FieldRow k="Aktueller Eigentümer" v={mp.current_owner_name ?? '—'} />
+      {location &&
+      (location.address_street || location.address_postcode || location.address_city) ? (
+        <FieldRow
+          k="Adresse"
+          v={[
+            location.address_street,
+            [location.address_postcode, location.address_city].filter(Boolean).join(' '),
+          ]
+            .filter((s) => s && s.trim())
+            .join(', ')}
+        />
+      ) : null}
       {mp.type === 'heating' && mp.tank_capacity ? (
         <FieldRow
           k="Tankvolumen"
@@ -448,6 +461,7 @@ function StammdatenEditForm({
   );
   const [contractNumber, setContractNumber] = useState(mp.contract_number ?? '');
   const [marketLocation, setMarketLocation] = useState(mp.market_location ?? '');
+  const [installationLocation, setInstallationLocation] = useState(mp.installation_location ?? '');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -498,6 +512,15 @@ function StammdatenEditForm({
           if (mp.market_location !== null) body['clear_market_location'] = true;
         } else if (trimmed !== mp.market_location) {
           body['market_location'] = trimmed;
+        }
+      }
+      // Einbauort fuer alle Typen, ``clear_*`` bei leerer Eingabe.
+      {
+        const trimmed = installationLocation.trim();
+        if (trimmed === '') {
+          if (mp.installation_location !== null) body['clear_installation_location'] = true;
+        } else if (trimmed !== mp.installation_location) {
+          body['installation_location'] = trimmed;
         }
       }
       const updated = await api.patch<MeasuringPointRead>(`/measuring-points/${mp.id}`, body);
@@ -581,6 +604,12 @@ function StammdatenEditForm({
           numeric
         />
       ) : null}
+      <TextField
+        label="Einbauort (optional)"
+        value={installationLocation}
+        onChange={(e) => setInstallationLocation(e.target.value)}
+        hint="z. B. 1. Stock, Wohnung 4b — leer = nicht gesetzt"
+      />
       {error ? (
         <div className="border-danger/40 bg-danger/10 rounded-card border-hairline p-3 text-caption text-danger">
           {error}

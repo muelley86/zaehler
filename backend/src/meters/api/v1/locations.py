@@ -64,6 +64,9 @@ def create_location(
         note=payload.note,
         latitude=payload.latitude,
         longitude=payload.longitude,
+        address_street=payload.address_street,
+        address_postcode=payload.address_postcode,
+        address_city=payload.address_city,
         main_location_id=payload.main_location_id,
     )
     db.add(location)
@@ -119,6 +122,16 @@ def update_location(
         if payload.longitude is not None and payload.longitude != location.longitude:
             diff["longitude"] = {"from": location.longitude, "to": payload.longitude}
             location.longitude = payload.longitude
+    # Adress-Felder: ``None`` im Payload = nicht aendern; leerer String = auf
+    # NULL setzen; sonst = Wert uebernehmen.
+    for addr_field in ("address_street", "address_postcode", "address_city"):
+        new_raw = getattr(payload, addr_field)
+        if new_raw is None:
+            continue
+        target = new_raw.strip() or None
+        if target != getattr(location, addr_field):
+            diff[addr_field] = {"from": getattr(location, addr_field), "to": target}
+            setattr(location, addr_field, target)
     # Hauptstandort: ``clear_main_location`` ueberschreibt jede gesetzte ID;
     # sonst greift nur, wenn explizit ein neuer Wert uebergeben wurde.
     if payload.clear_main_location:

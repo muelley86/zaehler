@@ -85,10 +85,14 @@ def search(
                 func.lower(MeasuringPoint.name).like(pattern),
                 func.lower(MeasuringPoint.contract_number).like(pattern),
                 func.lower(MeasuringPoint.market_location).like(pattern),
+                func.lower(MeasuringPoint.installation_location).like(pattern),
                 func.lower(Location.name).like(pattern),
                 func.lower(MainLocation.name).like(pattern),
                 func.lower(Location.note).like(pattern),
                 func.lower(MainLocation.note).like(pattern),
+                func.lower(Location.address_street).like(pattern),
+                func.lower(Location.address_postcode).like(pattern),
+                func.lower(Location.address_city).like(pattern),
                 MeasuringPoint.id.in_(pm_subq),
                 MeasuringPoint.id.in_(owner_subq),
             )
@@ -161,11 +165,12 @@ def _classify(mp: MeasuringPoint, needle_lower: str) -> SearchHit | None:
     owner_hit = _owner_match(mp, needle_lower)
     if owner_hit is not None:
         owner_name, is_note = owner_hit
-        return _make_hit(
-            mp,
-            SearchMatchKind.OWNER_NOTE if is_note else SearchMatchKind.OWNER,
-            owner_name,
-        )
+        if not is_note:
+            return _make_hit(mp, SearchMatchKind.OWNER, owner_name)
+        # OWNER_NOTE-Treffer wird unten erst weiter abgearbeitet (niedrige
+        # Prioritaet); merken wir uns nur und vergleichen am Ende.
+    if mp.installation_location and needle_lower in mp.installation_location.lower():
+        return _make_hit(mp, SearchMatchKind.INSTALLATION_LOCATION, mp.installation_location)
     if needle_lower in mp.name.lower():
         return _make_hit(mp, SearchMatchKind.NAME)
     loc = mp.location
@@ -174,6 +179,16 @@ def _classify(mp: MeasuringPoint, needle_lower: str) -> SearchHit | None:
         return _make_hit(mp, SearchMatchKind.MAIN_LOCATION)
     if loc and needle_lower in loc.name.lower():
         return _make_hit(mp, SearchMatchKind.LOCATION)
+    # Standort-Adress-Match: irgendeines der drei Adress-Felder enthaelt das
+    # ``needle``. Detail kombiniert das matchende Feld fuer den UI-Hint.
+    if loc is not None:
+        for value in (loc.address_street, loc.address_postcode, loc.address_city):
+            if value and needle_lower in value.lower():
+                return _make_hit(mp, SearchMatchKind.LOCATION_ADDRESS, value)
+    # Owner-Notiz-Match (verzoegert aus owner_hit oben — niedrigere Prio).
+    if owner_hit is not None:
+        owner_name, _ = owner_hit
+        return _make_hit(mp, SearchMatchKind.OWNER_NOTE, owner_name)
     if main and main.note and needle_lower in main.note.lower():
         return _make_hit(mp, SearchMatchKind.MAIN_LOCATION_NOTE)
     if loc and loc.note and needle_lower in loc.note.lower():

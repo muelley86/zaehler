@@ -190,6 +190,20 @@ function LocationCard({
         {loc.note ? loc.note : <em className="text-tertiary">Keine Notiz</em>}
       </div>
 
+      {loc.address_street || loc.address_postcode || loc.address_city ? (
+        <div className="mt-2 text-caption text-tertiary">
+          <div className="text-caption-bold uppercase">Adresse</div>
+          <div className="text-secondary">
+            {[
+              loc.address_street,
+              [loc.address_postcode, loc.address_city].filter(Boolean).join(' '),
+            ]
+              .filter((s) => s && s.trim())
+              .join(', ')}
+          </div>
+        </div>
+      ) : null}
+
       {hasGeo && loc.latitude !== null && loc.longitude !== null ? (
         <button
           type="button"
@@ -536,6 +550,42 @@ function MainLocationSelect({
   );
 }
 
+function AddressFields({
+  street,
+  postcode,
+  city,
+  onChange,
+}: {
+  street: string;
+  postcode: string;
+  city: string;
+  onChange: (next: { street?: string; postcode?: string; city?: string }) => void;
+}) {
+  return (
+    <>
+      <TextField
+        label="Straße + Hausnr. (optional)"
+        value={street}
+        onChange={(e) => onChange({ street: e.target.value })}
+      />
+      <div className="grid grid-cols-3 gap-2">
+        <TextField
+          label="PLZ"
+          value={postcode}
+          onChange={(e) => onChange({ postcode: e.target.value })}
+        />
+        <div className="col-span-2">
+          <TextField
+            label="Ort"
+            value={city}
+            onChange={(e) => onChange({ city: e.target.value })}
+          />
+        </div>
+      </div>
+    </>
+  );
+}
+
 function EditForm({
   loc,
   mainLocations,
@@ -551,6 +601,9 @@ function EditForm({
   const [note, setNote] = useState(loc.note ?? '');
   const [latitude, setLatitude] = useState(loc.latitude !== null ? String(loc.latitude) : '');
   const [longitude, setLongitude] = useState(loc.longitude !== null ? String(loc.longitude) : '');
+  const [street, setStreet] = useState(loc.address_street ?? '');
+  const [postcode, setPostcode] = useState(loc.address_postcode ?? '');
+  const [city, setCity] = useState(loc.address_city ?? '');
   const [mainLocationId, setMainLocationId] = useState<number | null>(loc.main_location_id);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -575,6 +628,18 @@ function EditForm({
       } else {
         body['latitude'] = geo.lat;
         body['longitude'] = geo.lng;
+      }
+      // Adressfelder: leeren String schicken um zu loeschen; sonst nur,
+      // wenn veraendert. Backend strippt und mapt "" → NULL.
+      const addressEntries: Array<[string, string, string | null]> = [
+        ['address_street', street, loc.address_street],
+        ['address_postcode', postcode, loc.address_postcode],
+        ['address_city', city, loc.address_city],
+      ];
+      for (const [key, current, original] of addressEntries) {
+        const trimmed = current.trim();
+        const target = trimmed || null;
+        if (target !== original) body[key] = trimmed;
       }
       // Hauptstandort: ``null`` allein lassen Backend als „nicht aendern"
       // interpretieren — explizit ``clear_main_location: true`` senden, wenn
@@ -602,6 +667,16 @@ function EditForm({
         value={mainLocationId}
         onChange={setMainLocationId}
         options={mainLocations}
+      />
+      <AddressFields
+        street={street}
+        postcode={postcode}
+        city={city}
+        onChange={(next) => {
+          if (next.street !== undefined) setStreet(next.street);
+          if (next.postcode !== undefined) setPostcode(next.postcode);
+          if (next.city !== undefined) setCity(next.city);
+        }}
       />
       <GeoPicker
         latitude={latitude}
@@ -637,6 +712,9 @@ function CreateForm({
   const [note, setNote] = useState('');
   const [latitude, setLatitude] = useState('');
   const [longitude, setLongitude] = useState('');
+  const [street, setStreet] = useState('');
+  const [postcode, setPostcode] = useState('');
+  const [city, setCity] = useState('');
   const [mainLocationId, setMainLocationId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -656,12 +734,18 @@ function CreateForm({
         body['latitude'] = geo.lat;
         body['longitude'] = geo.lng;
       }
+      if (street.trim()) body['address_street'] = street.trim();
+      if (postcode.trim()) body['address_postcode'] = postcode.trim();
+      if (city.trim()) body['address_city'] = city.trim();
       if (mainLocationId !== null) body['main_location_id'] = mainLocationId;
       await api.post('/locations', body);
       setName('');
       setNote('');
       setLatitude('');
       setLongitude('');
+      setStreet('');
+      setPostcode('');
+      setCity('');
       setMainLocationId(null);
       onCreated();
     } catch (err) {
@@ -691,6 +775,16 @@ function CreateForm({
           value={mainLocationId}
           onChange={setMainLocationId}
           options={mainLocations}
+        />
+        <AddressFields
+          street={street}
+          postcode={postcode}
+          city={city}
+          onChange={(next) => {
+            if (next.street !== undefined) setStreet(next.street);
+            if (next.postcode !== undefined) setPostcode(next.postcode);
+            if (next.city !== undefined) setCity(next.city);
+          }}
         />
         <GeoPicker
           latitude={latitude}

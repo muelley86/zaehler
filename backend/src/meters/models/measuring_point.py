@@ -50,6 +50,10 @@ class MeasuringPoint(Base, TimestampMixin):
     # UNIQUE-Constraint (Bestandsdaten-Import waere sonst fragil).
     contract_number: Mapped[str | None] = mapped_column(String(64), nullable=True)
     market_location: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    # Freitext-Einbauort innerhalb des Standorts (z. B. „1. Stock, Wohnung 4b",
+    # „Heizungsraum links"). Hilft, einen MP physisch zu finden, ohne dass die
+    # Location-Granularitaet uebertrieben werden muss.
+    installation_location: Mapped[str | None] = mapped_column(String(200), nullable=True)
 
     location: Mapped[Location | None] = relationship("Location")
     physical_meters: Mapped[list[PhysicalMeter]] = relationship(

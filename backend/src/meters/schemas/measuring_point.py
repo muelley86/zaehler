@@ -47,6 +47,8 @@ class MeasuringPointBase(BaseModel):
     # (MaLo-ID) — nur Strom. Beide optional, max 64 Zeichen.
     contract_number: str | None = Field(default=None, max_length=64)
     market_location: str | None = Field(default=None, max_length=64)
+    # Genauer Einbauort innerhalb des Standorts (z. B. „1. Stock, Wohnung 4b").
+    installation_location: str | None = Field(default=None, max_length=200)
 
     @model_validator(mode="after")
     def _tank_capacity_only_heating(self) -> Self:
@@ -124,6 +126,8 @@ class MeasuringPointUpdate(BaseModel):
     clear_contract_number: bool = False
     market_location: str | None = Field(default=None, max_length=64)
     clear_market_location: bool = False
+    installation_location: str | None = Field(default=None, max_length=200)
+    clear_installation_location: bool = False
 
 
 class MeasuringPointRead(APIModel):
@@ -145,6 +149,7 @@ class MeasuringPointRead(APIModel):
     heating_source: HeatingSource | None
     contract_number: str | None = None
     market_location: str | None = None
+    installation_location: str | None = None
     # Aktueller Eigentuemer (vom Router aus dem ``OwnerAssignment`` mit
     # ``valid_to IS NULL`` befuellt). ``None``, wenn aktuell keiner.
     current_owner_id: int | None = None

@@ -111,6 +111,7 @@ describe('MeasuringPointsAdminPage Wizard', () => {
             main_location_name: null,
             contract_number: null,
             market_location: null,
+            installation_location: null,
             current_owner_id: null,
             current_owner_name: null,
             is_bidirectional: false,

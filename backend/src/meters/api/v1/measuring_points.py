@@ -146,6 +146,7 @@ def create_measuring_point(
         heating_source=payload.heating_source,
         contract_number=payload.contract_number,
         market_location=payload.market_location,
+        installation_location=payload.installation_location,
     )
     db.add(mp)
     db.flush()
@@ -295,6 +296,25 @@ def update_measuring_point(
             "to": payload.contract_number,
         }
         mp.contract_number = payload.contract_number
+
+    # Einbauort: Freitext, ohne Typ-Validation. ``clear_*`` setzt explizit
+    # auf NULL.
+    if payload.clear_installation_location:
+        if mp.installation_location is not None:
+            diff["installation_location"] = {
+                "from": mp.installation_location,
+                "to": None,
+            }
+            mp.installation_location = None
+    elif (
+        payload.installation_location is not None
+        and payload.installation_location != mp.installation_location
+    ):
+        diff["installation_location"] = {
+            "from": mp.installation_location,
+            "to": payload.installation_location,
+        }
+        mp.installation_location = payload.installation_location
 
     # Marktlokation: nur fuer Strom zulaessig.
     if payload.market_location is not None and mp.type is not MeterType.ELECTRICITY:

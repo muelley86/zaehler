@@ -98,9 +98,11 @@ export type SearchMatchKind =
   | 'contract_number'
   | 'market_location'
   | 'owner'
+  | 'installation_location'
   | 'name'
   | 'main_location'
   | 'location'
+  | 'location_address'
   | 'owner_note'
   | 'main_location_note'
   | 'location_note';
@@ -149,6 +151,9 @@ export interface LocationRead {
   note: string | null;
   latitude: number | null;
   longitude: number | null;
+  address_street: string | null;
+  address_postcode: string | null;
+  address_city: string | null;
   main_location_id: number | null;
   main_location_name: string | null;
 }
@@ -168,6 +173,7 @@ export interface MeasuringPointRead {
   heating_source: HeatingSource | null;
   contract_number: string | null;
   market_location: string | null;
+  installation_location: string | null;
   current_owner_id: number | null;
   current_owner_name: string | null;
   physical_meters: PhysicalMeterRead[];

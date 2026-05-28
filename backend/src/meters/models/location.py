@@ -28,6 +28,11 @@ class Location(Base, TimestampMixin):
     # max. 6 Nachkommastellen (~10 cm), Float-32 deckt das ab.
     latitude: Mapped[float | None] = mapped_column(Float)
     longitude: Mapped[float | None] = mapped_column(Float)
+    # Postanschrift — optional, drei strukturierte Felder analog Owner.
+    # Ergaenzt die Geo-Koordinaten um die postalische Adresse.
+    address_street: Mapped[str | None] = mapped_column(String(200))
+    address_postcode: Mapped[str | None] = mapped_column(String(20))
+    address_city: Mapped[str | None] = mapped_column(String(120))
     # Optionaler Hauptstandort — uebergeordnete Klammer (z. B. „Hauptgebaeude").
     # Cascade SET NULL: wenn der Hauptstandort geloescht wird, behalten wir den
     # Zaehlerstandort und setzen die Referenz auf NULL.

@@ -189,3 +189,40 @@ def test_update_register_label(admin_client: TestClient) -> None:
     )
     assert resp.status_code == 200
     assert resp.json()["label"] == "Erdgas (kalibriert)"
+
+
+def test_location_with_address(admin_client: TestClient) -> None:
+    resp = admin_client.post(
+        "/api/v1/locations",
+        json={
+            "name": "Wohnung-Hauptstr",
+            "address_street": "Hauptstr. 12",
+            "address_postcode": "12345",
+            "address_city": "Berlin",
+        },
+    )
+    assert resp.status_code == 201, resp.text
+    body = resp.json()
+    assert body["address_street"] == "Hauptstr. 12"
+    assert body["address_postcode"] == "12345"
+    assert body["address_city"] == "Berlin"
+
+
+def test_patch_address_update_and_clear(admin_client: TestClient) -> None:
+    create = admin_client.post(
+        "/api/v1/locations",
+        json={"name": "Wohnung-Clear", "address_city": "Hamburg"},
+    ).json()
+    loc_id = create["id"]
+    # Update
+    upd = admin_client.patch(
+        f"/api/v1/locations/{loc_id}",
+        json={"address_city": "Bremen"},
+    ).json()
+    assert upd["address_city"] == "Bremen"
+    # Clear via leerem String
+    cleared = admin_client.patch(
+        f"/api/v1/locations/{loc_id}",
+        json={"address_city": ""},
+    ).json()
+    assert cleared["address_city"] is None
