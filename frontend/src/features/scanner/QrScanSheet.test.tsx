@@ -122,4 +122,17 @@ describe('QrScanSheet', () => {
     expect(navigateMock).not.toHaveBeenCalled();
     expect(onClose).not.toHaveBeenCalled();
   });
+
+  it('zeigt Diagnose-Toast bei nicht zuordenbarem QR-Inhalt', async () => {
+    const { screen } = await import('@testing-library/react');
+    const QrScanSheet = await loadSheet();
+    renderWithRouter(<QrScanSheet open onClose={vi.fn()} />);
+
+    await waitFor(() => expect(_capturedSuccess).not.toBeNull());
+    _capturedSuccess?.('https://example.com/whatever');
+
+    const toast = await screen.findByTestId('qr-scan-unknown');
+    expect(toast).toHaveTextContent(/Code erkannt/);
+    expect(toast).toHaveTextContent(/example\.com\/whatever/);
+  });
 });

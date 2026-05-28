@@ -47,12 +47,24 @@ class TimestampMixin:
 
 def _make_engine() -> Engine:
     connect_args: dict[str, Any] = {}
+    engine_kwargs: dict[str, Any] = {
+        "future": True,
+        # Connection-Pool grosszuegig dimensionieren — uvicorn-Default-
+        # Threadpool hat 40 Threads, da ist ein 15-Pool (default 5+10)
+        # sofort dicht. 20+20 deckt Spitzenlasten ab; pool_timeout 10 s
+        # statt default 30 s, damit ein Pool-ausgehungerter Request
+        # schneller als 500 zurueckkommt statt minutenlang zu haengen.
+        "pool_size": 20,
+        "max_overflow": 20,
+        "pool_timeout": 10,
+        "pool_pre_ping": True,
+    }
     if settings.database_url.startswith("sqlite"):
         connect_args["check_same_thread"] = False
     return create_engine(
         settings.database_url,
         connect_args=connect_args,
-        future=True,
+        **engine_kwargs,
     )
 
 
@@ -70,6 +82,11 @@ def _set_sqlite_pragmas(dbapi_connection: Any, _: Any) -> None:
         cursor.execute("PRAGMA journal_mode=WAL")
         cursor.execute("PRAGMA foreign_keys=ON")
         cursor.execute("PRAGMA synchronous=NORMAL")
+        # busy_timeout: bei einem WAL-Schreib-Lock (1 Writer gleichzeitig)
+        # wartet SQLite bis zu 5 s, bevor er SQLITE_BUSY wirft. SQLite-
+        # Default ist 0, was unter parallelen Reading-POSTs zu sofortigen
+        # 500-Fehlern + uvicorn-Threadpool-Stau gefuehrt hat.
+        cursor.execute("PRAGMA busy_timeout=5000")
         # Negative Werte = KiB statt Pages. -64000 = 64 MB Page-Cache;
         # bei 4-KB-Pages also ca. 16 000 Pages. Spürbar bei wiederholten
         # Lookups (Session-Validation, Reading-Listen) ohne nennenswerten

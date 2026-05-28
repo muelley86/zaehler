@@ -52,6 +52,13 @@ export function QrScanSheet({ open, onClose }: QrScanSheetProps) {
   const instanceRef = useRef<Html5QrcodeInstance | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [starting, setStarting] = useState(false);
+  // Diagnose-Hinweis: wenn die Library einen QR dekodiert, aber das
+  // Format nicht zu Token/MP passt, zeigen wir den dekodierten Text
+  // kurz an. So sieht der User, ob die Kamera ueberhaupt etwas
+  // erkennt — und an welchem Format-Quirk es klemmt (z. B. veraltete
+  // PWA mit altem parseScannedUrl-Code).
+  const [unknownDecoded, setUnknownDecoded] = useState<string | null>(null);
+  const unknownTimeoutRef = useRef<number | null>(null);
 
   // Refs für Callbacks, die der Parent pro Render möglicherweise neu erzeugt.
   // Damit bleibt der Camera-Effect unabhängig vom Render-Zyklus stabil.
@@ -101,6 +108,19 @@ export function QrScanSheet({ open, onClose }: QrScanSheetProps) {
             const result = parseScannedUrl(decodedText);
             if (!result) {
               // Kein passender QR-Inhalt — weiter scannen, kein Modal-Close.
+              // Wir zeigen aber kurz den dekodierten Text als Diagnose-
+              // Toast, damit der User sieht, was tatsaechlich gescannt
+              // wurde (z. B. altes Token-Format aus PWA-Cache).
+              const preview =
+                decodedText.length > 60 ? decodedText.slice(0, 60) + '…' : decodedText;
+              setUnknownDecoded(preview);
+              if (unknownTimeoutRef.current !== null) {
+                window.clearTimeout(unknownTimeoutRef.current);
+              }
+              unknownTimeoutRef.current = window.setTimeout(() => {
+                setUnknownDecoded(null);
+                unknownTimeoutRef.current = null;
+              }, 3000);
               return;
             }
             // Stop-Sequenz fire-and-forget: navigate löst Unmount aus, und
@@ -141,6 +161,10 @@ export function QrScanSheet({ open, onClose }: QrScanSheetProps) {
     return () => {
       cancelled = true;
       void teardown();
+      if (unknownTimeoutRef.current !== null) {
+        window.clearTimeout(unknownTimeoutRef.current);
+        unknownTimeoutRef.current = null;
+      }
     };
     // navigate und onClose absichtlich NICHT in den Deps — wir lesen sie
     // über die Refs und vermeiden dadurch unnötige Stream-Neustarts.
@@ -189,6 +213,15 @@ export function QrScanSheet({ open, onClose }: QrScanSheetProps) {
         {starting && !error ? (
           <div className="absolute inset-0 flex items-center justify-center text-white/80">
             Kamera wird gestartet…
+          </div>
+        ) : null}
+
+        {unknownDecoded ? (
+          <div
+            data-testid="qr-scan-unknown"
+            className="absolute bottom-4 left-1/2 max-w-[calc(100%-1rem)] -translate-x-1/2 rounded-card bg-black/80 px-4 py-2 text-caption text-white backdrop-blur"
+          >
+            Code erkannt, aber nicht zuordenbar: <span className="num">„{unknownDecoded}"</span>
           </div>
         ) : null}
       </div>
