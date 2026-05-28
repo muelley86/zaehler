@@ -127,6 +127,8 @@ def create_measuring_point(
         tank_capacity=payload.tank_capacity,
         transformer_factor=payload.transformer_factor,
         heating_source=payload.heating_source,
+        contract_number=payload.contract_number,
+        market_location=payload.market_location,
     )
     db.add(mp)
     db.flush()
@@ -244,6 +246,51 @@ def update_measuring_point(
             "to": payload.transformer_factor,
         }
         mp.transformer_factor = payload.transformer_factor
+
+    # Vertragsnummer: nur fuer Strom + Wasser zulaessig.
+    if payload.contract_number is not None and mp.type not in (
+        MeterType.ELECTRICITY,
+        MeterType.WATER,
+    ):
+        raise ProblemError(
+            status_code=422,
+            title="Invalid field",
+            detail="contract_number ist nur für Strom- oder Wasser-Messstellen zulässig",
+        )
+    if payload.clear_contract_number:
+        if mp.contract_number is not None:
+            diff["contract_number"] = {"from": mp.contract_number, "to": None}
+            mp.contract_number = None
+    elif (
+        payload.contract_number is not None
+        and payload.contract_number != mp.contract_number
+    ):
+        diff["contract_number"] = {
+            "from": mp.contract_number,
+            "to": payload.contract_number,
+        }
+        mp.contract_number = payload.contract_number
+
+    # Marktlokation: nur fuer Strom zulaessig.
+    if payload.market_location is not None and mp.type is not MeterType.ELECTRICITY:
+        raise ProblemError(
+            status_code=422,
+            title="Invalid field",
+            detail="market_location ist nur für Strom-Messstellen zulässig",
+        )
+    if payload.clear_market_location:
+        if mp.market_location is not None:
+            diff["market_location"] = {"from": mp.market_location, "to": None}
+            mp.market_location = None
+    elif (
+        payload.market_location is not None
+        and payload.market_location != mp.market_location
+    ):
+        diff["market_location"] = {
+            "from": mp.market_location,
+            "to": payload.market_location,
+        }
+        mp.market_location = payload.market_location
 
     if diff:
         record(

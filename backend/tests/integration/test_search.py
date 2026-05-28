@@ -35,6 +35,8 @@ def _create_mp(
     serial: str,
     *,
     location_id: int | None = None,
+    contract_number: str | None = None,
+    market_location: str | None = None,
 ) -> int:
     body: dict[str, Any] = {
         "name": name,
@@ -47,6 +49,10 @@ def _create_mp(
     }
     if location_id is not None:
         body["location_id"] = location_id
+    if contract_number is not None:
+        body["contract_number"] = contract_number
+    if market_location is not None:
+        body["market_location"] = market_location
     resp = client.post("/api/v1/measuring-points", json=body)
     assert resp.status_code == 201, resp.text
     return int(resp.json()["id"])
@@ -127,6 +133,44 @@ def test_distinct_results_no_dup(admin_client: TestClient) -> None:
     # MP-Name enthaelt "Dup" + zwei PhysicalMeter mit "DUP" → trotzdem nur EIN Hit.
     ids = [h["measuring_point_id"] for h in hits]
     assert ids.count(mp_id) == 1
+
+
+def test_match_by_contract_number(admin_client: TestClient) -> None:
+    _create_mp(
+        admin_client,
+        "Strom-Vertrag",
+        "SN-CN-1",
+        contract_number="VC-987654",
+    )
+    hits = admin_client.get("/api/v1/search?q=987654").json()
+    assert len(hits) == 1
+    assert hits[0]["matched_via"] == "contract_number"
+    assert hits[0]["matched_detail"] == "VC-987654"
+
+
+def test_match_by_market_location(admin_client: TestClient) -> None:
+    _create_mp(
+        admin_client,
+        "Strom-MaLo",
+        "SN-ML-1",
+        market_location="DE12345678901",
+    )
+    hits = admin_client.get("/api/v1/search?q=12345678901").json()
+    assert len(hits) == 1
+    assert hits[0]["matched_via"] == "market_location"
+    assert hits[0]["matched_detail"] == "DE12345678901"
+
+
+def test_priority_contract_beats_name(admin_client: TestClient) -> None:
+    # Name UND contract_number enthalten "PRIO" — contract gewinnt (Prio 2 < 4).
+    _create_mp(
+        admin_client,
+        "Strom-PRIO-Name",
+        "SN-PR-1",
+        contract_number="PRIO-CONTRACT",
+    )
+    hits = admin_client.get("/api/v1/search?q=prio").json()
+    assert hits[0]["matched_via"] == "contract_number"
 
 
 def test_recorder_only_sees_own_mps(

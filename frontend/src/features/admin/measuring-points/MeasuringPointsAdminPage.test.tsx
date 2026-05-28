@@ -108,6 +108,8 @@ describe('MeasuringPointsAdminPage Wizard', () => {
             location_name: null,
             main_location_id: null,
             main_location_name: null,
+            contract_number: null,
+            market_location: null,
             is_bidirectional: false,
             has_dual_tariff: false,
             transformer_factor: null,

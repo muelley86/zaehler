@@ -9,6 +9,8 @@ class SearchMatchKind(enum.StrEnum):
     """Hoechste Prioritaet zuerst — bei Mehrfach-Match gewinnt der oberste."""
 
     SERIAL = "serial"
+    CONTRACT_NUMBER = "contract_number"
+    MARKET_LOCATION = "market_location"
     NAME = "name"
     MAIN_LOCATION = "main_location"
     LOCATION = "location"
@@ -18,11 +20,13 @@ class SearchMatchKind(enum.StrEnum):
 
 _PRIORITY: dict[SearchMatchKind, int] = {
     SearchMatchKind.SERIAL: 1,
-    SearchMatchKind.NAME: 2,
-    SearchMatchKind.MAIN_LOCATION: 3,
-    SearchMatchKind.LOCATION: 4,
-    SearchMatchKind.MAIN_LOCATION_NOTE: 5,
-    SearchMatchKind.LOCATION_NOTE: 6,
+    SearchMatchKind.CONTRACT_NUMBER: 2,
+    SearchMatchKind.MARKET_LOCATION: 3,
+    SearchMatchKind.NAME: 4,
+    SearchMatchKind.MAIN_LOCATION: 5,
+    SearchMatchKind.LOCATION: 6,
+    SearchMatchKind.MAIN_LOCATION_NOTE: 7,
+    SearchMatchKind.LOCATION_NOTE: 8,
 }
 
 

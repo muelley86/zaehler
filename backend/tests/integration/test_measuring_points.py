@@ -238,3 +238,127 @@ def test_replace_meter_rolls_back_on_incomplete_finals(admin_client: TestClient)
         "Alle Register müssen weiter aktiv sein"
     )
     assert {r["id"] for r in only_meter["registers"]} == old_register_ids
+
+
+# ---------------------------------------------------------------------------
+# Vertragsnummer + Marktlokation (Strom: beide / Wasser: nur contract_number)
+# ---------------------------------------------------------------------------
+
+
+def test_create_electricity_with_contract_and_market(admin_client: TestClient) -> None:
+    resp = admin_client.post(
+        "/api/v1/measuring-points",
+        json={
+            "name": "Strom-mit-Vertrag",
+            "type": "electricity",
+            "is_bidirectional": False,
+            "has_dual_tariff": False,
+            "contract_number": "K-12345",
+            "market_location": "DE0001234567",
+            "serial_number": "E-VC-1",
+            "installed_at": "2024-01-01",
+            "initial_values": {"1.8.0": "0"},
+        },
+    )
+    assert resp.status_code == 201, resp.text
+    body = resp.json()
+    assert body["contract_number"] == "K-12345"
+    assert body["market_location"] == "DE0001234567"
+
+
+def test_create_water_with_contract_no_market(admin_client: TestClient) -> None:
+    resp = admin_client.post(
+        "/api/v1/measuring-points",
+        json={
+            "name": "Wasser-mit-Vertrag",
+            "type": "water",
+            "is_bidirectional": False,
+            "has_dual_tariff": False,
+            "contract_number": "W-9999",
+            "serial_number": "W-VC-1",
+            "installed_at": "2024-01-01",
+            "initial_values": {},
+        },
+    )
+    assert resp.status_code == 201
+    assert resp.json()["contract_number"] == "W-9999"
+
+
+def test_market_location_rejected_for_water(admin_client: TestClient) -> None:
+    resp = admin_client.post(
+        "/api/v1/measuring-points",
+        json={
+            "name": "Wasser-mit-MaLo",
+            "type": "water",
+            "is_bidirectional": False,
+            "has_dual_tariff": False,
+            "market_location": "DE000000000",
+            "serial_number": "W-MARKET-FAIL",
+            "installed_at": "2024-01-01",
+            "initial_values": {},
+        },
+    )
+    assert resp.status_code == 422
+
+
+def test_contract_number_rejected_for_gas(admin_client: TestClient) -> None:
+    resp = admin_client.post(
+        "/api/v1/measuring-points",
+        json={
+            "name": "Gas-mit-Vertrag",
+            "type": "gas",
+            "is_bidirectional": False,
+            "has_dual_tariff": False,
+            "contract_number": "G-1",
+            "serial_number": "G-CONTRACT-FAIL",
+            "installed_at": "2024-01-01",
+            "initial_values": {},
+        },
+    )
+    assert resp.status_code == 422
+
+
+def test_patch_clear_contract_and_market(admin_client: TestClient) -> None:
+    create = admin_client.post(
+        "/api/v1/measuring-points",
+        json={
+            "name": "Strom-Clear",
+            "type": "electricity",
+            "is_bidirectional": False,
+            "has_dual_tariff": False,
+            "contract_number": "K-CLEAR",
+            "market_location": "DE-CLEAR",
+            "serial_number": "E-CLEAR",
+            "installed_at": "2024-01-01",
+            "initial_values": {"1.8.0": "0"},
+        },
+    ).json()
+    mp_id = create["id"]
+    resp = admin_client.patch(
+        f"/api/v1/measuring-points/{mp_id}",
+        json={"clear_contract_number": True, "clear_market_location": True},
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["contract_number"] is None
+    assert body["market_location"] is None
+
+
+def test_patch_market_location_rejected_for_water(admin_client: TestClient) -> None:
+    create = admin_client.post(
+        "/api/v1/measuring-points",
+        json={
+            "name": "Wasser-No-Market",
+            "type": "water",
+            "is_bidirectional": False,
+            "has_dual_tariff": False,
+            "serial_number": "W-NO-MARKET",
+            "installed_at": "2024-01-01",
+            "initial_values": {},
+        },
+    ).json()
+    resp = admin_client.patch(
+        f"/api/v1/measuring-points/{create['id']}",
+        json={"market_location": "DE000000000"},
+    )
+    assert resp.status_code == 422
