@@ -10,6 +10,13 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.24.0](https://github.com/muelley86/zaehler/compare/v2.23.0...v2.24.0) (2026-05-28)
+
+
+### Funktionen
+
+* **stammdaten:** Standort-Adresse + MP-Einbauort + Suche + CSV ([#107](https://github.com/muelley86/zaehler/issues/107)) ([0b45649](https://github.com/muelley86/zaehler/commit/0b45649c8e01c8d8675249e7f5d8030abf8134e6))
+
 ## [2.23.0](https://github.com/muelley86/zaehler/compare/v2.22.0...v2.23.0) (2026-05-28)
 
 
