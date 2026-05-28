@@ -10,6 +10,13 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.15.1](https://github.com/muelley86/zaehler/compare/v2.15.0...v2.15.1) (2026-05-28)
+
+
+### Fehlerbehebungen
+
+* **readings:** Concurrency-Limit fuer State-Fetch in der Erfassen-Seite ([#73](https://github.com/muelley86/zaehler/issues/73)) ([c0bd7e1](https://github.com/muelley86/zaehler/commit/c0bd7e1edc4adb711b4d6a3bf073c41b7eab7d37))
+
 ## [2.15.0](https://github.com/muelley86/zaehler/compare/v2.14.2...v2.15.0) (2026-05-28)
 
 
