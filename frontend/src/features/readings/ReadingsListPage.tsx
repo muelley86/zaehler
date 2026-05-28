@@ -711,7 +711,7 @@ const ReadingItem = memo(function ReadingItem({
           ) : null}
           <div className="mt-1 text-caption text-tertiary">
             {reading.created_by_username ?? '—'} ·{' '}
-            <span className="num">{reading.created_at.replace('T', ' ').slice(0, 16)}</span>
+            <span className="num">{formatDateTimeDe(reading.created_at)}</span>
           </div>
         </div>
         <div className="shrink-0 text-right">
@@ -815,7 +815,7 @@ const DeliveryItem = memo(function DeliveryItem({
           ) : null}
           <div className="mt-1 text-caption text-tertiary">
             {delivery.created_by_username ?? '—'} ·{' '}
-            <span className="num">{delivery.created_at.replace('T', ' ').slice(0, 16)}</span>
+            <span className="num">{formatDateTimeDe(delivery.created_at)}</span>
           </div>
         </div>
         <div className="shrink-0 text-right">
@@ -1193,7 +1193,9 @@ function DeliveryEditForm({
   onCancel: () => void;
 }) {
   const [amount, setAmount] = useState(delivery.amount.replace('.', ','));
-  const [deliveryAt, setDeliveryAt] = useState(delivery.delivery_at.slice(0, 16));
+  // ISO-Z muss in lokale datetime-local-Form konvertiert werden — sonst
+  // zeigt das Input-Feld UTC (= 2h Versatz in MESZ).
+  const [deliveryAt, setDeliveryAt] = useState(toInputDateTime(delivery.delivery_at));
   const [note, setNote] = useState(delivery.note ?? '');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);

@@ -12,6 +12,20 @@ DecimalStr = Annotated[
 ]
 
 
+def to_utc_iso(dt: datetime | None) -> str | None:
+    """Naive UTC-``datetime`` → ISO-8601-String mit ``Z``. ``None`` → ``None``.
+
+    Pendant zu ``UtcDateTime``-Serializer, aber als reine Funktion fuer
+    Stellen, die nicht durch Pydantic laufen (Audit-Diffs, Plausibility-
+    Antworten, CSV/JSON-Exports). Idempotent.
+    """
+    if dt is None:
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=UTC)
+    return dt.astimezone(UTC).isoformat().replace("+00:00", "Z")
+
+
 def _serialize_utc(dt: datetime) -> str:
     """Serialisiere ``datetime`` als ISO-8601 mit explizitem ``Z``.
 

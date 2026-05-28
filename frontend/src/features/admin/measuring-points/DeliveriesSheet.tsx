@@ -127,7 +127,7 @@ export function DeliveriesSheet({
                     {d.note ? <div className="text-caption text-tertiary">{d.note}</div> : null}
                     <div className="text-caption text-tertiary">
                       {d.created_by_username ?? '—'} ·{' '}
-                      <span className="num">{d.created_at.replace('T', ' ').slice(0, 16)}</span>
+                      <span className="num">{formatDateTimeDe(d.created_at)}</span>
                     </div>
                   </div>
                   <div className="text-right">
