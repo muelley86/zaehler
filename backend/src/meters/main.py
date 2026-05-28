@@ -18,7 +18,11 @@ from starlette.middleware.gzip import GZipMiddleware
 from starlette.types import Scope
 
 from meters.api import router as api_router
-from meters.core.config import assert_secure_secret_key, settings
+from meters.core.config import (
+    assert_secure_production_config,
+    assert_secure_secret_key,
+    settings,
+)
 from meters.core.logging import configure_logging
 from meters.core.middleware import install_origin_check, install_security_headers
 from meters.core.problem import ProblemError, install_problem_handlers
@@ -46,6 +50,7 @@ class _CachedAssets(StaticFiles):
 def create_app() -> FastAPI:
     configure_logging("DEBUG" if settings.debug else "INFO")
     assert_secure_secret_key()
+    assert_secure_production_config()
     app = FastAPI(title=settings.app_name, debug=settings.debug)
     # GZip vor Routing aktivieren — komprimiert JSON-Responses und das
     # gebaute JS/CSS um typischerweise 60-75 %. Schwelle 1024 B vermeidet

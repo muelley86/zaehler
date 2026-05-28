@@ -608,3 +608,43 @@ def test_oil_consumption_same_day_reading_then_delivery_then_reading(db: Session
     # Zweites Intervall (700 → 2050, mit Lieferung 1500 dazwischen):
     #   Verbrauch = 700 + 1500 - 2050 = 150.
     assert consumptions == [Decimal("100"), Decimal("150")]
+
+
+# ---------------------------------------------------------------------------
+# Production-Config Boot-Assertion (assert_secure_production_config)
+# ---------------------------------------------------------------------------
+
+
+def test_production_config_requires_cookie_secure(monkeypatch) -> None:
+    """Boot-Assertion: debug=False + cookie_secure=False → RuntimeError."""
+    import pytest
+
+    from meters.core import config as cfg
+
+    monkeypatch.setattr(cfg.settings, "debug", False)
+    monkeypatch.setattr(cfg.settings, "cookie_secure", False)
+    with pytest.raises(RuntimeError, match="COOKIE_SECURE"):
+        cfg.assert_secure_production_config()
+
+
+def test_production_config_warns_on_trust_proxy_off(monkeypatch, recwarn) -> None:
+    """Boot-Assertion: debug=False + cookie_secure=True + trust_proxy=False →
+    Warning (kein Boot-Abort, weil Edge-Case ohne Proxy theoretisch denkbar)."""
+    from meters.core import config as cfg
+
+    monkeypatch.setattr(cfg.settings, "debug", False)
+    monkeypatch.setattr(cfg.settings, "cookie_secure", True)
+    monkeypatch.setattr(cfg.settings, "trust_proxy", False)
+    cfg.assert_secure_production_config()
+    assert any("TRUST_PROXY" in str(w.message) for w in recwarn.list)
+
+
+def test_dev_config_skips_assertion(monkeypatch) -> None:
+    """Im Dev-Mode (debug=True) sind cookie_secure/trust_proxy egal — keine
+    Assertions, keine Warnings."""
+    from meters.core import config as cfg
+
+    monkeypatch.setattr(cfg.settings, "debug", True)
+    monkeypatch.setattr(cfg.settings, "cookie_secure", False)
+    monkeypatch.setattr(cfg.settings, "trust_proxy", False)
+    cfg.assert_secure_production_config()

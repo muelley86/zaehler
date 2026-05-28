@@ -20,6 +20,10 @@ _TMP_MEDIA.mkdir(parents=True, exist_ok=True)
 os.environ["METERS_DATABASE_URL"] = f"sqlite:///{_TMP_DB}"
 os.environ["METERS_SECRET_KEY"] = "test-secret-do-not-use-in-prod"
 os.environ["METERS_BCRYPT_ROUNDS"] = "4"
+# Test-Default: debug=True, damit assert_secure_production_config() in der
+# Test-Suite nicht greift (sonst muessten wir cookie_secure=True und
+# trust_proxy=True setzen, was die Tests nur kompliziert).
+os.environ["METERS_DEBUG"] = "True"
 os.environ["METERS_MEDIA_DIR"] = str(_TMP_MEDIA)
 
 from fastapi.testclient import TestClient  # noqa: E402
