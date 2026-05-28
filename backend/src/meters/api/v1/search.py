@@ -63,6 +63,8 @@ def search(
         .where(
             or_(
                 func.lower(MeasuringPoint.name).like(pattern),
+                func.lower(MeasuringPoint.contract_number).like(pattern),
+                func.lower(MeasuringPoint.market_location).like(pattern),
                 func.lower(Location.name).like(pattern),
                 func.lower(MainLocation.name).like(pattern),
                 func.lower(Location.note).like(pattern),
@@ -112,6 +114,10 @@ def _classify(mp: MeasuringPoint, needle_lower: str) -> SearchHit | None:
     if matching_pms:
         matching_pms.sort(key=lambda pm: (pm.removed_at is not None, pm.installed_at))
         return _make_hit(mp, SearchMatchKind.SERIAL, matching_pms[0].serial_number)
+    if mp.contract_number and needle_lower in mp.contract_number.lower():
+        return _make_hit(mp, SearchMatchKind.CONTRACT_NUMBER, mp.contract_number)
+    if mp.market_location and needle_lower in mp.market_location.lower():
+        return _make_hit(mp, SearchMatchKind.MARKET_LOCATION, mp.market_location)
     if needle_lower in mp.name.lower():
         return _make_hit(mp, SearchMatchKind.NAME)
     loc = mp.location

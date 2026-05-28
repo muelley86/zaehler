@@ -95,6 +95,8 @@ export interface PhysicalMeterRead {
 
 export type SearchMatchKind =
   | 'serial'
+  | 'contract_number'
+  | 'market_location'
   | 'name'
   | 'main_location'
   | 'location'
@@ -141,6 +143,8 @@ export interface MeasuringPointRead {
   tank_capacity: string | null;
   transformer_factor: number | null;
   heating_source: HeatingSource | null;
+  contract_number: string | null;
+  market_location: string | null;
   physical_meters: PhysicalMeterRead[];
 }
 

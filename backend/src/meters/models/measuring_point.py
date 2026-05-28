@@ -44,6 +44,11 @@ class MeasuringPoint(Base, TimestampMixin):
         SAEnum(HeatingSource, name="heating_source", native_enum=False, length=20),
         nullable=True,
     )
+    # Vertragsnummer (Kundennr. beim Versorger) — relevant fuer Strom + Wasser.
+    # Marktlokation (MaLo-ID, 11-stellig) — nur Strom. Beide optional, kein
+    # UNIQUE-Constraint (Bestandsdaten-Import waere sonst fragil).
+    contract_number: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    market_location: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
     location: Mapped[Location | None] = relationship("Location")
     physical_meters: Mapped[list[PhysicalMeter]] = relationship(

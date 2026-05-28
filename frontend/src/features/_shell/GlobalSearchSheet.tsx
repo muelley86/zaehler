@@ -30,6 +30,8 @@ const MIN_QUERY_LEN = 2;
 
 const MATCH_LABEL: Record<SearchMatchKind, string> = {
   serial: 'Zähler-Nr.',
+  contract_number: 'Vertragsnr.',
+  market_location: 'Marktlokation',
   name: 'Name',
   main_location: 'Hauptstandort',
   location: 'Zählerstandort',

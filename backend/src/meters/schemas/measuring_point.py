@@ -43,6 +43,10 @@ class MeasuringPointBase(BaseModel):
     tank_capacity: Decimal | None = Field(default=None, gt=Decimal("0"))
     transformer_factor: int | None = Field(default=None, gt=0, le=10000)
     heating_source: HeatingSource | None = None
+    # Vertragsnummer (Versorger-Kundennr.) — fuer Strom + Wasser. Marktlokation
+    # (MaLo-ID) — nur Strom. Beide optional, max 64 Zeichen.
+    contract_number: str | None = Field(default=None, max_length=64)
+    market_location: str | None = Field(default=None, max_length=64)
 
     @model_validator(mode="after")
     def _tank_capacity_only_heating(self) -> Self:
@@ -64,6 +68,21 @@ class MeasuringPointBase(BaseModel):
             raise ValueError("heating_source ist für Wärme-Messstellen Pflicht")
         if self.type is not MeterType.HEATING and self.heating_source is not None:
             raise ValueError("heating_source ist nur für Wärme-Messstellen zulässig")
+        return self
+
+    @model_validator(mode="after")
+    def _contract_number_only_electricity_or_water(self) -> Self:
+        if self.contract_number is not None and self.type not in (
+            MeterType.ELECTRICITY,
+            MeterType.WATER,
+        ):
+            raise ValueError("contract_number ist nur für Strom- oder Wasser-Messstellen zulässig")
+        return self
+
+    @model_validator(mode="after")
+    def _market_location_only_electricity(self) -> Self:
+        if self.market_location is not None and self.type is not MeterType.ELECTRICITY:
+            raise ValueError("market_location ist nur für Strom-Messstellen zulässig")
         return self
 
 
@@ -97,6 +116,10 @@ class MeasuringPointUpdate(BaseModel):
     transformer_factor: int | None = Field(default=None, gt=0, le=10000)
     clear_transformer_factor: bool = False
     heating_source: HeatingSource | None = None
+    contract_number: str | None = Field(default=None, max_length=64)
+    clear_contract_number: bool = False
+    market_location: str | None = Field(default=None, max_length=64)
+    clear_market_location: bool = False
 
 
 class MeasuringPointRead(APIModel):
@@ -116,6 +139,8 @@ class MeasuringPointRead(APIModel):
     tank_capacity: DecimalStr | None
     transformer_factor: int | None
     heating_source: HeatingSource | None
+    contract_number: str | None = None
+    market_location: str | None = None
     physical_meters: list[PhysicalMeterRead]
 
 

@@ -399,6 +399,12 @@ function StammdatenReadView({
           />
         </>
       ) : null}
+      {(mp.type === 'electricity' || mp.type === 'water') && mp.contract_number ? (
+        <FieldRow k="Vertragsnummer" v={mp.contract_number} />
+      ) : null}
+      {mp.type === 'electricity' && mp.market_location ? (
+        <FieldRow k="Marktlokation" v={mp.market_location} />
+      ) : null}
       {mp.type === 'heating' && mp.tank_capacity ? (
         <FieldRow
           k="Tankvolumen"
@@ -435,6 +441,8 @@ function StammdatenEditForm({
   const [transformerFactor, setTransformerFactor] = useState(
     mp.transformer_factor !== null ? String(mp.transformer_factor) : '',
   );
+  const [contractNumber, setContractNumber] = useState(mp.contract_number ?? '');
+  const [marketLocation, setMarketLocation] = useState(mp.market_location ?? '');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -466,6 +474,25 @@ function StammdatenEditForm({
             throw new RangeError('Wandlerfaktor muss eine positive Ganzzahl sein.');
           }
           body['transformer_factor'] = parsed;
+        }
+      }
+      // Vertragsnummer: leer + vorher gesetzt → clear; sonst direkt schicken.
+      // Backend ignoriert das Feld fuer Typen, die es nicht erlauben — aber
+      // wir senden's ohnehin nur, wenn der Typ es zulaesst (electricity/water).
+      if (mp.type === 'electricity' || mp.type === 'water') {
+        const trimmed = contractNumber.trim();
+        if (trimmed === '') {
+          if (mp.contract_number !== null) body['clear_contract_number'] = true;
+        } else if (trimmed !== mp.contract_number) {
+          body['contract_number'] = trimmed;
+        }
+      }
+      if (mp.type === 'electricity') {
+        const trimmed = marketLocation.trim();
+        if (trimmed === '') {
+          if (mp.market_location !== null) body['clear_market_location'] = true;
+        } else if (trimmed !== mp.market_location) {
+          body['market_location'] = trimmed;
         }
       }
       const updated = await api.patch<MeasuringPointRead>(`/measuring-points/${mp.id}`, body);
@@ -517,7 +544,27 @@ function StammdatenEditForm({
             Hinweis: Register werden nicht automatisch angepasst — beim nächsten Zählerwechsel
             wirken sich die Flags auf den neuen Zähler aus.
           </div>
+          <TextField
+            label="Vertragsnummer (optional)"
+            value={contractNumber}
+            onChange={(e) => setContractNumber(e.target.value)}
+            hint="leer = nicht gesetzt"
+          />
+          <TextField
+            label="Marktlokation / MaLo-ID (optional)"
+            value={marketLocation}
+            onChange={(e) => setMarketLocation(e.target.value)}
+            hint="leer = nicht gesetzt"
+          />
         </>
+      ) : null}
+      {mp.type === 'water' ? (
+        <TextField
+          label="Vertragsnummer (optional)"
+          value={contractNumber}
+          onChange={(e) => setContractNumber(e.target.value)}
+          hint="leer = nicht gesetzt"
+        />
       ) : null}
       {mp.type === 'heating' ? (
         <TextField

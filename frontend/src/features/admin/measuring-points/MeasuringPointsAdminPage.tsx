@@ -302,6 +302,10 @@ function CreateFormFields({
   const [dual, setDual] = useState(false);
   const [transformerFactor, setTransformerFactor] = useState('');
 
+  // Vertragsnummer + Marktlokation (siehe Typ-Gating beim Submit).
+  const [contractNumber, setContractNumber] = useState('');
+  const [marketLocation, setMarketLocation] = useState('');
+
   // Heizung
   const [heatingSource, setHeatingSource] = useState<HeatingSource>('oil');
   const [registers, setRegisters] = useState<RegisterDraft[]>(HEATING_PRESETS.oil);
@@ -336,6 +340,13 @@ function CreateFormFields({
           throw new RangeError('Wandlerfaktor muss eine positive Ganzzahl sein.');
         }
         body['transformer_factor'] = parsed;
+      }
+      // Vertragsnummer fuer Strom + Wasser; Marktlokation nur Strom.
+      if ((type === 'electricity' || type === 'water') && contractNumber.trim()) {
+        body['contract_number'] = contractNumber.trim();
+      }
+      if (type === 'electricity' && marketLocation.trim()) {
+        body['market_location'] = marketLocation.trim();
       }
       if (type === 'heating') {
         body['heating_source'] = heatingSource;
@@ -412,7 +423,28 @@ function CreateFormFields({
             hint="leer = kein Wandler; Verbräuche werden mit dem Faktor multipliziert."
             numeric
           />
+          <TextField
+            label="Vertragsnummer (optional)"
+            value={contractNumber}
+            onChange={(e) => setContractNumber(e.target.value)}
+            hint="Kundennummer beim Versorger — hilft beim Rechnungs-Abgleich."
+          />
+          <TextField
+            label="Marktlokation / MaLo-ID (optional)"
+            value={marketLocation}
+            onChange={(e) => setMarketLocation(e.target.value)}
+            hint="11-stellige MaLo aus der Stromrechnung."
+          />
         </>
+      ) : null}
+
+      {type === 'water' ? (
+        <TextField
+          label="Vertragsnummer (optional)"
+          value={contractNumber}
+          onChange={(e) => setContractNumber(e.target.value)}
+          hint="Kundennummer beim Wasserversorger."
+        />
       ) : null}
 
       {type === 'heating' ? (
