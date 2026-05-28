@@ -32,7 +32,8 @@ def _create_mp(
         body["owner_valid_from"] = owner_valid_from
     resp = client.post("/api/v1/measuring-points", json=body)
     assert resp.status_code == 201, resp.text
-    return resp.json()
+    out: dict[str, Any] = resp.json()
+    return out
 
 
 def _create_owner(client: TestClient, name: str) -> int:
