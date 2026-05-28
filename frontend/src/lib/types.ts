@@ -93,6 +93,25 @@ export interface PhysicalMeterRead {
   registers: RegisterRead[];
 }
 
+export type SearchMatchKind =
+  | 'serial'
+  | 'name'
+  | 'main_location'
+  | 'location'
+  | 'main_location_note'
+  | 'location_note';
+
+export interface SearchHit {
+  measuring_point_id: number;
+  measuring_point_name: string;
+  location_id: number | null;
+  location_name: string | null;
+  main_location_id: number | null;
+  main_location_name: string | null;
+  matched_via: SearchMatchKind;
+  matched_detail: string | null;
+}
+
 export interface MainLocationRead {
   id: number;
   name: string;

@@ -11,7 +11,7 @@
  * Sub-Sidebar bzw. Tab-Strip angezeigt.
  */
 
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import {
   ClipboardList,
   Gauge,
@@ -20,10 +20,12 @@ import {
   MoreHorizontal,
   PencilLine,
   Plus,
+  Search,
   Settings,
 } from 'lucide-react';
 import { NavLink, useNavigate } from 'react-router-dom';
 
+import { GlobalSearchSheet } from '@/features/_shell/GlobalSearchSheet';
 import { useAuth } from '@/features/auth/auth-context';
 import { cx } from './ui/cx';
 
@@ -90,6 +92,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const { me, logout } = useAuth();
   const navigate = useNavigate();
   const isAdmin = me?.role === 'admin';
+  const [searchOpen, setSearchOpen] = useState(false);
 
   async function handleLogout() {
     await logout();
@@ -132,6 +135,19 @@ export function AppShell({ children }: { children: ReactNode }) {
         <div className="px-2 pb-4">
           <LogoLockup />
         </div>
+
+        {/* Such-Button im Sidebar-Header — vor dem ersten Nav-Eintrag, damit
+            er prominent ist, ohne sich als Nav-Item zu tarnen. */}
+        <button
+          type="button"
+          onClick={() => setSearchOpen(true)}
+          data-testid="sidebar-search"
+          aria-label="Suche öffnen"
+          className="bg-fill/50 mb-2 flex items-center gap-2.5 rounded-pill border-hairline border-border px-2.5 py-2 text-body-sm font-medium text-secondary transition-colors hover:bg-fill hover:text-label"
+        >
+          <Search size={18} className="shrink-0 opacity-70" />
+          Suchen
+        </button>
 
         <nav className="flex flex-col gap-0.5">
           {PRIMARY_NAV.map((n) => (
@@ -226,7 +242,18 @@ export function AppShell({ children }: { children: ReactNode }) {
           <div className="pt-3">
             <LogoLockup size="sm" />
           </div>
-          <div className="pt-3 text-caption text-tertiary">{me?.username}</div>
+          <div className="flex items-center gap-2 pt-3">
+            <button
+              type="button"
+              onClick={() => setSearchOpen(true)}
+              data-testid="mobile-search"
+              aria-label="Suche öffnen"
+              className="flex h-8 w-8 items-center justify-center rounded-full text-tertiary transition-colors hover:bg-fill hover:text-label"
+            >
+              <Search size={18} />
+            </button>
+            <span className="text-caption text-tertiary">{me?.username}</span>
+          </div>
         </header>
 
         <main className="min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden pb-24 md:pb-8">
@@ -286,6 +313,9 @@ export function AppShell({ children }: { children: ReactNode }) {
           </NavLink>
         </nav>
       </div>
+
+      {/* Globale Suche — Mobile + Desktop teilen sich das gleiche Sheet. */}
+      <GlobalSearchSheet open={searchOpen} onClose={() => setSearchOpen(false)} />
     </div>
   );
 }
