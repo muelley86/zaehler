@@ -44,9 +44,9 @@ class MeasuringPointBase(BaseModel):
     transformer_factor: int | None = Field(default=None, gt=0, le=10000)
     heating_source: HeatingSource | None = None
     # Vertragsnummer (Versorger-Kundennr.) — fuer Strom + Wasser. Marktlokation
-    # (MaLo-ID) — nur Strom. Beide optional, max 64 Zeichen.
+    # (MaLo-ID, exakt 11 Ziffern) — nur Strom. Beide optional.
     contract_number: str | None = Field(default=None, max_length=64)
-    market_location: str | None = Field(default=None, max_length=64)
+    market_location: str | None = Field(default=None, max_length=11, pattern=r"^\d{11}$")
     # Genauer Einbauort innerhalb des Standorts (z. B. „1. Stock, Wohnung 4b").
     installation_location: str | None = Field(default=None, max_length=200)
 

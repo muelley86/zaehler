@@ -73,3 +73,46 @@ def test_reject_duplicate_owner_name(admin_client: TestClient) -> None:
 def test_owner_admin_only(admin_client: TestClient, recorder_client: TestClient) -> None:
     assert recorder_client.get("/api/v1/owners").status_code == 200
     assert recorder_client.post("/api/v1/owners", json={"name": "Verboten"}).status_code == 403
+
+
+# ---------------------------------------------------------------------------
+# Input-Validierung (PLZ, VAT-ID, Email)
+# ---------------------------------------------------------------------------
+
+
+def test_postcode_must_be_five_digits(admin_client: TestClient) -> None:
+    valid = admin_client.post(
+        "/api/v1/owners", json={"name": "Eigt-PLZ-OK", "address_postcode": "12345"}
+    )
+    assert valid.status_code == 201
+
+    invalid = admin_client.post(
+        "/api/v1/owners", json={"name": "Eigt-PLZ-BAD", "address_postcode": "abc"}
+    )
+    assert invalid.status_code == 422
+
+    too_long = admin_client.post(
+        "/api/v1/owners", json={"name": "Eigt-PLZ-LONG", "address_postcode": "123456"}
+    )
+    assert too_long.status_code == 422
+
+
+def test_vat_id_normalised_uppercase(admin_client: TestClient) -> None:
+    resp = admin_client.post("/api/v1/owners", json={"name": "Eigt-VAT", "vat_id": "de123456789"})
+    assert resp.status_code == 201
+    assert resp.json()["vat_id"] == "DE123456789"
+
+
+def test_vat_id_invalid_pattern(admin_client: TestClient) -> None:
+    resp = admin_client.post("/api/v1/owners", json={"name": "Eigt-VAT-BAD", "vat_id": "abc"})
+    assert resp.status_code == 422
+
+
+def test_email_invalid(admin_client: TestClient) -> None:
+    resp = admin_client.post("/api/v1/owners", json={"name": "Eigt-Email-BAD", "email": "kein-at"})
+    assert resp.status_code == 422
+
+    ok = admin_client.post(
+        "/api/v1/owners", json={"name": "Eigt-Email-OK", "email": "max@example.com"}
+    )
+    assert ok.status_code == 201

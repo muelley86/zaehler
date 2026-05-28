@@ -226,3 +226,14 @@ def test_patch_address_update_and_clear(admin_client: TestClient) -> None:
         json={"address_city": ""},
     ).json()
     assert cleared["address_city"] is None
+
+
+def test_location_postcode_must_be_five_digits(admin_client: TestClient) -> None:
+    ok = admin_client.post(
+        "/api/v1/locations", json={"name": "Loc-PLZ-OK", "address_postcode": "12345"}
+    )
+    assert ok.status_code == 201
+    bad = admin_client.post(
+        "/api/v1/locations", json={"name": "Loc-PLZ-BAD", "address_postcode": "abc"}
+    )
+    assert bad.status_code == 422

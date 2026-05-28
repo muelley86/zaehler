@@ -203,7 +203,7 @@ def test_global_deliveries_listing_with_filters(admin_client: TestClient) -> Non
 
     filtered = admin_client.get("/api/v1/deliveries", params={"from_date": "2024-04-01"})
     assert len(filtered.json()) == 1
-    assert filtered.json()[0]["delivery_at"] == "2024-04-15T12:00:00"
+    assert filtered.json()[0]["delivery_at"] == "2024-04-15T12:00:00Z"
 
     by_mp = admin_client.get("/api/v1/deliveries", params={"measuring_point_id": mp["id"]})
     assert len(by_mp.json()) == 2

@@ -473,6 +473,9 @@ function CreateFormFields({
             value={marketLocation}
             onChange={(e) => setMarketLocation(e.target.value)}
             hint="11-stellige MaLo aus der Stromrechnung."
+            inputMode="numeric"
+            pattern="\d{11}"
+            maxLength={11}
           />
         </>
       ) : null}

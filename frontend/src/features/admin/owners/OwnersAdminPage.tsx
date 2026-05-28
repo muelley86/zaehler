@@ -357,6 +357,10 @@ function FormFields({
           label="PLZ"
           value={state.address_postcode}
           onChange={(e) => set('address_postcode', e.target.value)}
+          inputMode="numeric"
+          pattern="\d{5}"
+          maxLength={5}
+          hint="5 Ziffern"
         />
         <div className="col-span-2">
           <TextField
@@ -370,17 +374,22 @@ function FormFields({
         label="E-Mail"
         value={state.email}
         onChange={(e) => set('email', e.target.value)}
+        type="email"
       />
       <TextField
         label="Telefon"
         value={state.phone}
         onChange={(e) => set('phone', e.target.value)}
+        type="tel"
       />
       <div className="grid grid-cols-2 gap-2">
         <TextField
           label="USt-IdNr."
           value={state.vat_id}
-          onChange={(e) => set('vat_id', e.target.value)}
+          onChange={(e) => set('vat_id', e.target.value.toUpperCase())}
+          pattern="[A-Z]{2}[A-Z0-9]{2,18}"
+          maxLength={20}
+          hint="z. B. DE123456789"
         />
         <TextField
           label="Steuer-Nr."
