@@ -1,15 +1,13 @@
 /**
  * Bulk-Druck für eine Auswahl an QR-Tokens.
  *
- * Drei Layouts werden unterstützt:
+ * Zwei Layouts werden unterstützt:
  *
  * 1. ``cut-2x4`` — Schnitt-Bogen 2×4, 95×65 mm pro Feld inkl. Token-Text
  *    und Messstellen-Namen. Default — die Etiketten werden ausgeschnitten
  *    und auf den Zähler geklebt.
- * 2. ``avery-l4731rev`` — Avery Zweckform L4731REV, 25,4 × 10 mm, 7×27
- *    = 189 Etiketten pro Bogen. Nur QR-Code, keine Beschriftung.
- * 3. ``avery-3320`` — Avery Zweckform 3320 / „32×10-R", 32 × 10 mm,
- *    4×11 = 44 Etiketten pro Bogen. Nur QR-Code, keine Beschriftung.
+ * 2. ``avery-l6008`` — Avery Zweckform L6008-20 (wetterfest), 25,4 × 10 mm,
+ *    7×27 = 189 Etiketten pro Bogen. Nur QR-Code, keine Beschriftung.
  *
  * Auf den Avery-Bögen (10 mm Höhe) wird der QR als 10 × 10 mm Quadrat
  * mittig zentriert. Die menschenlesbare Token-Bezeichnung („K7MP3X9F")
@@ -50,7 +48,7 @@
 
 import type { QrTokenRead } from '@/lib/types';
 
-export type LabelLayoutId = 'cut-2x4' | 'avery-l4731rev' | 'avery-3320';
+export type LabelLayoutId = 'cut-2x4' | 'avery-l6008';
 
 /**
  * Geometrie eines Etikettenbogens. Alle Werte in Millimetern, sodass das
@@ -109,10 +107,10 @@ export const DEFAULT_LAYOUTS: Record<LabelLayoutId, LabelLayout> = {
     showLabelText: true,
     qrPlacement: 'center-with-caption',
   },
-  'avery-l4731rev': {
-    id: 'avery-l4731rev',
-    name: 'Avery L4731REV',
-    description: '25,4 × 10 mm, 7 × 27 = 189/Bogen — nur QR, ohne Beschriftung',
+  'avery-l6008': {
+    id: 'avery-l6008',
+    name: 'Avery L6008-20',
+    description: '25,4 × 10 mm, 7 × 27 = 189/Bogen — wetterfest, ohne Beschriftung',
     pageWidthMm: 210,
     pageHeightMm: 297,
     cols: 7,
@@ -127,28 +125,9 @@ export const DEFAULT_LAYOUTS: Record<LabelLayoutId, LabelLayout> = {
     showLabelText: false,
     qrPlacement: 'center-only',
   },
-  'avery-3320': {
-    id: 'avery-3320',
-    name: 'Avery 3320 / 32×10-R',
-    description: '32 × 10 mm, 4 × 11 = 44/Bogen — nur QR, ohne Beschriftung',
-    pageWidthMm: 210,
-    pageHeightMm: 297,
-    cols: 4,
-    rows: 11,
-    // Best-Guess-Defaults — bei Bedarf in der UI feinjustieren.
-    marginTopMm: 13,
-    marginLeftMm: 8,
-    hPitchMm: 49, // 32 mm Etikett + 17 mm Lücke
-    vPitchMm: 25, // 10 mm Etikett + 15 mm Lücke
-    labelWidthMm: 32,
-    labelHeightMm: 10,
-    showCutBorder: false,
-    showLabelText: false,
-    qrPlacement: 'center-only',
-  },
 };
 
-export const LAYOUT_ORDER: LabelLayoutId[] = ['cut-2x4', 'avery-l4731rev', 'avery-3320'];
+export const LAYOUT_ORDER: LabelLayoutId[] = ['cut-2x4', 'avery-l6008'];
 
 /**
  * Token mit zugehörigem inline-SVG-String — interner Druck-Typ.
