@@ -10,6 +10,13 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.15.0](https://github.com/muelley86/zaehler/compare/v2.14.2...v2.15.0) (2026-05-28)
+
+
+### Funktionen
+
+* **qr:** Avery L6008-20 als Drucklayout, L4731REV/3320 entfernt ([#71](https://github.com/muelley86/zaehler/issues/71)) ([b5b877e](https://github.com/muelley86/zaehler/commit/b5b877e3a50be9231ef0a1bcd35c35238a0dffd0))
+
 ## [2.14.2](https://github.com/muelley86/zaehler/compare/v2.14.1...v2.14.2) (2026-05-28)
 
 
