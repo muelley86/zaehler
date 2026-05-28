@@ -44,9 +44,7 @@ def test_create_main_location_audited(admin_client: TestClient) -> None:
 
 
 def test_update_main_location_audit_diff(admin_client: TestClient) -> None:
-    created = admin_client.post(
-        "/api/v1/main-locations", json={"name": "Anbau"}
-    ).json()
+    created = admin_client.post("/api/v1/main-locations", json={"name": "Anbau"}).json()
     admin_client.patch(
         f"/api/v1/main-locations/{created['id']}",
         json={"name": "Anbau-Sued", "note": "neuer Trakt"},
@@ -59,9 +57,7 @@ def test_update_main_location_audit_diff(admin_client: TestClient) -> None:
 
 
 def test_delete_main_location_sets_location_to_null(admin_client: TestClient) -> None:
-    main = admin_client.post(
-        "/api/v1/main-locations", json={"name": "Nebenhaus"}
-    ).json()
+    main = admin_client.post("/api/v1/main-locations", json={"name": "Nebenhaus"}).json()
     loc = admin_client.post(
         "/api/v1/locations",
         json={"name": "Keller-Nebenhaus", "main_location_id": main["id"]},
@@ -81,9 +77,7 @@ def test_reject_duplicate_name(admin_client: TestClient) -> None:
 
 
 def test_assign_and_clear_main_location_on_location(admin_client: TestClient) -> None:
-    main = admin_client.post(
-        "/api/v1/main-locations", json={"name": "Hof"}
-    ).json()
+    main = admin_client.post("/api/v1/main-locations", json={"name": "Hof"}).json()
     loc = admin_client.post(
         "/api/v1/locations", json={"name": "Garage", "main_location_id": main["id"]}
     ).json()
@@ -102,17 +96,12 @@ def test_assign_invalid_main_location_fails(admin_client: TestClient) -> None:
     assert resp.status_code == 404
 
 
-def test_main_location_admin_only(
-    admin_client: TestClient, recorder_client: TestClient
-) -> None:
+def test_main_location_admin_only(admin_client: TestClient, recorder_client: TestClient) -> None:
     # Recorder darf lesen
     assert recorder_client.get("/api/v1/main-locations").status_code == 200
     # ... aber nicht schreiben
     assert (
-        recorder_client.post(
-            "/api/v1/main-locations", json={"name": "Verboten"}
-        ).status_code
-        == 403
+        recorder_client.post("/api/v1/main-locations", json={"name": "Verboten"}).status_code == 403
     )
 
 

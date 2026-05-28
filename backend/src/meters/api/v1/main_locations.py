@@ -52,9 +52,7 @@ def create_main_location(
         db.flush()
     except IntegrityError as exc:
         db.rollback()
-        raise ProblemError(
-            status_code=409, title="MainLocation name already exists"
-        ) from exc
+        raise ProblemError(status_code=409, title="MainLocation name already exists") from exc
     record(
         db,
         user_id=admin.id,
@@ -101,9 +99,7 @@ def update_main_location(
         db.commit()
     except IntegrityError as exc:
         db.rollback()
-        raise ProblemError(
-            status_code=409, title="MainLocation name already exists"
-        ) from exc
+        raise ProblemError(status_code=409, title="MainLocation name already exists") from exc
     db.refresh(obj)
     return MainLocationRead.model_validate(obj)
 

@@ -33,6 +33,7 @@ def _ensure_main_location(db: Session, main_location_id: int | None) -> None:
     if db.get(MainLocation, main_location_id) is None:
         raise ProblemError(status_code=404, title="MainLocation not found")
 
+
 router = APIRouter(prefix="/locations", tags=["locations"])
 
 
