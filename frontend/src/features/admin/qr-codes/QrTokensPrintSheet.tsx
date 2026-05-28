@@ -193,7 +193,14 @@ function sanitizeSvgForInline(raw: string): string {
   return svg;
 }
 
-async function fetchTokenSvg(tokenStr: string): Promise<string> {
+// Max parallele SVG-Requests beim Bulk-Druck. Browser begrenzen HTTP/2-
+// Streams ohnehin in dieser Groessenordnung; auf der Server-Seite
+// vermeidet das Limit, dass Threadpool- und DB-Connection-Pool-Limits
+// unter ~200 parallelen Anfragen reissen (das war die Ursache des
+// „HTTP 500"-Fehlers bei einem 189er-Avery-Bogen).
+const PRINT_SVG_CONCURRENCY = 8;
+
+async function fetchTokenSvgOnce(tokenStr: string): Promise<string> {
   // Same-origin-Fetch im Opener-Kontext — Cookies, CSP und Origin sind hier
   // alle „normal", anders als später im about:blank-Fenster.
   const r = await fetch(
@@ -204,9 +211,71 @@ async function fetchTokenSvg(tokenStr: string): Promise<string> {
     },
   );
   if (!r.ok) {
-    throw new Error(`QR-SVG für ${tokenStr} konnte nicht geladen werden (HTTP ${r.status})`);
+    // Wenn das Backend einen problem+json-Body mitschickt, ueberneh wir
+    // ``detail`` — damit sehen wir bei sporadischen 5xx auf einen Blick,
+    // ob es ein Pool-Timeout, Pillow- oder ein anderer Fehler war.
+    let detail = '';
+    try {
+      const body = (await r.clone().json()) as { detail?: string };
+      if (typeof body.detail === 'string' && body.detail) detail = ` — ${body.detail}`;
+    } catch {
+      /* nicht-JSON-Body, ignorieren */
+    }
+    const err: Error & { status?: number } = new Error(
+      `QR-SVG für ${tokenStr} konnte nicht geladen werden (HTTP ${r.status})${detail}`,
+    );
+    err.status = r.status;
+    throw err;
   }
   return sanitizeSvgForInline(await r.text());
+}
+
+async function fetchTokenSvg(tokenStr: string): Promise<string> {
+  // Bis zu 2 Wiederholungen bei serverseitigen 5xx — kompensiert sporadische
+  // Threadpool-/Connection-Pool-Glitches, ohne den User mit einer fehlge-
+  // schlagenen Bogen-Vorbereitung zu blockieren. 4xx wird sofort weiter-
+  // geworfen (kein retry, das ist ein dauerhafter Fehler).
+  let lastErr: unknown;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      return await fetchTokenSvgOnce(tokenStr);
+    } catch (err) {
+      const status = (err as { status?: number }).status;
+      if (status !== undefined && status < 500) throw err;
+      lastErr = err;
+      if (attempt < 2) {
+        await new Promise((resolve) => window.setTimeout(resolve, 250 + attempt * 250));
+      }
+    }
+  }
+  throw lastErr instanceof Error ? lastErr : new Error(String(lastErr));
+}
+
+/** Verarbeitet Tokens mit beschraenkter Parallelitaet — wartet, bis ein
+ * Slot frei wird, bevor der naechste Request startet. Aequivalent zu
+ * ``p-limit(PRINT_SVG_CONCURRENCY)`` ohne neue Dependency. Exportiert
+ * fuer Unit-Tests.
+ */
+export async function fetchSvgsWithConcurrency(tokens: QrTokenRead[]): Promise<TokenWithSvg[]> {
+  const result: (TokenWithSvg | undefined)[] = new Array<TokenWithSvg | undefined>(tokens.length);
+  let next = 0;
+  async function worker(): Promise<void> {
+    while (next < tokens.length) {
+      const i = next++;
+      const t = tokens[i];
+      if (!t) continue;
+      const svg = await fetchTokenSvg(t.token);
+      result[i] = { ...t, svg };
+    }
+  }
+  const workers = Array.from({ length: Math.min(PRINT_SVG_CONCURRENCY, tokens.length) }, () =>
+    worker(),
+  );
+  await Promise.all(workers);
+  // Alle Indizes belegt — ``continue`` im Worker greift nur, wenn der
+  // Token-Index ungueltig waere (kann hier nicht passieren). Cast ist
+  // safe, gibt mypy/eslint Ruhe.
+  return result as TokenWithSvg[];
 }
 
 function buildLabelInner(token: TokenWithSvg, layout: LabelLayout): string {
@@ -499,12 +568,11 @@ export function openTokensPrintWindow(tokens: QrTokenRead[], layout: LabelLayout
   // sind davon nicht betroffen — same-origin-Inheritance reicht hier.
   void (async () => {
     try {
-      // SVG direkt im map-Callback fetchen — vermeidet einen separaten
-      // Zip-Schritt mit Index-Zugriff (der unter noUncheckedIndexedAccess
-      // ein ``string | undefined`` ergeben würde).
-      const tokensWithSvg: TokenWithSvg[] = await Promise.all(
-        tokens.map(async (t) => ({ ...t, svg: await fetchTokenSvg(t.token) })),
-      );
+      // Parallelitaet bewusst begrenzen — bei einem voll besetzten
+      // Avery-Bogen (189 Etiketten) hat ``Promise.all`` ueber alle
+      // Tokens den Backend-Threadpool/DB-Pool sporadisch in den 500
+      // gefahren.
+      const tokensWithSvg = await fetchSvgsWithConcurrency(tokens);
       const html = buildPrintHtml(tokensWithSvg, layout);
       w.document.open();
       w.document.write(html);

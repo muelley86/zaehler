@@ -8,6 +8,7 @@ Admin oder Recorder mit Flag ``can_assign_qr_tokens``.
 
 from __future__ import annotations
 
+import logging
 from typing import Literal
 
 from fastapi import APIRouter, Query, Request, Response, status
@@ -41,6 +42,7 @@ from meters.services.qr_token import (
 )
 
 router = APIRouter(prefix="/qr-tokens", tags=["qr-tokens"])
+logger = logging.getLogger(__name__)
 
 # Größenmapping für QR-Generierung — analog zum bisherigen Direkt-URL-Endpoint.
 _QR_BOX_SIZES: dict[str, int] = {"small": 6, "medium": 8, "large": 12}
@@ -226,12 +228,25 @@ def render_qr(
     _load_or_404(db, token_str)
     url = _build_token_url(request, token_str)
     box_size = _QR_BOX_SIZES[size]
-    if format == "svg":
-        body = qr_svg_bytes(url, box_size=box_size)
-        media_type = "image/svg+xml"
-    else:
-        body = qr_png_bytes(url, box_size=box_size)
-        media_type = "image/png"
+    # Render in try/except, damit beim Bulk-Druck eines vollen Bogens
+    # (z. B. Avery l4731rev mit 189 Etiketten) jeder einzelne Fehler im
+    # Log landet und das Frontend einen brauchbaren Detail-Text bekommt
+    # statt einem nackten 500. Mögliche Ursachen: qrcode-DataOverflow,
+    # Pillow-IO, Threadpool-Drift unter dichtem Concurrency-Load.
+    try:
+        if format == "svg":
+            body = qr_svg_bytes(url, box_size=box_size)
+            media_type = "image/svg+xml"
+        else:
+            body = qr_png_bytes(url, box_size=box_size)
+            media_type = "image/png"
+    except Exception as exc:
+        logger.exception("QR-Render fehlgeschlagen fuer Token %s (format=%s)", token_str, format)
+        raise ProblemError(
+            status_code=500,
+            title="QR render failed",
+            detail=f"{type(exc).__name__}: {exc}",
+        ) from exc
     return Response(
         content=body,
         media_type=media_type,
