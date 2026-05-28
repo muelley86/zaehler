@@ -10,6 +10,13 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.18.0](https://github.com/muelley86/zaehler/compare/v2.17.0...v2.18.0) (2026-05-28)
+
+
+### Funktionen
+
+* **dashboard:** Standort-Gruppen mit zuklappbaren Akkordeons ([#95](https://github.com/muelley86/zaehler/issues/95)) ([a0ecc30](https://github.com/muelley86/zaehler/commit/a0ecc30d69ac431bf3c47ae9a5c3fa58b66f6c6e))
+
 ## [2.17.0](https://github.com/muelley86/zaehler/compare/v2.16.5...v2.17.0) (2026-05-28)
 
 
