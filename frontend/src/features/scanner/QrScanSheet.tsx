@@ -135,17 +135,17 @@ export function QrScanSheet({ open, onClose }: QrScanSheetProps) {
         await instance.start(
           {
             facingMode: 'environment',
-            // HD-Aufloesung explizit anfordern — sonst liefert
-            // ``getUserMedia`` oft nur 640×480, und ein gedruckter
-            // 10-mm-QR (Avery L6008) bringt zu wenige Pixel auf die
-            // Linse fuer eine zuverlaessige Decodierung. Mit
-            // ``ideal: 1920×1080`` waehlt der Browser die hoechste
-            // verfuegbare Aufloesung; ``min`` legt eine Untergrenze fest.
-            width: { ideal: 1920, min: 1280 },
-            height: { ideal: 1080, min: 720 },
+            // Weiche ideal-Constraints ohne ``min`` — sonst rejected
+            // iOS Safari den Stream stumm, wenn die Rueckkamera in dem
+            // Moment keinen passenden Modus anbietet. 720p reicht fuer
+            // Avery-L6008 (qrbox 85 % von 720 = 612 px Decode-Region).
+            width: { ideal: 1920 },
+            height: { ideal: 1080 },
           },
           {
-            fps: 25,
+            // 15 fps statt 25 — defensiver, verlaesslicher First-Frame
+            // auf iOS; QR-Decoding braucht keine 25 Hz.
+            fps: 15,
             // qrbox 85 % statt 70 % — fuer kleine Druck-QRs zaehlt jedes
             // Pixel; eine groessere Decode-Region erlaubt es dem User,
             // den Code lockerer in die Mitte zu halten.
@@ -153,7 +153,9 @@ export function QrScanSheet({ open, onClose }: QrScanSheetProps) {
               const side = Math.floor(Math.min(viewW, viewH) * 0.85);
               return { width: side, height: side };
             },
-            aspectRatio: 1.0,
+            // aspectRatio bewusst ungesetzt — iPhone-Rueckkameras
+            // liefern nativ 4:3 / 16:9; ein hartes 1:1 hat auf iOS
+            // WebKit zu stummen schwarzen Frames gefuehrt.
             // Native BarcodeDetector-API auf Chromium-Browsern (Desktop
             // Chrome/Edge, Android Chrome) statt ZXing-JS-Fallback —
             // signifikant schnellere und robustere Erkennung von
@@ -205,12 +207,18 @@ export function QrScanSheet({ open, onClose }: QrScanSheetProps) {
       } catch (err) {
         if (cancelled) return;
         setStarting(false);
+        // Original-Fehler in die Console — der UI-Banner zeigt sonst nur
+        // einen Fallback-Text und die echte Ursache (z. B. „Failed to
+        // fetch dynamically imported module" oder „OverconstrainedError")
+        // bleibt unsichtbar.
+        console.error('[QrScanSheet] start failed', err);
+        const rawMsg = err instanceof Error ? err.message : String(err);
         const msg =
           err instanceof Error && /permission|denied|notallowed/i.test(err.message)
             ? 'Kamerazugriff verweigert. Auf iPhone: Einstellungen → Apps → Browser (Safari/Chrome) → Kamera aktivieren. Sonst: in den Browser-Einstellungen freigeben.'
             : err instanceof Error && /notfound|no.*camera/i.test(err.message)
               ? 'Keine Kamera erkannt. Bitte Messstelle manuell auswählen.'
-              : 'Scanner konnte nicht gestartet werden. Bitte Messstelle manuell auswählen.';
+              : `Scanner konnte nicht gestartet werden: ${rawMsg}. Bitte Messstelle manuell auswählen.`;
         setError(msg);
       }
     })();
