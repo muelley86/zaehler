@@ -10,6 +10,13 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.16.4](https://github.com/muelley86/zaehler/compare/v2.16.3...v2.16.4) (2026-05-28)
+
+
+### Fehlerbehebungen
+
+* **scanner:** Zoom 2x wenn unterstuetzt, Capabilities-Log, AF nur bei Support ([#89](https://github.com/muelley86/zaehler/issues/89)) ([d8497b3](https://github.com/muelley86/zaehler/commit/d8497b3ef0af52adf52c488a69922d2124e2e576))
+
 ## [2.16.3](https://github.com/muelley86/zaehler/compare/v2.16.2...v2.16.3) (2026-05-28)
 
 
