@@ -13,6 +13,7 @@ from meters.api.v1 import (
     physical_meters,
     qr_tokens,
     readings,
+    search,
     users,
 )
 
@@ -28,5 +29,6 @@ router.include_router(deliveries.router)
 router.include_router(exports.router)
 router.include_router(audit.router)
 router.include_router(qr_tokens.router)
+router.include_router(search.router)
 
 __all__ = ["router"]

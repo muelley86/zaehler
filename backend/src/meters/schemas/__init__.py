@@ -48,6 +48,7 @@ from meters.schemas.reading import (
     ReadingRead,
     ReadingUpdate,
 )
+from meters.schemas.search import SearchHit, SearchMatchKind
 from meters.schemas.state import RegisterStateRead
 from meters.schemas.user import (
     PasswordResetRequest,
@@ -97,6 +98,8 @@ __all__ = [
     "RegisterStateRead",
     "RegisterUpdate",
     "ReplaceMeterRequest",
+    "SearchHit",
+    "SearchMatchKind",
     "TotpActivateRequest",
     "TotpActivateResponse",
     "TotpDisableRequest",
