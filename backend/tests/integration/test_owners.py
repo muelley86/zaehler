@@ -72,6 +72,4 @@ def test_reject_duplicate_owner_name(admin_client: TestClient) -> None:
 
 def test_owner_admin_only(admin_client: TestClient, recorder_client: TestClient) -> None:
     assert recorder_client.get("/api/v1/owners").status_code == 200
-    assert (
-        recorder_client.post("/api/v1/owners", json={"name": "Verboten"}).status_code == 403
-    )
+    assert recorder_client.post("/api/v1/owners", json={"name": "Verboten"}).status_code == 403
