@@ -10,6 +10,13 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.14.2](https://github.com/muelley86/zaehler/compare/v2.14.1...v2.14.2) (2026-05-28)
+
+
+### Fehlerbehebungen
+
+* **qr:** Bulk-QR-Druck mit 189 Etiketten zuverlaessig hinbekommen ([#69](https://github.com/muelley86/zaehler/issues/69)) ([242f0e0](https://github.com/muelley86/zaehler/commit/242f0e0e841842bab17bba63029a87c9a1aae860))
+
 ## [2.14.1](https://github.com/muelley86/zaehler/compare/v2.14.0...v2.14.1) (2026-05-27)
 
 
