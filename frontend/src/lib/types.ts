@@ -93,12 +93,20 @@ export interface PhysicalMeterRead {
   registers: RegisterRead[];
 }
 
+export interface MainLocationRead {
+  id: number;
+  name: string;
+  note: string | null;
+}
+
 export interface LocationRead {
   id: number;
   name: string;
   note: string | null;
   latitude: number | null;
   longitude: number | null;
+  main_location_id: number | null;
+  main_location_name: string | null;
 }
 
 export interface MeasuringPointRead {
@@ -107,6 +115,8 @@ export interface MeasuringPointRead {
   type: MeterType;
   location_id: number | null;
   location_name: string | null;
+  main_location_id: number | null;
+  main_location_name: string | null;
   is_bidirectional: boolean;
   has_dual_tariff: boolean;
   tank_capacity: string | null;

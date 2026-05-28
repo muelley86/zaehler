@@ -64,7 +64,11 @@ def _load_with_meters(db: DbSession, mp_id: int) -> MeasuringPoint | None:
 
 def _to_read(mp: MeasuringPoint) -> MeasuringPointRead:
     data = MeasuringPointRead.model_validate(mp)
-    data.location_name = mp.location.name if mp.location else None
+    location = mp.location
+    data.location_name = location.name if location else None
+    main_loc = location.main_location if location else None
+    data.main_location_id = main_loc.id if main_loc else None
+    data.main_location_name = main_loc.name if main_loc else None
     return data
 
 

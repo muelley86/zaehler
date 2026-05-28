@@ -18,7 +18,13 @@ import { Link } from 'react-router-dom';
 
 import { LargeTitle } from '@/components/ui';
 import { api } from '@/lib/api';
-import type { LocationRead, MeasuringPointRead, QrTokenRead, UserRead } from '@/lib/types';
+import type {
+  LocationRead,
+  MainLocationRead,
+  MeasuringPointRead,
+  QrTokenRead,
+  UserRead,
+} from '@/lib/types';
 import { cx } from '@/components/ui/cx';
 
 import { ADMIN_SECTIONS, type AdminNavItem, type AdminSectionColor } from './adminNav';
@@ -26,6 +32,7 @@ import { ADMIN_SECTIONS, type AdminNavItem, type AdminSectionColor } from './adm
 interface Counts {
   '/admin/messstellen'?: number;
   '/admin/standorte'?: number;
+  '/admin/hauptstandorte'?: number;
   '/admin/benutzer'?: number;
   '/admin/qr-codes'?: number;
 }
@@ -46,13 +53,15 @@ export function AdminHubPage() {
       api.get<UserRead[]>('/users'),
       api.get<MeasuringPointRead[]>('/measuring-points'),
       api.get<LocationRead[]>('/locations'),
+      api.get<MainLocationRead[]>('/main-locations'),
       api.get<QrTokenRead[]>('/qr-tokens'),
-    ]).then(([users, mps, locs, tokens]) => {
+    ]).then(([users, mps, locs, mains, tokens]) => {
       if (cancelled) return;
       const next: Counts = {};
       if (users.status === 'fulfilled') next['/admin/benutzer'] = users.value.length;
       if (mps.status === 'fulfilled') next['/admin/messstellen'] = mps.value.length;
       if (locs.status === 'fulfilled') next['/admin/standorte'] = locs.value.length;
+      if (mains.status === 'fulfilled') next['/admin/hauptstandorte'] = mains.value.length;
       if (tokens.status === 'fulfilled') next['/admin/qr-codes'] = tokens.value.length;
       setCounts(next);
     });

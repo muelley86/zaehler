@@ -106,6 +106,8 @@ describe('MeasuringPointsAdminPage Wizard', () => {
             heating_source: null,
             location_id: null,
             location_name: null,
+            main_location_id: null,
+            main_location_name: null,
             is_bidirectional: false,
             has_dual_tariff: false,
             transformer_factor: null,

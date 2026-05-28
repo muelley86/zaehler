@@ -18,6 +18,11 @@ from meters.schemas.auth import (
 from meters.schemas.common import APIModel, DecimalStr, ProblemDetails
 from meters.schemas.delivery import DeliveryCreate, DeliveryRead, DeliveryUpdate
 from meters.schemas.location import LocationCreate, LocationRead, LocationUpdate
+from meters.schemas.main_location import (
+    MainLocationCreate,
+    MainLocationRead,
+    MainLocationUpdate,
+)
 from meters.schemas.measuring_point import (
     HeatingRegisterCreate,
     MeasuringPointCreate,
@@ -68,6 +73,9 @@ __all__ = [
     "LocationUpdate",
     "LoginRequest",
     "LoginResponse",
+    "MainLocationCreate",
+    "MainLocationRead",
+    "MainLocationUpdate",
     "MeResponse",
     "MeasuringPointCreate",
     "MeasuringPointRead",

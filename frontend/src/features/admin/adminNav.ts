@@ -13,7 +13,16 @@
  */
 
 import type { ReactNode } from 'react';
-import { Database, Gauge, MapPin, QrCode, ScrollText, Shield, Users } from 'lucide-react';
+import {
+  Building2,
+  Database,
+  Gauge,
+  MapPin,
+  QrCode,
+  ScrollText,
+  Shield,
+  Users,
+} from 'lucide-react';
 import { createElement } from 'react';
 
 export type AdminSectionColor = 'primary' | 'electricity' | 'water' | 'heating';
@@ -43,9 +52,18 @@ export const ADMIN_SECTIONS: AdminNavItem[] = [
   },
   {
     to: '/admin/standorte',
-    label: 'Standorte',
+    label: 'Zählerstandorte',
+    short: 'Zählerstand.',
     icon: createElement(MapPin, { size: 18 }),
     description: 'Adressen und Geo-Punkte',
+    color: 'water',
+  },
+  {
+    to: '/admin/hauptstandorte',
+    label: 'Hauptstandorte',
+    short: 'Haupt.',
+    icon: createElement(Building2, { size: 18 }),
+    description: 'Logische Klammer ueber Zaehlerstandorten',
     color: 'water',
   },
   {
