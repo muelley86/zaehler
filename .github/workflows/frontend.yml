@@ -23,7 +23,7 @@ jobs:
 
       - uses: pnpm/action-setup@v4
         with:
-          version: 9
+          version: 11
 
       - uses: actions/setup-node@v4
         with:
@@ -45,8 +45,6 @@ jobs:
         run: pnpm type-check
 
       - name: Vitest
-        # `--` trennt pnpm-Flags von vitest-Argumenten. Ohne den Separator
-        # frisst pnpm v9 das `--run` selbst und meldet "Unknown option".
         run: pnpm exec vitest run
 
       - name: Build
