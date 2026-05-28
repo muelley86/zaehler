@@ -46,6 +46,7 @@
  *     und schreiben den finalen HTML-Body erst, nachdem die SVGs da sind.
  */
 
+import { mapWithConcurrency } from '@/lib/concurrency';
 import type { QrTokenRead } from '@/lib/types';
 
 export type LabelLayoutId = 'cut-2x4' | 'avery-l6008';
@@ -233,30 +234,16 @@ async function fetchTokenSvg(tokenStr: string): Promise<string> {
 }
 
 /** Verarbeitet Tokens mit beschraenkter Parallelitaet — wartet, bis ein
- * Slot frei wird, bevor der naechste Request startet. Aequivalent zu
- * ``p-limit(PRINT_SVG_CONCURRENCY)`` ohne neue Dependency. Exportiert
- * fuer Unit-Tests.
+ * Slot frei wird, bevor der naechste Request startet. Nutzt den
+ * generischen ``mapWithConcurrency``-Helper aus ``@/lib/concurrency``.
+ * Exportiert fuer Unit-Tests.
  */
 export async function fetchSvgsWithConcurrency(tokens: QrTokenRead[]): Promise<TokenWithSvg[]> {
-  const result: (TokenWithSvg | undefined)[] = new Array<TokenWithSvg | undefined>(tokens.length);
-  let next = 0;
-  async function worker(): Promise<void> {
-    while (next < tokens.length) {
-      const i = next++;
-      const t = tokens[i];
-      if (!t) continue;
-      const svg = await fetchTokenSvg(t.token);
-      result[i] = { ...t, svg };
-    }
-  }
-  const workers = Array.from({ length: Math.min(PRINT_SVG_CONCURRENCY, tokens.length) }, () =>
-    worker(),
+  return mapWithConcurrency(
+    tokens,
+    async (t) => ({ ...t, svg: await fetchTokenSvg(t.token) }),
+    PRINT_SVG_CONCURRENCY,
   );
-  await Promise.all(workers);
-  // Alle Indizes belegt — ``continue`` im Worker greift nur, wenn der
-  // Token-Index ungueltig waere (kann hier nicht passieren). Cast ist
-  // safe, gibt mypy/eslint Ruhe.
-  return result as TokenWithSvg[];
 }
 
 function buildLabelInner(token: TokenWithSvg, layout: LabelLayout): string {

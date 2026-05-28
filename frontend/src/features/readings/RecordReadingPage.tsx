@@ -16,6 +16,7 @@ import {
 import { PageGlows } from '@/components/PageGlows';
 import { ApiError, api, isPlausibilityWarning } from '@/lib/api';
 import { formatDateTimeDe, formatDe, localInputToIso, nowForInput, parseDe } from '@/lib/format';
+import { mapWithConcurrency } from '@/lib/concurrency';
 import { tryGetDeviceLocation } from '@/lib/geo';
 import { describeMeterType } from '@/lib/meterLabels';
 import type {
@@ -83,15 +84,18 @@ export function RecordReadingPage() {
   }, []);
 
   // Letzte Stände aller MPs nachladen — wir brauchen sie für die
-  // Plausibilitäts-Deltas pro Register.
+  // Plausibilitäts-Deltas pro Register. Bei vielen MPs (>20) wuerde ein
+  // ungebremstes Promise.all den Backend-Pool leersaugen und Token-Assign-
+  // Klicks fuer Minuten blockieren — deshalb mit Concurrency-Limit.
   const refreshStates = (current: MeasuringPointRead[] | null) => {
     if (!current) return;
-    void Promise.all(
-      current.map((mp) =>
+    void mapWithConcurrency(
+      current,
+      (mp) =>
         api
           .get<RegisterStateRead[]>(`/measuring-points/${mp.id}/state`)
           .catch(() => [] as RegisterStateRead[]),
-      ),
+      5,
     ).then((results) => {
       const next = new Map<number, RegisterStateRead>();
       for (const list of results) {
