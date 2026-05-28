@@ -10,6 +10,13 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.22.0](https://github.com/muelley86/zaehler/compare/v2.21.0...v2.22.0) (2026-05-28)
+
+
+### Funktionen
+
+* **measuring-points:** Vertragsnummer + Marktlokation + Suche ([#103](https://github.com/muelley86/zaehler/issues/103)) ([71734e1](https://github.com/muelley86/zaehler/commit/71734e15548b3e851fb3f7452835fbcb17c59ee9))
+
 ## [2.21.0](https://github.com/muelley86/zaehler/compare/v2.20.0...v2.21.0) (2026-05-28)
 
 
