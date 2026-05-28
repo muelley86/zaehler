@@ -37,6 +37,7 @@ def _create_mp(
     location_id: int | None = None,
     contract_number: str | None = None,
     market_location: str | None = None,
+    installation_location: str | None = None,
 ) -> int:
     body: dict[str, Any] = {
         "name": name,
@@ -53,6 +54,8 @@ def _create_mp(
         body["contract_number"] = contract_number
     if market_location is not None:
         body["market_location"] = market_location
+    if installation_location is not None:
+        body["installation_location"] = installation_location
     resp = client.post("/api/v1/measuring-points", json=body)
     assert resp.status_code == 201, resp.text
     return int(resp.json()["id"])
@@ -171,6 +174,34 @@ def test_priority_contract_beats_name(admin_client: TestClient) -> None:
     )
     hits = admin_client.get("/api/v1/search?q=prio").json()
     assert hits[0]["matched_via"] == "contract_number"
+
+
+def test_match_by_installation_location(admin_client: TestClient) -> None:
+    _create_mp(
+        admin_client,
+        "Strom-Einbau-Search",
+        "SN-INS-1",
+        installation_location="1. Stock, Wohnung 4b",
+    )
+    hits = admin_client.get("/api/v1/search?q=wohnung").json()
+    assert any(h["matched_via"] == "installation_location" for h in hits)
+
+
+def test_match_by_location_address(admin_client: TestClient) -> None:
+    loc = admin_client.post(
+        "/api/v1/locations",
+        json={
+            "name": "Wohnung-Addr",
+            "address_street": "Bahnhofstr. 9",
+            "address_postcode": "10115",
+            "address_city": "Berlin",
+        },
+    ).json()
+    _create_mp(admin_client, "Strom-Addr", "SN-ADDR-1", location_id=loc["id"])
+    hits = admin_client.get("/api/v1/search?q=bahnhof").json()
+    assert any(h["matched_via"] == "location_address" for h in hits)
+    hits_city = admin_client.get("/api/v1/search?q=10115").json()
+    assert any(h["matched_via"] == "location_address" for h in hits_city)
 
 
 def _create_owner_with_name(client: TestClient, name: str, note: str | None = None) -> int:

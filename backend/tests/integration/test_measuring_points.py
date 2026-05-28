@@ -362,3 +362,47 @@ def test_patch_market_location_rejected_for_water(admin_client: TestClient) -> N
         json={"market_location": "DE000000000"},
     )
     assert resp.status_code == 422
+
+
+# ---------------------------------------------------------------------------
+# Installation-Location (Einbauort) — Freitext, alle Typen erlaubt
+# ---------------------------------------------------------------------------
+
+
+def test_create_with_installation_location(admin_client: TestClient) -> None:
+    resp = admin_client.post(
+        "/api/v1/measuring-points",
+        json={
+            "name": "Strom-Einbau",
+            "type": "electricity",
+            "is_bidirectional": False,
+            "has_dual_tariff": False,
+            "installation_location": "1. Stock, Wohnung 4b",
+            "serial_number": "E-INST-1",
+            "installed_at": "2024-01-01",
+            "initial_values": {"1.8.0": "0"},
+        },
+    )
+    assert resp.status_code == 201
+    assert resp.json()["installation_location"] == "1. Stock, Wohnung 4b"
+
+
+def test_patch_clear_installation_location(admin_client: TestClient) -> None:
+    create = admin_client.post(
+        "/api/v1/measuring-points",
+        json={
+            "name": "Strom-Einbau-Clear",
+            "type": "electricity",
+            "is_bidirectional": False,
+            "has_dual_tariff": False,
+            "installation_location": "Initial",
+            "serial_number": "E-IC-1",
+            "installed_at": "2024-01-01",
+            "initial_values": {"1.8.0": "0"},
+        },
+    ).json()
+    cleared = admin_client.patch(
+        f"/api/v1/measuring-points/{create['id']}",
+        json={"clear_installation_location": True},
+    ).json()
+    assert cleared["installation_location"] is None

@@ -316,6 +316,9 @@ function CreateFormFields({
   const [contractNumber, setContractNumber] = useState('');
   const [marketLocation, setMarketLocation] = useState('');
 
+  // Einbauort (alle Typen)
+  const [installationLocation, setInstallationLocation] = useState('');
+
   // Heizung
   const [heatingSource, setHeatingSource] = useState<HeatingSource>('oil');
   const [registers, setRegisters] = useState<RegisterDraft[]>(HEATING_PRESETS.oil);
@@ -362,6 +365,9 @@ function CreateFormFields({
         body['owner_id'] = ownerId;
         // valid_from = installed_at (= Default beim Erstanlegen).
         body['owner_valid_from'] = installedAt;
+      }
+      if (installationLocation.trim()) {
+        body['installation_location'] = installationLocation.trim();
       }
       if (type === 'heating') {
         body['heating_source'] = heatingSource;
@@ -423,6 +429,12 @@ function CreateFormFields({
           </option>
         ))}
       </Select>
+      <TextField
+        label="Einbauort (optional)"
+        value={installationLocation}
+        onChange={(e) => setInstallationLocation(e.target.value)}
+        hint="z. B. 1. Stock, Wohnung 4b oder Heizungsraum links."
+      />
       <TextField
         label="Seriennummer"
         value={serial}
