@@ -10,6 +10,13 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.16.2](https://github.com/muelley86/zaehler/compare/v2.16.1...v2.16.2) (2026-05-28)
+
+
+### Fehlerbehebungen
+
+* **scanner:** width/height aus 1. start-Argument in videoConstraints verschieben ([#85](https://github.com/muelley86/zaehler/issues/85)) ([28c85d4](https://github.com/muelley86/zaehler/commit/28c85d49d077873457e50557c2b2a90440da23ad))
+
 ## [2.16.1](https://github.com/muelley86/zaehler/compare/v2.16.0...v2.16.1) (2026-05-28)
 
 
