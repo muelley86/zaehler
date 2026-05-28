@@ -10,6 +10,13 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.24.1](https://github.com/muelley86/zaehler/compare/v2.24.0...v2.24.1) (2026-05-28)
+
+
+### Fehlerbehebungen
+
+* **time:** UTC-Suffix in Reading/Delivery/State-Responses; feat(inputs): PLZ/MaLo/VAT/Email-Regex ([#109](https://github.com/muelley86/zaehler/issues/109)) ([a9b422d](https://github.com/muelley86/zaehler/commit/a9b422d134cbb5509834008f2d350881455acf0c))
+
 ## [2.24.0](https://github.com/muelley86/zaehler/compare/v2.23.0...v2.24.0) (2026-05-28)
 
 
