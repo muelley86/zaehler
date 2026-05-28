@@ -10,6 +10,13 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.23.0](https://github.com/muelley86/zaehler/compare/v2.22.0...v2.23.0) (2026-05-28)
+
+
+### Funktionen
+
+* **owners:** Eigentuemer + periodisierte MP-Zuordnung mit Stichtag ([#105](https://github.com/muelley86/zaehler/issues/105)) ([9c4af9f](https://github.com/muelley86/zaehler/commit/9c4af9f6ea6d421672c4131776a7f15286316812))
+
 ## [2.22.0](https://github.com/muelley86/zaehler/compare/v2.21.0...v2.22.0) (2026-05-28)
 
 
