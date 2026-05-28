@@ -1,0 +1,17 @@
+# Seit pnpm 11 wandern globale Settings aus ``package.json::pnpm`` hierher.
+# pnpm akzeptiert die Datei nur, wenn auch ein ``packages:``-Feld vorhanden
+# ist — wir haben keine echte Monorepo-Struktur, sondern listen schlicht das
+# aktuelle Verzeichnis als einziges Member (funktional identisch zu „kein
+# Workspace"). Ohne diesen Eintrag failt ``pnpm install`` mit
+# „packages field missing or empty".
+packages:
+  - '.'
+
+# pnpm 11 fuehrt postinstall-/install-Scripts fremder Pakete standardmaessig
+# NICHT aus (Hardening gegen Supply-Chain-Angriffe). Wir whitelisten hier
+# explizit die Pakete, die ein Native-Binary beim Install bauen muessen:
+# - ``esbuild``: laedt das plattformspezifische Binary nach.
+# - ``msw``: legt den Service-Worker-Stub fuer den Browser-Mock an.
+allowBuilds:
+  esbuild: true
+  msw: true
