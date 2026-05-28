@@ -147,11 +147,13 @@ export function QrScanSheet({ open, onClose }: QrScanSheetProps) {
             // 15 fps statt 25 — defensiver, verlaesslicher First-Frame
             // auf iOS; QR-Decoding braucht keine 25 Hz.
             fps: 15,
-            // qrbox 85 % statt 70 % — fuer kleine Druck-QRs zaehlt jedes
-            // Pixel; eine groessere Decode-Region erlaubt es dem User,
-            // den Code lockerer in die Mitte zu halten.
+            // qrbox 65 % — kleinerer Suchbereich zwingt den User, den
+            // QR mittiger zu halten, und gibt dem Decoder mehr effektive
+            // Pixel pro Modul auf kleinen gedruckten Codes (Avery L6008
+            // 10 mm). 85 % war zu grosszuegig und liess kleine Codes
+            // im Suchraum verschwinden.
             qrbox: (viewW, viewH) => {
-              const side = Math.floor(Math.min(viewW, viewH) * 0.85);
+              const side = Math.floor(Math.min(viewW, viewH) * 0.65);
               return { width: side, height: side };
             },
             // HD-Aufloesung anfordern, damit Avery-L6008 (10 mm gedruckt)
@@ -214,6 +216,41 @@ export function QrScanSheet({ open, onClose }: QrScanSheetProps) {
           return;
         }
         setStarting(false);
+
+        // Continuous-AutoFocus erzwingen — iOS Safari startet die
+        // Rueckkamera ueber ``getUserMedia`` mit Fixed-Focus, weshalb
+        // kleine QRs aus 5–10 cm unscharf bleiben (native iOS-Camera-
+        // App nutzt continuous AF und erkennt dieselben Codes problem-
+        // los). Browser ohne Support ignorieren die ``advanced``-
+        // Constraint stillschweigend — kein Crash, nur Log.
+        // Diagnose-Log: effektive Aufloesung + FocusMode in Console,
+        // damit wir bei Decode-Problemen sehen, was die Hardware wirklich
+        // liefert (1080p vs. 640×480, Ultra-Wide vs. Wide-Lens).
+        try {
+          const reader = document.getElementById(READER_ID);
+          const video = reader?.querySelector('video') ?? null;
+          const stream = video && video.srcObject instanceof MediaStream ? video.srcObject : null;
+          const track = stream?.getVideoTracks()[0] ?? null;
+          if (track) {
+            console.info('[QrScanSheet] track settings', track.getSettings());
+            // ``focusMode`` ist nicht in ``lib.dom.d.ts``, aber W3C-Media-
+            // Capture-Standard. Eigener Subtype, damit kein as-Cast noetig.
+            interface FocusableConstraintSet extends MediaTrackConstraintSet {
+              focusMode?: 'continuous' | 'manual' | 'single-shot' | 'auto';
+            }
+            interface FocusableTrackConstraints extends MediaTrackConstraints {
+              advanced?: FocusableConstraintSet[];
+            }
+            const focusConstraints: FocusableTrackConstraints = {
+              advanced: [{ focusMode: 'continuous' }],
+            };
+            await track
+              .applyConstraints(focusConstraints)
+              .catch((e: unknown) => console.info('[QrScanSheet] focusMode set failed', e));
+          }
+        } catch (e) {
+          console.info('[QrScanSheet] post-start diagnostics failed', e);
+        }
       } catch (err) {
         if (cancelled) return;
         setStarting(false);
