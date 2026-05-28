@@ -44,6 +44,9 @@ interface Html5QrcodeInstance {
       fps: number;
       qrbox?: QrBoxSize | QrBoxFn;
       aspectRatio?: number;
+      // Aufloesungs-Hints gehoeren hierher und NICHT ins erste Argument
+      // (das akzeptiert nur 1 Key — ``facingMode`` ODER ``deviceId``).
+      videoConstraints?: VideoConstraints;
       // BarcodeDetector-API in Chromium-Browsern nutzen — deutlich
       // schneller und robuster als die ZXing-JS-Pipeline. Auf Safari
       // ohne Effekt (kein API-Support, Fallback auf ZXing).
@@ -133,15 +136,13 @@ export function QrScanSheet({ open, onClose }: QrScanSheetProps) {
         instanceRef.current = instance;
 
         await instance.start(
-          {
-            facingMode: 'environment',
-            // Weiche ideal-Constraints ohne ``min`` — sonst rejected
-            // iOS Safari den Stream stumm, wenn die Rueckkamera in dem
-            // Moment keinen passenden Modus anbietet. 720p reicht fuer
-            // Avery-L6008 (qrbox 85 % von 720 = 612 px Decode-Region).
-            width: { ideal: 1920 },
-            height: { ideal: 1080 },
-          },
+          // html5-qrcode erlaubt im ersten Argument EXAKT 1 Key
+          // (``facingMode`` oder ``deviceId``). Aufloesungs-Hints
+          // muessen ueber ``configuration.videoConstraints`` gesetzt
+          // werden — sonst wirft die Library zur Laufzeit
+          // „'cameraIdOrConfig' object should have exactly 1 key, found
+          // 3 keys" und der Scanner startet nie (gemeldet 2026-05-28).
+          { facingMode: 'environment' },
           {
             // 15 fps statt 25 — defensiver, verlaesslicher First-Frame
             // auf iOS; QR-Decoding braucht keine 25 Hz.
@@ -153,9 +154,18 @@ export function QrScanSheet({ open, onClose }: QrScanSheetProps) {
               const side = Math.floor(Math.min(viewW, viewH) * 0.85);
               return { width: side, height: side };
             },
+            // HD-Aufloesung anfordern, damit Avery-L6008 (10 mm gedruckt)
+            // genug Pixel auf der Decode-Region bekommt. ``ideal`` ohne
+            // ``min`` — iOS Safari rejected sonst stumm, wenn die
+            // Rueckkamera gerade keinen passenden Modus anbietet.
             // aspectRatio bewusst ungesetzt — iPhone-Rueckkameras
             // liefern nativ 4:3 / 16:9; ein hartes 1:1 hat auf iOS
             // WebKit zu stummen schwarzen Frames gefuehrt.
+            videoConstraints: {
+              facingMode: 'environment',
+              width: { ideal: 1920 },
+              height: { ideal: 1080 },
+            },
             // Native BarcodeDetector-API auf Chromium-Browsern (Desktop
             // Chrome/Edge, Android Chrome) statt ZXing-JS-Fallback —
             // signifikant schnellere und robustere Erkennung von
