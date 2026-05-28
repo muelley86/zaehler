@@ -10,6 +10,13 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.20.0](https://github.com/muelley86/zaehler/compare/v2.19.0...v2.20.0) (2026-05-28)
+
+
+### Funktionen
+
+* **dashboard:** CSV-Export um Hauptstandort-Spalte ergaenzt + Zeitraum im Dateinamen ([#99](https://github.com/muelley86/zaehler/issues/99)) ([1142140](https://github.com/muelley86/zaehler/commit/1142140f6b83020b75bd3d7a9621a3e612e03902))
+
 ## [2.19.0](https://github.com/muelley86/zaehler/compare/v2.18.0...v2.19.0) (2026-05-28)
 
 
