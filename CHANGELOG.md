@@ -10,6 +10,13 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.16.3](https://github.com/muelley86/zaehler/compare/v2.16.2...v2.16.3) (2026-05-28)
+
+
+### Fehlerbehebungen
+
+* **scanner:** AutoFocus + kleinere qrbox + Diagnose-Log fuer kleine QRs ([#87](https://github.com/muelley86/zaehler/issues/87)) ([519d347](https://github.com/muelley86/zaehler/commit/519d3478232fd3d288cb681185f62e902bef0b01))
+
 ## [2.16.2](https://github.com/muelley86/zaehler/compare/v2.16.1...v2.16.2) (2026-05-28)
 
 
