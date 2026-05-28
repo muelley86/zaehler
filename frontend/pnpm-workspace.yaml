@@ -1,0 +1,8 @@
+# pnpm 11 fuehrt postinstall-/install-Scripts fremder Pakete standardmaessig
+# NICHT aus (Hardening gegen Supply-Chain-Angriffe). Wir whitelisten hier
+# explizit die Pakete, die ein Native-Binary beim Install bauen muessen:
+# - ``esbuild``: laedt das plattformspezifische Binary nach.
+# - ``msw``: legt den Service-Worker-Stub fuer den Browser-Mock an.
+allowBuilds:
+  esbuild: true
+  msw: true
