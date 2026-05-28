@@ -81,6 +81,20 @@ describe('Druck-Layouts', () => {
   });
 });
 
+describe('Druck-Hinweis-Banner', () => {
+  it('Druck-HTML enthaelt den Hinweis auf "Raender: Keine" und "100 %"', () => {
+    const html = buildPrintHtml([makeToken()], DEFAULT_LAYOUTS['avery-l6008']);
+    expect(html).toContain('class="print-hint"');
+    expect(html).toMatch(/Ränder:\s*<strong>Keine/);
+    expect(html).toMatch(/Skalierung:\s*<strong>100\s*%/);
+  });
+
+  it('Hinweis-Banner wird beim Druck ausgeblendet (@media print)', () => {
+    const html = buildPrintHtml([makeToken()], DEFAULT_LAYOUTS['avery-l6008']);
+    expect(html).toMatch(/@media print[\s\S]*\.print-hint\s*\{[^}]*display:\s*none/);
+  });
+});
+
 describe('buildPrintHtml — Browser-Quirk-resistente Generierung', () => {
   // Regression: Firefox blockiert in einem ``about:blank``-Pop-up sowohl
   // ``<img src="/api/v1/...">`` als auch ``<script src="/api/v1/...">``,

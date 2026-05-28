@@ -269,7 +269,11 @@ Atomar in einer Transaktion:
     Für den Avery-Bogen sind Margin/Pitch in mm im UI feinjustierbar
     (Override pro Layout in localStorage). Alte localStorage-Keys
     (`avery-l4731rev`, `avery-3320`) werden in `loadPrefs()` migriert
-    bzw. verworfen. Wichtig in
+    bzw. verworfen. **Beim Drucken im Browser-Dialog** zwingend
+    „Ränder: Keine" und „Skalierung: 100 %" wählen — sonst staucht
+    der Browser den Inhalt und die letzte Etikettenreihe rutscht aus
+    dem Druckbereich. Das Pop-up zeigt vor dem Druck einen gelben
+    Hinweis-Banner mit genau diesen Einstellungen. Wichtig in
     `QrTokensPrintSheet.tsx`: `window.open` darf NICHT mit `noopener`
     aufgerufen werden — sonst gibt der Browser `null` zurück und das
     `document.write` greift nie (weiße Seite).

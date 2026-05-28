@@ -116,7 +116,9 @@ export const DEFAULT_LAYOUTS: Record<LabelLayoutId, LabelLayout> = {
     cols: 7,
     rows: 27,
     marginTopMm: 13.5,
-    marginLeftMm: 8.6,
+    // 9 mm — abgeglichen mit Plasn (Paperless-ngx-ASN-Tool, verified-Status)
+    // für L4731, das mechanisch identisch zum L6008-20 ist.
+    marginLeftMm: 9,
     hPitchMm: 27.9, // 25,4 mm Etikett + 2,5 mm Lücke
     vPitchMm: 10, // bündig — keine vertikale Lücke
     labelWidthMm: 25.4,
@@ -461,12 +463,45 @@ export function buildPrintHtml(tokens: TokenWithSvg[], layout: LabelLayout): str
     color: #555;
     padding: 4px 4px 4px 8px;
   }
+  /* Druck-Hinweis: nur am Bildschirm sichtbar, beim eigentlichen Druck
+     ausgeblendet. Adressiert den haeufigsten Bedien-Fehler: Browser-
+     Default "An Seite anpassen" + Standard-Raender stauchen den Inhalt
+     und schneiden die letzten Etikettenreihen ab. */
+  .print-hint {
+    position: fixed;
+    top: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    max-width: 540px;
+    background: #fff8c5;
+    border: 2px solid #d4a72c;
+    border-radius: 8px;
+    padding: 12px 16px;
+    font-size: 13px;
+    line-height: 1.4;
+    color: #1f2328;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.18);
+    z-index: 9999;
+  }
+  .print-hint strong { color: #9a6700; }
+  .print-hint ul { margin: 6px 0 6px 18px; padding: 0; }
+  .print-hint li { margin: 2px 0; }
   @media print {
     .controls { display: none !important; }
+    .print-hint { display: none !important; }
   }
 </style>
 </head>
 <body>
+  <div class="print-hint">
+    <strong>Wichtig für korrekten Druck</strong> — bitte im Browser-Dialog wählen:
+    <ul>
+      <li>Ränder: <strong>Keine</strong></li>
+      <li>Skalierung: <strong>100 %</strong> (bzw. „Tatsächliche Größe")</li>
+      <li>Kopf-/Fußzeilen: <strong>Aus</strong></li>
+    </ul>
+    Andernfalls staucht der Browser den Inhalt und die letzte Etikettenreihe rutscht aus dem Druckbereich.
+  </div>
   ${pagesHtml}
   <div class="controls">
     <span class="info">${tokens.length} QR · ${escapeHtml(layout.name)}</span>
