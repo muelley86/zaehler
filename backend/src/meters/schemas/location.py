@@ -21,13 +21,16 @@ def _strip_or_none(value: str | None) -> str | None:
     return stripped or None
 
 
+_POSTCODE_RE = r"^\d{5}$"
+
+
 class LocationCreate(BaseModel):
     name: str = Field(min_length=1, max_length=120)
     note: str | None = Field(default=None, max_length=500)
     latitude: float | None = Field(default=None, ge=-90, le=90)
     longitude: float | None = Field(default=None, ge=-180, le=180)
     address_street: str | None = Field(default=None, max_length=200)
-    address_postcode: str | None = Field(default=None, max_length=20)
+    address_postcode: str | None = Field(default=None, max_length=5, pattern=_POSTCODE_RE)
     address_city: str | None = Field(default=None, max_length=120)
     main_location_id: int | None = None
 

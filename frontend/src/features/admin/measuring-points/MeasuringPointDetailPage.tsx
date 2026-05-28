@@ -582,7 +582,10 @@ function StammdatenEditForm({
             label="Marktlokation / MaLo-ID (optional)"
             value={marketLocation}
             onChange={(e) => setMarketLocation(e.target.value)}
-            hint="leer = nicht gesetzt"
+            hint="11-stellige Ziffernfolge; leer = nicht gesetzt"
+            inputMode="numeric"
+            pattern="\d{11}"
+            maxLength={11}
           />
         </>
       ) : null}

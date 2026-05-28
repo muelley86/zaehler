@@ -5,7 +5,7 @@ from decimal import Decimal
 
 from pydantic import BaseModel, Field, field_validator
 
-from meters.schemas.common import APIModel, DecimalStr
+from meters.schemas.common import APIModel, DecimalStr, UtcDateTime
 
 # Toleranz für Client-Server-Clock-Skew — Smartphones im Feld können
 # leicht falsch laufen; 5 Min Puffer verhindert sinnlose 422er bei
@@ -61,9 +61,9 @@ class ReadingRead(APIModel):
     id: int
     register_id: int
     value: DecimalStr
-    reading_at: datetime
+    reading_at: UtcDateTime
     note: str | None
-    created_at: datetime
+    created_at: UtcDateTime
     created_by_user_id: int | None
     created_by_username: str | None = None
     has_photo: bool = False

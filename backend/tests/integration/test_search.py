@@ -156,12 +156,12 @@ def test_match_by_market_location(admin_client: TestClient) -> None:
         admin_client,
         "Strom-MaLo",
         "SN-ML-1",
-        market_location="DE12345678901",
+        market_location="12345678901",
     )
     hits = admin_client.get("/api/v1/search?q=12345678901").json()
     assert len(hits) == 1
     assert hits[0]["matched_via"] == "market_location"
-    assert hits[0]["matched_detail"] == "DE12345678901"
+    assert hits[0]["matched_detail"] == "12345678901"
 
 
 def test_priority_contract_beats_name(admin_client: TestClient) -> None:

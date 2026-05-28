@@ -254,7 +254,7 @@ def test_create_electricity_with_contract_and_market(admin_client: TestClient) -
             "is_bidirectional": False,
             "has_dual_tariff": False,
             "contract_number": "K-12345",
-            "market_location": "DE0001234567",
+            "market_location": "12345678901",
             "serial_number": "E-VC-1",
             "installed_at": "2024-01-01",
             "initial_values": {"1.8.0": "0"},
@@ -263,7 +263,7 @@ def test_create_electricity_with_contract_and_market(admin_client: TestClient) -
     assert resp.status_code == 201, resp.text
     body = resp.json()
     assert body["contract_number"] == "K-12345"
-    assert body["market_location"] == "DE0001234567"
+    assert body["market_location"] == "12345678901"
 
 
 def test_create_water_with_contract_no_market(admin_client: TestClient) -> None:
@@ -292,7 +292,7 @@ def test_market_location_rejected_for_water(admin_client: TestClient) -> None:
             "type": "water",
             "is_bidirectional": False,
             "has_dual_tariff": False,
-            "market_location": "DE000000000",
+            "market_location": "00000000000",
             "serial_number": "W-MARKET-FAIL",
             "installed_at": "2024-01-01",
             "initial_values": {},
@@ -327,7 +327,7 @@ def test_patch_clear_contract_and_market(admin_client: TestClient) -> None:
             "is_bidirectional": False,
             "has_dual_tariff": False,
             "contract_number": "K-CLEAR",
-            "market_location": "DE-CLEAR",
+            "market_location": "99999999999",
             "serial_number": "E-CLEAR",
             "installed_at": "2024-01-01",
             "initial_values": {"1.8.0": "0"},
@@ -359,7 +359,7 @@ def test_patch_market_location_rejected_for_water(admin_client: TestClient) -> N
     ).json()
     resp = admin_client.patch(
         f"/api/v1/measuring-points/{create['id']}",
-        json={"market_location": "DE000000000"},
+        json={"market_location": "00000000000"},
     )
     assert resp.status_code == 422
 
@@ -406,3 +406,36 @@ def test_patch_clear_installation_location(admin_client: TestClient) -> None:
         json={"clear_installation_location": True},
     ).json()
     assert cleared["installation_location"] is None
+
+
+def test_market_location_invalid_pattern(admin_client: TestClient) -> None:
+    # zu kurz
+    short = admin_client.post(
+        "/api/v1/measuring-points",
+        json={
+            "name": "MaLo-Short",
+            "type": "electricity",
+            "is_bidirectional": False,
+            "has_dual_tariff": False,
+            "market_location": "12345",
+            "serial_number": "E-MS",
+            "installed_at": "2024-01-01",
+            "initial_values": {"1.8.0": "0"},
+        },
+    )
+    assert short.status_code == 422
+    # mit Buchstaben
+    alpha = admin_client.post(
+        "/api/v1/measuring-points",
+        json={
+            "name": "MaLo-Alpha",
+            "type": "electricity",
+            "is_bidirectional": False,
+            "has_dual_tariff": False,
+            "market_location": "abc",
+            "serial_number": "E-MA",
+            "installed_at": "2024-01-01",
+            "initial_values": {"1.8.0": "0"},
+        },
+    )
+    assert alpha.status_code == 422

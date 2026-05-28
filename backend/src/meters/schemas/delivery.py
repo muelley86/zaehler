@@ -5,7 +5,7 @@ from decimal import Decimal
 
 from pydantic import BaseModel, Field
 
-from meters.schemas.common import APIModel, DecimalStr
+from meters.schemas.common import APIModel, DecimalStr, UtcDateTime
 
 
 class DeliveryCreate(BaseModel):
@@ -23,9 +23,9 @@ class DeliveryUpdate(BaseModel):
 class DeliveryRead(APIModel):
     id: int
     register_id: int
-    delivery_at: datetime
+    delivery_at: UtcDateTime
     amount: DecimalStr
     note: str | None
-    created_at: datetime
+    created_at: UtcDateTime
     created_by_user_id: int | None
     created_by_username: str | None = None

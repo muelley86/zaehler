@@ -573,6 +573,9 @@ function AddressFields({
           label="PLZ"
           value={postcode}
           onChange={(e) => onChange({ postcode: e.target.value })}
+          inputMode="numeric"
+          pattern="\d{5}"
+          maxLength={5}
         />
         <div className="col-span-2">
           <TextField
