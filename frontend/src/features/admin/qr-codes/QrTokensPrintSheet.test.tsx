@@ -43,8 +43,8 @@ function makeToken(overrides: Partial<TokenWithSvg> = {}): TokenWithSvg {
 }
 
 describe('Druck-Layouts', () => {
-  it('listet alle drei Layouts in stabiler Reihenfolge', () => {
-    expect(LAYOUT_ORDER).toEqual(['cut-2x4', 'avery-l4731rev', 'avery-3320']);
+  it('listet beide Layouts in stabiler Reihenfolge', () => {
+    expect(LAYOUT_ORDER).toEqual(['cut-2x4', 'avery-l6008']);
   });
 
   for (const id of LAYOUT_ORDER) {
@@ -70,19 +70,28 @@ describe('Druck-Layouts', () => {
     });
   }
 
-  it('L4731REV liefert genau 189 Etiketten pro Bogen', () => {
-    const l = DEFAULT_LAYOUTS['avery-l4731rev'];
+  it('L6008-20 liefert genau 189 Etiketten pro Bogen', () => {
+    const l = DEFAULT_LAYOUTS['avery-l6008'];
     expect(l.cols * l.rows).toBe(189);
-  });
-
-  it('Avery 3320 / 32×10-R liefert genau 44 Etiketten pro Bogen', () => {
-    const l = DEFAULT_LAYOUTS['avery-3320'];
-    expect(l.cols * l.rows).toBe(44);
   });
 
   it('Schnitt-Bogen 2×4 liefert 8 Etiketten pro Bogen', () => {
     const l = DEFAULT_LAYOUTS['cut-2x4'];
     expect(l.cols * l.rows).toBe(8);
+  });
+});
+
+describe('Druck-Hinweis-Banner', () => {
+  it('Druck-HTML enthaelt den Hinweis auf "Raender: Keine" und "100 %"', () => {
+    const html = buildPrintHtml([makeToken()], DEFAULT_LAYOUTS['avery-l6008']);
+    expect(html).toContain('class="print-hint"');
+    expect(html).toMatch(/Ränder:\s*<strong>Keine/);
+    expect(html).toMatch(/Skalierung:\s*<strong>100\s*%/);
+  });
+
+  it('Hinweis-Banner wird beim Druck ausgeblendet (@media print)', () => {
+    const html = buildPrintHtml([makeToken()], DEFAULT_LAYOUTS['avery-l6008']);
+    expect(html).toMatch(/@media print[\s\S]*\.print-hint\s*\{[^}]*display:\s*none/);
   });
 });
 
@@ -109,7 +118,7 @@ describe('buildPrintHtml — Browser-Quirk-resistente Generierung', () => {
   });
 
   it('referenziert keine /api/v1/-Endpoints (weder Bilder noch Skripte)', () => {
-    const html = buildPrintHtml([makeToken()], DEFAULT_LAYOUTS['avery-l4731rev']);
+    const html = buildPrintHtml([makeToken()], DEFAULT_LAYOUTS['avery-l6008']);
     expect(html).not.toContain('/api/v1/');
   });
 

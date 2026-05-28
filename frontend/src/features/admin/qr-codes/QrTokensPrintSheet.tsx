@@ -1,15 +1,13 @@
 /**
  * Bulk-Druck für eine Auswahl an QR-Tokens.
  *
- * Drei Layouts werden unterstützt:
+ * Zwei Layouts werden unterstützt:
  *
  * 1. ``cut-2x4`` — Schnitt-Bogen 2×4, 95×65 mm pro Feld inkl. Token-Text
  *    und Messstellen-Namen. Default — die Etiketten werden ausgeschnitten
  *    und auf den Zähler geklebt.
- * 2. ``avery-l4731rev`` — Avery Zweckform L4731REV, 25,4 × 10 mm, 7×27
- *    = 189 Etiketten pro Bogen. Nur QR-Code, keine Beschriftung.
- * 3. ``avery-3320`` — Avery Zweckform 3320 / „32×10-R", 32 × 10 mm,
- *    4×11 = 44 Etiketten pro Bogen. Nur QR-Code, keine Beschriftung.
+ * 2. ``avery-l6008`` — Avery Zweckform L6008-20 (wetterfest), 25,4 × 10 mm,
+ *    7×27 = 189 Etiketten pro Bogen. Nur QR-Code, keine Beschriftung.
  *
  * Auf den Avery-Bögen (10 mm Höhe) wird der QR als 10 × 10 mm Quadrat
  * mittig zentriert. Die menschenlesbare Token-Bezeichnung („K7MP3X9F")
@@ -50,7 +48,7 @@
 
 import type { QrTokenRead } from '@/lib/types';
 
-export type LabelLayoutId = 'cut-2x4' | 'avery-l4731rev' | 'avery-3320';
+export type LabelLayoutId = 'cut-2x4' | 'avery-l6008';
 
 /**
  * Geometrie eines Etikettenbogens. Alle Werte in Millimetern, sodass das
@@ -109,16 +107,18 @@ export const DEFAULT_LAYOUTS: Record<LabelLayoutId, LabelLayout> = {
     showLabelText: true,
     qrPlacement: 'center-with-caption',
   },
-  'avery-l4731rev': {
-    id: 'avery-l4731rev',
-    name: 'Avery L4731REV',
-    description: '25,4 × 10 mm, 7 × 27 = 189/Bogen — nur QR, ohne Beschriftung',
+  'avery-l6008': {
+    id: 'avery-l6008',
+    name: 'Avery L6008-20',
+    description: '25,4 × 10 mm, 7 × 27 = 189/Bogen — wetterfest, ohne Beschriftung',
     pageWidthMm: 210,
     pageHeightMm: 297,
     cols: 7,
     rows: 27,
     marginTopMm: 13.5,
-    marginLeftMm: 8.6,
+    // 9 mm — abgeglichen mit Plasn (Paperless-ngx-ASN-Tool, verified-Status)
+    // für L4731, das mechanisch identisch zum L6008-20 ist.
+    marginLeftMm: 9,
     hPitchMm: 27.9, // 25,4 mm Etikett + 2,5 mm Lücke
     vPitchMm: 10, // bündig — keine vertikale Lücke
     labelWidthMm: 25.4,
@@ -127,28 +127,9 @@ export const DEFAULT_LAYOUTS: Record<LabelLayoutId, LabelLayout> = {
     showLabelText: false,
     qrPlacement: 'center-only',
   },
-  'avery-3320': {
-    id: 'avery-3320',
-    name: 'Avery 3320 / 32×10-R',
-    description: '32 × 10 mm, 4 × 11 = 44/Bogen — nur QR, ohne Beschriftung',
-    pageWidthMm: 210,
-    pageHeightMm: 297,
-    cols: 4,
-    rows: 11,
-    // Best-Guess-Defaults — bei Bedarf in der UI feinjustieren.
-    marginTopMm: 13,
-    marginLeftMm: 8,
-    hPitchMm: 49, // 32 mm Etikett + 17 mm Lücke
-    vPitchMm: 25, // 10 mm Etikett + 15 mm Lücke
-    labelWidthMm: 32,
-    labelHeightMm: 10,
-    showCutBorder: false,
-    showLabelText: false,
-    qrPlacement: 'center-only',
-  },
 };
 
-export const LAYOUT_ORDER: LabelLayoutId[] = ['cut-2x4', 'avery-l4731rev', 'avery-3320'];
+export const LAYOUT_ORDER: LabelLayoutId[] = ['cut-2x4', 'avery-l6008'];
 
 /**
  * Token mit zugehörigem inline-SVG-String — interner Druck-Typ.
@@ -482,12 +463,45 @@ export function buildPrintHtml(tokens: TokenWithSvg[], layout: LabelLayout): str
     color: #555;
     padding: 4px 4px 4px 8px;
   }
+  /* Druck-Hinweis: nur am Bildschirm sichtbar, beim eigentlichen Druck
+     ausgeblendet. Adressiert den haeufigsten Bedien-Fehler: Browser-
+     Default "An Seite anpassen" + Standard-Raender stauchen den Inhalt
+     und schneiden die letzten Etikettenreihen ab. */
+  .print-hint {
+    position: fixed;
+    top: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    max-width: 540px;
+    background: #fff8c5;
+    border: 2px solid #d4a72c;
+    border-radius: 8px;
+    padding: 12px 16px;
+    font-size: 13px;
+    line-height: 1.4;
+    color: #1f2328;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.18);
+    z-index: 9999;
+  }
+  .print-hint strong { color: #9a6700; }
+  .print-hint ul { margin: 6px 0 6px 18px; padding: 0; }
+  .print-hint li { margin: 2px 0; }
   @media print {
     .controls { display: none !important; }
+    .print-hint { display: none !important; }
   }
 </style>
 </head>
 <body>
+  <div class="print-hint">
+    <strong>Wichtig für korrekten Druck</strong> — bitte im Browser-Dialog wählen:
+    <ul>
+      <li>Ränder: <strong>Keine</strong></li>
+      <li>Skalierung: <strong>100 %</strong> (bzw. „Tatsächliche Größe")</li>
+      <li>Kopf-/Fußzeilen: <strong>Aus</strong></li>
+    </ul>
+    Andernfalls staucht der Browser den Inhalt und die letzte Etikettenreihe rutscht aus dem Druckbereich.
+  </div>
   ${pagesHtml}
   <div class="controls">
     <span class="info">${tokens.length} QR · ${escapeHtml(layout.name)}</span>

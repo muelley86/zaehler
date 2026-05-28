@@ -5,9 +5,9 @@
  *  1. "Neue QR-Codes erzeugen": Anzahl wählen, Backend liefert Token-Liste
  *     zurück, alle erscheinen sofort als "frei" in der Liste.
  *  2. "Auswahl drucken": ausgewählte Tokens werden auf A4 ausgedruckt —
- *     wahlweise als Schnitt-Bogen 2×4 (Default), Avery L4731REV (25,4 ×
- *     10 mm, 189/Bogen) oder Avery 3320 / 32×10-R (32 × 10 mm, 44/Bogen).
- *     Layout-Wahl und Druckparameter bleiben pro Browser in localStorage.
+ *     wahlweise als Schnitt-Bogen 2×4 (Default) oder Avery L6008-20
+ *     (25,4 × 10 mm, 189/Bogen, wetterfest). Layout-Wahl und Druck-
+ *     parameter bleiben pro Browser in localStorage.
  *  3. Vor Ort: Mitarbeiter klebt einen Sticker auf den Zähler, scannt mit
  *     dem Smartphone und ordnet via /erfassen?token=… der MP zu.
  *  4. Hier in der Verwaltung sieht der Admin den Status und kann bei Bedarf
@@ -56,16 +56,37 @@ interface StoredPrefs {
   overrides: Partial<Record<LabelLayoutId, LayoutOverride>>;
 }
 
+// Migrationen alter localStorage-Keys auf die aktuellen Layout-IDs.
+// Wir benennen ``avery-l4731rev`` zu ``avery-l6008`` um (geometrisch
+// identisch, nur Etikettenmaterial unterscheidet sich) und verwerfen
+// ``avery-3320`` (entfernt — kein Geometrie-Pendant).
+const LEGACY_LAYOUT_MAP: Record<string, LabelLayoutId | null> = {
+  'avery-l4731rev': 'avery-l6008',
+  'avery-3320': null,
+};
+
+export function migrateLayoutId(value: unknown): LabelLayoutId | null {
+  if (typeof value !== 'string') return null;
+  if ((LAYOUT_ORDER as string[]).includes(value)) return value as LabelLayoutId;
+  return LEGACY_LAYOUT_MAP[value] ?? null;
+}
+
 function loadPrefs(): StoredPrefs {
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) return { selectedLayout: 'cut-2x4', overrides: {} };
     const parsed = JSON.parse(raw) as Partial<StoredPrefs>;
-    const selected = parsed.selectedLayout;
-    const valid = selected !== undefined && (LAYOUT_ORDER as string[]).includes(selected);
+
+    const migratedSelected = migrateLayoutId(parsed.selectedLayout) ?? 'cut-2x4';
+
+    const migratedOverrides: Partial<Record<LabelLayoutId, LayoutOverride>> = {};
+    for (const [oldKey, override] of Object.entries(parsed.overrides ?? {})) {
+      const newKey = migrateLayoutId(oldKey);
+      if (newKey && override) migratedOverrides[newKey] = override;
+    }
     return {
-      selectedLayout: valid ? selected : 'cut-2x4',
-      overrides: parsed.overrides ?? {},
+      selectedLayout: migratedSelected,
+      overrides: migratedOverrides,
     };
   } catch {
     return { selectedLayout: 'cut-2x4', overrides: {} };

@@ -260,14 +260,20 @@ Atomar in einer Transaktion:
     eigenen Tabelle `qr_token` verwaltet — nicht direkt aus der MP-ID
     abgeleitet.
   - Bulk-Druck: ausgewählte Tokens werden auf einem A4-Bogen ausgedruckt.
-    Drei Layouts wählbar (gespeichert in localStorage):
+    Zwei Layouts wählbar (gespeichert in localStorage):
     `cut-2x4` (Schnitt-Bogen 95×65 mm, 8/Bogen — Default, mit Token-Text
-    und MP-Namen), `avery-l4731rev` (25,4 × 10 mm, 7×27 = 189/Bogen) und
-    `avery-3320` (32 × 10 mm, 4×11 = 44/Bogen). Auf den Avery-Bögen wird
-    nur der QR als 10×10 mm Quadrat mittig pro Etikett gedruckt — keine
-    Token-/MP-Beschriftung, weil sie auf dieser Größe nur Platz kostet.
-    Für die Avery-Bögen sind Margin/Pitch in mm im UI feinjustierbar
-    (Override pro Layout in localStorage). Wichtig in
+    und MP-Namen) und `avery-l6008` (Avery L6008-20, wetterfest, 25,4 ×
+    10 mm, 7×27 = 189/Bogen). Auf den Avery-Bögen wird nur der QR als
+    10×10 mm Quadrat mittig pro Etikett gedruckt — keine Token-/MP-
+    Beschriftung, weil sie auf dieser Größe nur Platz kostet.
+    Für den Avery-Bogen sind Margin/Pitch in mm im UI feinjustierbar
+    (Override pro Layout in localStorage). Alte localStorage-Keys
+    (`avery-l4731rev`, `avery-3320`) werden in `loadPrefs()` migriert
+    bzw. verworfen. **Beim Drucken im Browser-Dialog** zwingend
+    „Ränder: Keine" und „Skalierung: 100 %" wählen — sonst staucht
+    der Browser den Inhalt und die letzte Etikettenreihe rutscht aus
+    dem Druckbereich. Das Pop-up zeigt vor dem Druck einen gelben
+    Hinweis-Banner mit genau diesen Einstellungen. Wichtig in
     `QrTokensPrintSheet.tsx`: `window.open` darf NICHT mit `noopener`
     aufgerufen werden — sonst gibt der Browser `null` zurück und das
     `document.write` greift nie (weiße Seite).
