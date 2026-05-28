@@ -80,9 +80,7 @@ def search(
         if hit is not None:
             hits.append(hit)
 
-    hits.sort(
-        key=lambda h: (match_priority(h.matched_via), h.measuring_point_name.lower())
-    )
+    hits.sort(key=lambda h: (match_priority(h.matched_via), h.measuring_point_name.lower()))
     return hits[:limit]
 
 
@@ -110,9 +108,7 @@ def _classify(mp: MeasuringPoint, needle_lower: str) -> SearchHit | None:
     > *_NOTE. Kein Treffer in Python (sollte nicht passieren wenn SQL matched)
     → None, dann verwerfen wir die Zeile."""
     # Serial: nimm das erste matchende PhysicalMeter (aktiv bevorzugt).
-    matching_pms = [
-        pm for pm in mp.physical_meters if needle_lower in pm.serial_number.lower()
-    ]
+    matching_pms = [pm for pm in mp.physical_meters if needle_lower in pm.serial_number.lower()]
     if matching_pms:
         matching_pms.sort(key=lambda pm: (pm.removed_at is not None, pm.installed_at))
         return _make_hit(mp, SearchMatchKind.SERIAL, matching_pms[0].serial_number)
