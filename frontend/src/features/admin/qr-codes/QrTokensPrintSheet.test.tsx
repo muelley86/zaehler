@@ -10,11 +10,16 @@
  * im Firefox-about:blank-Fenster ohne externe Resource-Requests rendert.
  */
 
+import { http, HttpResponse } from 'msw';
 import { describe, expect, it } from 'vitest';
+
+import { server } from '@/tests/server';
+import type { QrTokenRead } from '@/lib/types';
 
 import {
   buildPrintHtml,
   DEFAULT_LAYOUTS,
+  fetchSvgsWithConcurrency,
   LAYOUT_ORDER,
   type TokenWithSvg,
 } from './QrTokensPrintSheet';
@@ -135,5 +140,78 @@ describe('buildPrintHtml — Browser-Quirk-resistente Generierung', () => {
     const html = buildPrintHtml(tokens, layout);
     const pageMatches = html.match(/<div class="page">/g);
     expect(pageMatches).toHaveLength(2);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// fetchSvgsWithConcurrency
+// ---------------------------------------------------------------------------
+
+function makeBareToken(token: string): QrTokenRead {
+  return {
+    id: Number(token.replace(/\D/g, '')) || 0,
+    token,
+    measuring_point_id: null,
+    measuring_point_name: null,
+    created_at: '2025-07-01T00:00:00Z',
+    created_by_user_id: 1,
+    assigned_at: null,
+    assigned_by_user_id: null,
+  };
+}
+
+describe('fetchSvgsWithConcurrency', () => {
+  it('liefert die SVGs in Token-Reihenfolge zurueck', async () => {
+    server.use(
+      http.get('/api/v1/qr-tokens/:t/qr', ({ params }) =>
+        HttpResponse.text(`<svg data-id="${String(params['t'])}"></svg>`, {
+          headers: { 'Content-Type': 'image/svg+xml' },
+        }),
+      ),
+    );
+    const tokens = ['TOK1', 'TOK2', 'TOK3'].map(makeBareToken);
+    const result = await fetchSvgsWithConcurrency(tokens);
+    expect(result.map((r) => r.token)).toEqual(['TOK1', 'TOK2', 'TOK3']);
+    expect(result[0]?.svg).toContain('data-id="TOK1"');
+    expect(result[2]?.svg).toContain('data-id="TOK3"');
+  });
+
+  it('begrenzt die parallelen Requests auf 8 (Pool-Schutz)', async () => {
+    let active = 0;
+    let maxActive = 0;
+    server.use(
+      http.get('/api/v1/qr-tokens/:t/qr', async () => {
+        active++;
+        maxActive = Math.max(maxActive, active);
+        await new Promise((r) => setTimeout(r, 5));
+        active--;
+        return HttpResponse.text('<svg></svg>', {
+          headers: { 'Content-Type': 'image/svg+xml' },
+        });
+      }),
+    );
+    const tokens = Array.from({ length: 50 }, (_, i) => makeBareToken(`TOK${i}`));
+    await fetchSvgsWithConcurrency(tokens);
+    expect(maxActive).toBeGreaterThan(0);
+    expect(maxActive).toBeLessThanOrEqual(8);
+  });
+
+  it('versucht bei 5xx ein paar Wiederholungen, bevor er aufgibt', async () => {
+    let attempts = 0;
+    server.use(
+      http.get('/api/v1/qr-tokens/:t/qr', () => {
+        attempts++;
+        if (attempts < 3) {
+          return new HttpResponse(null, { status: 500 });
+        }
+        return HttpResponse.text('<svg></svg>', {
+          headers: { 'Content-Type': 'image/svg+xml' },
+        });
+      }),
+    );
+    const result = await fetchSvgsWithConcurrency([makeBareToken('FLAKY1')]);
+    expect(attempts).toBe(3);
+    expect(result).toHaveLength(1);
+    expect(result[0]?.svg).toContain('<svg');
   });
 });
