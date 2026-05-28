@@ -341,7 +341,8 @@ export function DashboardPage() {
   function downloadCsv() {
     const header = [
       'Messstelle',
-      'Standort',
+      'Hauptstandort',
+      'Zählerstandort',
       'Typ',
       'OBIS',
       'Einheit',
@@ -354,6 +355,7 @@ export function DashboardPage() {
       lines.push(
         [
           p.mp.name,
+          p.mp.main_location_name ?? '',
           p.mp.location_name ?? '',
           p.mp.type,
           p.obis_code,
@@ -370,7 +372,11 @@ export function DashboardPage() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `verbrauch_${new Date().toISOString().slice(0, 10)}.csv`;
+    // Zeitraum im Dateinamen macht den Filter-Effekt sichtbar — wenn beide
+    // Endpunkte gesetzt sind (Default seit v2.17.0: laufendes Jahr), nutzen
+    // wir sie; sonst Fallback auf heutiges Datum.
+    const rangeSuffix = from && to ? `${from}_${to}` : new Date().toISOString().slice(0, 10);
+    a.download = `verbrauch_${rangeSuffix}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   }
