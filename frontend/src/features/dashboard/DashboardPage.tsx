@@ -1,6 +1,6 @@
 import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
-import { Download, Filter, Plus } from 'lucide-react';
+import { ChevronDown, Download, Filter, Plus } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import {
   CartesianGrid,
@@ -56,6 +56,32 @@ const CHART_MARGIN = { top: 10, right: 16, bottom: 8, left: 8 } as const;
 const EMPTY_CONSUMPTION: ConsumptionPoint[] = [];
 const EMPTY_READINGS: ReadingRead[] = [];
 const EMPTY_STATES: RegisterStateRead[] = [];
+
+// localStorage-Key fuer den Collapse-Zustand der Standort-Gruppen.
+// Wir speichern die Set-Mitglieder als JSON-Array; ``__no_location__``
+// ist der Sentinel-Key fuer MPs ohne ``location_id``.
+const COLLAPSED_LOCATIONS_KEY = 'dashboard.collapsedLocations';
+const NO_LOCATION_KEY = '__no_location__';
+
+function loadCollapsedLocations(): Set<string> {
+  try {
+    const raw = window.localStorage.getItem(COLLAPSED_LOCATIONS_KEY);
+    if (!raw) return new Set();
+    const arr = JSON.parse(raw) as unknown;
+    if (!Array.isArray(arr)) return new Set();
+    return new Set(arr.filter((x): x is string => typeof x === 'string'));
+  } catch {
+    return new Set();
+  }
+}
+
+function saveCollapsedLocations(set: Set<string>) {
+  try {
+    window.localStorage.setItem(COLLAPSED_LOCATIONS_KEY, JSON.stringify([...set]));
+  } catch {
+    /* QuotaExceeded / SecurityError ignorieren — non-fatal UX-State */
+  }
+}
 
 interface ConsumptionsByMP {
   [mpId: number]: ConsumptionPoint[];
@@ -198,6 +224,41 @@ export function DashboardPage() {
     }
     return out;
   }, [filteredPoints, readingsByMP, from, to]);
+
+  // Karten pro Standort gruppieren — bei wachsendem MP-Bestand wuerde
+  // das Dashboard sonst sehr lang. Gruppen sind alphabetisch sortiert,
+  // „Ohne Standort" steht am Ende. Collapse-State wird in localStorage
+  // persistiert, damit der User beim naechsten Login dieselbe Sicht hat.
+  const [collapsedLocations, setCollapsedLocations] = useState<Set<string>>(() =>
+    loadCollapsedLocations(),
+  );
+
+  const groupedByLocation = useMemo(() => {
+    const groups = new Map<string, { label: string; points: MeasuringPointRead[] }>();
+    for (const mp of filteredPoints) {
+      const key = mp.location_id === null ? NO_LOCATION_KEY : String(mp.location_id);
+      const label =
+        mp.location_id === null ? 'Ohne Standort' : (mp.location_name ?? `#${mp.location_id}`);
+      const existing = groups.get(key);
+      if (existing) existing.points.push(mp);
+      else groups.set(key, { label, points: [mp] });
+    }
+    return Array.from(groups.entries()).sort(([keyA, a], [keyB, b]) => {
+      if (keyA === NO_LOCATION_KEY) return 1;
+      if (keyB === NO_LOCATION_KEY) return -1;
+      return a.label.localeCompare(b.label, 'de');
+    });
+  }, [filteredPoints]);
+
+  const toggleLocation = useCallback((key: string) => {
+    setCollapsedLocations((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      saveCollapsedLocations(next);
+      return next;
+    });
+  }, []);
 
   const locationOptions = useMemo(() => {
     const map = new Map<number | null, string>();
@@ -379,17 +440,41 @@ export function DashboardPage() {
         <EmptyState icon={<Filter size={32} />} title="Keine Messstellen entsprechen dem Filter" />
       ) : null}
 
-      {mpDataReady && filteredPoints.length > 0
-        ? filteredPoints.map((mp) => (
-            <MeasuringPointCard
-              key={mp.id}
-              mp={mp}
-              consumption={consumptionByMp.get(mp.id) ?? EMPTY_CONSUMPTION}
-              readings={readingsFilteredByMp.get(mp.id) ?? EMPTY_READINGS}
-              state={states[mp.id] ?? EMPTY_STATES}
-              onChanged={handleChanged}
-            />
-          ))
+      {mpDataReady && groupedByLocation.length > 0
+        ? groupedByLocation.map(([key, group]) => {
+            const isCollapsed = collapsedLocations.has(key);
+            return (
+              <div key={key} className="space-y-3">
+                <button
+                  type="button"
+                  onClick={() => toggleLocation(key)}
+                  className="bg-fill/40 hover:bg-fill/60 flex w-full items-center justify-between gap-2 rounded-card border-hairline border-border px-4 py-2 text-left transition-colors"
+                  aria-expanded={!isCollapsed}
+                >
+                  <span className="flex items-baseline gap-2">
+                    <span className="text-headline">{group.label}</span>
+                    <span className="text-caption text-tertiary">{group.points.length}</span>
+                  </span>
+                  <ChevronDown
+                    size={18}
+                    className={`transition-transform ${isCollapsed ? '-rotate-90' : ''}`}
+                  />
+                </button>
+                {!isCollapsed
+                  ? group.points.map((mp) => (
+                      <MeasuringPointCard
+                        key={mp.id}
+                        mp={mp}
+                        consumption={consumptionByMp.get(mp.id) ?? EMPTY_CONSUMPTION}
+                        readings={readingsFilteredByMp.get(mp.id) ?? EMPTY_READINGS}
+                        state={states[mp.id] ?? EMPTY_STATES}
+                        onChanged={handleChanged}
+                      />
+                    ))
+                  : null}
+              </div>
+            );
+          })
         : null}
     </PageContainer>
   );
