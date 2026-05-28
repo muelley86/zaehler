@@ -87,8 +87,11 @@ export function DashboardPage() {
 
   const [locationFilter, setLocationFilter] = useState<Set<number | null>>(new Set());
   const [typeFilter, setTypeFilter] = useState<Set<MeterType>>(new Set());
-  const [from, setFrom] = useState('');
-  const [to, setTo] = useState('');
+  // Default: laufendes Kalenderjahr — Uebersicht bleibt fokussiert,
+  // User kann das Range manuell aufweiten (z. B. Mehrjahres-Vergleich).
+  const currentYear = new Date().getFullYear();
+  const [from, setFrom] = useState(`${currentYear}-01-01`);
+  const [to, setTo] = useState(`${currentYear}-12-31`);
 
   useEffect(() => {
     Promise.all([
@@ -940,7 +943,7 @@ function ConsumptionSummary({
 function CurrentStateTile({ state }: { state: RegisterStateRead }) {
   return (
     <div className="bg-fill/60 rounded-card border-hairline border-border p-4">
-      <div className="text-caption-bold uppercase text-tertiary">{state.label}</div>
+      <div className="text-caption-bold uppercase text-tertiary">Zählerstand {state.label}</div>
       <div className="mt-1.5 flex items-baseline gap-1.5">
         <span className="num text-title-1 leading-none tracking-tighter text-label">
           {state.current_value !== null ? formatDe(state.current_value) : '—'}
