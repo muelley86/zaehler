@@ -10,6 +10,13 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.16.5](https://github.com/muelley86/zaehler/compare/v2.16.4...v2.16.5) (2026-05-28)
+
+
+### Fehlerbehebungen
+
+* **pwa:** Release-Trigger fuer fehlende Manifest-Icons (v2.16.5) ([9219dd2](https://github.com/muelley86/zaehler/commit/9219dd28505de80e2466ee5cc0c72936b2509fd5))
+
 ## [2.16.4](https://github.com/muelley86/zaehler/compare/v2.16.3...v2.16.4) (2026-05-28)
 
 
