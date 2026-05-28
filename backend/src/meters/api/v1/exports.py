@@ -26,6 +26,7 @@ from meters.models import (
     Register,
     UserRole,
 )
+from meters.schemas.common import to_utc_iso
 from meters.services.access import restrict_mp_query
 
 router = APIRouter(prefix="/export", tags=["export"])
@@ -108,7 +109,7 @@ def _serialize(value: object) -> object:
     if isinstance(value, Decimal):
         return format(value, "f")
     if isinstance(value, datetime):
-        return value.isoformat()
+        return to_utc_iso(value)
     return value
 
 
@@ -129,7 +130,7 @@ def full_dump(db: DbDep, _admin: AdminUser) -> Response:
     )
 
     payload = {
-        "exported_at": datetime.now(UTC).isoformat(),
+        "exported_at": to_utc_iso(datetime.now(UTC)),
         "measuring_points": [
             {
                 "id": mp.id,
@@ -157,7 +158,7 @@ def full_dump(db: DbDep, _admin: AdminUser) -> Response:
                                     {
                                         "id": rd.id,
                                         "value": format(rd.value, "f"),
-                                        "reading_at": rd.reading_at.isoformat(),
+                                        "reading_at": to_utc_iso(rd.reading_at),
                                         "note": rd.note,
                                         "created_at": _serialize(rd.created_at),
                                         "created_by_user_id": rd.created_by_user_id,

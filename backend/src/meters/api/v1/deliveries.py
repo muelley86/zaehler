@@ -24,6 +24,7 @@ from meters.models import (
     UserRole,
 )
 from meters.schemas import DeliveryCreate, DeliveryRead, DeliveryUpdate
+from meters.schemas.common import to_utc_iso
 from meters.services.access import assert_can_access_register, restrict_mp_query
 from meters.services.audit import record
 
@@ -138,7 +139,7 @@ def create_delivery(
         entity_id=delivery.id,
         diff={
             "register_id": register.id,
-            "delivery_at": payload.delivery_at.isoformat(),
+            "delivery_at": to_utc_iso(payload.delivery_at),
             "amount": format(payload.amount, "f"),
         },
         ip_address=client_ip(request),
@@ -162,8 +163,8 @@ def update_delivery(
     diff: dict[str, object] = {}
     if payload.delivery_at is not None and payload.delivery_at != delivery.delivery_at:
         diff["delivery_at"] = {
-            "from": delivery.delivery_at.isoformat(),
-            "to": payload.delivery_at.isoformat(),
+            "from": to_utc_iso(delivery.delivery_at),
+            "to": to_utc_iso(payload.delivery_at),
         }
         delivery.delivery_at = payload.delivery_at
     if payload.amount is not None and payload.amount != delivery.amount:
@@ -208,7 +209,7 @@ def delete_delivery(
         entity_id=delivery.id,
         diff={
             "register_id": delivery.register_id,
-            "delivery_at": delivery.delivery_at.isoformat(),
+            "delivery_at": to_utc_iso(delivery.delivery_at),
             "amount": format(delivery.amount, "f"),
         },
         ip_address=client_ip(request),

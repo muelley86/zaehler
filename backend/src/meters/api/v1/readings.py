@@ -33,6 +33,7 @@ from meters.models import (
     UserRole,
 )
 from meters.schemas import ConsumptionPoint, ReadingCreate, ReadingRead, ReadingUpdate
+from meters.schemas.common import to_utc_iso
 from meters.services.access import (
     assert_can_access_mp,
     assert_can_access_register,
@@ -145,7 +146,7 @@ def _check_value_in_series(
                 "acknowledge_field": "acknowledge_warnings",
                 "previous": {
                     "id": before.id,
-                    "reading_at": before.reading_at.isoformat(),
+                    "reading_at": to_utc_iso(before.reading_at),
                     "value": format(before.value, "f"),
                 },
             },
@@ -165,7 +166,7 @@ def _check_value_in_series(
                 "acknowledge_field": "acknowledge_warnings",
                 "next": {
                     "id": after.id,
-                    "reading_at": after.reading_at.isoformat(),
+                    "reading_at": to_utc_iso(after.reading_at),
                     "value": format(after.value, "f"),
                 },
             },
@@ -270,7 +271,7 @@ def create_reading(
         diff={
             "register_id": register.id,
             "value": format(payload.value, "f"),
-            "reading_at": payload.reading_at.isoformat(),
+            "reading_at": to_utc_iso(payload.reading_at),
         },
         ip_address=client_ip(request),
     )
@@ -315,8 +316,8 @@ def update_reading(
         reading.value = payload.value
     if payload.reading_at is not None and payload.reading_at != reading.reading_at:
         diff["reading_at"] = {
-            "from": reading.reading_at.isoformat(),
-            "to": payload.reading_at.isoformat(),
+            "from": to_utc_iso(reading.reading_at),
+            "to": to_utc_iso(payload.reading_at),
         }
         reading.reading_at = payload.reading_at
     if payload.note is not None and payload.note != reading.note:
@@ -368,7 +369,7 @@ def delete_reading(
         diff={
             "register_id": reading.register_id,
             "value": format(reading.value, "f"),
-            "reading_at": reading.reading_at.isoformat(),
+            "reading_at": to_utc_iso(reading.reading_at),
         },
         ip_address=client_ip(request),
     )
