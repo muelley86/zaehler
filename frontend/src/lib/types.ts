@@ -97,9 +97,11 @@ export type SearchMatchKind =
   | 'serial'
   | 'contract_number'
   | 'market_location'
+  | 'owner'
   | 'name'
   | 'main_location'
   | 'location'
+  | 'owner_note'
   | 'main_location_note'
   | 'location_note';
 
@@ -112,6 +114,27 @@ export interface SearchHit {
   main_location_name: string | null;
   matched_via: SearchMatchKind;
   matched_detail: string | null;
+}
+
+export interface OwnerRead {
+  id: number;
+  name: string;
+  address_street: string | null;
+  address_postcode: string | null;
+  address_city: string | null;
+  email: string | null;
+  phone: string | null;
+  vat_id: string | null;
+  tax_id: string | null;
+  note: string | null;
+}
+
+export interface OwnerAssignmentRead {
+  id: number;
+  owner_id: number | null;
+  owner_name: string | null;
+  valid_from: string;
+  valid_to: string | null;
 }
 
 export interface MainLocationRead {
@@ -145,6 +168,8 @@ export interface MeasuringPointRead {
   heating_source: HeatingSource | null;
   contract_number: string | null;
   market_location: string | null;
+  current_owner_id: number | null;
+  current_owner_name: string | null;
   physical_meters: PhysicalMeterRead[];
 }
 

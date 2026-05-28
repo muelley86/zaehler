@@ -47,6 +47,8 @@ function _mp(overrides: Partial<Record<string, unknown>> = {}) {
     main_location_name: null,
     contract_number: null,
     market_location: null,
+    current_owner_id: null,
+    current_owner_name: null,
     is_bidirectional: false,
     has_dual_tariff: false,
     tank_capacity: null,

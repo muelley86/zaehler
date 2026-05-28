@@ -21,6 +21,7 @@ import {
   QrCode,
   ScrollText,
   Shield,
+  User,
   Users,
 } from 'lucide-react';
 import { createElement } from 'react';
@@ -65,6 +66,14 @@ export const ADMIN_SECTIONS: AdminNavItem[] = [
     icon: createElement(Building2, { size: 18 }),
     description: 'Logische Klammer ueber Zaehlerstandorten',
     color: 'water',
+  },
+  {
+    to: '/admin/eigentuemer',
+    label: 'Eigentümer',
+    short: 'Eigt.',
+    icon: createElement(User, { size: 18 }),
+    description: 'Eigentuemer-Stammdaten und MP-Zuordnung',
+    color: 'primary',
   },
   {
     to: '/admin/benutzer',

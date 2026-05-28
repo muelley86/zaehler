@@ -13,6 +13,8 @@ from meters.models.delivery import Delivery
 from meters.models.location import Location
 from meters.models.main_location import MainLocation
 from meters.models.measuring_point import MeasuringPoint
+from meters.models.owner import Owner
+from meters.models.owner_assignment import OwnerAssignment
 from meters.models.physical_meter import PhysicalMeter
 from meters.models.qr_token import QrToken
 from meters.models.reading import Reading
@@ -32,6 +34,8 @@ __all__ = [
     "MainLocation",
     "MeasuringPoint",
     "MeterType",
+    "Owner",
+    "OwnerAssignment",
     "PendingTotpChallenge",
     "PhysicalMeter",
     "QrToken",

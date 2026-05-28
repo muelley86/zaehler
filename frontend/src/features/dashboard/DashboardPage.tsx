@@ -128,6 +128,7 @@ export function DashboardPage() {
 
   const [locationFilter, setLocationFilter] = useState<Set<number | null>>(new Set());
   const [mainLocationFilter, setMainLocationFilter] = useState<Set<number | null>>(new Set());
+  const [ownerFilter, setOwnerFilter] = useState<Set<number | null>>(new Set());
   const [typeFilter, setTypeFilter] = useState<Set<MeterType>>(new Set());
   // Default: laufendes Kalenderjahr — Uebersicht bleibt fokussiert,
   // User kann das Range manuell aufweiten (z. B. Mehrjahres-Vergleich).
@@ -193,11 +194,12 @@ export function DashboardPage() {
     if (!points) return [];
     return points.filter((mp) => {
       if (mainLocationFilter.size > 0 && !mainLocationFilter.has(mp.main_location_id)) return false;
+      if (ownerFilter.size > 0 && !ownerFilter.has(mp.current_owner_id)) return false;
       if (locationFilter.size > 0 && !locationFilter.has(mp.location_id)) return false;
       if (typeFilter.size > 0 && !typeFilter.has(mp.type)) return false;
       return true;
     });
-  }, [points, mainLocationFilter, locationFilter, typeFilter]);
+  }, [points, mainLocationFilter, ownerFilter, locationFilter, typeFilter]);
 
   const filteredConsumption = useMemo(() => {
     const out: Array<ConsumptionPoint & { mp: MeasuringPointRead }> = [];
@@ -338,10 +340,21 @@ export function DashboardPage() {
     return Array.from(map.entries());
   }, [points]);
 
+  const ownerOptions = useMemo(() => {
+    const map = new Map<number, string>();
+    points?.forEach((mp) => {
+      if (mp.current_owner_id !== null && !map.has(mp.current_owner_id)) {
+        map.set(mp.current_owner_id, mp.current_owner_name ?? `#${mp.current_owner_id}`);
+      }
+    });
+    return Array.from(map.entries());
+  }, [points]);
+
   function downloadCsv() {
     const header = [
       'Messstelle',
       'Hauptstandort',
+      'Eigentümer',
       'Zählerstandort',
       'Typ',
       'OBIS',
@@ -356,6 +369,7 @@ export function DashboardPage() {
         [
           p.mp.name,
           p.mp.main_location_name ?? '',
+          p.mp.current_owner_name ?? '',
           p.mp.location_name ?? '',
           p.mp.type,
           p.obis_code,
@@ -457,6 +471,25 @@ export function DashboardPage() {
               </Pill>
             </FilterRow>
           ) : null}
+          {ownerOptions.length > 0 ? (
+            <FilterRow label="Eigentümer">
+              {ownerOptions.map(([id, name]) => (
+                <Pill
+                  key={`owner-${id}`}
+                  active={ownerFilter.has(id)}
+                  onClick={() => setOwnerFilter(toggle(ownerFilter, id))}
+                >
+                  {name}
+                </Pill>
+              ))}
+              <Pill
+                active={ownerFilter.has(null)}
+                onClick={() => setOwnerFilter(toggle(ownerFilter, null))}
+              >
+                ohne Eigentümer
+              </Pill>
+            </FilterRow>
+          ) : null}
           <FilterRow label="Zählerstandorte">
             {locationOptions.map(([id, name]) => (
               <Pill
@@ -490,11 +523,17 @@ export function DashboardPage() {
             <span className="text-tertiary">—</span>
             <DateInput value={to} onChange={setTo} aria-label="bis" />
           </FilterRow>
-          {mainLocationFilter.size || locationFilter.size || typeFilter.size || from || to ? (
+          {mainLocationFilter.size ||
+          ownerFilter.size ||
+          locationFilter.size ||
+          typeFilter.size ||
+          from ||
+          to ? (
             <button
               type="button"
               onClick={() => {
                 setMainLocationFilter(new Set());
+                setOwnerFilter(new Set());
                 setLocationFilter(new Set());
                 setTypeFilter(new Set());
                 setFrom('');

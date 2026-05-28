@@ -95,6 +95,10 @@ class MeasuringPointCreate(MeasuringPointBase):
     # ``HeatingRegisterCreate.initial_value`` (initial_values bleibt für
     # Strom/Wasser, wo der OBIS-Code als Schlüssel dient).
     registers: list[HeatingRegisterCreate] = Field(default_factory=list)
+    # Optionaler erster Eigentuemer + Stichtag (Default = installed_at).
+    # Bleibt ``owner_id=None``, wird kein Assignment angelegt.
+    owner_id: int | None = None
+    owner_valid_from: date | None = None
 
     @model_validator(mode="after")
     def _registers_match_type(self) -> Self:
@@ -141,6 +145,10 @@ class MeasuringPointRead(APIModel):
     heating_source: HeatingSource | None
     contract_number: str | None = None
     market_location: str | None = None
+    # Aktueller Eigentuemer (vom Router aus dem ``OwnerAssignment`` mit
+    # ``valid_to IS NULL`` befuellt). ``None``, wenn aktuell keiner.
+    current_owner_id: int | None = None
+    current_owner_name: str | None = None
     physical_meters: list[PhysicalMeterRead]
 
 

@@ -35,6 +35,7 @@ import type {
   LocationRead,
   MeasuringPointRead,
   MeterType,
+  OwnerRead,
 } from '@/lib/types';
 import { HEATING_UNITS } from '@/lib/types';
 import { cx } from '@/components/ui/cx';
@@ -112,6 +113,7 @@ const HEATING_PRESETS: Record<HeatingSource, RegisterDraft[]> = {
 export function MeasuringPointsAdminPage() {
   const [points, setPoints] = useState<MeasuringPointRead[] | null>(null);
   const [locations, setLocations] = useState<LocationRead[]>([]);
+  const [owners, setOwners] = useState<OwnerRead[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
 
@@ -119,10 +121,12 @@ export function MeasuringPointsAdminPage() {
     Promise.all([
       api.get<MeasuringPointRead[]>('/measuring-points'),
       api.get<LocationRead[]>('/locations'),
+      api.get<OwnerRead[]>('/owners'),
     ])
-      .then(([mps, locs]) => {
+      .then(([mps, locs, owns]) => {
         setPoints(mps);
         setLocations(locs);
+        setOwners(owns);
       })
       .catch((err: unknown) => {
         if (err instanceof ApiError) setError(err.problem.detail ?? err.problem.title);
@@ -140,7 +144,7 @@ export function MeasuringPointsAdminPage() {
         </div>
       ) : null}
 
-      <CreateForm locations={locations} onCreated={refresh} />
+      <CreateForm locations={locations} owners={owners} onCreated={refresh} />
 
       <div className="space-y-3">
         {(points ?? []).map((mp) => (
@@ -218,9 +222,11 @@ function MPCard({ mp, onChanged }: { mp: MeasuringPointRead; onChanged: () => vo
 
 function CreateForm({
   locations,
+  owners,
   onCreated,
 }: {
   locations: LocationRead[];
+  owners: OwnerRead[];
   onCreated: () => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -270,6 +276,7 @@ function CreateForm({
         <CreateFormFields
           type={type}
           locations={locations}
+          owners={owners}
           onBack={() => setType(null)}
           onCreated={() => {
             close();
@@ -284,16 +291,19 @@ function CreateForm({
 function CreateFormFields({
   type,
   locations,
+  owners,
   onBack,
   onCreated,
 }: {
   type: MeterType;
   locations: LocationRead[];
+  owners: OwnerRead[];
   onBack: () => void;
   onCreated: () => void;
 }) {
   const [name, setName] = useState('');
   const [locationId, setLocationId] = useState<number | null>(null);
+  const [ownerId, setOwnerId] = useState<number | null>(null);
   const [serial, setSerial] = useState('');
   const [installedAt, setInstalledAt] = useState(new Date().toISOString().slice(0, 10));
 
@@ -348,6 +358,11 @@ function CreateFormFields({
       if (type === 'electricity' && marketLocation.trim()) {
         body['market_location'] = marketLocation.trim();
       }
+      if (ownerId !== null) {
+        body['owner_id'] = ownerId;
+        // valid_from = installed_at (= Default beim Erstanlegen).
+        body['owner_valid_from'] = installedAt;
+      }
       if (type === 'heating') {
         body['heating_source'] = heatingSource;
         if (tankCapacity.trim()) body['tank_capacity'] = parseDe(tankCapacity);
@@ -393,6 +408,18 @@ function CreateFormFields({
         {locations.map((loc) => (
           <option key={loc.id} value={loc.id}>
             {loc.name}
+          </option>
+        ))}
+      </Select>
+      <Select
+        label="Eigentümer (optional)"
+        value={ownerId ?? ''}
+        onChange={(e) => setOwnerId(e.target.value ? Number(e.target.value) : null)}
+      >
+        <option value="">— kein Eigentümer —</option>
+        {owners.map((o) => (
+          <option key={o.id} value={o.id}>
+            {o.name}
           </option>
         ))}
       </Select>

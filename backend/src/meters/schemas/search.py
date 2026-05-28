@@ -11,9 +11,11 @@ class SearchMatchKind(enum.StrEnum):
     SERIAL = "serial"
     CONTRACT_NUMBER = "contract_number"
     MARKET_LOCATION = "market_location"
+    OWNER = "owner"
     NAME = "name"
     MAIN_LOCATION = "main_location"
     LOCATION = "location"
+    OWNER_NOTE = "owner_note"
     MAIN_LOCATION_NOTE = "main_location_note"
     LOCATION_NOTE = "location_note"
 
@@ -22,11 +24,13 @@ _PRIORITY: dict[SearchMatchKind, int] = {
     SearchMatchKind.SERIAL: 1,
     SearchMatchKind.CONTRACT_NUMBER: 2,
     SearchMatchKind.MARKET_LOCATION: 3,
-    SearchMatchKind.NAME: 4,
-    SearchMatchKind.MAIN_LOCATION: 5,
-    SearchMatchKind.LOCATION: 6,
-    SearchMatchKind.MAIN_LOCATION_NOTE: 7,
-    SearchMatchKind.LOCATION_NOTE: 8,
+    SearchMatchKind.OWNER: 4,
+    SearchMatchKind.NAME: 5,
+    SearchMatchKind.MAIN_LOCATION: 6,
+    SearchMatchKind.LOCATION: 7,
+    SearchMatchKind.OWNER_NOTE: 8,
+    SearchMatchKind.MAIN_LOCATION_NOTE: 9,
+    SearchMatchKind.LOCATION_NOTE: 10,
 }
 
 

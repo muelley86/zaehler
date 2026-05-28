@@ -21,7 +21,14 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.orm import selectinload
 
 from meters.api.deps import CurrentUser, DbDep
-from meters.models import Location, MainLocation, MeasuringPoint, PhysicalMeter
+from meters.models import (
+    Location,
+    MainLocation,
+    MeasuringPoint,
+    Owner,
+    OwnerAssignment,
+    PhysicalMeter,
+)
 from meters.schemas import SearchHit, SearchMatchKind
 from meters.schemas.search import match_priority
 from meters.services.access import restrict_mp_query
@@ -52,6 +59,18 @@ def search(
     pm_subq = select(PhysicalMeter.measuring_point_id).where(
         func.lower(PhysicalMeter.serial_number).like(pattern)
     )
+    # Owner-Subquery: MP-IDs, die in *irgendeiner* Periode (auch historisch)
+    # einen Owner mit passendem Namen ODER passender Notiz hatten.
+    owner_subq = (
+        select(OwnerAssignment.measuring_point_id)
+        .join(Owner, OwnerAssignment.owner_id == Owner.id)
+        .where(
+            or_(
+                func.lower(Owner.name).like(pattern),
+                func.lower(Owner.note).like(pattern),
+            )
+        )
+    )
     stmt = (
         select(MeasuringPoint)
         .outerjoin(Location, MeasuringPoint.location_id == Location.id)
@@ -59,6 +78,7 @@ def search(
         .options(
             selectinload(MeasuringPoint.location).selectinload(Location.main_location),
             selectinload(MeasuringPoint.physical_meters),
+            selectinload(MeasuringPoint.owner_assignments).selectinload(OwnerAssignment.owner),
         )
         .where(
             or_(
@@ -70,6 +90,7 @@ def search(
                 func.lower(Location.note).like(pattern),
                 func.lower(MainLocation.note).like(pattern),
                 MeasuringPoint.id.in_(pm_subq),
+                MeasuringPoint.id.in_(owner_subq),
             )
         )
         .distinct()
@@ -105,6 +126,25 @@ def _make_hit(
     )
 
 
+def _owner_match(mp: MeasuringPoint, needle_lower: str) -> tuple[str, bool] | None:
+    """Sucht den ersten Owner (aktiv bevorzugt), dessen Name das ``needle``
+    enthaelt. Rueckgabe (Name, is_note_match). ``None``, wenn nirgends."""
+    # Aktuell offen zuerst, dann historische absteigend nach valid_from.
+    sorted_assignments = sorted(
+        mp.owner_assignments,
+        key=lambda a: (a.valid_to is not None, -a.valid_from.toordinal()),
+    )
+    # Phase 1: Treffer auf Owner-Name.
+    for a in sorted_assignments:
+        if a.owner is not None and needle_lower in a.owner.name.lower():
+            return (a.owner.name, False)
+    # Phase 2: Treffer auf Owner-Notiz.
+    for a in sorted_assignments:
+        if a.owner is not None and a.owner.note and needle_lower in a.owner.note.lower():
+            return (a.owner.name, True)
+    return None
+
+
 def _classify(mp: MeasuringPoint, needle_lower: str) -> SearchHit | None:
     """Hoechste Prioritaet gewinnt — SERIAL > NAME > MAIN_LOCATION > LOCATION
     > *_NOTE. Kein Treffer in Python (sollte nicht passieren wenn SQL matched)
@@ -118,6 +158,14 @@ def _classify(mp: MeasuringPoint, needle_lower: str) -> SearchHit | None:
         return _make_hit(mp, SearchMatchKind.CONTRACT_NUMBER, mp.contract_number)
     if mp.market_location and needle_lower in mp.market_location.lower():
         return _make_hit(mp, SearchMatchKind.MARKET_LOCATION, mp.market_location)
+    owner_hit = _owner_match(mp, needle_lower)
+    if owner_hit is not None:
+        owner_name, is_note = owner_hit
+        return _make_hit(
+            mp,
+            SearchMatchKind.OWNER_NOTE if is_note else SearchMatchKind.OWNER,
+            owner_name,
+        )
     if needle_lower in mp.name.lower():
         return _make_hit(mp, SearchMatchKind.NAME)
     loc = mp.location
