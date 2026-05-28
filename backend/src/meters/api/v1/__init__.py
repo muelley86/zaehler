@@ -8,6 +8,7 @@ from meters.api.v1 import (
     deliveries,
     exports,
     locations,
+    main_locations,
     measuring_points,
     physical_meters,
     qr_tokens,
@@ -19,6 +20,7 @@ router = APIRouter(prefix="/v1")
 router.include_router(auth.router)
 router.include_router(users.router)
 router.include_router(locations.router)
+router.include_router(main_locations.router)
 router.include_router(measuring_points.router)
 router.include_router(physical_meters.router)
 router.include_router(readings.router)

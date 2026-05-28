@@ -57,15 +57,18 @@ const EMPTY_CONSUMPTION: ConsumptionPoint[] = [];
 const EMPTY_READINGS: ReadingRead[] = [];
 const EMPTY_STATES: RegisterStateRead[] = [];
 
-// localStorage-Key fuer den Collapse-Zustand der Standort-Gruppen.
-// Wir speichern die Set-Mitglieder als JSON-Array; ``__no_location__``
-// ist der Sentinel-Key fuer MPs ohne ``location_id``.
-const COLLAPSED_LOCATIONS_KEY = 'dashboard.collapsedLocations';
+// localStorage-Keys fuer die Akkordeon-Zustaende. Wir speichern die
+// AUFGEKLAPPTEN Gruppen — Default ist „alles zu", d. h. ein leeres Set bei
+// erstem Aufruf. „Ohne Hauptstandort"/„Ohne Zaehlerstandort" haben eigene
+// Sentinel-Keys, damit echte ID 0 (theoretisch) nicht kollidiert.
+const EXPANDED_MAIN_LOCATIONS_KEY = 'dashboard.expandedMainLocations';
+const EXPANDED_LOCATIONS_KEY = 'dashboard.expandedLocations';
+const NO_MAIN_LOCATION_KEY = '__no_main_location__';
 const NO_LOCATION_KEY = '__no_location__';
 
-function loadCollapsedLocations(): Set<string> {
+function loadExpandedSet(key: string): Set<string> {
   try {
-    const raw = window.localStorage.getItem(COLLAPSED_LOCATIONS_KEY);
+    const raw = window.localStorage.getItem(key);
     if (!raw) return new Set();
     const arr = JSON.parse(raw) as unknown;
     if (!Array.isArray(arr)) return new Set();
@@ -75,12 +78,24 @@ function loadCollapsedLocations(): Set<string> {
   }
 }
 
-function saveCollapsedLocations(set: Set<string>) {
+function saveExpandedSet(key: string, set: Set<string>) {
   try {
-    window.localStorage.setItem(COLLAPSED_LOCATIONS_KEY, JSON.stringify([...set]));
+    window.localStorage.setItem(key, JSON.stringify([...set]));
   } catch {
     /* QuotaExceeded / SecurityError ignorieren — non-fatal UX-State */
   }
+}
+
+interface LocationGroup {
+  locationKey: string;
+  locationLabel: string;
+  points: MeasuringPointRead[];
+}
+interface MainLocationGroup {
+  mainKey: string;
+  mainLabel: string;
+  totalPoints: number;
+  locations: LocationGroup[];
 }
 
 interface ConsumptionsByMP {
@@ -112,6 +127,7 @@ export function DashboardPage() {
   const handleChanged = useCallback(() => setTick((t) => t + 1), []);
 
   const [locationFilter, setLocationFilter] = useState<Set<number | null>>(new Set());
+  const [mainLocationFilter, setMainLocationFilter] = useState<Set<number | null>>(new Set());
   const [typeFilter, setTypeFilter] = useState<Set<MeterType>>(new Set());
   // Default: laufendes Kalenderjahr — Uebersicht bleibt fokussiert,
   // User kann das Range manuell aufweiten (z. B. Mehrjahres-Vergleich).
@@ -176,11 +192,12 @@ export function DashboardPage() {
   const filteredPoints = useMemo(() => {
     if (!points) return [];
     return points.filter((mp) => {
+      if (mainLocationFilter.size > 0 && !mainLocationFilter.has(mp.main_location_id)) return false;
       if (locationFilter.size > 0 && !locationFilter.has(mp.location_id)) return false;
       if (typeFilter.size > 0 && !typeFilter.has(mp.type)) return false;
       return true;
     });
-  }, [points, locationFilter, typeFilter]);
+  }, [points, mainLocationFilter, locationFilter, typeFilter]);
 
   const filteredConsumption = useMemo(() => {
     const out: Array<ConsumptionPoint & { mp: MeasuringPointRead }> = [];
@@ -225,37 +242,78 @@ export function DashboardPage() {
     return out;
   }, [filteredPoints, readingsByMP, from, to]);
 
-  // Karten pro Standort gruppieren — bei wachsendem MP-Bestand wuerde
-  // das Dashboard sonst sehr lang. Gruppen sind alphabetisch sortiert,
-  // „Ohne Standort" steht am Ende. Collapse-State wird in localStorage
-  // persistiert, damit der User beim naechsten Login dieselbe Sicht hat.
-  const [collapsedLocations, setCollapsedLocations] = useState<Set<string>>(() =>
-    loadCollapsedLocations(),
+  // Zweistufige Gruppierung: Hauptstandort > Zaehlerstandort > Karten.
+  // Bei wachsendem MP-Bestand bleibt das Dashboard kompakt — Default ist
+  // „alles zugeklappt", User klappt selektiv auf. localStorage speichert
+  // die AUFGEKLAPPTEN Keys (expanded-Semantik); leeres Set = alles zu.
+  // Sortierung pro Ebene: Label alphabetisch, „Ohne …"-Buckets ans Ende.
+  const [expandedMainLocations, setExpandedMainLocations] = useState<Set<string>>(() =>
+    loadExpandedSet(EXPANDED_MAIN_LOCATIONS_KEY),
+  );
+  const [expandedLocations, setExpandedLocations] = useState<Set<string>>(() =>
+    loadExpandedSet(EXPANDED_LOCATIONS_KEY),
   );
 
-  const groupedByLocation = useMemo(() => {
-    const groups = new Map<string, { label: string; points: MeasuringPointRead[] }>();
+  const groupedByMainLocation = useMemo<MainLocationGroup[]>(() => {
+    const outer = new Map<string, { label: string; locs: Map<string, LocationGroup> }>();
     for (const mp of filteredPoints) {
-      const key = mp.location_id === null ? NO_LOCATION_KEY : String(mp.location_id);
-      const label =
-        mp.location_id === null ? 'Ohne Standort' : (mp.location_name ?? `#${mp.location_id}`);
-      const existing = groups.get(key);
-      if (existing) existing.points.push(mp);
-      else groups.set(key, { label, points: [mp] });
+      const mainKey =
+        mp.main_location_id === null ? NO_MAIN_LOCATION_KEY : String(mp.main_location_id);
+      const mainLabel =
+        mp.main_location_id === null
+          ? 'Ohne Hauptstandort'
+          : (mp.main_location_name ?? `#${mp.main_location_id}`);
+      const locKey = mp.location_id === null ? NO_LOCATION_KEY : String(mp.location_id);
+      const locLabel =
+        mp.location_id === null
+          ? 'Ohne Zählerstandort'
+          : (mp.location_name ?? `#${mp.location_id}`);
+      let outerEntry = outer.get(mainKey);
+      if (!outerEntry) {
+        outerEntry = { label: mainLabel, locs: new Map() };
+        outer.set(mainKey, outerEntry);
+      }
+      let innerEntry = outerEntry.locs.get(locKey);
+      if (!innerEntry) {
+        innerEntry = { locationKey: locKey, locationLabel: locLabel, points: [] };
+        outerEntry.locs.set(locKey, innerEntry);
+      }
+      innerEntry.points.push(mp);
     }
-    return Array.from(groups.entries()).sort(([keyA, a], [keyB, b]) => {
-      if (keyA === NO_LOCATION_KEY) return 1;
-      if (keyB === NO_LOCATION_KEY) return -1;
-      return a.label.localeCompare(b.label, 'de');
-    });
+    return Array.from(outer.entries())
+      .sort(([keyA, a], [keyB, b]) => {
+        if (keyA === NO_MAIN_LOCATION_KEY) return 1;
+        if (keyB === NO_MAIN_LOCATION_KEY) return -1;
+        return a.label.localeCompare(b.label, 'de');
+      })
+      .map(([mainKey, group]) => ({
+        mainKey,
+        mainLabel: group.label,
+        totalPoints: Array.from(group.locs.values()).reduce((acc, g) => acc + g.points.length, 0),
+        locations: Array.from(group.locs.values()).sort((a, b) => {
+          if (a.locationKey === NO_LOCATION_KEY) return 1;
+          if (b.locationKey === NO_LOCATION_KEY) return -1;
+          return a.locationLabel.localeCompare(b.locationLabel, 'de');
+        }),
+      }));
   }, [filteredPoints]);
 
-  const toggleLocation = useCallback((key: string) => {
-    setCollapsedLocations((prev) => {
+  const toggleMainLocation = useCallback((key: string) => {
+    setExpandedMainLocations((prev) => {
       const next = new Set(prev);
       if (next.has(key)) next.delete(key);
       else next.add(key);
-      saveCollapsedLocations(next);
+      saveExpandedSet(EXPANDED_MAIN_LOCATIONS_KEY, next);
+      return next;
+    });
+  }, []);
+
+  const toggleLocation = useCallback((key: string) => {
+    setExpandedLocations((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      saveExpandedSet(EXPANDED_LOCATIONS_KEY, next);
       return next;
     });
   }, []);
@@ -265,6 +323,16 @@ export function DashboardPage() {
     points?.forEach((mp) => {
       if (mp.location_id !== null && !map.has(mp.location_id)) {
         map.set(mp.location_id, mp.location_name ?? `#${mp.location_id}`);
+      }
+    });
+    return Array.from(map.entries());
+  }, [points]);
+
+  const mainLocationOptions = useMemo(() => {
+    const map = new Map<number, string>();
+    points?.forEach((mp) => {
+      if (mp.main_location_id !== null && !map.has(mp.main_location_id)) {
+        map.set(mp.main_location_id, mp.main_location_name ?? `#${mp.main_location_id}`);
       }
     });
     return Array.from(map.entries());
@@ -364,7 +432,26 @@ export function DashboardPage() {
 
       <Section header="Filter">
         <div className="space-y-4 p-5">
-          <FilterRow label="Standorte">
+          {mainLocationOptions.length > 0 ? (
+            <FilterRow label="Hauptstandorte">
+              {mainLocationOptions.map(([id, name]) => (
+                <Pill
+                  key={`main-${id}`}
+                  active={mainLocationFilter.has(id)}
+                  onClick={() => setMainLocationFilter(toggle(mainLocationFilter, id))}
+                >
+                  {name}
+                </Pill>
+              ))}
+              <Pill
+                active={mainLocationFilter.has(null)}
+                onClick={() => setMainLocationFilter(toggle(mainLocationFilter, null))}
+              >
+                ohne Hauptstandort
+              </Pill>
+            </FilterRow>
+          ) : null}
+          <FilterRow label="Zählerstandorte">
             {locationOptions.map(([id, name]) => (
               <Pill
                 key={String(id)}
@@ -378,7 +465,7 @@ export function DashboardPage() {
               active={locationFilter.has(null)}
               onClick={() => setLocationFilter(toggle(locationFilter, null))}
             >
-              ohne Standort
+              ohne Zählerstandort
             </Pill>
           </FilterRow>
           <FilterRow label="Zählerart">
@@ -397,10 +484,11 @@ export function DashboardPage() {
             <span className="text-tertiary">—</span>
             <DateInput value={to} onChange={setTo} aria-label="bis" />
           </FilterRow>
-          {locationFilter.size || typeFilter.size || from || to ? (
+          {mainLocationFilter.size || locationFilter.size || typeFilter.size || from || to ? (
             <button
               type="button"
               onClick={() => {
+                setMainLocationFilter(new Set());
                 setLocationFilter(new Set());
                 setTypeFilter(new Set());
                 setFrom('');
@@ -440,37 +528,69 @@ export function DashboardPage() {
         <EmptyState icon={<Filter size={32} />} title="Keine Messstellen entsprechen dem Filter" />
       ) : null}
 
-      {mpDataReady && groupedByLocation.length > 0
-        ? groupedByLocation.map(([key, group]) => {
-            const isCollapsed = collapsedLocations.has(key);
+      {mpDataReady && groupedByMainLocation.length > 0
+        ? groupedByMainLocation.map((mainGroup) => {
+            const mainExpanded = expandedMainLocations.has(mainGroup.mainKey);
             return (
-              <div key={key} className="space-y-3">
+              <div key={mainGroup.mainKey} className="space-y-3">
                 <button
                   type="button"
-                  onClick={() => toggleLocation(key)}
-                  className="bg-fill/40 hover:bg-fill/60 flex w-full items-center justify-between gap-2 rounded-card border-hairline border-border px-4 py-2 text-left transition-colors"
-                  aria-expanded={!isCollapsed}
+                  onClick={() => toggleMainLocation(mainGroup.mainKey)}
+                  className="bg-fill/40 hover:bg-fill/60 flex w-full items-center justify-between gap-2 rounded-card border-hairline border-border px-4 py-3 text-left transition-colors"
+                  aria-expanded={mainExpanded}
                 >
                   <span className="flex items-baseline gap-2">
-                    <span className="text-headline">{group.label}</span>
-                    <span className="text-caption text-tertiary">{group.points.length}</span>
+                    <span className="text-title-3 font-semibold tracking-tight">
+                      {mainGroup.mainLabel}
+                    </span>
+                    <span className="text-caption text-tertiary">{mainGroup.totalPoints}</span>
                   </span>
                   <ChevronDown
                     size={18}
-                    className={`transition-transform ${isCollapsed ? '-rotate-90' : ''}`}
+                    className={`transition-transform ${mainExpanded ? '' : '-rotate-90'}`}
                   />
                 </button>
-                {!isCollapsed
-                  ? group.points.map((mp) => (
-                      <MeasuringPointCard
-                        key={mp.id}
-                        mp={mp}
-                        consumption={consumptionByMp.get(mp.id) ?? EMPTY_CONSUMPTION}
-                        readings={readingsFilteredByMp.get(mp.id) ?? EMPTY_READINGS}
-                        state={states[mp.id] ?? EMPTY_STATES}
-                        onChanged={handleChanged}
-                      />
-                    ))
+                {mainExpanded
+                  ? mainGroup.locations.map((locGroup) => {
+                      // Inner-Key kombiniert mainKey, damit derselbe „Ohne
+                      // Zaehlerstandort"-Sentinel unter mehreren Hauptstand-
+                      // orten unabhaengig persistiert werden kann.
+                      const innerKey = `${mainGroup.mainKey}::${locGroup.locationKey}`;
+                      const locExpanded = expandedLocations.has(innerKey);
+                      return (
+                        <div key={innerKey} className="ml-2 space-y-3">
+                          <button
+                            type="button"
+                            onClick={() => toggleLocation(innerKey)}
+                            className="bg-fill/30 hover:bg-fill/50 flex w-full items-center justify-between gap-2 rounded-card border-hairline border-border px-4 py-2 text-left transition-colors"
+                            aria-expanded={locExpanded}
+                          >
+                            <span className="flex items-baseline gap-2">
+                              <span className="text-headline">{locGroup.locationLabel}</span>
+                              <span className="text-caption text-tertiary">
+                                {locGroup.points.length}
+                              </span>
+                            </span>
+                            <ChevronDown
+                              size={16}
+                              className={`transition-transform ${locExpanded ? '' : '-rotate-90'}`}
+                            />
+                          </button>
+                          {locExpanded
+                            ? locGroup.points.map((mp) => (
+                                <MeasuringPointCard
+                                  key={mp.id}
+                                  mp={mp}
+                                  consumption={consumptionByMp.get(mp.id) ?? EMPTY_CONSUMPTION}
+                                  readings={readingsFilteredByMp.get(mp.id) ?? EMPTY_READINGS}
+                                  state={states[mp.id] ?? EMPTY_STATES}
+                                  onChanged={handleChanged}
+                                />
+                              ))
+                            : null}
+                        </div>
+                      );
+                    })
                   : null}
               </div>
             );

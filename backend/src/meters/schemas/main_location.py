@@ -14,12 +14,9 @@ def _strip_nonempty(value: str | None) -> str | None:
     return stripped
 
 
-class LocationCreate(BaseModel):
+class MainLocationCreate(BaseModel):
     name: str = Field(min_length=1, max_length=120)
     note: str | None = Field(default=None, max_length=500)
-    latitude: float | None = Field(default=None, ge=-90, le=90)
-    longitude: float | None = Field(default=None, ge=-180, le=180)
-    main_location_id: int | None = None
 
     @field_validator("name")
     @classmethod
@@ -29,17 +26,9 @@ class LocationCreate(BaseModel):
         return result
 
 
-class LocationUpdate(BaseModel):
+class MainLocationUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=120)
     note: str | None = Field(default=None, max_length=500)
-    latitude: float | None = Field(default=None, ge=-90, le=90)
-    longitude: float | None = Field(default=None, ge=-180, le=180)
-    clear_coordinates: bool = False
-    # Hauptstandort-Zuordnung: ``None`` als Wert allein ist nicht aussage-
-    # kraeftig (= „nicht aendern"). Mit ``clear_main_location=True`` kann
-    # der Admin die Zuordnung explizit aufheben.
-    main_location_id: int | None = None
-    clear_main_location: bool = False
 
     @field_validator("name")
     @classmethod
@@ -47,11 +36,7 @@ class LocationUpdate(BaseModel):
         return _strip_nonempty(value)
 
 
-class LocationRead(APIModel):
+class MainLocationRead(APIModel):
     id: int
     name: str
     note: str | None
-    latitude: float | None
-    longitude: float | None
-    main_location_id: int | None = None
-    main_location_name: str | None = None

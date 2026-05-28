@@ -105,6 +105,12 @@ class MeasuringPointRead(APIModel):
     type: MeterType
     location_id: int | None
     location_name: str | None = None
+    # Hauptstandort wird zur Anzeige im Dashboard mitgeliefert — es ist der
+    # ``main_location_id``/``name`` der gerade verknuepften Location (per
+    # joined-load zweistufig). ``None``, wenn der Zaehlerstandort entweder
+    # selbst nicht gesetzt ist oder keinen Hauptstandort hat.
+    main_location_id: int | None = None
+    main_location_name: str | None = None
     is_bidirectional: bool
     has_dual_tariff: bool
     tank_capacity: DecimalStr | None

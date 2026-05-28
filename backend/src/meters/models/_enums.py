@@ -59,6 +59,7 @@ class AuditEntityType(enum.StrEnum):
     PHYSICAL_METER = "physical_meter"
     REGISTER = "register"
     LOCATION = "location"
+    MAIN_LOCATION = "main_location"
     DELIVERY = "delivery"
     SESSION = "session"
     QR_TOKEN = "qr_token"

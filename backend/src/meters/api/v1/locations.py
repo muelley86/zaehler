@@ -11,12 +11,28 @@ from __future__ import annotations
 from fastapi import APIRouter, Request, status
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
 
 from meters.api.deps import AdminUser, CurrentUser, DbDep, client_ip
 from meters.core.problem import ProblemError
-from meters.models import AuditAction, AuditEntityType, Location
+from meters.models import AuditAction, AuditEntityType, Location, MainLocation
 from meters.schemas import LocationCreate, LocationRead, LocationUpdate
 from meters.services.audit import record
+
+
+def _to_read(loc: Location) -> LocationRead:
+    data = LocationRead.model_validate(loc)
+    data.main_location_id = loc.main_location.id if loc.main_location else None
+    data.main_location_name = loc.main_location.name if loc.main_location else None
+    return data
+
+
+def _ensure_main_location(db: Session, main_location_id: int | None) -> None:
+    if main_location_id is None:
+        return
+    if db.get(MainLocation, main_location_id) is None:
+        raise ProblemError(status_code=404, title="MainLocation not found")
+
 
 router = APIRouter(prefix="/locations", tags=["locations"])
 
@@ -24,7 +40,7 @@ router = APIRouter(prefix="/locations", tags=["locations"])
 @router.get("", response_model=list[LocationRead])
 def list_locations(db: DbDep, _user: CurrentUser) -> list[LocationRead]:
     rows = list(db.scalars(select(Location).order_by(Location.name)))
-    return [LocationRead.model_validate(r) for r in rows]
+    return [_to_read(r) for r in rows]
 
 
 @router.get("/{location_id}", response_model=LocationRead)
@@ -32,7 +48,7 @@ def get_location(location_id: int, db: DbDep, _user: CurrentUser) -> LocationRea
     loc = db.get(Location, location_id)
     if loc is None:
         raise ProblemError(status_code=404, title="Location not found")
-    return LocationRead.model_validate(loc)
+    return _to_read(loc)
 
 
 @router.post("", response_model=LocationRead, status_code=status.HTTP_201_CREATED)
@@ -42,11 +58,13 @@ def create_location(
     db: DbDep,
     admin: AdminUser,
 ) -> LocationRead:
+    _ensure_main_location(db, payload.main_location_id)
     location = Location(
         name=payload.name,
         note=payload.note,
         latitude=payload.latitude,
         longitude=payload.longitude,
+        main_location_id=payload.main_location_id,
     )
     db.add(location)
     try:
@@ -65,7 +83,7 @@ def create_location(
     )
     db.commit()
     db.refresh(location)
-    return LocationRead.model_validate(location)
+    return _to_read(location)
 
 
 @router.patch("/{location_id}", response_model=LocationRead)
@@ -101,6 +119,22 @@ def update_location(
         if payload.longitude is not None and payload.longitude != location.longitude:
             diff["longitude"] = {"from": location.longitude, "to": payload.longitude}
             location.longitude = payload.longitude
+    # Hauptstandort: ``clear_main_location`` ueberschreibt jede gesetzte ID;
+    # sonst greift nur, wenn explizit ein neuer Wert uebergeben wurde.
+    if payload.clear_main_location:
+        if location.main_location_id is not None:
+            diff["main_location_id"] = {"from": location.main_location_id, "to": None}
+        location.main_location_id = None
+    elif (
+        payload.main_location_id is not None
+        and payload.main_location_id != location.main_location_id
+    ):
+        _ensure_main_location(db, payload.main_location_id)
+        diff["main_location_id"] = {
+            "from": location.main_location_id,
+            "to": payload.main_location_id,
+        }
+        location.main_location_id = payload.main_location_id
     if diff:
         record(
             db,
@@ -117,7 +151,7 @@ def update_location(
         db.rollback()
         raise ProblemError(status_code=409, title="Location name already exists") from exc
     db.refresh(location)
-    return LocationRead.model_validate(location)
+    return _to_read(location)
 
 
 @router.delete("/{location_id}", status_code=204)

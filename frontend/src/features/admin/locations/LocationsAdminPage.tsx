@@ -6,7 +6,7 @@ import { Button, Card, EmptyState, LargeTitle, Section, Sheet, TextField } from 
 import { LocationMap } from '@/components/LocationMap';
 import { LocationMapSheet } from '@/components/LocationMapSheet';
 import { ApiError, api } from '@/lib/api';
-import type { LocationRead, MeasuringPointRead } from '@/lib/types';
+import type { LocationRead, MainLocationRead, MeasuringPointRead } from '@/lib/types';
 
 // Default-Karten-Zentrum (Kassel, Mitte Deutschland) wenn der User noch
 // keine Koordinaten hat und auf "Auf Karte wählen" klickt.
@@ -16,6 +16,7 @@ const DEFAULT_LNG = 10.45;
 export function LocationsAdminPage() {
   const [locations, setLocations] = useState<LocationRead[] | null>(null);
   const [points, setPoints] = useState<MeasuringPointRead[] | null>(null);
+  const [mainLocations, setMainLocations] = useState<MainLocationRead[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
   const [editing, setEditing] = useState<LocationRead | null>(null);
@@ -34,6 +35,12 @@ export function LocationsAdminPage() {
       .catch(() => {
         /* nicht kritisch — count ist optional */
       });
+    api
+      .get<MainLocationRead[]>('/main-locations')
+      .then(setMainLocations)
+      .catch(() => {
+        /* nicht kritisch — Dropdown ist optional, leeres Default-Set */
+      });
   }, [tick]);
 
   const refresh = () => setTick((t) => t + 1);
@@ -48,14 +55,14 @@ export function LocationsAdminPage() {
 
   return (
     <>
-      <LargeTitle title="Standorte" />
+      <LargeTitle title="Zählerstandorte" />
       {error ? (
         <div className="border-danger/40 bg-danger/10 rounded-card border-hairline p-3 text-danger">
           {error}
         </div>
       ) : null}
 
-      <CreateForm onCreated={refresh} />
+      <CreateForm onCreated={refresh} mainLocations={mainLocations} />
 
       {locations && locations.length === 0 ? (
         <EmptyState
@@ -82,6 +89,7 @@ export function LocationsAdminPage() {
         {editing ? (
           <EditForm
             loc={editing}
+            mainLocations={mainLocations}
             onSaved={() => {
               setEditing(null);
               refresh();
@@ -150,6 +158,12 @@ function LocationCard({
                 ? 'Keine Messstellen'
                 : `${mpCount} ${mpCount === 1 ? 'Messstelle' : 'Messstellen'}`}
             </div>
+            {loc.main_location_name ? (
+              <div className="mt-0.5 text-caption text-tertiary">
+                Hauptstandort:{' '}
+                <span className="font-medium text-secondary">{loc.main_location_name}</span>
+              </div>
+            ) : null}
           </div>
         </div>
         <div className="flex gap-1">
@@ -494,12 +508,42 @@ function parseGeo(
 // Edit-Form
 // ---------------------------------------------------------------------------
 
+function MainLocationSelect({
+  value,
+  onChange,
+  options,
+}: {
+  value: number | null;
+  onChange: (v: number | null) => void;
+  options: MainLocationRead[];
+}) {
+  return (
+    <label className="block">
+      <span className="mb-1 block text-caption-bold text-secondary">Hauptstandort</span>
+      <select
+        value={value === null ? '' : String(value)}
+        onChange={(e) => onChange(e.target.value ? Number(e.target.value) : null)}
+        className="block w-full rounded-pill border-hairline border-border bg-fill px-3 py-2 text-body-sm text-label"
+      >
+        <option value="">— keiner —</option>
+        {options.map((opt) => (
+          <option key={opt.id} value={opt.id}>
+            {opt.name}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
 function EditForm({
   loc,
+  mainLocations,
   onSaved,
   onCancel,
 }: {
   loc: LocationRead;
+  mainLocations: MainLocationRead[];
   onSaved: () => void;
   onCancel: () => void;
 }) {
@@ -507,6 +551,7 @@ function EditForm({
   const [note, setNote] = useState(loc.note ?? '');
   const [latitude, setLatitude] = useState(loc.latitude !== null ? String(loc.latitude) : '');
   const [longitude, setLongitude] = useState(loc.longitude !== null ? String(loc.longitude) : '');
+  const [mainLocationId, setMainLocationId] = useState<number | null>(loc.main_location_id);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -531,6 +576,14 @@ function EditForm({
         body['latitude'] = geo.lat;
         body['longitude'] = geo.lng;
       }
+      // Hauptstandort: ``null`` allein lassen Backend als „nicht aendern"
+      // interpretieren — explizit ``clear_main_location: true`` senden, wenn
+      // der User die Zuordnung entfernt hat.
+      if (mainLocationId === null && loc.main_location_id !== null) {
+        body['clear_main_location'] = true;
+      } else if (mainLocationId !== null && mainLocationId !== loc.main_location_id) {
+        body['main_location_id'] = mainLocationId;
+      }
       await api.patch(`/locations/${loc.id}`, body);
       onSaved();
     } catch (err) {
@@ -545,6 +598,11 @@ function EditForm({
     <form onSubmit={(e) => void save(e)} className="space-y-3">
       <TextField label="Name" value={name} onChange={(e) => setName(e.target.value)} required />
       <TextField label="Notiz" value={note} onChange={(e) => setNote(e.target.value)} />
+      <MainLocationSelect
+        value={mainLocationId}
+        onChange={setMainLocationId}
+        options={mainLocations}
+      />
       <GeoPicker
         latitude={latitude}
         longitude={longitude}
@@ -568,11 +626,18 @@ function EditForm({
 // Create-Form
 // ---------------------------------------------------------------------------
 
-function CreateForm({ onCreated }: { onCreated: () => void }) {
+function CreateForm({
+  onCreated,
+  mainLocations,
+}: {
+  onCreated: () => void;
+  mainLocations: MainLocationRead[];
+}) {
   const [name, setName] = useState('');
   const [note, setNote] = useState('');
   const [latitude, setLatitude] = useState('');
   const [longitude, setLongitude] = useState('');
+  const [mainLocationId, setMainLocationId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -591,11 +656,13 @@ function CreateForm({ onCreated }: { onCreated: () => void }) {
         body['latitude'] = geo.lat;
         body['longitude'] = geo.lng;
       }
+      if (mainLocationId !== null) body['main_location_id'] = mainLocationId;
       await api.post('/locations', body);
       setName('');
       setNote('');
       setLatitude('');
       setLongitude('');
+      setMainLocationId(null);
       onCreated();
     } catch (err) {
       if (err instanceof ApiError) setError(err.problem.detail ?? err.problem.title);
@@ -606,7 +673,7 @@ function CreateForm({ onCreated }: { onCreated: () => void }) {
   }
 
   return (
-    <Section header="Neuer Standort">
+    <Section header="Neuer Zählerstandort">
       <form onSubmit={(e) => void handleSubmit(e)} className="space-y-3 p-5">
         <TextField
           label="Name"
@@ -619,6 +686,11 @@ function CreateForm({ onCreated }: { onCreated: () => void }) {
           label="Notiz (optional)"
           value={note}
           onChange={(e) => setNote(e.target.value)}
+        />
+        <MainLocationSelect
+          value={mainLocationId}
+          onChange={setMainLocationId}
+          options={mainLocations}
         />
         <GeoPicker
           latitude={latitude}
