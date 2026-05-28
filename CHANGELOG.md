@@ -10,6 +10,13 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.16.1](https://github.com/muelley86/zaehler/compare/v2.16.0...v2.16.1) (2026-05-28)
+
+
+### Fehlerbehebungen
+
+* **scanner:** Original-Fehler sichtbar machen, iOS-Constraints aufweichen ([#83](https://github.com/muelley86/zaehler/issues/83)) ([808ce6f](https://github.com/muelley86/zaehler/commit/808ce6f814ac82ad9379e3e31380a782c40d166e))
+
 ## [2.16.0](https://github.com/muelley86/zaehler/compare/v2.15.3...v2.16.0) (2026-05-28)
 
 
