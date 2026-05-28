@@ -217,36 +217,67 @@ export function QrScanSheet({ open, onClose }: QrScanSheetProps) {
         }
         setStarting(false);
 
-        // Continuous-AutoFocus erzwingen — iOS Safari startet die
-        // Rueckkamera ueber ``getUserMedia`` mit Fixed-Focus, weshalb
-        // kleine QRs aus 5–10 cm unscharf bleiben (native iOS-Camera-
-        // App nutzt continuous AF und erkennt dieselben Codes problem-
-        // los). Browser ohne Support ignorieren die ``advanced``-
-        // Constraint stillschweigend — kein Crash, nur Log.
-        // Diagnose-Log: effektive Aufloesung + FocusMode in Console,
-        // damit wir bei Decode-Problemen sehen, was die Hardware wirklich
-        // liefert (1080p vs. 640×480, Ultra-Wide vs. Wide-Lens).
+        // Diagnose + Zoom-Pfad:
+        // - ``getSettings()`` loggt die effektive Aufloesung
+        // - ``getCapabilities()`` loggt, welche advanced-Constraints die
+        //   Hardware/Browser-Kombi anbietet
+        // - Wir aktivieren nur, was die Capabilities tatsaechlich nennen
+        //   — iOS WebKit gibt z. B. ``focusMode`` grundsaetzlich nicht
+        //   frei und meckert sonst mit OverconstrainedError.
+        // - Falls ``zoom`` verfuegbar: 2× setzen, damit kleine gedruckte
+        //   QRs (Avery L6008, 10 mm) in den AF-Sweet-Spot der iPhone-
+        //   Rueckkamera kommen. Die native iOS-Camera-App schafft die
+        //   Codes — wir kompensieren das fehlende Web-AF durch Zoom.
         try {
           const reader = document.getElementById(READER_ID);
           const video = reader?.querySelector('video') ?? null;
           const stream = video && video.srcObject instanceof MediaStream ? video.srcObject : null;
           const track = stream?.getVideoTracks()[0] ?? null;
           if (track) {
+            // ``focusMode`` / ``zoom`` sind nicht in lib.dom.d.ts —
+            // lokale Subtypes, der einzige as-Cast geht auf das Methoden-
+            // Ergebnis (Variable, nicht Object-Literal — vertraegt sich
+            // mit eslint ``objectLiteralTypeAssertions: 'never'``).
+            interface ZoomCapability {
+              min?: number;
+              max?: number;
+              step?: number;
+            }
+            interface ExtendedCapabilities extends MediaTrackCapabilities {
+              focusMode?: string[];
+              zoom?: ZoomCapability;
+            }
+            const capabilities = track.getCapabilities() as ExtendedCapabilities;
+            console.info('[QrScanSheet] track capabilities', capabilities);
             console.info('[QrScanSheet] track settings', track.getSettings());
-            // ``focusMode`` ist nicht in ``lib.dom.d.ts``, aber W3C-Media-
-            // Capture-Standard. Eigener Subtype, damit kein as-Cast noetig.
-            interface FocusableConstraintSet extends MediaTrackConstraintSet {
+
+            interface AdvancedConstraintSet extends MediaTrackConstraintSet {
               focusMode?: 'continuous' | 'manual' | 'single-shot' | 'auto';
+              zoom?: number;
             }
-            interface FocusableTrackConstraints extends MediaTrackConstraints {
-              advanced?: FocusableConstraintSet[];
+            interface AdvancedTrackConstraints extends MediaTrackConstraints {
+              advanced?: AdvancedConstraintSet[];
             }
-            const focusConstraints: FocusableTrackConstraints = {
-              advanced: [{ focusMode: 'continuous' }],
-            };
-            await track
-              .applyConstraints(focusConstraints)
-              .catch((e: unknown) => console.info('[QrScanSheet] focusMode set failed', e));
+
+            const advanced: AdvancedConstraintSet[] = [];
+            if (
+              Array.isArray(capabilities.focusMode) &&
+              capabilities.focusMode.includes('continuous')
+            ) {
+              advanced.push({ focusMode: 'continuous' });
+            }
+            const zoomCap = capabilities.zoom;
+            if (zoomCap && typeof zoomCap.max === 'number' && zoomCap.max > 1) {
+              advanced.push({ zoom: Math.min(zoomCap.max, 2) });
+            }
+            if (advanced.length > 0) {
+              const constraints: AdvancedTrackConstraints = { advanced };
+              await track
+                .applyConstraints(constraints)
+                .catch((e: unknown) =>
+                  console.info('[QrScanSheet] advanced constraints failed', e),
+                );
+            }
           }
         } catch (e) {
           console.info('[QrScanSheet] post-start diagnostics failed', e);
