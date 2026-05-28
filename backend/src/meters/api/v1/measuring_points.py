@@ -261,10 +261,7 @@ def update_measuring_point(
         if mp.contract_number is not None:
             diff["contract_number"] = {"from": mp.contract_number, "to": None}
             mp.contract_number = None
-    elif (
-        payload.contract_number is not None
-        and payload.contract_number != mp.contract_number
-    ):
+    elif payload.contract_number is not None and payload.contract_number != mp.contract_number:
         diff["contract_number"] = {
             "from": mp.contract_number,
             "to": payload.contract_number,
@@ -282,10 +279,7 @@ def update_measuring_point(
         if mp.market_location is not None:
             diff["market_location"] = {"from": mp.market_location, "to": None}
             mp.market_location = None
-    elif (
-        payload.market_location is not None
-        and payload.market_location != mp.market_location
-    ):
+    elif payload.market_location is not None and payload.market_location != mp.market_location:
         diff["market_location"] = {
             "from": mp.market_location,
             "to": payload.market_location,

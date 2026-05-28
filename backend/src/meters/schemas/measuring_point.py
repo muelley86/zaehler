@@ -76,9 +76,7 @@ class MeasuringPointBase(BaseModel):
             MeterType.ELECTRICITY,
             MeterType.WATER,
         ):
-            raise ValueError(
-                "contract_number ist nur für Strom- oder Wasser-Messstellen zulässig"
-            )
+            raise ValueError("contract_number ist nur für Strom- oder Wasser-Messstellen zulässig")
         return self
 
     @model_validator(mode="after")
