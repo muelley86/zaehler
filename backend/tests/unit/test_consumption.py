@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from decimal import Decimal
 
+import pytest
 from sqlalchemy.orm import Session
 
 from meters.core.obis import RegisterDef
@@ -615,10 +616,10 @@ def test_oil_consumption_same_day_reading_then_delivery_then_reading(db: Session
 # ---------------------------------------------------------------------------
 
 
-def test_production_config_requires_cookie_secure(monkeypatch) -> None:
+def test_production_config_requires_cookie_secure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Boot-Assertion: debug=False + cookie_secure=False → RuntimeError."""
-    import pytest
-
     from meters.core import config as cfg
 
     monkeypatch.setattr(cfg.settings, "debug", False)
@@ -627,7 +628,10 @@ def test_production_config_requires_cookie_secure(monkeypatch) -> None:
         cfg.assert_secure_production_config()
 
 
-def test_production_config_warns_on_trust_proxy_off(monkeypatch, recwarn) -> None:
+def test_production_config_warns_on_trust_proxy_off(
+    monkeypatch: pytest.MonkeyPatch,
+    recwarn: pytest.WarningsRecorder,
+) -> None:
     """Boot-Assertion: debug=False + cookie_secure=True + trust_proxy=False →
     Warning (kein Boot-Abort, weil Edge-Case ohne Proxy theoretisch denkbar)."""
     from meters.core import config as cfg
@@ -639,7 +643,7 @@ def test_production_config_warns_on_trust_proxy_off(monkeypatch, recwarn) -> Non
     assert any("TRUST_PROXY" in str(w.message) for w in recwarn.list)
 
 
-def test_dev_config_skips_assertion(monkeypatch) -> None:
+def test_dev_config_skips_assertion(monkeypatch: pytest.MonkeyPatch) -> None:
     """Im Dev-Mode (debug=True) sind cookie_secure/trust_proxy egal — keine
     Assertions, keine Warnings."""
     from meters.core import config as cfg
