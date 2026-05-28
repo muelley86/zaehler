@@ -54,6 +54,11 @@ const MainLocationsAdminPage = lazy(() =>
     default: m.MainLocationsAdminPage,
   })),
 );
+const OwnersAdminPage = lazy(() =>
+  import('@/features/admin/owners/OwnersAdminPage').then((m) => ({
+    default: m.OwnersAdminPage,
+  })),
+);
 const AuditLogPage = lazy(() =>
   import('@/features/admin/audit/AuditLogPage').then((m) => ({ default: m.AuditLogPage })),
 );
@@ -165,6 +170,7 @@ export function App() {
             <Route path="messstellen/:id" element={<MeasuringPointDetailPage />} />
             <Route path="standorte" element={<LocationsAdminPage />} />
             <Route path="hauptstandorte" element={<MainLocationsAdminPage />} />
+            <Route path="eigentuemer" element={<OwnersAdminPage />} />
             <Route path="benutzer" element={<UsersAdminPage />} />
             <Route path="qr-codes" element={<QrCodesAdminPage />} />
             <Route path="audit" element={<AuditLogPage />} />

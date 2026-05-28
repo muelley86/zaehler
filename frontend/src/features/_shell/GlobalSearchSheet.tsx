@@ -32,9 +32,11 @@ const MATCH_LABEL: Record<SearchMatchKind, string> = {
   serial: 'Zähler-Nr.',
   contract_number: 'Vertragsnr.',
   market_location: 'Marktlokation',
+  owner: 'Eigentümer',
   name: 'Name',
   main_location: 'Hauptstandort',
   location: 'Zählerstandort',
+  owner_note: 'Notiz Eigentümer',
   main_location_note: 'Notiz Hauptstandort',
   location_note: 'Notiz Zählerstandort',
 };

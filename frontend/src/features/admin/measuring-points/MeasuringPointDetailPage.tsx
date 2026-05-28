@@ -49,13 +49,15 @@ import {
 import { LocationMapSheet } from '@/components/LocationMapSheet';
 import { useAuth } from '@/features/auth/auth-context';
 import { ApiError, api } from '@/lib/api';
-import { formatDateTickDe, formatDateTimeDe, formatDe, parseDe } from '@/lib/format';
+import { formatDateDe, formatDateTickDe, formatDateTimeDe, formatDe, parseDe } from '@/lib/format';
 import { useChartTheme } from '@/lib/useChartTheme';
 import type {
   ConsumptionPoint,
   HeatingUnit,
   LocationRead,
   MeasuringPointRead,
+  OwnerAssignmentRead,
+  OwnerRead,
   PhysicalMeterRead,
   RegisterRead,
   RegisterStateRead,
@@ -169,6 +171,8 @@ export function MeasuringPointDetailPage() {
       />
 
       <PhysicalMetersCard mp={mp} onChanged={refresh} />
+
+      <OwnerHistoryCard mp={mp} onChanged={refresh} />
 
       <ConsumptionChart consumption={consumption} mp={mp} />
 
@@ -405,6 +409,7 @@ function StammdatenReadView({
       {mp.type === 'electricity' && mp.market_location ? (
         <FieldRow k="Marktlokation" v={mp.market_location} />
       ) : null}
+      <FieldRow k="Aktueller Eigentümer" v={mp.current_owner_name ?? '—'} />
       {mp.type === 'heating' && mp.tank_capacity ? (
         <FieldRow
           k="Tankvolumen"
@@ -1427,5 +1432,170 @@ function HeatingRegisterEditor({
         </Button>
       )}
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Eigentuemer-Historie + Wechsel
+// ---------------------------------------------------------------------------
+
+/** Listet alle ``OwnerAssignment``-Perioden absteigend. Aktive Periode oben
+ *  mit ``aktiv``-Badge. Button „Eigentümer wechseln" oeffnet ChangeOwnerSheet. */
+function OwnerHistoryCard({ mp, onChanged }: { mp: MeasuringPointRead; onChanged: () => void }) {
+  const [history, setHistory] = useState<OwnerAssignmentRead[]>([]);
+  const [owners, setOwners] = useState<OwnerRead[]>([]);
+  const [open, setOpen] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [tick, setTick] = useState(0);
+
+  useEffect(() => {
+    api
+      .get<OwnerAssignmentRead[]>(`/measuring-points/${mp.id}/owners`)
+      .then(setHistory)
+      .catch((err: unknown) => {
+        if (err instanceof ApiError) setError(err.problem.detail ?? err.problem.title);
+      });
+    api
+      .get<OwnerRead[]>('/owners')
+      .then(setOwners)
+      .catch(() => {
+        /* Dropdown bleibt leer */
+      });
+  }, [mp.id, tick]);
+
+  return (
+    <Section
+      header={
+        <div className="flex items-center justify-between gap-2">
+          <span>Eigentümer-Historie</span>
+          <Button
+            variant="bordered"
+            size="sm"
+            onClick={() => setOpen(true)}
+            disabled={owners.length === 0}
+          >
+            Eigentümer wechseln
+          </Button>
+        </div>
+      }
+    >
+      <div className="space-y-2 p-5">
+        {error ? (
+          <div className="text-caption text-danger">{error}</div>
+        ) : history.length === 0 ? (
+          <div className="text-caption text-tertiary">Noch keine Eigentümer-Zuordnung.</div>
+        ) : (
+          history.map((a) => {
+            const active = a.valid_to === null;
+            return (
+              <div
+                key={a.id}
+                className="bg-fill/40 flex items-center justify-between rounded-pill border-hairline border-border px-3 py-2"
+              >
+                <div className="min-w-0">
+                  <div className="truncate text-body-sm font-semibold text-label">
+                    {a.owner_name ?? <em className="text-tertiary">unbekannt</em>}
+                  </div>
+                  <div className="text-caption text-tertiary">
+                    ab {formatDateDe(a.valid_from)}
+                    {a.valid_to ? ` bis ${formatDateDe(a.valid_to)}` : ''}
+                  </div>
+                </div>
+                {active ? (
+                  <span className="rounded-full bg-primary-soft px-2 py-0.5 text-caption font-semibold text-primary-deep">
+                    aktiv
+                  </span>
+                ) : null}
+              </div>
+            );
+          })
+        )}
+      </div>
+      <Sheet open={open} onClose={() => setOpen(false)} title="Eigentümer wechseln">
+        <ChangeOwnerForm
+          mpId={mp.id}
+          owners={owners}
+          onSaved={() => {
+            setOpen(false);
+            setTick((t) => t + 1);
+            onChanged();
+          }}
+          onCancel={() => setOpen(false)}
+        />
+      </Sheet>
+    </Section>
+  );
+}
+
+function ChangeOwnerForm({
+  mpId,
+  owners,
+  onSaved,
+  onCancel,
+}: {
+  mpId: number;
+  owners: OwnerRead[];
+  onSaved: () => void;
+  onCancel: () => void;
+}) {
+  const [ownerId, setOwnerId] = useState<number | ''>('');
+  const [validFrom, setValidFrom] = useState(new Date().toISOString().slice(0, 10));
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function save(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (ownerId === '') {
+      setError('Bitte einen Eigentümer wählen.');
+      return;
+    }
+    setError(null);
+    setBusy(true);
+    try {
+      await api.post(`/measuring-points/${mpId}/change-owner`, {
+        owner_id: ownerId,
+        valid_from: validFrom,
+      });
+      onSaved();
+    } catch (err) {
+      if (err instanceof ApiError) setError(err.problem.detail ?? err.problem.title);
+      else setError('Wechsel fehlgeschlagen.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <form onSubmit={(e) => void save(e)} className="space-y-3">
+      <Select
+        label="Neuer Eigentümer"
+        value={ownerId}
+        onChange={(e) => setOwnerId(e.target.value ? Number(e.target.value) : '')}
+        required
+      >
+        <option value="">— bitte wählen —</option>
+        {owners.map((o) => (
+          <option key={o.id} value={o.id}>
+            {o.name}
+          </option>
+        ))}
+      </Select>
+      <TextField
+        label="Wechsel zum"
+        type="date"
+        value={validFrom}
+        onChange={(e) => setValidFrom(e.target.value)}
+        required
+      />
+      {error ? <div className="text-caption text-danger">{error}</div> : null}
+      <div className="flex gap-2">
+        <Button type="submit" variant="filled" disabled={busy} fullWidth>
+          {busy ? 'Speichere…' : 'Wechseln'}
+        </Button>
+        <Button type="button" variant="bordered" onClick={onCancel}>
+          Abbrechen
+        </Button>
+      </div>
+    </form>
   );
 }

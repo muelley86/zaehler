@@ -28,6 +28,7 @@ from meters.models import (
     Location,
     MeasuringPoint,
     MeterType,
+    OwnerAssignment,
     PhysicalMeter,
     Reading,
     Register,
@@ -36,16 +37,23 @@ from meters.models import (
     UserRole,
 )
 from meters.schemas import (
+    ChangeOwnerRequest,
     MeasuringPointCreate,
     MeasuringPointRead,
     MeasuringPointUpdate,
     MpAccessUserRead,
+    OwnerAssignmentRead,
     RegisterStateRead,
     ReplaceMeterRequest,
 )
 from meters.services.access import assert_can_access_mp, restrict_mp_query
 from meters.services.audit import record
 from meters.services.meter_replacement import install_first_meter, replace_meter
+from meters.services.owner_assignment import (
+    assign_owner,
+    current_assignment,
+    list_history,
+)
 from meters.services.state import state_for_measuring_point
 
 router = APIRouter(prefix="/measuring-points", tags=["measuring-points"])
@@ -62,13 +70,22 @@ def _load_with_meters(db: DbSession, mp_id: int) -> MeasuringPoint | None:
     )
 
 
-def _to_read(mp: MeasuringPoint) -> MeasuringPointRead:
+def _to_read(mp: MeasuringPoint, db: DbSession | None = None) -> MeasuringPointRead:
     data = MeasuringPointRead.model_validate(mp)
     location = mp.location
     data.location_name = location.name if location else None
     main_loc = location.main_location if location else None
     data.main_location_id = main_loc.id if main_loc else None
     data.main_location_name = main_loc.name if main_loc else None
+    # Aktueller Eigentuemer aus dem offenen Assignment lesen. ``db`` ist nur
+    # in den Routen None, die _to_read ohne DB-Zugriff aufrufen (gibt's nicht
+    # mehr — alle Callsites reichen db rein, aber der Default haelt die
+    # Signatur ruckwaertskompatibel).
+    if db is not None:
+        current = current_assignment(db, mp.id)
+        if current is not None and current.owner is not None:
+            data.current_owner_id = current.owner.id
+            data.current_owner_name = current.owner.name
     return data
 
 
@@ -91,7 +108,7 @@ def list_measuring_points(db: DbDep, user: CurrentUser) -> list[MeasuringPointRe
     )
     stmt = restrict_mp_query(stmt, user, mp_id_column=MeasuringPoint.id)
     items = list(db.scalars(stmt))
-    return [_to_read(m) for m in items]
+    return [_to_read(m, db) for m in items]
 
 
 @router.get("/{mp_id}", response_model=MeasuringPointRead)
@@ -107,7 +124,7 @@ def get_measuring_point(mp_id: int, db: DbDep, user: CurrentUser) -> MeasuringPo
     )
     if mp is None:
         raise ProblemError(status_code=404, title="Measuring point not found")
-    return _to_read(mp)
+    return _to_read(mp, db)
 
 
 @router.post("", response_model=MeasuringPointRead, status_code=status.HTTP_201_CREATED)
@@ -181,10 +198,21 @@ def create_measuring_point(
         diff={"name": mp.name, "type": mp.type.value, "location_id": payload.location_id},
         ip_address=client_ip(request),
     )
+    # Initiales Owner-Assignment, falls beim Anlegen ein Eigentuemer
+    # mitgegeben wurde. ``valid_from`` default = ``installed_at``.
+    if payload.owner_id is not None:
+        assign_owner(
+            db,
+            mp_id=mp.id,
+            owner_id=payload.owner_id,
+            valid_from=payload.owner_valid_from or payload.installed_at,
+            user_id=admin.id,
+            ip_address=client_ip(request),
+        )
     db.commit()
     refreshed = _load_with_meters(db, mp.id)
     assert refreshed is not None
-    return _to_read(refreshed)
+    return _to_read(refreshed, db)
 
 
 @router.patch("/{mp_id}", response_model=MeasuringPointRead)
@@ -299,7 +327,7 @@ def update_measuring_point(
     db.commit()
     refreshed = _load_with_meters(db, mp.id)
     assert refreshed is not None
-    return _to_read(refreshed)
+    return _to_read(refreshed, db)
 
 
 @router.delete("/{mp_id}", status_code=204)
@@ -383,7 +411,7 @@ def replace_meter_endpoint(
         ) from exc
     refreshed = _load_with_meters(db, mp.id)
     assert refreshed is not None
-    return _to_read(refreshed)
+    return _to_read(refreshed, db)
 
 
 @router.get("/{mp_id}/state", response_model=list[RegisterStateRead])
@@ -470,6 +498,49 @@ def get_mp_users(
             )
         )
     return out
+
+
+# ---------------------------------------------------------------------------
+# Eigentuemer-Historie + Wechsel-Endpoint
+# ---------------------------------------------------------------------------
+
+
+def _assignment_to_read(a: OwnerAssignment) -> OwnerAssignmentRead:
+    data = OwnerAssignmentRead.model_validate(a)
+    data.owner_name = a.owner.name if a.owner is not None else None
+    return data
+
+
+@router.get("/{mp_id}/owners", response_model=list[OwnerAssignmentRead])
+def list_owner_history(
+    mp_id: int,
+    db: DbDep,
+    user: CurrentUser,
+) -> list[OwnerAssignmentRead]:
+    assert_can_access_mp(db, user, mp_id)
+    return [_assignment_to_read(a) for a in list_history(db, mp_id)]
+
+
+@router.post("/{mp_id}/change-owner", response_model=MeasuringPointRead)
+def change_owner_endpoint(
+    mp_id: int,
+    payload: ChangeOwnerRequest,
+    request: Request,
+    db: DbDep,
+    admin: AdminUser,
+) -> MeasuringPointRead:
+    assign_owner(
+        db,
+        mp_id=mp_id,
+        owner_id=payload.owner_id,
+        valid_from=payload.valid_from,
+        user_id=admin.id,
+        ip_address=client_ip(request),
+    )
+    db.commit()
+    refreshed = _load_with_meters(db, mp_id)
+    assert refreshed is not None
+    return _to_read(refreshed, db)
 
 
 # Der frühere GET /measuring-points/{id}/qr-Endpoint wurde mit Feature A

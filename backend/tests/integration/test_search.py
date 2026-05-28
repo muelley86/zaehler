@@ -173,6 +173,62 @@ def test_priority_contract_beats_name(admin_client: TestClient) -> None:
     assert hits[0]["matched_via"] == "contract_number"
 
 
+def _create_owner_with_name(client: TestClient, name: str, note: str | None = None) -> int:
+    resp = client.post("/api/v1/owners", json={"name": name, "note": note})
+    return int(resp.json()["id"])
+
+
+def test_match_by_current_owner_name(admin_client: TestClient) -> None:
+    owner_id = _create_owner_with_name(admin_client, "Mueller GmbH")
+    _create_mp(admin_client, "Strom-Mueller", "SN-MUE-1")
+    admin_client.post(
+        "/api/v1/measuring-points/1/change-owner",
+        json={"owner_id": owner_id, "valid_from": "2025-01-01"},
+    )
+    hits = admin_client.get("/api/v1/search?q=mueller").json()
+    assert any(h["matched_via"] == "owner" for h in hits)
+
+
+def test_match_by_historical_owner_name(admin_client: TestClient) -> None:
+    a = _create_owner_with_name(admin_client, "Hist-Owner-Schmidt")
+    b = _create_owner_with_name(admin_client, "Aktuell-Owner-Becker")
+    mp_id = _create_mp(admin_client, "Strom-Hist", "SN-HIS-1")
+    # Erst Schmidt anlegen, dann Becker — Schmidt ist historisch.
+    admin_client.post(
+        f"/api/v1/measuring-points/{mp_id}/change-owner",
+        json={"owner_id": a, "valid_from": "2024-01-01"},
+    )
+    admin_client.post(
+        f"/api/v1/measuring-points/{mp_id}/change-owner",
+        json={"owner_id": b, "valid_from": "2025-06-01"},
+    )
+    hits = admin_client.get("/api/v1/search?q=schmidt").json()
+    assert any(h["matched_via"] == "owner" and h["measuring_point_id"] == mp_id for h in hits)
+
+
+def test_match_by_owner_note(admin_client: TestClient) -> None:
+    owner_id = _create_owner_with_name(admin_client, "Owner-Note-X", note="VIP-Klient")
+    mp_id = _create_mp(admin_client, "Strom-NoteSearch", "SN-ON-1")
+    admin_client.post(
+        f"/api/v1/measuring-points/{mp_id}/change-owner",
+        json={"owner_id": owner_id, "valid_from": "2024-01-01"},
+    )
+    hits = admin_client.get("/api/v1/search?q=vip").json()
+    assert any(h["matched_via"] == "owner_note" for h in hits)
+
+
+def test_priority_owner_beats_name(admin_client: TestClient) -> None:
+    owner_id = _create_owner_with_name(admin_client, "PRIO-OWNER-NAME")
+    mp_id = _create_mp(admin_client, "Strom-PRIO-Doppel", "SN-PD-1")
+    admin_client.post(
+        f"/api/v1/measuring-points/{mp_id}/change-owner",
+        json={"owner_id": owner_id, "valid_from": "2024-01-01"},
+    )
+    hits = admin_client.get("/api/v1/search?q=prio").json()
+    # MP-Name UND Owner-Name enthalten „PRIO" → Owner gewinnt (Prio 4 < 5).
+    assert hits[0]["matched_via"] == "owner"
+
+
 def test_recorder_only_sees_own_mps(
     admin_client: TestClient,
     recorder_client: TestClient,

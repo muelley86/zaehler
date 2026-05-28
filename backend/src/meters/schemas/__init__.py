@@ -30,6 +30,8 @@ from meters.schemas.measuring_point import (
     MeasuringPointUpdate,
     ReplaceMeterRequest,
 )
+from meters.schemas.owner import OwnerCreate, OwnerRead, OwnerUpdate
+from meters.schemas.owner_assignment import ChangeOwnerRequest, OwnerAssignmentRead
 from meters.schemas.physical_meter import (
     PhysicalMeterRead,
     PhysicalMeterUpdate,
@@ -62,6 +64,7 @@ __all__ = [
     "APIModel",
     "AuditLogRead",
     "BackupCodesResponse",
+    "ChangeOwnerRequest",
     "ChangePasswordRequest",
     "ConsumptionPoint",
     "DecimalStr",
@@ -82,6 +85,10 @@ __all__ = [
     "MeasuringPointRead",
     "MeasuringPointUpdate",
     "MpAccessUserRead",
+    "OwnerAssignmentRead",
+    "OwnerCreate",
+    "OwnerRead",
+    "OwnerUpdate",
     "PasswordResetRequest",
     "PasswordResetResponse",
     "PhysicalMeterRead",

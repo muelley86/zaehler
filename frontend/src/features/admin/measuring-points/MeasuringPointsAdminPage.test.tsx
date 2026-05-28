@@ -33,6 +33,7 @@ function _mockEmptyData() {
   server.use(
     http.get('/api/v1/measuring-points', () => HttpResponse.json([])),
     http.get('/api/v1/locations', () => HttpResponse.json([])),
+    http.get('/api/v1/owners', () => HttpResponse.json([])),
   );
 }
 
@@ -110,6 +111,8 @@ describe('MeasuringPointsAdminPage Wizard', () => {
             main_location_name: null,
             contract_number: null,
             market_location: null,
+            current_owner_id: null,
+            current_owner_name: null,
             is_bidirectional: false,
             has_dual_tariff: false,
             transformer_factor: null,
@@ -119,6 +122,7 @@ describe('MeasuringPointsAdminPage Wizard', () => {
         ]),
       ),
       http.get('/api/v1/locations', () => HttpResponse.json([])),
+      http.get('/api/v1/owners', () => HttpResponse.json([])),
     );
     renderWithRouter(<MeasuringPointsAdminPage />);
     const link = await screen.findByRole('link', {

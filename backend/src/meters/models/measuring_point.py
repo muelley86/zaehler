@@ -21,6 +21,7 @@ from meters.models._enums import HeatingSource, MeterType
 
 if TYPE_CHECKING:
     from meters.models.location import Location
+    from meters.models.owner_assignment import OwnerAssignment
     from meters.models.physical_meter import PhysicalMeter
 
 
@@ -56,4 +57,13 @@ class MeasuringPoint(Base, TimestampMixin):
         back_populates="measuring_point",
         cascade="all, delete-orphan",
         order_by="PhysicalMeter.installed_at",
+    )
+    # Periodisierte Owner-Historie. Aktuelles Assignment = ``valid_to IS NULL``.
+    # Cascade-Delete, weil MP-Delete bereits ueber Readings-Existenz-Check
+    # geschuetzt ist und die Historie ohne MP wertlos waere.
+    owner_assignments: Mapped[list[OwnerAssignment]] = relationship(
+        "OwnerAssignment",
+        back_populates="measuring_point",
+        cascade="all, delete-orphan",
+        order_by="OwnerAssignment.valid_from",
     )

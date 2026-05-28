@@ -50,6 +50,9 @@ class AuditAction(enum.StrEnum):
     TOKEN_ASSIGNED = "token_assigned"
     TOKEN_UNASSIGNED = "token_unassigned"
     TOKEN_DELETED = "token_deleted"
+    # Eigentuemer-Wechsel mit Stichtag — entity_type=MEASURING_POINT,
+    # diff = {"from": old_owner_id, "to": new_owner_id, "valid_from": "..."}.
+    OWNER_CHANGED = "owner_changed"
 
 
 class AuditEntityType(enum.StrEnum):
@@ -60,6 +63,7 @@ class AuditEntityType(enum.StrEnum):
     REGISTER = "register"
     LOCATION = "location"
     MAIN_LOCATION = "main_location"
+    OWNER = "owner"
     DELIVERY = "delivery"
     SESSION = "session"
     QR_TOKEN = "qr_token"
