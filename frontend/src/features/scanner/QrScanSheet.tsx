@@ -29,13 +29,25 @@ import { parseScannedUrl } from './parseScannedUrl';
  *  aufgerufen und liefert die aktuelle Erkennungsbox in Stream-Pixeln. */
 type QrBoxSize = number | { width: number; height: number };
 type QrBoxFn = (viewW: number, viewH: number) => QrBoxSize;
+// MediaTrackConstraints-Teilmenge — html5-qrcode reicht das Objekt 1:1 an
+// ``getUserMedia({ video: ... })`` durch. Wir steuern damit Aufloesung
+// und Front-/Rueckkamera-Wahl.
+type VideoConstraints = {
+  facingMode?: string | { exact: string } | { ideal: string };
+  width?: number | { ideal?: number; min?: number; max?: number };
+  height?: number | { ideal?: number; min?: number; max?: number };
+};
 interface Html5QrcodeInstance {
   start(
-    cameraConfig: { facingMode: string } | string,
+    cameraConfig: VideoConstraints | string,
     config: {
       fps: number;
       qrbox?: QrBoxSize | QrBoxFn;
       aspectRatio?: number;
+      // BarcodeDetector-API in Chromium-Browsern nutzen — deutlich
+      // schneller und robuster als die ZXing-JS-Pipeline. Auf Safari
+      // ohne Effekt (kein API-Support, Fallback auf ZXing).
+      experimentalFeatures?: { useBarCodeDetectorIfSupported?: boolean };
     },
     onSuccess: (decodedText: string) => void,
     onError?: (errorMessage: string) => void,
@@ -49,6 +61,17 @@ interface Html5QrcodeConstructor {
 }
 
 const READER_ID = 'qr-scanner-reader';
+
+/** iPhone Chrome erkennen — User-Agent enthaelt ``CriOS``. iOS Chrome
+ *  nutzt zwar WKWebView (selbe Engine wie Safari), erbt aber bekannte
+ *  Camera-Pipeline-Quirks: Permission ist erteilt, aber das Video-
+ *  Frame bleibt schwarz. Kein App-Code-Fix moeglich; wir zeigen dem
+ *  User einen Hinweis-Banner, dass er auf Safari ausweichen soll. */
+function isIphoneChrome(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  const ua = navigator.userAgent;
+  return /CriOS\//.test(ua) && /iPhone|iPad|iPod/.test(ua);
+}
 
 interface QrScanSheetProps {
   open: boolean;
@@ -110,23 +133,33 @@ export function QrScanSheet({ open, onClose }: QrScanSheetProps) {
         instanceRef.current = instance;
 
         await instance.start(
-          { facingMode: 'environment' },
           {
-            // 25 fps statt 10 — bei 10 fps decodiert die Library nur
-            // jeden 100-ms-Frame; verwackelte Frames blockieren die
-            // Erkennung dann oft mehrere Sekunden. 25 fps ist der
-            // html5-qrcode-Praxis-Standard.
+            facingMode: 'environment',
+            // HD-Aufloesung explizit anfordern — sonst liefert
+            // ``getUserMedia`` oft nur 640×480, und ein gedruckter
+            // 10-mm-QR (Avery L6008) bringt zu wenige Pixel auf die
+            // Linse fuer eine zuverlaessige Decodierung. Mit
+            // ``ideal: 1920×1080`` waehlt der Browser die hoechste
+            // verfuegbare Aufloesung; ``min`` legt eine Untergrenze fest.
+            width: { ideal: 1920, min: 1280 },
+            height: { ideal: 1080, min: 720 },
+          },
+          {
             fps: 25,
-            // qrbox als Funktion liefert eine Box, die relativ zur
-            // tatsaechlichen Stream-Groesse skaliert: 70 % der kuerzeren
-            // Kante. Bei einem 1080-px-iPhone-Stream ist die feste
-            // 240-px-Box nur ~22 % breit — der User muss den QR exakt
-            // in die kleine Mitte halten, sonst geht nichts.
+            // qrbox 85 % statt 70 % — fuer kleine Druck-QRs zaehlt jedes
+            // Pixel; eine groessere Decode-Region erlaubt es dem User,
+            // den Code lockerer in die Mitte zu halten.
             qrbox: (viewW, viewH) => {
-              const side = Math.floor(Math.min(viewW, viewH) * 0.7);
+              const side = Math.floor(Math.min(viewW, viewH) * 0.85);
               return { width: side, height: side };
             },
             aspectRatio: 1.0,
+            // Native BarcodeDetector-API auf Chromium-Browsern (Desktop
+            // Chrome/Edge, Android Chrome) statt ZXing-JS-Fallback —
+            // signifikant schnellere und robustere Erkennung von
+            // kleinen oder leicht verkippten QR-Codes. Auf Safari
+            // ohne Effekt.
+            experimentalFeatures: { useBarCodeDetectorIfSupported: true },
           },
           (decodedText) => {
             const result = parseScannedUrl(decodedText);
@@ -228,6 +261,16 @@ export function QrScanSheet({ open, onClose }: QrScanSheetProps) {
           <X size={18} />
         </button>
       </div>
+
+      {isIphoneChrome() ? (
+        <div
+          data-testid="qr-scan-ios-chrome-warning"
+          className="mx-4 mb-2 rounded-card border-hairline border-yellow-500/50 bg-yellow-500/15 p-3 text-caption text-white"
+        >
+          <strong className="font-semibold">Hinweis:</strong> Auf iPhone bleibt die Kamera in Chrome
+          haeufig schwarz (System-Quirk). Bitte stattdessen Safari verwenden.
+        </div>
+      ) : null}
 
       <div className="relative flex flex-1 items-center justify-center overflow-hidden">
         {/* Video-Target für html5-qrcode. Die Library injiziert das
