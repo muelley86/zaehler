@@ -92,6 +92,11 @@ ensure_whiptail() {
 # Whiptail-Eingabe-Helfer. whiptail schreibt das Ergebnis auf stderr — das
 # 3>&1 1>&2 2>&3 vertauscht Kanäle, damit $(...) den Wert einfangen kann.
 wt_menu()     { whiptail --backtitle "Zählerstand-App Installer" --title "$1" --menu "$2" 18 76 6 "${@:3}" 3>&1 1>&2 2>&3; }
+# Wie wt_menu, aber mit Auto-Size (0 0 0): newt passt Höhe/Breite/Listenhöhe an
+# Terminal + Eintragszahl an und scrollt bei Bedarf. Nötig für Menüs mit vielen
+# Einträgen (configure, 13 Stück) — die feste Höhe 18 ist dafür zu klein und
+# whiptail bricht sonst ohne Anzeige mit Exit != 0 ab.
+wt_menu_auto() { whiptail --backtitle "Zählerstand-App Installer" --title "$1" --menu "$2" 0 0 0 "${@:3}" 3>&1 1>&2 2>&3; }
 wt_input()    { whiptail --backtitle "Zählerstand-App Installer" --title "$1" --inputbox "$2" 11 76 "$3" 3>&1 1>&2 2>&3; }
 wt_password() { whiptail --backtitle "Zählerstand-App Installer" --title "$1" --passwordbox "$2" 11 76 3>&1 1>&2 2>&3; }
 wt_yesno()    { whiptail --backtitle "Zählerstand-App Installer" --title "$1" --yesno "$2" 14 76; }
@@ -1152,7 +1157,7 @@ cmd_configure() {
         if [[ "$v_photo" =~ ^[0-9]+$ ]]; then photo_mb=$(( v_photo / 1048576 )); else photo_mb="?"; fi
 
         local choice
-        choice=$(wt_menu "Konfiguration — meters.env" \
+        choice=$(wt_menu_auto "Konfiguration — meters.env" \
             "Einstellung wählen und ändern; am Ende 'Speichern' startet den Service neu.\nNetzwerk/HTTPS wird über die sichere Topologie-Auswahl gesetzt." \
             "session"  "Login-Gültigkeit (Tage) [aktuell: $v_session]" \
             "2fa"      "Admin-2FA-Pflicht [aktuell: $v_2fa]" \
