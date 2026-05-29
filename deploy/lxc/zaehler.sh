@@ -92,11 +92,35 @@ ensure_whiptail() {
 # Whiptail-Eingabe-Helfer. whiptail schreibt das Ergebnis auf stderr — das
 # 3>&1 1>&2 2>&3 vertauscht Kanäle, damit $(...) den Wert einfangen kann.
 wt_menu()     { whiptail --backtitle "Zählerstand-App Installer" --title "$1" --menu "$2" 18 76 6 "${@:3}" 3>&1 1>&2 2>&3; }
-# Wie wt_menu, aber mit Auto-Size (0 0 0): newt passt Höhe/Breite/Listenhöhe an
-# Terminal + Eintragszahl an und scrollt bei Bedarf. Nötig für Menüs mit vielen
-# Einträgen (configure, 13 Stück) — die feste Höhe 18 ist dafür zu klein und
-# whiptail bricht sonst ohne Anzeige mit Exit != 0 ab.
-wt_menu_auto() { whiptail --backtitle "Zählerstand-App Installer" --title "$1" --menu "$2" 0 0 0 "${@:3}" 3>&1 1>&2 2>&3; }
+# Setzt MH/MW/ML (Menü-Höhe/-Breite/Listenhöhe) passend zur Eintragszahl ($1)
+# und zur Terminalgröße. FESTE Zahlen — denn whiptail-Auto-Size (`0 0 0`) kann
+# die Terminalgröße nicht ermitteln, wenn stdout (durch das `$(...)`-Capture in
+# wt_menu_auto) eine Pipe statt das Terminal ist; das Menü erscheint dann nicht.
+_menu_dims() {
+    local n="$1" rows cols
+    rows=$(tput lines 2>/dev/null || echo 24); [[ "$rows" =~ ^[0-9]+$ ]] || rows=24
+    cols=$(tput cols 2>/dev/null || echo 80);  [[ "$cols" =~ ^[0-9]+$ ]] || cols=80
+    # Chrome-Marge 12 wie das funktionierende configure-network (18 76 6: Höhe =
+    # Listenhöhe + 12). Mit weniger Marge rendert die Box, aber die Liste bleibt
+    # leer (auf diesem newt/whiptail verifiziert: 21 76 13 = Marge 8 -> leer).
+    ML="$n"                                    # alle Einträge zeigen
+    MH=$(( ML + 12 ))                          # + Text/Titel/Buttons/Rand (Marge 12)
+    if [ "$MH" -gt $(( rows - 2 )) ]; then     # zu hoch fürs Terminal -> deckeln
+        MH=$(( rows - 2 )); ML=$(( MH - 12 ))  # Rest scrollt
+    fi
+    [ "$ML" -lt 3 ]  && ML=3
+    [ "$MH" -lt 15 ] && MH=15
+    MW=76; [ "$cols" -lt 80 ] && MW=$(( cols - 4 )); [ "$MW" -lt 40 ] && MW=40
+}
+
+# Wie wt_menu, aber mit aus Terminal+Eintragszahl berechneter Größe — für Menüs
+# mit vielen Einträgen (configure), für die die feste Höhe von wt_menu zu klein ist.
+wt_menu_auto() {
+    local MH MW ML
+    _menu_dims "$(( ($# - 2) / 2 ))"
+    whiptail --backtitle "Zählerstand-App Installer" --title "$1" \
+        --menu "$2" "$MH" "$MW" "$ML" "${@:3}" 3>&1 1>&2 2>&3
+}
 wt_input()    { whiptail --backtitle "Zählerstand-App Installer" --title "$1" --inputbox "$2" 11 76 "$3" 3>&1 1>&2 2>&3; }
 wt_password() { whiptail --backtitle "Zählerstand-App Installer" --title "$1" --passwordbox "$2" 11 76 3>&1 1>&2 2>&3; }
 wt_yesno()    { whiptail --backtitle "Zählerstand-App Installer" --title "$1" --yesno "$2" 14 76; }
