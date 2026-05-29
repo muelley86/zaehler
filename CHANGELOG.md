@@ -10,6 +10,13 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.24.5](https://github.com/muelley86/zaehler/compare/v2.24.4...v2.24.5) (2026-05-29)
+
+
+### Dokumentation
+
+* **audit:** Status-Nachtrag 2026-05-29 (34/42 Befunde behoben) ([#118](https://github.com/muelley86/zaehler/issues/118)) ([e4190d5](https://github.com/muelley86/zaehler/commit/e4190d57abad10f0c4586ad0e833acd8e51d8c2e))
+
 ## [2.24.4](https://github.com/muelley86/zaehler/compare/v2.24.3...v2.24.4) (2026-05-29)
 
 
