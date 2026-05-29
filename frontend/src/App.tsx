@@ -20,6 +20,7 @@ import { AppShell } from '@/components/AppShell';
 import { useAuth } from '@/features/auth/auth-context';
 import { ChangePasswordPage } from '@/features/auth/ChangePasswordPage';
 import { LoginPage } from '@/features/auth/LoginPage';
+import { TwoFactorSetupPage } from '@/features/auth/TwoFactorSetupPage';
 import { AdminLayout } from '@/features/admin/AdminLayout';
 
 const DashboardPage = lazy(() =>
@@ -145,6 +146,19 @@ export function App() {
     );
   }
 
+  // Erzwungene 2FA-Einrichtung (Admin ohne TOTP bei aktivem
+  // METERS_REQUIRE_TOTP_FOR_ADMIN). Greift nach der Passwort-Pflicht, damit
+  // die Reihenfolge "erst Passwort, dann 2FA" stimmt. Das Backend erzwingt
+  // dasselbe serverseitig (api/deps.py) — der Guard ist die UX-Schicht.
+  if (me.must_setup_totp) {
+    return (
+      <Routes>
+        <Route path="/2fa-einrichten" element={<TwoFactorSetupPage />} />
+        <Route path="*" element={<Navigate to="/2fa-einrichten" replace />} />
+      </Routes>
+    );
+  }
+
   return (
     <AppShell>
       <Suspense fallback={<RouteFallback />}>
@@ -155,6 +169,7 @@ export function App() {
           <Route path="/erfassungen" element={<ReadingsListPage />} />
           <Route path="/mehr" element={<MorePage />} />
           <Route path="/passwort-aendern" element={<ChangePasswordPage />} />
+          <Route path="/2fa-einrichten" element={<TwoFactorSetupPage />} />
 
           {/* Admin-Bereich. Sub-Pages rendern unter dem AdminLayout-Outlet. */}
           <Route

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
@@ -365,3 +366,75 @@ def test_login_blocked_for_inactive_user(client: TestClient, db: Session) -> Non
         json={"username": "deactivated", "password": "ungelogen-1234"},
     )
     assert resp.status_code == 401, resp.text
+
+
+# ---------------------------------------------------------------------------
+# Admin-2FA-Pflicht (METERS_REQUIRE_TOTP_FOR_ADMIN) — Opt-in, Default aus
+# ---------------------------------------------------------------------------
+
+
+def test_admin_without_totp_is_blocked_when_required(
+    admin_client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Flag an: Admin ohne aktives TOTP wird auf nicht-allowlisteten Endpoints
+    mit 403 + ``require_totp_setup`` geblockt."""
+    from meters.core import config as cfg
+
+    monkeypatch.setattr(cfg.settings, "require_totp_for_admin", True)
+    resp = admin_client.get("/api/v1/measuring-points")
+    assert resp.status_code == 403, resp.text
+    assert resp.json().get("require_totp_setup") is True
+
+
+def test_admin_without_totp_can_reach_2fa_setup_when_required(
+    admin_client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Die Einrichtungs-Endpoints bleiben erreichbar — sonst könnte der Admin
+    die erzwungene 2FA nie aktivieren."""
+    from meters.core import config as cfg
+
+    monkeypatch.setattr(cfg.settings, "require_totp_for_admin", True)
+    assert admin_client.get("/api/v1/auth/me").status_code == 200
+    assert admin_client.post("/api/v1/auth/2fa/setup").status_code == 200
+
+
+def test_admin_with_totp_not_blocked_when_required(
+    admin_client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Admin MIT aktivem TOTP wird nicht geblockt."""
+    import pyotp
+
+    from meters.core import config as cfg
+
+    setup = admin_client.post("/api/v1/auth/2fa/setup")
+    secret = setup.json()["secret"]
+    activated = admin_client.post(
+        "/api/v1/auth/2fa/activate", json={"code": pyotp.TOTP(secret).now()}
+    )
+    assert activated.status_code == 200, activated.text
+
+    monkeypatch.setattr(cfg.settings, "require_totp_for_admin", True)
+    assert admin_client.get("/api/v1/measuring-points").status_code == 200
+
+
+def test_recorder_not_blocked_by_admin_totp_requirement(
+    recorder_client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Die Pflicht gilt nur für Admins — Recorder (auch im LAN) unterliegen
+    nie einem MFA-Zwang."""
+    from meters.core import config as cfg
+
+    monkeypatch.setattr(cfg.settings, "require_totp_for_admin", True)
+    assert recorder_client.get("/api/v1/measuring-points").status_code == 200
+
+
+def test_me_exposes_must_setup_totp_flag(
+    admin_client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """``MeResponse.must_setup_totp`` steuert den Frontend-Guard. Default
+    (Flag aus) ist es False, mit Flag an für einen Admin ohne TOTP True."""
+    from meters.core import config as cfg
+
+    assert admin_client.get("/api/v1/auth/me").json()["must_setup_totp"] is False
+    monkeypatch.setattr(cfg.settings, "require_totp_for_admin", True)
+    assert admin_client.get("/api/v1/auth/me").json()["must_setup_totp"] is True

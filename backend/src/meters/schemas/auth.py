@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, computed_field
 
 from meters.models import UserRole
 from meters.schemas.common import APIModel, UtcDateTime
@@ -26,6 +26,21 @@ class MeResponse(APIModel):
     totp_enabled: bool
     can_assign_qr_tokens: bool
     last_login_at: UtcDateTime | None
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def must_setup_totp(self) -> bool:
+        """True, wenn dieser User wegen ``METERS_REQUIRE_TOTP_FOR_ADMIN`` noch
+        2FA einrichten muss (Admin ohne aktives TOTP). Steuert die erzwungene
+        Weiterleitung im Frontend; das Backend-Gate (``api/deps.py``) erzwingt
+        es unabhängig davon serverseitig."""
+        from meters.core.config import settings
+
+        return (
+            settings.require_totp_for_admin
+            and self.role is UserRole.ADMIN
+            and not self.totp_enabled
+        )
 
 
 class LoginResponse(BaseModel):

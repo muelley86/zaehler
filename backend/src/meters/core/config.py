@@ -85,6 +85,12 @@ class Settings(BaseSettings):
     # 413 ab, bevor Pillow den Decode startet.
     photo_max_upload_bytes: int = 20 * 1024 * 1024
 
+    # Wenn True, MUESSEN Admins 2FA/TOTP aktiviert haben: ein Admin ohne
+    # aktives TOTP wird nach dem Login zur Einrichtung gezwungen und kann bis
+    # dahin keine anderen Endpoints nutzen. Default False = kein Zwang (reiner
+    # LAN-Betrieb bleibt unberuehrt). Empfohlen bei Internet-Exposition.
+    require_totp_for_admin: bool = False
+
 
 settings = Settings()
 
