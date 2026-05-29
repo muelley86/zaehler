@@ -161,13 +161,13 @@ def test_qr_render_404_for_unknown_token(admin_client: TestClient) -> None:
     assert resp.status_code == 404
 
 
-def test_qr_render_500_includes_diagnostic_detail(
+def test_qr_render_500_does_not_leak_exception_details(
     admin_client: TestClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Wenn die QR-Rendering-Library failt (z. B. unter Threadpool-Druck oder
-    bei einem Library-Bug), muss das Backend einen problem+json mit
-    aussagekraeftigem ``detail`` liefern — sonst sieht das Frontend nur
-    HTTP 500 ohne Hinweis auf die Ursache."""
+    """Tier-1-Härtung: Wenn die QR-Rendering-Library failt, liefert das Backend
+    einen problem+json mit stabilem ``title`` und einem GENERISCHEN ``detail``.
+    Exception-Klasse und -Message gehören ins Log, NICHT in die HTTP-Antwort
+    (kein Info-Leak an einen potenziell exponierten Client)."""
     from meters.api.v1 import qr_tokens as qr_module
 
     def boom(*_args: object, **_kwargs: object) -> bytes:
@@ -181,8 +181,9 @@ def test_qr_render_500_includes_diagnostic_detail(
     assert resp.status_code == 500
     body = resp.json()
     assert body["title"] == "QR render failed"
-    assert "RuntimeError" in body["detail"]
-    assert "simulated qr lib crash" in body["detail"]
+    # Generische Meldung; interne Diagnostik darf NICHT durchsickern.
+    assert "RuntimeError" not in body["detail"]
+    assert "simulated qr lib crash" not in body["detail"]
 
 
 def test_qr_svg_encodes_short_q_path(admin_client: TestClient) -> None:

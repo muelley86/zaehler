@@ -241,11 +241,16 @@ def render_qr(
             body = qr_png_bytes(url, box_size=box_size)
             media_type = "image/png"
     except Exception as exc:
-        logger.exception("QR-Render fehlgeschlagen fuer Token %s (format=%s)", token_str, format)
+        # Token nur maskiert ins Log (nicht den vollständigen Wert) und dem
+        # Client eine generische Meldung geben — Exception-Klasse/-Message
+        # bleiben im Log, landen aber nicht in der HTTP-Antwort.
+        logger.exception(
+            "QR-Render fehlgeschlagen fuer Token %s… (format=%s)", token_str[:2], format
+        )
         raise ProblemError(
             status_code=500,
             title="QR render failed",
-            detail=f"{type(exc).__name__}: {exc}",
+            detail="QR-Code konnte nicht erzeugt werden.",
         ) from exc
     return Response(
         content=body,

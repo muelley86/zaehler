@@ -149,6 +149,17 @@ def save_photo(reading_id: int, upload: UploadFile) -> tuple[str, tuple[float, f
         upload.file.seek(0)
         opened = Image.open(upload.file)
         opened.load()
+    except Image.DecompressionBombError as exc:
+        # Pillows eingebauter Schutz: Bild überschreitet das Pixel-Limit
+        # (Decompression-Bomb). Wir senken die Schwelle bewusst NICHT — der
+        # Default-Cap deckt reguläre Handyfotos locker ab. Aber wir fangen den
+        # Fehler sauber als 413 ab, statt ihn als unbehandelten 500 mit
+        # Speicher-Spike durchzulassen.
+        raise ProblemError(
+            status_code=413,
+            title="Photo too large",
+            detail="Bildauflösung zu groß. Bitte ein kleineres Foto hochladen.",
+        ) from exc
     except (UnidentifiedImageError, OSError) as exc:
         raise ProblemError(
             status_code=422,
