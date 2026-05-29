@@ -10,6 +10,13 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.27.1](https://github.com/muelley86/zaehler/compare/v2.27.0...v2.27.1) (2026-05-29)
+
+
+### Fehlerbehebungen
+
+* **deploy:** zaehler configure bricht unter set -euo pipefail still ab ([#130](https://github.com/muelley86/zaehler/issues/130)) ([3d0d30b](https://github.com/muelley86/zaehler/commit/3d0d30bcd1705e39a05dd0c7aa1c944ba0c72542))
+
 ## [2.27.0](https://github.com/muelley86/zaehler/compare/v2.26.0...v2.27.0) (2026-05-29)
 
 
