@@ -10,6 +10,72 @@ Keine Code-Änderungen sind in diesem Audit enthalten — Befunde sind reine Dia
 
 ---
 
+## Status-Nachtrag (2026-05-29)
+
+Verifikation gegen den aktuellen `main` (HEAD `8efe152`, Release 2.24.4). Geprüft
+wurde jeder Befund einzeln im Quelltext / in den Tests / in den Migrationen.
+Stand der Abarbeitung: **34 behoben, 5 offen (alle Schweregrad „niedrig"),
+2 bewusst dokumentiert/mitigiert, 1 war nie ein Bug.**
+
+Legende: ✅ behoben · 🟡 teilweise/dokumentiert · ⬜ offen · ☑️ kein Handlungsbedarf
+
+| Nr. | Schweregrad | Status | Beleg / Anmerkung |
+|---|---|---|---|
+| 1.1 PWA Service-Worker | mittel | ✅ | `frontend/src/main.tsx` `registerSW({immediate:true})` (vite-pwa); PWA-Icons in PR #91 |
+| 1.2 Foto-Upload | mittel | ✅ | Upload-Endpoint `PUT /readings/{id}/photo` + `photo_lat/lon` (PR #55/#62/#64). Bewusst separater Upload, nicht in `ReadingCreate` |
+| 1.3 `created_by_user_id` „IMMER gesetzt" | mittel | ✅ | `reading.py:48` jetzt `nullable=False` (+SET NULL = effektives RESTRICT); Migration `20260505_1300_created_by_not_null` |
+| 1.4 PASSWORD_CHANGED Audit | niedrig | ✅ | `_enums.py:33` + Eintrag in `auth.py:241` |
+| 1.5 inaktiv: Bool vs. Timestamp | niedrig | ⬜ | unverändert (Design-Entscheidung, kein Bug) |
+| 2.1 Race Condition `replace_meter` | hoch | ✅ | Partial-Unique-Index `Migration 20260505_1000_one_active_meter` (`WHERE removed_at IS NULL`) |
+| 2.2 `_coerce_decimal_map` → 500 | mittel | ✅ | `meter_replacement.py:37-44` try/except → `ProblemError(400)` |
+| 2.3 Datums-Filter String-Vergleich | niedrig | ⬜ | `DashboardPage.tsx` weiterhin `.slice(0,10)`-Vergleich |
+| 2.4 `transformer_factor` ohne Max | niedrig | ✅ | `measuring_point.py:44,122` `le=10000` |
+| 3.1 CSP `script-src 'unsafe-inline'` | hoch | ✅ | `middleware.py:40` `script-src 'self'` (Bootstrap nach `/theme-bootstrap.js` ausgelagert); `style-src 'unsafe-inline'` bewusst (React-inline-styles) |
+| 3.2 TOTP-Challenge ohne UA/IP-Bindung | mittel | ✅ | `totp.py:175-188` vergleicht UA + IP, invalidiert bei Abweichung |
+| 3.3 `verify_2fa` ohne IP-Limiter | mittel | ✅ | `auth.py:136-142` `login_limiter` auf IP |
+| 3.4 X-Forwarded-For ohne Format-Check | niedrig | ✅ | `deps.py:88-90` `ipaddress.ip_address()`-Validierung + Fallback |
+| 3.5 Backup ohne 0600 | mittel | ✅ | `backup.sh` `umask 0077` + `chmod 0600` auf `.db.gz` und Foto-Archiv |
+| 3.6 LOGIN_FAILED speichert Username | niedrig | ✅ | `auth.py:96` `username_key[:32]` (lowercased, gekürzt) |
+| 3.7 TOTP-Secret Klartext in DB | niedrig | 🟡 | unverändert Klartext; dokumentiert (DB nur lokal, `0600`). Encryption-at-rest = zurückgestelltes Audit-Item |
+| 3.8 `cookie_secure` Default False | mittel | 🟡 | bewusst False (Direkt-HTTP-LAN); neue Boot-Warnung `assert_secure_production_config()` (PR #113/#114) |
+| 4.1 `created_by` nullable (Reading+Delivery) | mittel | ✅ | beide `nullable=False` (`reading.py:48`, `delivery.py:41`) |
+| 4.2 Delivery ohne UNIQUE | niedrig | ✅ | `delivery.py:30` `uq_delivery_register_at` + Migration `20260505_1200` |
+| 4.3 Audit-`diff` ohne Größenlimit | niedrig | ✅ | `services/audit.py` `_DIFF_MAX_BYTES = 8 KB` Soft-Limit |
+| 4.4 Audit-Index `(user_id, created_at)` | niedrig | ✅ | Migration `20260505_1200_audit_3_indexes` + `20260529_0600_audit_log_created_at_index` (PR #116) |
+| 4.5 lat/lon als Float | niedrig | ☑️ | intentional (GPS-Genauigkeit); + CHECK-Constraints. Kein Handlungsbedarf |
+| 5.1 Concurrency-Tests | hoch | ✅ | `tests/integration/test_concurrency.py` (ThreadPoolExecutor) |
+| 5.2 Migrations-Round-Trip-Tests | hoch | ✅ | `tests/integration/test_migrations.py` (Alembic upgrade/downgrade) |
+| 5.3 `replace_meter`-Atomarität | hoch | ✅ | `test_measuring_points.py::test_replace_meter_rolls_back_on_incomplete_finals` |
+| 5.4 Heating-Register-Vererbung | mittel | ✅ | `test_oil.py::test_replace_meter_inherits_custom_heating_registers` |
+| 5.5 Login mit `is_active=False` | mittel | ✅ | `test_auth.py::test_login_blocked_for_inactive_user` |
+| 5.6 Audit-Lücken (User/TOTP/PW) | mittel | ✅ | `test_users_lifecycle.py` + `test_audit.py` (password_change, totp_disable) |
+| 5.7 Export-Endpoints ohne Tests | mittel | ✅ | `tests/integration/test_exports.py` |
+| 5.8 Frontend-Tests minimal | mittel | ✅ | jetzt 16 Test-Dateien (RecordReadingPage, MeasuringPointsAdminPage, QrScan, …) |
+| 5.9 `_pairwise` Edge-Cases | niedrig | ✅ | `tests/unit/test_pairwise.py` (empty/single/two/three) |
+| 6.1 N+1: Deliveries `created_by` | mittel | ✅ | `deliveries.py:60,81` `selectinload(Delivery.created_by)` (PR #116) |
+| 6.2 `state_for_register` lädt alles | mittel | ✅ | `state.py:51-56` `ORDER BY … LIMIT 1`; MP-Variante 3 Bulk-Queries |
+| 6.3 `consumption` sortiert in Python | niedrig | ⬜ | `consumption.py:50` weiterhin `sorted()` in Python (bewusst, kleine Datenmengen) |
+| 6.4 Frontend-Bundle / Code-Splitting | mittel | ✅ | `App.tsx` 16 Routen via `React.lazy()` |
+| 6.5 Deliveries ohne `offset` | niedrig | ✅ | `deliveries.py:77,98` `offset`-Query-Param |
+| 6.6 Dashboard `consumptionSeries` ohne `useMemo` | niedrig | ✅ | `DashboardPage.tsx` in `useMemo()` |
+| 7.1 Audit-Schreibung dupliziert | niedrig | ⬜ | weiterhin inline `record(...)`-Aufrufe, kein Decorator/Context-Manager |
+| 7.2 `ReadingsListPage.tsx` > 1000 Zeilen | niedrig | ⬜ | weiterhin ~1323 Zeilen, nicht aufgeteilt |
+| 7.3 Magische HTTP-Statuscodes | niedrig | ✅ | `readings.py` `STATUS_PLAUSIBILITY_WARNING = 400` |
+| 7.4 Kein zentrales Logging-Setup | niedrig | ✅ | `core/logging.py` mit `configure_logging()` (dictConfig) |
+| 7.5 `_pairwise` ohne Generator-Type-Hint | niedrig | ✅ | `consumption.py:25` `-> Iterator[tuple[Reading, Reading]]` |
+
+**Offen (5, alle Schweregrad „niedrig", kein Sicherheits-/Korrektheitsrisiko):**
+1.5 (Bool/Timestamp-Konvention), 2.3 (Frontend-String-Datumsfilter),
+6.3 (Python-Sortierung in `consumption`), 7.1 (Audit-Decorator),
+7.2 (`ReadingsListPage`-Aufteilung).
+
+**Bewusst dokumentiert/mitigiert (2):** 3.7 (TOTP-Secret-Encryption — zurückgestellt),
+3.8 (`cookie_secure` für Direkt-HTTP-LAN, Boot-Warnung ergänzt).
+
+Alle 5 ursprünglichen **hoch**-Befunde (2.1, 5.1, 5.2, 5.3, + Test zu 2.1) sind behoben.
+
+---
+
 ## 1. Abweichungen von CLAUDE.md
 
 ### 1.1 PWA: Service-Worker nicht implementiert
@@ -316,3 +382,7 @@ Keine Code-Änderungen sind in diesem Audit enthalten — Befunde sind reine Dia
 5. **PWA-Service-Worker** (1.1, mittel) — von CLAUDE.md gefordert; ohne ihn ist die mobile Erfassung nicht offline-tauglich.
 
 Keine kritischen Befunde gefunden. Die Codebase ist überwiegend solide; die Hochkategorien adressieren Härtungs- und Test-Lücken, keine offenen Sicherheitsnotfälle.
+
+> **Nachtrag 2026-05-29:** Inzwischen sind 34 der 42 Befunde behoben (inkl. aller
+> 5 hoch-Befunde). Offen sind nur noch 5 „niedrig"-Punkte, 2 sind bewusst
+> dokumentiert/mitigiert, 1 war kein Bug. Details siehe **Status-Nachtrag** oben.
