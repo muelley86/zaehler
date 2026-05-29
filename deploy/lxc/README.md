@@ -180,7 +180,8 @@ geht das Session-Cookie nie versehentlich im Klartext über die Leitung.
    HTTPS-Proxy. `proxy-other` (parallel offene LAN-IP) ist **nicht**
    internet-tauglich.
 2. **2FA verpflichtend** für alle Accounts (siehe Abschnitt 5), insbesondere
-   Admins.
+   Admins. Mit `METERS_REQUIRE_TOTP_FOR_ADMIN=True` lässt sich das für Admins
+   erzwingen (Default aus — im reinen LAN-Betrieb kein Zwang).
 3. **Limits am Proxy** gegen Überlast/Missbrauch, z. B. bei Caddy/nginx:
    `client_max_body_size 25m;` und ein `limit_req`/Rate-Limit. Greift, bevor
    ein Request die App erreicht.
@@ -192,6 +193,7 @@ unverändertes Verhalten):
 |---|---|
 | `METERS_TRUSTED_PROXY_IPS` | Komma-Liste erlaubter Proxy-IPs. Gesetzt ⇒ `X-Forwarded-For` wird nur akzeptiert, wenn die direkte Verbindung von einer dieser IPs kommt (Spoofing-Schutz). |
 | `METERS_PUBLIC_BASE_URL` | Feste Basis-URL (z. B. `https://zaehler.example.com`) für gedruckte QR-Code-Links — sonst kann hinter dem Proxy eine interne `http://`-URL auf den Etiketten landen. |
+| `METERS_REQUIRE_TOTP_FOR_ADMIN` | `True` ⇒ Admins ohne aktives TOTP werden nach dem Login zur 2FA-Einrichtung gezwungen und können bis dahin nichts anderes tun. Default `False` = kein Zwang (reiner LAN-Betrieb unberührt). |
 
 Nach Änderungen an `meters.env`: `systemctl restart zaehler.service`.
 
