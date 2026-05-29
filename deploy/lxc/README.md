@@ -160,18 +160,26 @@ Codes: `docs/anleitung.md` Teil 6.
 > Für den reinen Heimnetz-Betrieb ist dieser Abschnitt **nicht** nötig — die
 > LAN-Defaults sind bewusst nicht fürs Internet ausgelegt.
 
-Soll die App vom offenen Internet aus erreichbar sein, gilt **ausschließlich**
-die Topologie `proxy-same` (HTTPS-Reverse-Proxy auf gleichem Host, App nur auf
-`127.0.0.1`):
+Für den Internet-Betrieb gibt es zwei taugliche Topologien — beide stellst du
+geführt über `sudo zaehler configure-network` ein:
+
+- **`proxy-same` (am saubersten):** HTTPS-Reverse-Proxy auf demselben Host, App
+  bindet auf `127.0.0.1` → die App hat **keine** direkte Exposition, es gibt
+  keinen offenen Port abzusichern.
+- **`proxy-external`:** Reverse-Proxy auf einem **anderen** Host/Container (NPM,
+  separates nginx). Die App muss dann auf `0.0.0.0` lauschen, damit der Proxy
+  sie erreicht — der App-Port ist also im Netz offen und **muss per Firewall**
+  abgesichert werden (siehe Unterabschnitt unten).
 
 ```bash
-sudo zaehler configure-network   # → "proxy-same" wählen
+sudo zaehler configure-network   # → "proxy-same" ODER "proxy-external" wählen
 ```
 
-Das setzt automatisch `cookie_secure=True`, `trust_proxy=True`, bindet auf
-`127.0.0.1` und aktiviert `METERS_PUBLIC_FACING=True`. Letzteres lässt den
-Dienst **hart abbrechen**, falls `cookie_secure` doch auf `False` steht — so
-geht das Session-Cookie nie versehentlich im Klartext über die Leitung.
+Beide setzen automatisch `cookie_secure=True`, `trust_proxy=True` und
+`METERS_PUBLIC_FACING=True`. Letzteres lässt den Dienst **hart abbrechen**, falls
+`cookie_secure` doch auf `False` steht — so geht das Session-Cookie nie
+versehentlich im Klartext über die Leitung. `proxy-external` setzt zusätzlich
+`METERS_TRUSTED_PROXY_IPS` auf die Proxy-IP (XFF-Spoofing-Schutz).
 
 **Checkliste vor der Freigabe nach außen:**
 
@@ -196,6 +204,28 @@ unverändertes Verhalten):
 | `METERS_REQUIRE_TOTP_FOR_ADMIN` | `True` ⇒ Admins ohne aktives TOTP werden nach dem Login zur 2FA-Einrichtung gezwungen und können bis dahin nichts anderes tun. Default `False` = kein Zwang (reiner LAN-Betrieb unberührt). |
 
 Nach Änderungen an `meters.env`: `systemctl restart zaehler.service`.
+
+### Proxy auf einem anderen Host (`proxy-external`)
+
+`sudo zaehler configure-network → proxy-external` fragt **Domain** und
+**Proxy-Host-IP** ab und schreibt alles Nötige (`cookie_secure=True`,
+`trust_proxy=True`, `public_facing=True`, `trusted_proxy_ips=<proxy-ip>`,
+`allowed_origins`/`public_base_url=https://<domain>`, `bind_host=0.0.0.0`).
+
+**Zwingend dazu — die Firewall**, denn die App lauscht auf `0.0.0.0:8000`:
+
+1. Aus dem Internet **nur** `:443` auf den **Proxy** weiterleiten — den
+   App-Port `:8000` **niemals** ins Internet forwarden.
+2. Auf dem App-Container `:8000` nur für die Proxy-IP zulassen, z. B.:
+   ```bash
+   ufw allow from <proxy-ip> to any port 8000 proto tcp
+   ufw deny 8000
+   ```
+
+Am Proxy (NPM/nginx/Caddy): `X-Forwarded-For` = echte Client-IP **ersetzen**
+(nicht anhängen), `X-Forwarded-Proto=https`, `client_max_body_size 25m` und ein
+Rate-Limit. Wenn der Proxy auf demselben Host möglich ist, ist `proxy-same`
+(App nur auf `127.0.0.1`) ohne Firewall-Aufwand die sicherere Wahl.
 
 ---
 
