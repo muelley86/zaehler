@@ -18,6 +18,7 @@ import { ApiError, api, isPlausibilityWarning } from '@/lib/api';
 import { formatDateTimeDe, formatDe, localInputToIso, nowForInput, parseDe } from '@/lib/format';
 import { mapWithConcurrency } from '@/lib/concurrency';
 import { tryGetDeviceLocation } from '@/lib/geo';
+import { compressImage } from '@/lib/imageCompression';
 import { describeMeterType } from '@/lib/meterLabels';
 import type {
   DeliveryRead,
@@ -449,9 +450,13 @@ function ReadingsForm({
         // keine GPS-Tags hat (typisch fuer iOS-capture-Aufnahmen).
         const fallbackGps = await tryGetDeviceLocation();
         if (!fallbackGps) gpsWasMissing = true;
+        // Client-side komprimieren — iPhone-Original ist oft 4–6 MB, im
+        // Keller mit schwachem LTE ein Upload-Killer. Schlaegt Decode
+        // fehl (Desktop-HEIC), bleibt das Original und Pillow uebernimmt.
+        const uploadFile = await compressImage(photo);
         for (const id of savedIds) {
           const fd = new FormData();
-          fd.append('photo', photo);
+          fd.append('photo', uploadFile);
           if (fallbackGps) {
             fd.append('gps_lat', String(fallbackGps.lat));
             fd.append('gps_lon', String(fallbackGps.lon));

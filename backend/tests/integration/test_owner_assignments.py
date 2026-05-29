@@ -152,6 +152,42 @@ def test_audit_log_for_owner_change(admin_client: TestClient) -> None:
         assert log.diff["valid_from"] == "2025-01-01"
 
 
+def test_list_measuring_points_no_n_plus_one_for_owners(admin_client: TestClient) -> None:
+    """Regressionstest: das MP-Listing darf nicht eine Query pro MP fuer das
+    aktuelle Owner-Assignment absetzen. ``current_assignments_bulk`` loest
+    das fuer alle Messstellen in einer einzigen Query."""
+    from sqlalchemy import event
+
+    from meters.db import engine
+
+    a = _create_owner(admin_client, "Bulk-A")
+    b = _create_owner(admin_client, "Bulk-B")
+    _create_mp(admin_client, "Strom-Bulk-1", "SN-B-1", owner_id=a)
+    _create_mp(admin_client, "Strom-Bulk-2", "SN-B-2", owner_id=b)
+    _create_mp(admin_client, "Strom-Bulk-3", "SN-B-3", owner_id=a)
+    _create_mp(admin_client, "Strom-Bulk-4", "SN-B-4")  # ohne Owner
+
+    queries: list[str] = []
+
+    def collect(_conn: object, _cursor: object, statement: str, *_a: object, **_kw: object) -> None:
+        queries.append(statement)
+
+    event.listen(engine, "before_cursor_execute", collect)
+    try:
+        resp = admin_client.get("/api/v1/measuring-points")
+    finally:
+        event.remove(engine, "before_cursor_execute", collect)
+    assert resp.status_code == 200
+    items = resp.json()
+    assert len(items) >= 4
+    owner_queries = [q for q in queries if "owner_assignment" in q.lower()]
+    # Bulk-Loader => max. 1 SELECT auf owner_assignment fuer die ganze Liste.
+    assert len(owner_queries) <= 1, (
+        f"Erwartet <=1 owner_assignment-Query, gefunden {len(owner_queries)}: "
+        + "\n".join(owner_queries)
+    )
+
+
 def test_mp_delete_cascades_assignments(admin_client: TestClient) -> None:
     # MP-Delete via Endpoint ist durch das Readings-Existenz-Lock geschuetzt
     # (install_first_meter legt initial readings an). Wir testen die DB-Cascade

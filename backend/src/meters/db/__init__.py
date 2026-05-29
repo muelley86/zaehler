@@ -92,6 +92,11 @@ def _set_sqlite_pragmas(dbapi_connection: Any, _: Any) -> None:
         # Lookups (Session-Validation, Reading-Listen) ohne nennenswerten
         # Speicherbedarf für einen Privathaushalt-Container.
         cursor.execute("PRAGMA cache_size=-64000")
+        # mmap_size: 64 MB Memory-Mapped I/O fuer SQLite-Reads. Spart
+        # syscalls und memcpy auf den Hot-Read-Paths (Dashboard, Listings).
+        # Eine kleine DB (< 64 MB) wird komplett im Memory abgebildet —
+        # praktisch wirkt es wie ein zweiter Cache mit Direkt-Zugriff.
+        cursor.execute("PRAGMA mmap_size=67108864")
     finally:
         cursor.close()
 

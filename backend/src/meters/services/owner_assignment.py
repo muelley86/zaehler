@@ -8,10 +8,11 @@ sodass keine Ueberlapps entstehen.
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from datetime import date
 
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from meters.core.problem import ProblemError
 from meters.models import AuditAction, AuditEntityType, MeasuringPoint, Owner, OwnerAssignment
@@ -27,6 +28,24 @@ def current_assignment(db: Session, mp_id: int) -> OwnerAssignment | None:
         )
         .order_by(OwnerAssignment.valid_from.desc())
     )
+
+
+def current_assignments_bulk(db: Session, mp_ids: Iterable[int]) -> dict[int, OwnerAssignment]:
+    """Liefert die aktuell offenen Zuordnungen fuer mehrere Messstellen in
+    einer einzigen Query. Verhindert N+1 in Listing-Endpoints.
+    """
+    ids = list(mp_ids)
+    if not ids:
+        return {}
+    rows = db.scalars(
+        select(OwnerAssignment)
+        .where(
+            OwnerAssignment.measuring_point_id.in_(ids),
+            OwnerAssignment.valid_to.is_(None),
+        )
+        .options(selectinload(OwnerAssignment.owner))
+    )
+    return {a.measuring_point_id: a for a in rows}
 
 
 def list_history(db: Session, mp_id: int) -> list[OwnerAssignment]:

@@ -52,6 +52,7 @@ from meters.services.meter_replacement import install_first_meter, replace_meter
 from meters.services.owner_assignment import (
     assign_owner,
     current_assignment,
+    current_assignments_bulk,
     list_history,
 )
 from meters.services.state import state_for_measuring_point
@@ -70,22 +71,28 @@ def _load_with_meters(db: DbSession, mp_id: int) -> MeasuringPoint | None:
     )
 
 
-def _to_read(mp: MeasuringPoint, db: DbSession | None = None) -> MeasuringPointRead:
+def _to_read(
+    mp: MeasuringPoint,
+    db: DbSession | None = None,
+    *,
+    current_owner: OwnerAssignment | None = None,
+) -> MeasuringPointRead:
     data = MeasuringPointRead.model_validate(mp)
     location = mp.location
     data.location_name = location.name if location else None
     main_loc = location.main_location if location else None
     data.main_location_id = main_loc.id if main_loc else None
     data.main_location_name = main_loc.name if main_loc else None
-    # Aktueller Eigentuemer aus dem offenen Assignment lesen. ``db`` ist nur
-    # in den Routen None, die _to_read ohne DB-Zugriff aufrufen (gibt's nicht
-    # mehr — alle Callsites reichen db rein, aber der Default haelt die
-    # Signatur ruckwaertskompatibel).
-    if db is not None:
-        current = current_assignment(db, mp.id)
-        if current is not None and current.owner is not None:
-            data.current_owner_id = current.owner.id
-            data.current_owner_name = current.owner.name
+    # Owner-Lookup: bevorzugt das per ``current_owner`` durchgereichte
+    # Assignment (Listing-Pfad mit Bulk-Preload, vermeidet N+1). Faellt es
+    # nicht durchgereicht, holen wir es per Single-Query nach — Detail-,
+    # Update- und Replace-Endpoints brauchen das jeweils nur einmal.
+    assignment = current_owner
+    if assignment is None and db is not None:
+        assignment = current_assignment(db, mp.id)
+    if assignment is not None and assignment.owner is not None:
+        data.current_owner_id = assignment.owner.id
+        data.current_owner_name = assignment.owner.name
     return data
 
 
@@ -108,7 +115,11 @@ def list_measuring_points(db: DbDep, user: CurrentUser) -> list[MeasuringPointRe
     )
     stmt = restrict_mp_query(stmt, user, mp_id_column=MeasuringPoint.id)
     items = list(db.scalars(stmt))
-    return [_to_read(m, db) for m in items]
+    # Owner-Assignments fuer alle MPs in einer Query vorladen. Kein db
+    # an _to_read durchreichen, damit der Single-Query-Fallback fuer
+    # MPs ohne Owner nicht greift.
+    owners_by_mp = current_assignments_bulk(db, (m.id for m in items))
+    return [_to_read(m, current_owner=owners_by_mp.get(m.id)) for m in items]
 
 
 @router.get("/{mp_id}", response_model=MeasuringPointRead)
