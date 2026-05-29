@@ -53,6 +53,15 @@ class Settings(BaseSettings):
     # umgehen / Audit-Log vergiften.
     trust_proxy: bool = False
 
+    # Öffentlich (Internet) erreichbar? Default False = LAN-Betrieb. Wird dies
+    # auf True gesetzt (typisch im ``proxy-same``-Setup), verlangt der
+    # Boot-Check zwingend ``cookie_secure=True`` und bricht sonst HART ab —
+    # damit eine versehentliche Klartext-HTTP-Exposition nicht unbemerkt im
+    # Log untergeht. Im reinen LAN-Betrieb NICHT setzen (oder False lassen),
+    # sonst startet der Service mit dem dort korrekten ``cookie_secure=False``
+    # nicht. Reines Opt-in: ändert für bestehende Setups nichts.
+    public_facing: bool = False
+
     # Erlaubte Origins für mutating-Requests (CSRF-Schutz als Defense-in-Depth
     # zu SameSite=strict). Komma-getrennt in der ENV setzen, z. B.
     # METERS_ALLOWED_ORIGINS="https://zaehler.example.com,https://alt.example.com".
@@ -117,8 +126,13 @@ def assert_secure_production_config() -> None:
     - ``cookie_secure=False`` heisst: Session-Cookie wird auch ueber
       unverschluesselte HTTP-Verbindungen mitgeschickt — Sniffing-Risiko.
       Bei Direkt-HTTP-Setups (kein Reverse-Proxy) ist ``False`` jedoch die
-      einzige Variante, in der Login ueberhaupt funktioniert — daher nur
-      Warnung, kein Boot-Abort.
+      einzige Variante, in der Login ueberhaupt funktioniert — daher im
+      LAN-Betrieb nur Warnung, kein Boot-Abort.
+    - ``public_facing=True`` + ``cookie_secure=False`` ist dagegen ein HARTER
+      Boot-Abort: wer die App bewusst ins Internet stellt, darf das
+      Session-Cookie nicht im Klartext ausliefern. Reines Opt-in — ohne
+      ``METERS_PUBLIC_FACING`` bleibt das Verhalten fuer bestehende Setups
+      unveraendert (nur Warnung).
     - ``trust_proxy=False`` hinter einem Reverse-Proxy heisst: Rate-Limit
       sieht die Proxy-IP statt der Client-IP und limitiert das ganze
       Netzwerk auf 5 Versuche/min.
@@ -131,6 +145,15 @@ def assert_secure_production_config() -> None:
     if settings.debug:
         return
     if not settings.cookie_secure:
+        if settings.public_facing:
+            raise RuntimeError(
+                "METERS_PUBLIC_FACING=True verlangt METERS_COOKIE_SECURE=True. "
+                "Bei oeffentlicher Erreichbarkeit wuerde das Session-Cookie sonst "
+                "im Klartext uebertragen (Sniffing / Session-Hijack). Entweder "
+                "einen HTTPS-Reverse-Proxy davorschalten und cookie_secure=True "
+                "setzen (Topologie 'proxy-same'), oder fuer reinen LAN-Betrieb "
+                "METERS_PUBLIC_FACING entfernen bzw. auf False setzen."
+            )
         warnings.warn(
             "METERS_COOKIE_SECURE ist False. Falls ein HTTPS-Reverse-Proxy "
             "davor steht, bitte auf True setzen — sonst geht das Session-"

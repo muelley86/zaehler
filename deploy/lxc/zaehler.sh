@@ -384,7 +384,11 @@ cmd_install() {
     # Defaults: App per IP im LAN sofort erreichbar (BIND_HOST=0.0.0.0).
     # Spätere HTTPS-only-Härtung via `zaehler.sh configure-network`.
     local cookie_secure_value="False"
-    local trust_proxy_value="True"
+    # Beim Install steht KEIN Proxy davor — die App ist direkt per IP (0.0.0.0)
+    # erreichbar. Darum X-Forwarded-For NICHT vertrauen (sonst kann jeder
+    # Client den Header fälschen → Rate-Limit-Bypass / Audit-Vergiftung). Auf
+    # True schaltet erst `configure-network` bei einem echten Proxy (proxy-*).
+    local trust_proxy_value="False"
     local allowed_origins_value=""
     if [ -n "$WIZ_REVERSE_PROXY_HOST" ]; then
         # Beide Origins erlauben: Direkt-IP + Reverse-Proxy-Domain.
@@ -405,6 +409,7 @@ METERS_BIND_HOST=$WIZ_BIND_HOST
 METERS_BIND_PORT=$WIZ_BIND_PORT
 METERS_COOKIE_SECURE=$cookie_secure_value
 METERS_TRUST_PROXY=$trust_proxy_value
+METERS_PUBLIC_FACING=False
 METERS_ALLOWED_ORIGINS=$allowed_origins_value
 EOF
         ok "Konfiguration mit zufälligem SECRET_KEY angelegt (cookie_secure=$cookie_secure_value, trust_proxy=$trust_proxy_value)"
@@ -893,8 +898,8 @@ cmd_configure_network() {
     mode=$(wt_menu "Netzwerk-Topologie" \
         "Wie soll die App erreichbar sein?\n\nAlle drei Optionen schreiben die nötigen Werte direkt in meters.env und starten den Service neu — du musst keinen Editor öffnen." \
         "lan-only"    "Nur direkt im LAN per IP (Standard, HTTP)" \
-        "proxy-other" "Plus HTTPS via Proxy auf anderem Host" \
-        "proxy-same"  "Strikt HTTPS via Proxy auf gleichem Host" \
+        "proxy-other" "HTTPS-Proxy + offene LAN-IP (nicht fuers Internet)" \
+        "proxy-same"  "Strikt HTTPS via Proxy (einziger Internet-Modus)" \
         "abort"       "Abbrechen") || die "Abgebrochen."
     [ "$mode" = "abort" ] && die "Abgebrochen."
 
@@ -904,22 +909,27 @@ cmd_configure_network() {
     current_port=$(grep -E '^METERS_BIND_PORT=' "$env_file" | cut -d= -f2 | tr -d ' "')
     [ -z "$current_port" ] && current_port=8000
 
-    local bind_host cookie_secure trust_proxy origins=""
+    local bind_host cookie_secure trust_proxy public_facing origins=""
     case "$mode" in
         lan-only)
+            # Kein Proxy → direkter IP-Zugriff, also XFF nicht vertrauen.
             bind_host="0.0.0.0"
             cookie_secure="False"
-            trust_proxy="True"
+            trust_proxy="False"
+            public_facing="False"
             origins=""
             ;;
         proxy-other)
             local proxy_domain
             proxy_domain=$(wt_input "Proxy-Domain" \
-                "Hostname/Domain, unter der die App via HTTPS-Proxy erreichbar ist:" \
+                "Hostname/Domain, unter der die App via HTTPS-Proxy erreichbar ist.\n\nHinweis: In diesem Modus bleibt die App ZUSAETZLICH direkt per HTTP-IP im LAN erreichbar — daher NICHT fuer echte Internet-Exposition geeignet. Dafuer 'proxy-same' waehlen." \
                 "zaehler.lan") || die "Abgebrochen."
             bind_host="0.0.0.0"
             cookie_secure="False"
             trust_proxy="True"
+            # Nicht public_facing: cookie_secure=False (Klartext-IP im LAN
+            # weiter offen). Würde public_facing=True den Boot hart abbrechen.
+            public_facing="False"
             origins="https://$proxy_domain"
             [ -n "$container_ip" ] && origins="$origins,http://$container_ip:$current_port"
             ;;
@@ -931,6 +941,9 @@ cmd_configure_network() {
             bind_host="127.0.0.1"
             cookie_secure="True"
             trust_proxy="True"
+            # Einziger fuer echtes Internet freigegebener Modus → public_facing
+            # aktiviert den harten Boot-Guard (kein Klartext-Cookie online).
+            public_facing="True"
             origins="https://$proxy_domain"
             ;;
     esac
@@ -939,8 +952,9 @@ cmd_configure_network() {
     _set_env_key "$env_file" "METERS_BIND_HOST" "$bind_host"
     _set_env_key "$env_file" "METERS_COOKIE_SECURE" "$cookie_secure"
     _set_env_key "$env_file" "METERS_TRUST_PROXY" "$trust_proxy"
+    _set_env_key "$env_file" "METERS_PUBLIC_FACING" "$public_facing"
     _set_env_key "$env_file" "METERS_ALLOWED_ORIGINS" "$origins"
-    ok "BIND_HOST=$bind_host  COOKIE_SECURE=$cookie_secure  TRUST_PROXY=$trust_proxy"
+    ok "BIND_HOST=$bind_host  COOKIE_SECURE=$cookie_secure  TRUST_PROXY=$trust_proxy  PUBLIC_FACING=$public_facing"
     [ -n "$origins" ] && ok "ALLOWED_ORIGINS=$origins"
 
     msg_run "Service neu starten"
