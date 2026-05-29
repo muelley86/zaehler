@@ -10,6 +10,13 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.27.2](https://github.com/muelley86/zaehler/compare/v2.27.1...v2.27.2) (2026-05-29)
+
+
+### Fehlerbehebungen
+
+* **deploy:** configure-Menue erschien nicht (whiptail-Hoehe zu klein) ([#132](https://github.com/muelley86/zaehler/issues/132)) ([867a1a2](https://github.com/muelley86/zaehler/commit/867a1a26668738dc667ab957733b63c060c7554a))
+
 ## [2.27.1](https://github.com/muelley86/zaehler/compare/v2.27.0...v2.27.1) (2026-05-29)
 
 
