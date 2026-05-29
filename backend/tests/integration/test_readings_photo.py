@@ -449,3 +449,23 @@ def test_delete_photo_clears_gps_fields(admin_client: TestClient, db: Session) -
     assert reloaded.photo_path is None
     assert reloaded.photo_lat is None
     assert reloaded.photo_lon is None
+
+
+def test_reject_decompression_bomb(
+    admin_client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Tier-1-Härtung: Pillow-DecompressionBombError wird als 413 abgefangen.
+
+    Das Pixel-Limit wird in der Produktion NICHT gesenkt (Default-Cap deckt
+    Handyfotos ab); hier setzen wir es nur testweise drastisch herab, damit ein
+    normales Testfoto das 2-fache MAX_IMAGE_PIXELS überschreitet und greift —
+    sauberes 413 statt unbehandeltem 500.
+    """
+    register_id = _setup_water_mp(admin_client)
+    rid = _create_reading(admin_client, register_id)
+    monkeypatch.setattr(Image, "MAX_IMAGE_PIXELS", 10)
+    resp = admin_client.put(
+        f"/api/v1/readings/{rid}/photo",
+        files={"photo": ("bomb.jpg", _make_jpeg(size=(400, 300)), "image/jpeg")},
+    )
+    assert resp.status_code == 413, resp.text

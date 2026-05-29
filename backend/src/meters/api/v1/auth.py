@@ -151,6 +151,19 @@ def verify_2fa(
         raise ProblemError(status_code=401, title="Challenge expired or unknown")
     user, challenge = resolved
 
+    # Zusätzlich zum IP-Limiter den Username-Bucket prüfen: schützt gegen
+    # 2FA-Code-Brute-Force, wenn ein Angreifer per IP-Rotation (Botnet, IPv6)
+    # den IP-Limiter umgeht. Der User ist über die Challenge bekannt. Ein
+    # legitimer Nutzer mit korrektem Code akkumuliert keine Fehlversuche und
+    # ist von dieser Sperre nicht betroffen.
+    username_locked = username_limiter.check(user.username.lower())
+    if username_locked is not None:
+        raise ProblemError(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            title="Too many attempts",
+            detail=f"2FA-Versuche gesperrt. Erneut versuchen in ~{int(username_locked)}s.",
+        )
+
     if not user.totp_secret or not user.totp_enabled:
         # Sicherheits-Failsafe: User hat 2FA in der Zwischenzeit deaktiviert.
         totp_service.consume_pending_challenge(db, challenge=challenge)

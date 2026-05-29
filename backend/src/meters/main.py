@@ -51,7 +51,17 @@ def create_app() -> FastAPI:
     configure_logging("DEBUG" if settings.debug else "INFO")
     assert_secure_secret_key()
     assert_secure_production_config()
-    app = FastAPI(title=settings.app_name, debug=settings.debug)
+    # OpenAPI/Swagger/ReDoc nur im Dev-Modus. In Produktion (``debug=False``)
+    # geben ``/docs``, ``/redoc`` und ``/openapi.json`` einem Scanner sonst die
+    # vollständige API-Landkarte preis. Das SPA-Frontend nutzt diese Endpunkte
+    # nicht — Abschalten kostet keine Funktion.
+    app = FastAPI(
+        title=settings.app_name,
+        debug=settings.debug,
+        docs_url="/docs" if settings.debug else None,
+        redoc_url="/redoc" if settings.debug else None,
+        openapi_url="/openapi.json" if settings.debug else None,
+    )
     # GZip vor Routing aktivieren — komprimiert JSON-Responses und das
     # gebaute JS/CSS um typischerweise 60-75 %. Schwelle 1024 B vermeidet
     # Overhead für kleine Antworten.

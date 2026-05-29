@@ -23,6 +23,8 @@ def main() -> None:
         port=settings.bind_port,
         log_level="info",
         access_log=False,
+        # Kein ``Server: uvicorn``-Header — nimmt Scannern einen Fingerprint.
+        server_header=False,
     )
 
 
