@@ -155,6 +155,48 @@ Codes: `docs/anleitung.md` Teil 6.
 
 ---
 
+## 6. (Nur bei Bedarf) Betrieb im öffentlichen Internet
+
+> Für den reinen Heimnetz-Betrieb ist dieser Abschnitt **nicht** nötig — die
+> LAN-Defaults sind bewusst nicht fürs Internet ausgelegt.
+
+Soll die App vom offenen Internet aus erreichbar sein, gilt **ausschließlich**
+die Topologie `proxy-same` (HTTPS-Reverse-Proxy auf gleichem Host, App nur auf
+`127.0.0.1`):
+
+```bash
+sudo zaehler configure-network   # → "proxy-same" wählen
+```
+
+Das setzt automatisch `cookie_secure=True`, `trust_proxy=True`, bindet auf
+`127.0.0.1` und aktiviert `METERS_PUBLIC_FACING=True`. Letzteres lässt den
+Dienst **hart abbrechen**, falls `cookie_secure` doch auf `False` steht — so
+geht das Session-Cookie nie versehentlich im Klartext über die Leitung.
+
+**Checkliste vor der Freigabe nach außen:**
+
+1. **Nur der Proxy ist erreichbar.** Firewall so setzen, dass der App-Port
+   (8000) von außen nicht direkt offen ist — einziger Eingang ist der
+   HTTPS-Proxy. `proxy-other` (parallel offene LAN-IP) ist **nicht**
+   internet-tauglich.
+2. **2FA verpflichtend** für alle Accounts (siehe Abschnitt 5), insbesondere
+   Admins.
+3. **Limits am Proxy** gegen Überlast/Missbrauch, z. B. bei Caddy/nginx:
+   `client_max_body_size 25m;` und ein `limit_req`/Rate-Limit. Greift, bevor
+   ein Request die App erreicht.
+
+**Optionale Härtungs-Settings** in `/opt/zaehler/data/meters.env` (alle leer =
+unverändertes Verhalten):
+
+| Variable | Zweck |
+|---|---|
+| `METERS_TRUSTED_PROXY_IPS` | Komma-Liste erlaubter Proxy-IPs. Gesetzt ⇒ `X-Forwarded-For` wird nur akzeptiert, wenn die direkte Verbindung von einer dieser IPs kommt (Spoofing-Schutz). |
+| `METERS_PUBLIC_BASE_URL` | Feste Basis-URL (z. B. `https://zaehler.example.com`) für gedruckte QR-Code-Links — sonst kann hinter dem Proxy eine interne `http://`-URL auf den Etiketten landen. |
+
+Nach Änderungen an `meters.env`: `systemctl restart zaehler.service`.
+
+---
+
 ## Spätere Updates
 
 **Ein Befehl, der alles erledigt:**

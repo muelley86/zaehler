@@ -213,6 +213,34 @@ def test_qr_svg_encodes_short_q_path(admin_client: TestClient) -> None:
     assert url == f"https://zaehler.example/q/{token}"
 
 
+def test_build_token_url_uses_public_base_url_override(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Tier-3-Härtung: METERS_PUBLIC_BASE_URL hat Vorrang vor Scheme/Host aus
+    dem Request — so tragen gedruckte Etiketten hinter einem HTTPS-Proxy die
+    korrekte https-URL statt eines internen http-Hosts. Der Trailing-Slash
+    wird normalisiert."""
+    from starlette.requests import Request as StarletteRequest
+
+    from meters.api.v1.qr_tokens import _build_token_url
+    from meters.core.config import settings
+
+    # Dasselbe Settings-Singleton, das qr_tokens referenziert.
+    monkeypatch.setattr(settings, "public_base_url", "https://zaehler.example.com/")
+    fake_scope = {
+        "type": "http",
+        "scheme": "http",  # interner Request nur http (hinter TLS-Proxy)
+        "server": ("127.0.0.1", 8000),
+        "headers": [(b"host", b"127.0.0.1:8000")],
+        "path": "/api/v1/qr-tokens/x/qr",
+        "query_string": b"",
+        "method": "GET",
+        "client": ("127.0.0.1", 0),
+    }
+    url = _build_token_url(StarletteRequest(fake_scope), "K7MP3X9F")
+    assert url == "https://zaehler.example.com/q/K7MP3X9F"
+
+
 def test_print_bootstrap_js_is_public(admin_client: TestClient) -> None:
     """Das Bootstrap-Script ist öffentlich (keine Auth) — es enthält nur
     generische Print-Logik, keinen User-spezifischen Inhalt, und wird vom
