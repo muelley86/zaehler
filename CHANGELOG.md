@@ -10,6 +10,25 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.25.0](https://github.com/muelley86/zaehler/compare/v2.24.5...v2.25.0) (2026-05-29)
+
+
+### Funktionen
+
+* **security:** optionale Admin-2FA-Pflicht (METERS_REQUIRE_TOTP_FOR_ADMIN) ([#123](https://github.com/muelley86/zaehler/issues/123)) ([2037111](https://github.com/muelley86/zaehler/commit/20371114e8aee3087f6b01bc0863a85433f30559))
+* **security:** Tier-3-Opt-ins — XFF-Pinning, QR-HTTPS-URL, Internet-Doku ([#122](https://github.com/muelley86/zaehler/issues/122)) ([23a2c6b](https://github.com/muelley86/zaehler/commit/23a2c6bbe7ae2b7404ed0025f1cf656ccc67449e))
+
+
+### Fehlerbehebungen
+
+* **security:** Tier-1-Haertung ohne Funktionseinschraenkung ([#120](https://github.com/muelley86/zaehler/issues/120)) ([a4c3cea](https://github.com/muelley86/zaehler/commit/a4c3cea854f6ea764591d41b3d02f82e560d617a))
+* **security:** Tier-2-Haertung — sichere Deploy-Defaults + Online-Boot-Guard ([#121](https://github.com/muelley86/zaehler/issues/121)) ([8690568](https://github.com/muelley86/zaehler/commit/86905689304011393940abfc88ad66a79ed92ef0))
+
+
+### Dokumentation
+
+* METERS_REQUIRE_TOTP_FOR_ADMIN im Internet-Abschnitt ergaenzen ([#125](https://github.com/muelley86/zaehler/issues/125)) ([f9f0084](https://github.com/muelley86/zaehler/commit/f9f00848515a071610a3ae595993e94f6169f590))
+
 ## [2.24.5](https://github.com/muelley86/zaehler/compare/v2.24.4...v2.24.5) (2026-05-29)
 
 
