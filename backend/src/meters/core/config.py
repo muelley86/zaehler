@@ -70,7 +70,22 @@ class Settings(BaseSettings):
     # den ENV-Wert als JSON zu parsen — wir wollen ein simples comma-Format.
     allowed_origins: Annotated[list[str], NoDecode] = []
 
-    @field_validator("allowed_origins", mode="before")
+    # Optionale Allowlist von Proxy-IPs (komma-getrennt). Ist sie gesetzt, wird
+    # ``X-Forwarded-For`` NUR akzeptiert, wenn die unmittelbare Verbindungs-IP
+    # (``request.client.host``) hier gelistet ist — schliesst XFF-Spoofing aus,
+    # wenn die App neben dem Proxy auch direkt erreichbar ist. Leer (Default) =
+    # altes Verhalten (bei ``trust_proxy=True`` wird XFF immer ausgewertet).
+    # Rein additiv — fuer bestehende Setups aendert sich nichts.
+    trusted_proxy_ips: Annotated[list[str], NoDecode] = []
+
+    # Optionale feste Basis-URL (z. B. ``https://zaehler.example.com``) fuer
+    # gedruckte QR-Code-Links. Hinter einem HTTPS-Reverse-Proxy sieht der
+    # App-Request intern oft nur ``http`` — ohne Override truegen gedruckte
+    # Etiketten dann eine ``http://``-URL. Leer (Default) = aus dem Request
+    # ableiten (altes Verhalten).
+    public_base_url: str = ""
+
+    @field_validator("allowed_origins", "trusted_proxy_ips", mode="before")
     @classmethod
     def _split_origins(cls, v: Any) -> Any:
         if v is None:
