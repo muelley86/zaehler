@@ -97,13 +97,17 @@ der Boot-Config in diesem Commit ergänzt (`assert_secure_production_config`).
 Neue Funktion `assert_secure_production_config()` in `core/config.py`,
 aufgerufen in der App-Factory (`main.py`):
 
-- `debug=False && cookie_secure=False` → **RuntimeError beim Boot**.
-  Verhindert, dass das Session-Cookie in Production über HTTP gesendet
-  werden kann.
-- `debug=False && cookie_secure=True && trust_proxy=False` → **Warning**.
-  Der LXC-Reverse-Proxy ist faktisch immer vorgeschaltet, wenn HTTPS
-  terminiert wird. Ohne `trust_proxy=True` greift das Rate-Limit auf die
-  Proxy-IP zurück und sperrt das ganze Netzwerk gemeinsam.
+- `debug=False && cookie_secure=False` → **Warning im Log**.
+  Hinweis, dass das Session-Cookie auch über HTTP rausgeht. Bewusst kein
+  Boot-Abort, weil Direkt-HTTP-LAN-Setups ohne Reverse-Proxy diese
+  Kombination zwingend brauchen (Cookie kommt sonst nie zurück → Login
+  geht nicht).
+- `debug=False && cookie_secure=True && trust_proxy=False` → **Warning im
+  Log**. Der LXC-Reverse-Proxy ist faktisch immer vorgeschaltet, wenn
+  HTTPS terminiert wird. Ohne `trust_proxy=True` greift das Rate-Limit
+  auf die Proxy-IP zurück und sperrt das ganze Netzwerk gemeinsam.
+- Bei `cookie_secure=False` wird die TRUST_PROXY-Warning unterdrückt —
+  in einem Direkt-HTTP-LAN-Setup ist `trust_proxy=False` korrekt.
 
 `assert_secure_secret_key()` existiert bereits und bleibt unverändert.
 
