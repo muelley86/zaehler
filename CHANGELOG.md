@@ -10,6 +10,13 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.27.0](https://github.com/muelley86/zaehler/compare/v2.26.0...v2.27.0) (2026-05-29)
+
+
+### Funktionen
+
+* **deploy:** gefuehrter meters.env-Editor (zaehler configure) ([#128](https://github.com/muelley86/zaehler/issues/128)) ([6262fc3](https://github.com/muelley86/zaehler/commit/6262fc3c3df0eb693aafe217f2c9f6a45d3627e7))
+
 ## [2.26.0](https://github.com/muelley86/zaehler/compare/v2.25.0...v2.26.0) (2026-05-29)
 
 
