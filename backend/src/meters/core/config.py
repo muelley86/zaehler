@@ -111,16 +111,19 @@ def assert_secure_secret_key() -> None:
 
 
 def assert_secure_production_config() -> None:
-    """Bricht den Boot ab, wenn in Production (``debug=False``) sicherheits-
-    relevante Settings auf unsicheren Defaults stehen.
+    """Warnt im Log, wenn in Production (``debug=False``) sicherheitsrelevante
+    Settings auf unsicheren Defaults stehen.
 
-    - ``cookie_secure=False`` in Production heisst: Session-Cookie wird auch
-      ueber unverschluesselte HTTP-Verbindungen mitgeschickt — Sniffing-Risiko.
-    - ``trust_proxy=False`` in Production hinter einem Reverse-Proxy heisst:
-      Rate-Limit sieht die Proxy-IP statt der Client-IP und limitiert das ganze
+    - ``cookie_secure=False`` heisst: Session-Cookie wird auch ueber
+      unverschluesselte HTTP-Verbindungen mitgeschickt — Sniffing-Risiko.
+      Bei Direkt-HTTP-Setups (kein Reverse-Proxy) ist ``False`` jedoch die
+      einzige Variante, in der Login ueberhaupt funktioniert — daher nur
+      Warnung, kein Boot-Abort.
+    - ``trust_proxy=False`` hinter einem Reverse-Proxy heisst: Rate-Limit
+      sieht die Proxy-IP statt der Client-IP und limitiert das ganze
       Netzwerk auf 5 Versuche/min.
 
-    Im Dev-Modus nur Warnungen, damit ``uv run uvicorn ... --reload`` ohne
+    Im Dev-Modus passiert nichts, damit ``uv run uvicorn ... --reload`` ohne
     HTTPS bequem laeuft.
     """
     import warnings
@@ -128,13 +131,14 @@ def assert_secure_production_config() -> None:
     if settings.debug:
         return
     if not settings.cookie_secure:
-        raise RuntimeError(
-            "METERS_COOKIE_SECURE ist in Production Pflicht (True). Setze die "
-            "Variable in /opt/zaehler/data/meters.env auf ``True`` — der LXC-"
-            "Reverse-Proxy terminiert HTTPS, daher kann der Cookie sicher als "
-            "Secure markiert werden."
+        warnings.warn(
+            "METERS_COOKIE_SECURE ist False. Falls ein HTTPS-Reverse-Proxy "
+            "davor steht, bitte auf True setzen — sonst geht das Session-"
+            "Cookie auch ueber unverschluesseltes HTTP. Bei Direkt-HTTP im "
+            "LAN ist False korrekt.",
+            stacklevel=2,
         )
-    if not settings.trust_proxy:
+    if settings.cookie_secure and not settings.trust_proxy:
         warnings.warn(
             "METERS_TRUST_PROXY ist False, obwohl cookie_secure=True auf einen "
             "Reverse-Proxy-Setup hindeutet. Rate-Limit greift sonst auf die "
