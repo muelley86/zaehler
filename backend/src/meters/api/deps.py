@@ -34,6 +34,17 @@ _ALLOWED_PATHS_DURING_FORCE_PW_CHANGE = (
     "/api/v1/auth/logout",
 )
 
+# Endpoints, die ein Admin mit erzwungener — aber noch nicht eingerichteter —
+# 2FA aufrufen darf, damit er TOTP überhaupt aktivieren kann. Alles andere →
+# 403 mit ``require_totp_setup`` (Frontend leitet zur Einrichtung um).
+_ALLOWED_PATHS_DURING_TOTP_SETUP = (
+    "/api/v1/auth/me",
+    "/api/v1/auth/logout",
+    "/api/v1/auth/2fa/status",
+    "/api/v1/auth/2fa/setup",
+    "/api/v1/auth/2fa/activate",
+)
+
 
 def get_current_user(
     request: Request,
@@ -53,6 +64,18 @@ def get_current_user(
             title="Password change required",
             detail="Bitte ändere zuerst dein Passwort unter /auth/change-password.",
             extra={"force_password_change": True},
+        )
+    if (
+        settings.require_totp_for_admin
+        and user.role is UserRole.ADMIN
+        and not user.totp_enabled
+        and request.url.path not in _ALLOWED_PATHS_DURING_TOTP_SETUP
+    ):
+        raise ProblemError(
+            status_code=403,
+            title="2FA setup required",
+            detail="Als Admin musst du zuerst die Zwei-Faktor-Authentisierung einrichten.",
+            extra={"require_totp_setup": True},
         )
     return user
 
