@@ -208,6 +208,8 @@ is_interactive() { [ -t 0 ] && [ -t 1 ] && have_whiptail; }
 valid_port() { [[ "$1" =~ ^[0-9]+$ ]] && [ "$1" -ge 1 ] && [ "$1" -le 65535 ]; }
 valid_time() { [[ "$1" =~ ^([01][0-9]|2[0-3]):[0-5][0-9]$ ]]; }
 valid_user() { [[ "$1" =~ ^[a-zA-Z][a-zA-Z0-9_-]{1,31}$ ]]; }
+# Positive Ganzzahl >= $2.
+valid_uint_min() { [[ "$1" =~ ^[0-9]+$ ]] && [ "$1" -ge "$2" ]; }
 
 # Sammelt alle Eingaben für die Installation per whiptail-Dialogen oder
 # (falls non-interactive) aus ENV-Variablen + Defaults.
@@ -888,6 +890,15 @@ _set_env_key() {
     fi
 }
 
+# Liest den aktuellen Wert eines Schlüssels aus meters.env (letzter Treffer
+# gewinnt). Leerer Output, wenn der Schlüssel fehlt — der Caller setzt dann
+# den Default für die Vorbelegung.
+_get_env_value() {
+    local file="$1" key="$2"
+    [ -f "$file" ] || return 0
+    grep -E "^${key}=" "$file" | tail -1 | cut -d= -f2- | tr -d ' "'
+}
+
 cmd_configure_network() {
     require_root
     local env_file="$DATA_DIR/meters.env"
@@ -1021,6 +1032,170 @@ cmd_configure_network() {
             extra="\n\nFIREWALL: aus dem Internet nur den Proxy (:443) erreichbar machen,\n:$current_port NIE forwarden — idealerweise nur die Proxy-IP zulassen."
         fi
         wt_msgbox "Netzwerk konfiguriert" "Topologie: $mode\n\n$url_lines$extra\n\nMit 'sudo bash $0 status' kannst du jederzeit den Service- und Bind-Status prüfen." || true
+    fi
+}
+
+# -----------------------------------------------------------------------------
+# configure — geführter meters.env-Editor (alle Werte, mit Kurz-Erklärung)
+# -----------------------------------------------------------------------------
+
+# Jeder _cfg_* gibt 0 zurück, wenn ein neuer Wert geschrieben wurde, sonst 1
+# (Abbruch, ungültig oder unverändert) — der Aufrufer setzt darauf das
+# changed-Flag.
+_cfg_uint() {
+    local file="$1" key="$2" cur="$3" min="$4" help="$5" val
+    val=$(wt_input "$key" "$help\n\nGanze Zahl >= $min." "$cur") || return 1
+    if ! valid_uint_min "$val" "$min"; then
+        wt_msgbox "Ungültig" "'$val' ist keine ganze Zahl >= $min."
+        return 1
+    fi
+    [ "$val" = "$cur" ] && return 1
+    _set_env_key "$file" "$key" "$val"
+    ok "$key=$val"
+}
+
+_cfg_bcrypt() {
+    local file="$1" cur="$2" val
+    val=$(wt_input "METERS_BCRYPT_ROUNDS" \
+        "Rechenaufwand fürs Passwort-Hashing (bcrypt cost). Höher = sicherer, aber langsamer beim Login. Empfohlen: 12. Wirkt nur auf neue/geänderte Passwörter.\n\nWert zwischen 10 und 15." "$cur") || return 1
+    if ! valid_uint_min "$val" 10 || [ "$val" -gt 15 ]; then
+        wt_msgbox "Ungültig" "Bitte eine Zahl zwischen 10 und 15."
+        return 1
+    fi
+    [ "$val" = "$cur" ] && return 1
+    _set_env_key "$file" METERS_BCRYPT_ROUNDS "$val"
+    ok "METERS_BCRYPT_ROUNDS=$val"
+}
+
+_cfg_photo() {
+    local file="$1" cur_mb="$2" mb bytes
+    mb=$(wt_input "Max. Foto-Upload (MB)" \
+        "Maximale Größe einer hochgeladenen Foto-Datei in Megabyte (vor dem Reencode). Größere werden mit HTTP 413 abgelehnt.\n\nGanze Zahl >= 1." "$cur_mb") || return 1
+    if ! valid_uint_min "$mb" 1; then
+        wt_msgbox "Ungültig" "Bitte eine ganze Zahl >= 1 (MB)."
+        return 1
+    fi
+    [ "$mb" = "$cur_mb" ] && return 1
+    bytes=$(( mb * 1048576 ))
+    _set_env_key "$file" METERS_PHOTO_MAX_UPLOAD_BYTES "$bytes"
+    ok "METERS_PHOTO_MAX_UPLOAD_BYTES=$bytes (${mb} MB)"
+}
+
+_cfg_samesite() {
+    local file="$1" cur="$2" val
+    val=$(wt_menu "Cookie-SameSite" \
+        "Steuert, wann der Browser das Session-Cookie mitsendet (CSRF-Schutz).\n\nstrict = maximal sicher; lax = lockerer, falls extern verlinkte Erfassungs-Links (?token=) zicken." \
+        "strict" "Maximal sicher (Default)" \
+        "lax"    "Lockerer (externe Links)") || return 1
+    [ "$val" = "$cur" ] && return 1
+    _set_env_key "$file" METERS_COOKIE_SAMESITE "$val"
+    ok "METERS_COOKIE_SAMESITE=$val"
+}
+
+_cfg_2fa() {
+    local file="$1" cur="$2" val
+    val=$(wt_menu "Admin-2FA-Pflicht" \
+        "Wenn aktiv, MUSS jeder Admin 2FA/TOTP einrichten und kann bis dahin nichts anderes tun. Empfohlen, sobald die App aus dem Internet erreichbar ist; im reinen LAN-Betrieb meist aus." \
+        "False" "Aus - kein Zwang (Default)" \
+        "True"  "An  - Admins muessen 2FA einrichten") || return 1
+    [ "$val" = "$cur" ] && return 1
+    _set_env_key "$file" METERS_REQUIRE_TOTP_FOR_ADMIN "$val"
+    ok "METERS_REQUIRE_TOTP_FOR_ADMIN=$val"
+}
+
+_cfg_port() {
+    local file="$1" cur="$2" val
+    val=$(wt_input "App-Port" \
+        "TCP-Port, auf dem die App lauscht. Achtung: ein vorhandener Reverse-Proxy muss danach auf denselben Port zeigen." "$cur") || return 1
+    if ! valid_port "$val"; then
+        wt_msgbox "Ungültig" "Bitte einen Port zwischen 1 und 65535."
+        return 1
+    fi
+    [ "$val" = "$cur" ] && return 1
+    _set_env_key "$file" METERS_BIND_PORT "$val"
+    ok "METERS_BIND_PORT=$val"
+}
+
+_cfg_secret() {
+    local file="$1" newkey
+    wt_yesno "Secret-Key neu generieren?" \
+        "Erzeugt einen neuen zufälligen METERS_SECRET_KEY.\n\nFOLGE: ALLE aktiven Sessions werden ungültig — jeder muss sich neu anmelden. 2FA/Backup-Codes bleiben gültig.\n\nFortfahren?" || return 1
+    newkey=$("$PYTHON_BIN" -c 'import secrets; print(secrets.token_urlsafe(48))') \
+        || { wt_msgbox "Fehler" "Konnte keinen Schlüssel erzeugen ($PYTHON_BIN fehlt?)."; return 1; }
+    _set_env_key "$file" METERS_SECRET_KEY "$newkey"
+    ok "METERS_SECRET_KEY neu gesetzt (Sessions werden beim Neustart ungültig)."
+}
+
+cmd_configure() {
+    require_root
+    local env_file="$DATA_DIR/meters.env"
+    [ -f "$env_file" ] || die "Konfiguration $env_file fehlt — bitte erst 'install' ausführen."
+    is_interactive || die "Dieses Kommando ist interaktiv (whiptail). Auf einem TTY ausführen — oder Werte direkt in $env_file setzen (Doku: README, Abschnitt Konfiguration)."
+    ensure_whiptail
+
+    local changed=0
+    while :; do
+        local v_session v_bcrypt v_lmax v_lwin v_llock v_same v_2fa v_photo v_port photo_mb
+        v_session=$(_get_env_value "$env_file" METERS_SESSION_LIFETIME_DAYS); v_session=${v_session:-30}
+        v_bcrypt=$(_get_env_value "$env_file" METERS_BCRYPT_ROUNDS);          v_bcrypt=${v_bcrypt:-12}
+        v_lmax=$(_get_env_value "$env_file" METERS_LOGIN_MAX_ATTEMPTS);       v_lmax=${v_lmax:-5}
+        v_lwin=$(_get_env_value "$env_file" METERS_LOGIN_WINDOW_SECONDS);     v_lwin=${v_lwin:-60}
+        v_llock=$(_get_env_value "$env_file" METERS_LOGIN_LOCKOUT_SECONDS);   v_llock=${v_llock:-900}
+        v_same=$(_get_env_value "$env_file" METERS_COOKIE_SAMESITE);          v_same=${v_same:-strict}
+        v_2fa=$(_get_env_value "$env_file" METERS_REQUIRE_TOTP_FOR_ADMIN);    v_2fa=${v_2fa:-False}
+        v_photo=$(_get_env_value "$env_file" METERS_PHOTO_MAX_UPLOAD_BYTES);  v_photo=${v_photo:-20971520}
+        v_port=$(_get_env_value "$env_file" METERS_BIND_PORT);               v_port=${v_port:-8000}
+        if [[ "$v_photo" =~ ^[0-9]+$ ]]; then photo_mb=$(( v_photo / 1048576 )); else photo_mb="?"; fi
+
+        local choice
+        choice=$(wt_menu "Konfiguration — meters.env" \
+            "Einstellung wählen und ändern; am Ende 'Speichern' startet den Service neu.\nNetzwerk/HTTPS wird über die sichere Topologie-Auswahl gesetzt." \
+            "session"  "Login-Gültigkeit (Tage) [aktuell: $v_session]" \
+            "2fa"      "Admin-2FA-Pflicht [aktuell: $v_2fa]" \
+            "lmax"     "Login-Fehlversuche bis Sperre [aktuell: $v_lmax]" \
+            "lwin"     "Fehlversuch-Fenster (Sek.) [aktuell: $v_lwin]" \
+            "llock"    "Sperrdauer (Sek.) [aktuell: $v_llock]" \
+            "bcrypt"   "Passwort-Hash-Aufwand 10-15 [aktuell: $v_bcrypt]" \
+            "photo"    "Max. Foto-Upload (MB) [aktuell: $photo_mb]" \
+            "samesite" "Cookie-SameSite [aktuell: $v_same]" \
+            "port"     "App-Port [aktuell: $v_port]" \
+            "network"  "-> Netzwerk & HTTPS-Proxy (Topologie)" \
+            "secret"   "Secret-Key neu generieren (meldet alle ab)" \
+            "done"     "Speichern & Service neu starten" \
+            "abort"    "Abbrechen") || break
+
+        case "$choice" in
+            session) _cfg_uint "$env_file" METERS_SESSION_LIFETIME_DAYS "$v_session" 1 \
+                       "Wie lange ein Login gültig bleibt (Sliding-Ablauf, in Tagen) — jede Aktivität verlängert ihn." && changed=1 ;;
+            lmax)    _cfg_uint "$env_file" METERS_LOGIN_MAX_ATTEMPTS "$v_lmax" 1 \
+                       "Erlaubte Login-Fehlversuche je IP im Zeitfenster, bevor gesperrt wird." && changed=1 ;;
+            lwin)    _cfg_uint "$env_file" METERS_LOGIN_WINDOW_SECONDS "$v_lwin" 1 \
+                       "Zeitfenster (Sekunden), über das die Login-Fehlversuche gezählt werden." && changed=1 ;;
+            llock)   _cfg_uint "$env_file" METERS_LOGIN_LOCKOUT_SECONDS "$v_llock" 1 \
+                       "Sperrdauer (Sekunden) nach zu vielen Fehlversuchen." && changed=1 ;;
+            bcrypt)   _cfg_bcrypt "$env_file" "$v_bcrypt" && changed=1 ;;
+            photo)    _cfg_photo "$env_file" "$photo_mb" && changed=1 ;;
+            samesite) _cfg_samesite "$env_file" "$v_same" && changed=1 ;;
+            2fa)      _cfg_2fa "$env_file" "$v_2fa" && changed=1 ;;
+            port)     _cfg_port "$env_file" "$v_port" && changed=1 ;;
+            network)  cmd_configure_network; return ;;
+            secret)   _cfg_secret "$env_file" && changed=1 ;;
+            done)     break ;;
+            abort)    ok "Abgebrochen — bereits geschriebene Werte sind erst nach einem Neustart aktiv."; return ;;
+        esac
+    done
+
+    if [ "$changed" = "1" ]; then
+        msg_run "Service neu starten (Einstellungen werden beim Start gelesen)"
+        systemctl restart "$SERVICE_NAME"
+        sleep 2
+        if systemctl is-active --quiet "$SERVICE_NAME"; then
+            ok "Service läuft mit der neuen Konfiguration."
+        else
+            warn "Service nicht aktiv — prüfe 'systemctl status $SERVICE_NAME' und 'journalctl -u $SERVICE_NAME -n 50'."
+        fi
+    else
+        ok "Keine Änderungen vorgenommen."
     fi
 }
 
@@ -1283,6 +1458,10 @@ ${C_BOLD}zaehler.sh — Verwaltungsskript für die Zählerstand-App${C_RESET}
                          vergessen) — fragt User+Passwort interaktiv
 
   ${C_BOLD}Netzwerk / Sicherheit:${C_RESET}
+    configure            Alle meters.env-Einstellungen geführt anpassen
+                         (Session, Login-Limits, bcrypt, 2FA-Pflicht,
+                         Foto-Limit, … — je mit kurzer Erklärung); startet
+                         den Service danach neu
     configure-network    Netzwerk-Topologie nachträglich umstellen
                          (LAN-Only / HTTPS-Proxy auf anderem oder
                          gleichem Host) — schreibt meters.env automatisch
@@ -1335,6 +1514,7 @@ case "${1:-help}" in
     fix-database)        cmd_fix_database ;;
     rollback)            cmd_rollback "${2:-}" ;;
     reset-password)      cmd_reset_password ;;
+    configure)           cmd_configure ;;
     configure-network)   cmd_configure_network ;;
     audit)               cmd_audit ;;
     status)              cmd_status ;;

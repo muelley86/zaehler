@@ -99,17 +99,25 @@ Editieren von `meters.env`:
 sudo zaehler configure-network
 ```
 
-Drei Optionen im Menü:
+Vier Optionen im Menü:
 
-- **Nur direkt im LAN per IP** (HTTP, Standard)
-- **Plus HTTPS via Proxy auf anderem Host** (NPM in eigenem Container,
-  separates nginx etc. — App bleibt parallel per IP erreichbar)
-- **Strikt HTTPS via Proxy auf gleichem Host** (Caddy/nginx neben der
-  App, keine HTTP-IP-Erreichbarkeit)
+- **Nur direkt im LAN per IP** (`lan-only`, HTTP, Standard)
+- **HTTPS-Proxy + offene LAN-IP** (`proxy-other`, NPM/nginx auf anderem Host —
+  App bleibt parallel per IP erreichbar; **nur LAN, nicht fürs Internet**)
+- **Strikt HTTPS via Proxy auf gleichem Host** (`proxy-same`, Caddy/nginx neben
+  der App, App nur auf `127.0.0.1` — der saubere Internet-Modus)
+- **Internet via Proxy auf anderem Host** (`proxy-external`, fragt zusätzlich
+  die Proxy-IP ab und setzt `trusted_proxy_ips`/`public_facing`; **Firewall
+  Pflicht**, siehe Abschnitt 6)
 
 Der Wizard fragt bei den Proxy-Optionen nach der Domain, schreibt
 `meters.env`, startet den Service neu und verifiziert die
 Erreichbarkeit.
+
+Alle übrigen Einstellungen (Session-Dauer, Login-Limits, bcrypt, 2FA-Pflicht,
+Foto-Limit, …) passt du mit `sudo zaehler configure` an — jede Einstellung mit
+kurzer Erklärung; die vollständige Variablen-Referenz steht im
+Haupt-[`README.md`](../../README.md).
 
 Solange die App nur im Heimnetz läuft, ist Schritt 4 ausreichend. Sobald du
 sie per Domainname und HTTPS bereitstellen willst, schalte einen Reverse-Proxy
