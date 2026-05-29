@@ -896,11 +896,12 @@ cmd_configure_network() {
     ensure_whiptail
     local mode
     mode=$(wt_menu "Netzwerk-Topologie" \
-        "Wie soll die App erreichbar sein?\n\nAlle drei Optionen schreiben die nötigen Werte direkt in meters.env und starten den Service neu — du musst keinen Editor öffnen." \
-        "lan-only"    "Nur direkt im LAN per IP (Standard, HTTP)" \
-        "proxy-other" "HTTPS-Proxy + offene LAN-IP (nicht fuers Internet)" \
-        "proxy-same"  "Strikt HTTPS via Proxy (einziger Internet-Modus)" \
-        "abort"       "Abbrechen") || die "Abgebrochen."
+        "Wie soll die App erreichbar sein?\n\nAlle Optionen schreiben die nötigen Werte direkt in meters.env und starten den Service neu — du musst keinen Editor öffnen." \
+        "lan-only"     "Nur direkt im LAN per IP (Standard, HTTP)" \
+        "proxy-other"  "HTTPS-Proxy + offene LAN-IP (nur LAN, nicht Internet)" \
+        "proxy-same"   "Strikt HTTPS via Proxy auf gleichem Host (Internet)" \
+        "proxy-external" "Internet via Proxy auf anderem Host (+ Firewall)" \
+        "abort"        "Abbrechen") || die "Abgebrochen."
     [ "$mode" = "abort" ] && die "Abgebrochen."
 
     local container_ip
@@ -909,7 +910,10 @@ cmd_configure_network() {
     current_port=$(grep -E '^METERS_BIND_PORT=' "$env_file" | cut -d= -f2 | tr -d ' "')
     [ -z "$current_port" ] && current_port=8000
 
+    # trusted_proxy_ips/public_base_url werden in allen Modi gesetzt (auch leer),
+    # damit ein Wechsel von proxy-external zurück keinen stale Wert hinterlässt.
     local bind_host cookie_secure trust_proxy public_facing origins=""
+    local trusted_proxy_ips="" public_base_url=""
     case "$mode" in
         lan-only)
             # Kein Proxy → direkter IP-Zugriff, also XFF nicht vertrauen.
@@ -922,7 +926,7 @@ cmd_configure_network() {
         proxy-other)
             local proxy_domain
             proxy_domain=$(wt_input "Proxy-Domain" \
-                "Hostname/Domain, unter der die App via HTTPS-Proxy erreichbar ist.\n\nHinweis: In diesem Modus bleibt die App ZUSAETZLICH direkt per HTTP-IP im LAN erreichbar — daher NICHT fuer echte Internet-Exposition geeignet. Dafuer 'proxy-same' waehlen." \
+                "Hostname/Domain, unter der die App via HTTPS-Proxy erreichbar ist.\n\nHinweis: In diesem Modus bleibt die App ZUSAETZLICH direkt per HTTP-IP im LAN erreichbar — daher NICHT fuer echte Internet-Exposition geeignet. Fuer Internet 'proxy-same' oder 'proxy-external' waehlen." \
                 "zaehler.lan") || die "Abgebrochen."
             bind_host="0.0.0.0"
             cookie_secure="False"
@@ -941,10 +945,31 @@ cmd_configure_network() {
             bind_host="127.0.0.1"
             cookie_secure="True"
             trust_proxy="True"
-            # Einziger fuer echtes Internet freigegebener Modus → public_facing
+            # Internet-tauglich (Proxy auf gleichem Host) → public_facing
             # aktiviert den harten Boot-Guard (kein Klartext-Cookie online).
             public_facing="True"
             origins="https://$proxy_domain"
+            public_base_url="https://$proxy_domain"
+            ;;
+        proxy-external)
+            # Internet, Proxy auf ANDEREM Host. App muss auf 0.0.0.0 lauschen
+            # (sonst kommt der externe Proxy nicht ran) → Direkt-Port bleibt im
+            # Netz offen. Sicher nur mit Firewall (nur Proxy-IP auf :PORT) +
+            # cookie_secure + XFF-Pinning auf die Proxy-IP.
+            local proxy_domain proxy_ip
+            proxy_domain=$(wt_input "Proxy-Domain" \
+                "Öffentliche HTTPS-Domain, unter der die App über den Reverse-Proxy erreichbar ist (z. B. zaehler.example.com):" \
+                "zaehler.example.com") || die "Abgebrochen."
+            proxy_ip=$(wt_input "Proxy-Host-IP" \
+                "IP-Adresse des Reverse-Proxy-Hosts. NUR dieser IP wird X-Forwarded-For geglaubt — schützt vor Header-Spoofing über den offenen App-Port." \
+                "") || die "Abgebrochen."
+            bind_host="0.0.0.0"
+            cookie_secure="True"
+            trust_proxy="True"
+            public_facing="True"
+            trusted_proxy_ips="$proxy_ip"
+            origins="https://$proxy_domain"
+            public_base_url="https://$proxy_domain"
             ;;
     esac
 
@@ -953,9 +978,18 @@ cmd_configure_network() {
     _set_env_key "$env_file" "METERS_COOKIE_SECURE" "$cookie_secure"
     _set_env_key "$env_file" "METERS_TRUST_PROXY" "$trust_proxy"
     _set_env_key "$env_file" "METERS_PUBLIC_FACING" "$public_facing"
+    _set_env_key "$env_file" "METERS_TRUSTED_PROXY_IPS" "$trusted_proxy_ips"
+    _set_env_key "$env_file" "METERS_PUBLIC_BASE_URL" "$public_base_url"
     _set_env_key "$env_file" "METERS_ALLOWED_ORIGINS" "$origins"
     ok "BIND_HOST=$bind_host  COOKIE_SECURE=$cookie_secure  TRUST_PROXY=$trust_proxy  PUBLIC_FACING=$public_facing"
     [ -n "$origins" ] && ok "ALLOWED_ORIGINS=$origins"
+    [ -n "$trusted_proxy_ips" ] && ok "TRUSTED_PROXY_IPS=$trusted_proxy_ips"
+    [ -n "$public_base_url" ] && ok "PUBLIC_BASE_URL=$public_base_url"
+    if [ "$mode" = "proxy-external" ]; then
+        warn "WICHTIG (Firewall): Aus dem Internet darf NUR der Proxy (:443) erreichbar sein —"
+        warn "  den App-Port :$current_port NIEMALS ins Internet forwarden. Idealerweise auf"
+        warn "  diesem Container :$current_port nur fuer die Proxy-IP ($trusted_proxy_ips) zulassen."
+    fi
 
     msg_run "Service neu starten"
     systemctl restart "$SERVICE_NAME"
@@ -975,14 +1009,18 @@ cmd_configure_network() {
         if [ -n "$container_ip" ]; then
             url_lines="• Direkt-IP   :  http://$container_ip:$current_port"
         fi
+        local extra=""
         case "$mode" in
-            proxy-other|proxy-same)
+            proxy-other|proxy-same|proxy-external)
                 local proxy_line
                 proxy_line=$(grep -oE 'https://[^,]+' <<<"$origins" | head -1)
                 url_lines="$url_lines\n• Reverse-Proxy:  $proxy_line"
                 ;;
         esac
-        wt_msgbox "Netzwerk konfiguriert" "Topologie: $mode\n\n$url_lines\n\nMit 'sudo bash $0 status' kannst du jederzeit den Service- und Bind-Status prüfen." || true
+        if [ "$mode" = "proxy-external" ]; then
+            extra="\n\nFIREWALL: aus dem Internet nur den Proxy (:443) erreichbar machen,\n:$current_port NIE forwarden — idealerweise nur die Proxy-IP zulassen."
+        fi
+        wt_msgbox "Netzwerk konfiguriert" "Topologie: $mode\n\n$url_lines$extra\n\nMit 'sudo bash $0 status' kannst du jederzeit den Service- und Bind-Status prüfen." || true
     fi
 }
 

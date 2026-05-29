@@ -166,21 +166,64 @@ pnpm test --run
 pnpm build
 ```
 
-## Konfiguration
+## Konfiguration (`meters.env`)
 
 Alle Einstellungen via Umgebungsvariablen (Präfix `METERS_`). Im LXC-Setup
-liegen sie in `/opt/zaehler/data/meters.env`. Wichtige Optionen:
+liegen sie in `/opt/zaehler/data/meters.env`. Die **netzwerk- und
+sicherheitsrelevanten** Werte setzt du am besten geführt mit
+`sudo zaehler configure-network` (statt die Datei von Hand zu editieren) — siehe
+[`deploy/lxc/README.md`](./deploy/lxc/README.md) Abschnitt 4/6.
+
+**Kern / Secret**
 
 | Variable | Default | Bedeutung |
 |---|---|---|
+| `METERS_SECRET_KEY` | `change-me-in-production` | Server-Geheimnis für Session-Token-HMAC — **Pflicht in Produktion** (Boot bricht sonst ab) |
 | `METERS_DATABASE_URL` | `sqlite:///./data/meters.db` | SQLite-Pfad |
-| `METERS_SECRET_KEY` | `change-me-in-production` | Server-Geheimnis für Session-Token-Hashing — **muss in Produktion gesetzt werden** |
+| `METERS_DEBUG` | `False` | Nur Entwicklung. In Produktion `False` lassen (sonst `/docs` + Tracebacks offen) |
+| `METERS_MEDIA_DIR` | `…/data/media/photos` | Ablage der Reading-Fotos |
+| `METERS_PHOTO_MAX_UPLOAD_BYTES` | `20971520` (20 MB) | Max. Roh-Upload pro Foto |
+
+**Authentifizierung / Session**
+
+| Variable | Default | Bedeutung |
+|---|---|---|
 | `METERS_SESSION_LIFETIME_DAYS` | `30` | Cookie-Lebensdauer (Sliding) |
 | `METERS_BCRYPT_ROUNDS` | `12` | Bcrypt-Cost-Faktor |
-| `METERS_LOGIN_MAX_ATTEMPTS` | `5` | Login-Versuche pro Minute pro IP |
+| `METERS_LOGIN_MAX_ATTEMPTS` | `5` | Login-Fehlversuche pro IP im Zeitfenster |
+| `METERS_LOGIN_WINDOW_SECONDS` | `60` | Zeitfenster für die Fehlversuch-Zählung |
 | `METERS_LOGIN_LOCKOUT_SECONDS` | `900` | Sperrdauer nach Überschreiten |
-| `METERS_COOKIE_SECURE` | `False` | `True` setzen, sobald HTTPS davor steht |
+| `METERS_REQUIRE_TOTP_FOR_ADMIN` | `False` | `True` ⇒ Admins müssen 2FA einrichten, bevor sie etwas anderes tun (Opt-in, für Internet empfohlen) |
+
+**Netzwerk & Reverse-Proxy** — i. d. R. via `configure-network` gesetzt
+
+| Variable | Default | Bedeutung |
+|---|---|---|
+| `METERS_BIND_HOST` | `0.0.0.0` | Auf `127.0.0.1`, sobald ein Proxy auf demselben Host davor steht |
+| `METERS_BIND_PORT` | `8000` | TCP-Port |
+| `METERS_COOKIE_SECURE` | `False` | **`True`, sobald HTTPS davor steht** — sonst geht das Session-Cookie im Klartext |
 | `METERS_COOKIE_SAMESITE` | `strict` | `strict` oder `lax` |
+| `METERS_TRUST_PROXY` | `False` | `True` **nur** mit vertrauenswürdigem Proxy davor (wertet `X-Forwarded-For` aus) |
+| `METERS_ALLOWED_ORIGINS` | (leer) | Komma-Liste erlaubter Origins für mutierende Requests (CSRF), z. B. `https://zaehler.example.com` |
+
+**Internet-Härtung** — nur bei öffentlicher Erreichbarkeit nötig, alle Opt-in
+
+| Variable | Default | Bedeutung |
+|---|---|---|
+| `METERS_PUBLIC_FACING` | `False` | `True` ⇒ Boot **bricht ab**, wenn `cookie_secure=False` — verhindert versehentliches Klartext-Cookie online |
+| `METERS_TRUSTED_PROXY_IPS` | (leer) | Komma-Liste; `X-Forwarded-For` wird nur akzeptiert, wenn die direkte Verbindung von einer dieser Proxy-IPs kommt (Spoofing-Schutz) |
+| `METERS_PUBLIC_BASE_URL` | (leer) | Feste `https://…`-Basis für gedruckte QR-Links (sonst evtl. interne `http://`-URL auf den Etiketten) |
+
+### Sichere Setups (Kurzrezepte)
+
+- **Nur Heimnetz (Default):** nichts zu tun — `http://<lxc-ip>:8000`.
+- **HTTPS, Proxy auf gleichem Host:** `sudo zaehler configure-network → proxy-same`
+  (setzt `bind_host=127.0.0.1`, `cookie_secure=True`, `trust_proxy=True`, `public_facing=True`).
+- **Internet, Proxy auf anderem Host:** `sudo zaehler configure-network → proxy-external`
+  (zusätzlich `trusted_proxy_ips`). **Firewall Pflicht:** aus dem Internet nur den Proxy
+  (`:443`), den App-Port `:8000` nie forwarden. Details: `deploy/lxc/README.md` Abschnitt 6.
+
+Für Internet-Betrieb zusätzlich `METERS_REQUIRE_TOTP_FOR_ADMIN=True` und 2FA für alle Accounts.
 
 ## Lizenz / Status
 
