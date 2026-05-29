@@ -669,3 +669,57 @@ def test_dev_config_skips_assertion(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(cfg.settings, "cookie_secure", False)
     monkeypatch.setattr(cfg.settings, "trust_proxy", False)
     cfg.assert_secure_production_config()
+
+
+def test_public_facing_without_cookie_secure_aborts_boot(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Tier-2-Härtung: public_facing=True + cookie_secure=False → harter
+    Boot-Abort. Wer die App bewusst ins Internet stellt, darf das Session-
+    Cookie nicht im Klartext ausliefern."""
+    from meters.core import config as cfg
+
+    monkeypatch.setattr(cfg.settings, "debug", False)
+    monkeypatch.setattr(cfg.settings, "public_facing", True)
+    monkeypatch.setattr(cfg.settings, "cookie_secure", False)
+    with pytest.raises(RuntimeError, match="PUBLIC_FACING"):
+        cfg.assert_secure_production_config()
+
+
+def test_public_facing_with_cookie_secure_boots(monkeypatch: pytest.MonkeyPatch) -> None:
+    """public_facing=True + cookie_secure=True + trust_proxy=True (proxy-same):
+    kein Abort, keine Warnung."""
+    from meters.core import config as cfg
+
+    monkeypatch.setattr(cfg.settings, "debug", False)
+    monkeypatch.setattr(cfg.settings, "public_facing", True)
+    monkeypatch.setattr(cfg.settings, "cookie_secure", True)
+    monkeypatch.setattr(cfg.settings, "trust_proxy", True)
+    cfg.assert_secure_production_config()
+
+
+def test_public_facing_default_off_keeps_lan_warning(
+    monkeypatch: pytest.MonkeyPatch,
+    recwarn: pytest.WarningsRecorder,
+) -> None:
+    """Opt-in-Garantie: ohne public_facing bleibt cookie_secure=False im
+    LAN nur eine Warnung (kein Abort) — bestehende Direkt-HTTP-Setups
+    booten unverändert."""
+    from meters.core import config as cfg
+
+    monkeypatch.setattr(cfg.settings, "debug", False)
+    monkeypatch.setattr(cfg.settings, "public_facing", False)
+    monkeypatch.setattr(cfg.settings, "cookie_secure", False)
+    cfg.assert_secure_production_config()
+    assert any("COOKIE_SECURE" in str(w.message) for w in recwarn.list)
+
+
+def test_public_facing_in_dev_mode_skips_abort(monkeypatch: pytest.MonkeyPatch) -> None:
+    """debug=True hat Vorrang: selbst public_facing=True + cookie_secure=False
+    bricht im Dev-Modus nicht ab."""
+    from meters.core import config as cfg
+
+    monkeypatch.setattr(cfg.settings, "debug", True)
+    monkeypatch.setattr(cfg.settings, "public_facing", True)
+    monkeypatch.setattr(cfg.settings, "cookie_secure", False)
+    cfg.assert_secure_production_config()

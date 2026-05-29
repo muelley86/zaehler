@@ -16,6 +16,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session as DbSession
 
 from meters.api.deps import AdminUser, CurrentUser, DbDep, client_ip
+from meters.core.config import settings
 from meters.core.problem import ProblemError
 from meters.models import (
     AuditAction,
@@ -74,7 +75,13 @@ def _build_token_url(request: Request, token_str: str) -> str:
     ``/erfassen?token=...`` weiterleitet (siehe ``App.tsx``). Die
     Legacy-URL ``/erfassen?token=...`` bleibt parallel gültig — bestehende
     geklebte Etiketten funktionieren weiter.
+
+    Ist ``METERS_PUBLIC_BASE_URL`` gesetzt, hat diese feste Basis Vorrang —
+    hinter einem HTTPS-Reverse-Proxy sieht der interne Request oft nur ``http``,
+    sodass gedruckte Etiketten sonst eine ``http://``-URL trügen.
     """
+    if settings.public_base_url:
+        return f"{settings.public_base_url.rstrip('/')}/q/{token_str}"
     scheme = request.url.scheme or "http"
     host = request.url.netloc or request.headers.get("host", "")
     return f"{scheme}://{host}/q/{token_str}"
@@ -241,11 +248,16 @@ def render_qr(
             body = qr_png_bytes(url, box_size=box_size)
             media_type = "image/png"
     except Exception as exc:
-        logger.exception("QR-Render fehlgeschlagen fuer Token %s (format=%s)", token_str, format)
+        # Token nur maskiert ins Log (nicht den vollständigen Wert) und dem
+        # Client eine generische Meldung geben — Exception-Klasse/-Message
+        # bleiben im Log, landen aber nicht in der HTTP-Antwort.
+        logger.exception(
+            "QR-Render fehlgeschlagen fuer Token %s… (format=%s)", token_str[:2], format
+        )
         raise ProblemError(
             status_code=500,
             title="QR render failed",
-            detail=f"{type(exc).__name__}: {exc}",
+            detail="QR-Code konnte nicht erzeugt werden.",
         ) from exc
     return Response(
         content=body,

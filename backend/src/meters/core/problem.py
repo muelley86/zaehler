@@ -8,6 +8,7 @@ damit auch die im gleichen Format ausgeliefert werden.
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from fastapi import FastAPI, Request, status
@@ -15,6 +16,8 @@ from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
+
+logger = logging.getLogger(__name__)
 
 PROBLEM_MEDIA_TYPE = "application/problem+json"
 
@@ -90,4 +93,19 @@ def install_problem_handlers(app: FastAPI) -> None:
             title="Validation failed",
             detail="Request body or parameters did not satisfy the schema.",
             extra={"errors": jsonable_encoder(exc.errors())},
+        )
+
+    @app.exception_handler(Exception)
+    async def _unhandled_handler(request: Request, exc: Exception) -> JSONResponse:
+        # Fängt alles, was sonst als nackter 500 (ggf. mit internem Detail)
+        # rausginge. Der vollständige Traceback landet im Log, der Client
+        # bekommt eine generische RFC-7807-Antwort — kein Info-Leak. Greift
+        # nur in Produktion; bei ``debug=True`` zeigt Starlette weiterhin den
+        # Traceback, damit die Entwicklung bequem bleibt.
+        logger.exception("Unbehandelte Ausnahme bei %s %s", request.method, request.url.path)
+        return _problem_response(
+            request,
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            title="Internal Server Error",
+            detail="Ein interner Fehler ist aufgetreten.",
         )

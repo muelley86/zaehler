@@ -103,15 +103,26 @@ def client_ip(request: Request) -> str | None:
     Der Header wird gegen ``ipaddress.ip_address`` validiert. Damit landen
     fehlerhaft konfigurierte Proxies oder manipulierte Header nicht im
     Audit-Log oder den Rate-Limit-Buckets.
+
+    Optionales Proxy-Pinning: ist ``METERS_TRUSTED_PROXY_IPS`` gesetzt, wird
+    ``X-Forwarded-For`` NUR ausgewertet, wenn die unmittelbare Verbindungs-IP
+    in dieser Allowlist steht. So kann ein Angreifer, der die App (z. B. im
+    ``proxy-other``-Modus) auch direkt erreicht, den Header nicht faelschen.
+    Leere Allowlist = bisheriges Verhalten.
     """
+    direct = request.client.host if request.client else None
     if settings.trust_proxy:
-        forwarded = request.headers.get("x-forwarded-for")
-        if forwarded:
-            candidate = forwarded.split(",")[0].strip()
-            try:
-                ipaddress.ip_address(candidate)
-            except ValueError:
-                pass  # falsch formatiert → fallback
-            else:
-                return candidate
-    return request.client.host if request.client else None
+        pinned_ok = (not settings.trusted_proxy_ips) or (
+            direct is not None and direct in settings.trusted_proxy_ips
+        )
+        if pinned_ok:
+            forwarded = request.headers.get("x-forwarded-for")
+            if forwarded:
+                candidate = forwarded.split(",")[0].strip()
+                try:
+                    ipaddress.ip_address(candidate)
+                except ValueError:
+                    pass  # falsch formatiert → fallback
+                else:
+                    return candidate
+    return direct

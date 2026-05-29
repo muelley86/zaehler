@@ -438,3 +438,47 @@ def test_me_exposes_must_setup_totp_flag(
     assert admin_client.get("/api/v1/auth/me").json()["must_setup_totp"] is False
     monkeypatch.setattr(cfg.settings, "require_totp_for_admin", True)
     assert admin_client.get("/api/v1/auth/me").json()["must_setup_totp"] is True
+
+
+def test_2fa_verify_throttled_per_username(admin_client: TestClient, client: TestClient) -> None:
+    """Tier-1-Härtung: ``/2fa/verify`` drosselt zusätzlich pro Username.
+
+    Schützt gegen 2FA-Code-Brute-Force, wenn ein Angreifer per IP-Rotation den
+    IP-Limiter umgeht. Ein legitimer Nutzer mit korrektem Code ist nicht
+    betroffen — geprüft wird die Sperre, nicht der Code.
+    """
+    import pyotp
+
+    from meters.services.rate_limit import username_limiter
+
+    setup = admin_client.post("/api/v1/auth/2fa/setup")
+    secret = setup.json()["secret"]
+    activated = admin_client.post(
+        "/api/v1/auth/2fa/activate", json={"code": pyotp.TOTP(secret).now()}
+    )
+    assert activated.status_code == 200, activated.text
+
+    login = client.post(
+        "/api/v1/auth/login",
+        json={"username": "admin", "password": "admin-pass-12345"},
+    )
+    assert login.json()["requires_2fa"] is True
+    challenge = login.json()["challenge_token"]
+
+    # Username-Bucket hart sperren, ohne den IP-Limiter zu triggern (der
+    # erfolgreiche Passwort-Schritt oben hat beide Buckets geleert).
+    username_limiter._state.clear()
+    for _ in range(username_limiter._max):
+        username_limiter.record_failure("admin")
+
+    try:
+        resp = client.post(
+            "/api/v1/auth/2fa/verify",
+            json={"challenge_token": challenge, "code": pyotp.TOTP(secret).now()},
+        )
+        assert resp.status_code == 429, resp.text
+        assert "2FA" in resp.json()["detail"]
+    finally:
+        # username_limiter wird (anders als login_limiter) vom conftest-
+        # Cleanup nicht zurückgesetzt — hier selbst aufräumen.
+        username_limiter._state.clear()
