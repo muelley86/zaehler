@@ -10,6 +10,13 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.27.3](https://github.com/muelley86/zaehler/compare/v2.27.2...v2.27.3) (2026-05-29)
+
+
+### Fehlerbehebungen
+
+* **deploy:** configure-Menue zeigt jetzt die Eintraege (feste Groesse + Marge 12) ([#134](https://github.com/muelley86/zaehler/issues/134)) ([f4169ed](https://github.com/muelley86/zaehler/commit/f4169ed64ae3fb415e85cc15e5f889d6548192a0))
+
 ## [2.27.2](https://github.com/muelley86/zaehler/compare/v2.27.1...v2.27.2) (2026-05-29)
 
 
