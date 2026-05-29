@@ -92,35 +92,6 @@ ensure_whiptail() {
 # Whiptail-Eingabe-Helfer. whiptail schreibt das Ergebnis auf stderr — das
 # 3>&1 1>&2 2>&3 vertauscht Kanäle, damit $(...) den Wert einfangen kann.
 wt_menu()     { whiptail --backtitle "Zählerstand-App Installer" --title "$1" --menu "$2" 18 76 6 "${@:3}" 3>&1 1>&2 2>&3; }
-# Setzt MH/MW/ML (Menü-Höhe/-Breite/Listenhöhe) passend zur Eintragszahl ($1)
-# und zur Terminalgröße. FESTE Zahlen — denn whiptail-Auto-Size (`0 0 0`) kann
-# die Terminalgröße nicht ermitteln, wenn stdout (durch das `$(...)`-Capture in
-# wt_menu_auto) eine Pipe statt das Terminal ist; das Menü erscheint dann nicht.
-_menu_dims() {
-    local n="$1" rows cols
-    rows=$(tput lines 2>/dev/null || echo 24); [[ "$rows" =~ ^[0-9]+$ ]] || rows=24
-    cols=$(tput cols 2>/dev/null || echo 80);  [[ "$cols" =~ ^[0-9]+$ ]] || cols=80
-    # Chrome-Marge 12 wie das funktionierende configure-network (18 76 6: Höhe =
-    # Listenhöhe + 12). Mit weniger Marge rendert die Box, aber die Liste bleibt
-    # leer (auf diesem newt/whiptail verifiziert: 21 76 13 = Marge 8 -> leer).
-    ML="$n"                                    # alle Einträge zeigen
-    MH=$(( ML + 12 ))                          # + Text/Titel/Buttons/Rand (Marge 12)
-    if [ "$MH" -gt $(( rows - 2 )) ]; then     # zu hoch fürs Terminal -> deckeln
-        MH=$(( rows - 2 )); ML=$(( MH - 12 ))  # Rest scrollt
-    fi
-    [ "$ML" -lt 3 ]  && ML=3
-    [ "$MH" -lt 15 ] && MH=15
-    MW=76; [ "$cols" -lt 80 ] && MW=$(( cols - 4 )); [ "$MW" -lt 40 ] && MW=40
-}
-
-# Wie wt_menu, aber mit aus Terminal+Eintragszahl berechneter Größe — für Menüs
-# mit vielen Einträgen (configure), für die die feste Höhe von wt_menu zu klein ist.
-wt_menu_auto() {
-    local MH MW ML
-    _menu_dims "$(( ($# - 2) / 2 ))"
-    whiptail --backtitle "Zählerstand-App Installer" --title "$1" \
-        --menu "$2" "$MH" "$MW" "$ML" "${@:3}" 3>&1 1>&2 2>&3
-}
 wt_input()    { whiptail --backtitle "Zählerstand-App Installer" --title "$1" --inputbox "$2" 11 76 "$3" 3>&1 1>&2 2>&3; }
 wt_password() { whiptail --backtitle "Zählerstand-App Installer" --title "$1" --passwordbox "$2" 11 76 3>&1 1>&2 2>&3; }
 wt_yesno()    { whiptail --backtitle "Zählerstand-App Installer" --title "$1" --yesno "$2" 14 76; }
@@ -1159,6 +1130,82 @@ _cfg_secret() {
     ok "METERS_SECRET_KEY neu gesetzt (Sessions werden beim Neustart ungültig)."
 }
 
+# Untermenüs (je <=6 Einträge) — nutzen das bewährte wt_menu (18 76 6), dieselbe
+# Geometrie wie configure-network. Bei einer Änderung wird das (in cmd_configure
+# lokale) CFG_CHANGED gesetzt. case-Arme set-e-sicher via `if … then … fi`.
+_cfg_grp_auth() {
+    local env_file="$1" sub v_session v_bcrypt v_2fa
+    while :; do
+        v_session=$(_get_env_value "$env_file" METERS_SESSION_LIFETIME_DAYS); v_session=${v_session:-30}
+        v_bcrypt=$(_get_env_value "$env_file" METERS_BCRYPT_ROUNDS);          v_bcrypt=${v_bcrypt:-12}
+        v_2fa=$(_get_env_value "$env_file" METERS_REQUIRE_TOTP_FOR_ADMIN);    v_2fa=${v_2fa:-False}
+        sub=$(wt_menu "Login & Sicherheit" \
+            "Einstellung wählen; '← Zurück' führt zum Hauptmenü." \
+            "session" "Login-Gültigkeit (Tage) [aktuell: $v_session]" \
+            "bcrypt"  "Passwort-Hash-Aufwand 10-15 [aktuell: $v_bcrypt]" \
+            "2fa"     "Admin-2FA-Pflicht [aktuell: $v_2fa]" \
+            "secret"  "Secret-Key neu generieren (meldet alle ab)" \
+            "back"    "← Zurück") || break
+        case "$sub" in
+            session) if _cfg_uint "$env_file" METERS_SESSION_LIFETIME_DAYS "$v_session" 1 \
+                        "Wie lange ein Login gültig bleibt (Sliding-Ablauf, in Tagen)."; then CFG_CHANGED=1; fi ;;
+            bcrypt)  if _cfg_bcrypt "$env_file" "$v_bcrypt"; then CFG_CHANGED=1; fi ;;
+            2fa)     if _cfg_2fa "$env_file" "$v_2fa"; then CFG_CHANGED=1; fi ;;
+            secret)  if _cfg_secret "$env_file"; then CFG_CHANGED=1; fi ;;
+            back)    break ;;
+        esac
+    done
+    return 0
+}
+
+_cfg_grp_limit() {
+    local env_file="$1" sub v_lmax v_lwin v_llock
+    while :; do
+        v_lmax=$(_get_env_value "$env_file" METERS_LOGIN_MAX_ATTEMPTS);     v_lmax=${v_lmax:-5}
+        v_lwin=$(_get_env_value "$env_file" METERS_LOGIN_WINDOW_SECONDS);   v_lwin=${v_lwin:-60}
+        v_llock=$(_get_env_value "$env_file" METERS_LOGIN_LOCKOUT_SECONDS); v_llock=${v_llock:-900}
+        sub=$(wt_menu "Login-Rate-Limit" \
+            "Einstellung wählen; '← Zurück' führt zum Hauptmenü." \
+            "lmax"  "Fehlversuche bis Sperre [aktuell: $v_lmax]" \
+            "lwin"  "Zähl-Zeitfenster (Sek.) [aktuell: $v_lwin]" \
+            "llock" "Sperrdauer (Sek.) [aktuell: $v_llock]" \
+            "back"  "← Zurück") || break
+        case "$sub" in
+            lmax)  if _cfg_uint "$env_file" METERS_LOGIN_MAX_ATTEMPTS "$v_lmax" 1 \
+                      "Erlaubte Login-Fehlversuche je IP im Zeitfenster, bevor gesperrt wird."; then CFG_CHANGED=1; fi ;;
+            lwin)  if _cfg_uint "$env_file" METERS_LOGIN_WINDOW_SECONDS "$v_lwin" 1 \
+                      "Zeitfenster (Sekunden), über das die Login-Fehlversuche gezählt werden."; then CFG_CHANGED=1; fi ;;
+            llock) if _cfg_uint "$env_file" METERS_LOGIN_LOCKOUT_SECONDS "$v_llock" 1 \
+                      "Sperrdauer (Sekunden) nach zu vielen Fehlversuchen."; then CFG_CHANGED=1; fi ;;
+            back)  break ;;
+        esac
+    done
+    return 0
+}
+
+_cfg_grp_misc() {
+    local env_file="$1" sub v_same v_photo v_port photo_mb
+    while :; do
+        v_same=$(_get_env_value "$env_file" METERS_COOKIE_SAMESITE);         v_same=${v_same:-strict}
+        v_photo=$(_get_env_value "$env_file" METERS_PHOTO_MAX_UPLOAD_BYTES); v_photo=${v_photo:-20971520}
+        v_port=$(_get_env_value "$env_file" METERS_BIND_PORT);              v_port=${v_port:-8000}
+        if [[ "$v_photo" =~ ^[0-9]+$ ]]; then photo_mb=$(( v_photo / 1048576 )); else photo_mb="?"; fi
+        sub=$(wt_menu "Cookie, Foto, Port" \
+            "Einstellung wählen; '← Zurück' führt zum Hauptmenü." \
+            "samesite" "Cookie-SameSite [aktuell: $v_same]" \
+            "photo"    "Max. Foto-Upload (MB) [aktuell: $photo_mb]" \
+            "port"     "App-Port [aktuell: $v_port]" \
+            "back"     "← Zurück") || break
+        case "$sub" in
+            samesite) if _cfg_samesite "$env_file" "$v_same"; then CFG_CHANGED=1; fi ;;
+            photo)    if _cfg_photo "$env_file" "$photo_mb"; then CFG_CHANGED=1; fi ;;
+            port)     if _cfg_port "$env_file" "$v_port"; then CFG_CHANGED=1; fi ;;
+            back)     break ;;
+        esac
+    done
+    return 0
+}
+
 cmd_configure() {
     require_root
     local env_file="$DATA_DIR/meters.env"
@@ -1166,59 +1213,29 @@ cmd_configure() {
     is_interactive || die "Dieses Kommando ist interaktiv (whiptail). Auf einem TTY ausführen — oder Werte direkt in $env_file setzen (Doku: README, Abschnitt Konfiguration)."
     ensure_whiptail
 
-    local changed=0
+    # Kleine, gruppierte Menüs (je <=6 Einträge) über das bewährte wt_menu —
+    # ein großes 13-Punkte-Menü rendert auf manchen whiptail/newt-Versionen nicht.
+    local CFG_CHANGED=0 top
     while :; do
-        local v_session v_bcrypt v_lmax v_lwin v_llock v_same v_2fa v_photo v_port photo_mb
-        v_session=$(_get_env_value "$env_file" METERS_SESSION_LIFETIME_DAYS); v_session=${v_session:-30}
-        v_bcrypt=$(_get_env_value "$env_file" METERS_BCRYPT_ROUNDS);          v_bcrypt=${v_bcrypt:-12}
-        v_lmax=$(_get_env_value "$env_file" METERS_LOGIN_MAX_ATTEMPTS);       v_lmax=${v_lmax:-5}
-        v_lwin=$(_get_env_value "$env_file" METERS_LOGIN_WINDOW_SECONDS);     v_lwin=${v_lwin:-60}
-        v_llock=$(_get_env_value "$env_file" METERS_LOGIN_LOCKOUT_SECONDS);   v_llock=${v_llock:-900}
-        v_same=$(_get_env_value "$env_file" METERS_COOKIE_SAMESITE);          v_same=${v_same:-strict}
-        v_2fa=$(_get_env_value "$env_file" METERS_REQUIRE_TOTP_FOR_ADMIN);    v_2fa=${v_2fa:-False}
-        v_photo=$(_get_env_value "$env_file" METERS_PHOTO_MAX_UPLOAD_BYTES);  v_photo=${v_photo:-20971520}
-        v_port=$(_get_env_value "$env_file" METERS_BIND_PORT);               v_port=${v_port:-8000}
-        if [[ "$v_photo" =~ ^[0-9]+$ ]]; then photo_mb=$(( v_photo / 1048576 )); else photo_mb="?"; fi
-
-        local choice
-        choice=$(wt_menu_auto "Konfiguration — meters.env" \
-            "Einstellung wählen und ändern; am Ende 'Speichern' startet den Service neu.\nNetzwerk/HTTPS wird über die sichere Topologie-Auswahl gesetzt." \
-            "session"  "Login-Gültigkeit (Tage) [aktuell: $v_session]" \
-            "2fa"      "Admin-2FA-Pflicht [aktuell: $v_2fa]" \
-            "lmax"     "Login-Fehlversuche bis Sperre [aktuell: $v_lmax]" \
-            "lwin"     "Fehlversuch-Fenster (Sek.) [aktuell: $v_lwin]" \
-            "llock"    "Sperrdauer (Sek.) [aktuell: $v_llock]" \
-            "bcrypt"   "Passwort-Hash-Aufwand 10-15 [aktuell: $v_bcrypt]" \
-            "photo"    "Max. Foto-Upload (MB) [aktuell: $photo_mb]" \
-            "samesite" "Cookie-SameSite [aktuell: $v_same]" \
-            "port"     "App-Port [aktuell: $v_port]" \
-            "network"  "-> Netzwerk & HTTPS-Proxy (Topologie)" \
-            "secret"   "Secret-Key neu generieren (meldet alle ab)" \
-            "done"     "Speichern & Service neu starten" \
-            "abort"    "Abbrechen") || break
-
-        case "$choice" in
-            session) _cfg_uint "$env_file" METERS_SESSION_LIFETIME_DAYS "$v_session" 1 \
-                       "Wie lange ein Login gültig bleibt (Sliding-Ablauf, in Tagen) — jede Aktivität verlängert ihn." && changed=1 ;;
-            lmax)    _cfg_uint "$env_file" METERS_LOGIN_MAX_ATTEMPTS "$v_lmax" 1 \
-                       "Erlaubte Login-Fehlversuche je IP im Zeitfenster, bevor gesperrt wird." && changed=1 ;;
-            lwin)    _cfg_uint "$env_file" METERS_LOGIN_WINDOW_SECONDS "$v_lwin" 1 \
-                       "Zeitfenster (Sekunden), über das die Login-Fehlversuche gezählt werden." && changed=1 ;;
-            llock)   _cfg_uint "$env_file" METERS_LOGIN_LOCKOUT_SECONDS "$v_llock" 1 \
-                       "Sperrdauer (Sekunden) nach zu vielen Fehlversuchen." && changed=1 ;;
-            bcrypt)   _cfg_bcrypt "$env_file" "$v_bcrypt" && changed=1 ;;
-            photo)    _cfg_photo "$env_file" "$photo_mb" && changed=1 ;;
-            samesite) _cfg_samesite "$env_file" "$v_same" && changed=1 ;;
-            2fa)      _cfg_2fa "$env_file" "$v_2fa" && changed=1 ;;
-            port)     _cfg_port "$env_file" "$v_port" && changed=1 ;;
-            network)  cmd_configure_network; return ;;
-            secret)   _cfg_secret "$env_file" && changed=1 ;;
-            done)     break ;;
-            abort)    ok "Abgebrochen — bereits geschriebene Werte sind erst nach einem Neustart aktiv."; return ;;
+        top=$(wt_menu "Konfiguration — meters.env" \
+            "Bereich wählen; am Ende 'Speichern' startet den Service neu." \
+            "auth"    "Login & Sicherheit (Dauer, bcrypt, 2FA, Secret)" \
+            "limit"   "Login-Rate-Limit (Versuche, Fenster, Sperre)" \
+            "misc"    "Cookie, Foto-Upload, App-Port" \
+            "network" "Netzwerk & HTTPS-Proxy (Topologie)" \
+            "save"    "Speichern & Service neu starten" \
+            "abort"   "Abbrechen") || break
+        case "$top" in
+            auth)    _cfg_grp_auth "$env_file" ;;
+            limit)   _cfg_grp_limit "$env_file" ;;
+            misc)    _cfg_grp_misc "$env_file" ;;
+            network) cmd_configure_network; return ;;
+            save)    break ;;
+            abort)   ok "Abgebrochen — bereits geschriebene Werte sind erst nach einem Neustart aktiv."; return ;;
         esac
     done
 
-    if [ "$changed" = "1" ]; then
+    if [ "$CFG_CHANGED" = "1" ]; then
         msg_run "Service neu starten (Einstellungen werden beim Start gelesen)"
         systemctl restart "$SERVICE_NAME"
         sleep 2
