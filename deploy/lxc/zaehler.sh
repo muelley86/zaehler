@@ -896,7 +896,11 @@ _set_env_key() {
 _get_env_value() {
     local file="$1" key="$2"
     [ -f "$file" ] || return 0
-    grep -E "^${key}=" "$file" | tail -1 | cut -d= -f2- | tr -d ' "'
+    # `|| true`: fehlt der Key, liefert grep Exit 1 — das wuerde unter dem
+    # `set -euo pipefail` des Skripts (pipefail) die ganze Command-Substitution
+    # scheitern lassen und `cmd_configure` STILL beenden (Menue erscheint nie).
+    # So: leerer Output + Exit 0; der ${var:-default}-Fallback greift.
+    grep -E "^${key}=" "$file" 2>/dev/null | tail -1 | cut -d= -f2- | tr -d ' "' || true
 }
 
 cmd_configure_network() {
