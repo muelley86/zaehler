@@ -10,6 +10,13 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.24.4](https://github.com/muelley86/zaehler/compare/v2.24.3...v2.24.4) (2026-05-29)
+
+
+### Performance
+
+* Performance-Audit + Quick-Wins (N+1, mmap, audit-Index, Foto-Kompression) ([#116](https://github.com/muelley86/zaehler/issues/116)) ([0038f0d](https://github.com/muelley86/zaehler/commit/0038f0d82cebb5c90d66c115f13dd66e84a02764))
+
 ## [2.24.3](https://github.com/muelley86/zaehler/compare/v2.24.2...v2.24.3) (2026-05-29)
 
 
