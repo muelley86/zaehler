@@ -169,10 +169,15 @@ pnpm build
 ## Konfiguration (`meters.env`)
 
 Alle Einstellungen via Umgebungsvariablen (Präfix `METERS_`). Im LXC-Setup
-liegen sie in `/opt/zaehler/data/meters.env`. Die **netzwerk- und
-sicherheitsrelevanten** Werte setzt du am besten geführt mit
-`sudo zaehler configure-network` (statt die Datei von Hand zu editieren) — siehe
-[`deploy/lxc/README.md`](./deploy/lxc/README.md) Abschnitt 4/6.
+liegen sie in `/opt/zaehler/data/meters.env`. Statt die Datei von Hand zu
+editieren, am besten geführt anpassen:
+
+- `sudo zaehler configure` — **alle** unten gelisteten Werte einzeln, je mit
+  kurzer Erklärung (Session, Login-Limits, bcrypt, 2FA-Pflicht, Foto-Limit, …);
+  startet den Dienst danach neu.
+- `sudo zaehler configure-network` — die **Netzwerk-/Proxy-Topologie** als
+  sicheres Bundle (lan-only / proxy-same / proxy-external), siehe
+  [`deploy/lxc/README.md`](./deploy/lxc/README.md) Abschnitt 4/6.
 
 **Kern / Secret**
 
