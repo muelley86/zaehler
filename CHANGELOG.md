@@ -10,6 +10,13 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.33.0](https://github.com/muelley86/zaehler/compare/v2.32.0...v2.33.0) (2026-06-01)
+
+
+### Funktionen
+
+* **reports:** Dimension "Messstelle" — Verbrauch je Zähler im Zeitraum ([#159](https://github.com/muelley86/zaehler/issues/159)) ([a7636d6](https://github.com/muelley86/zaehler/commit/a7636d69e3d93e384b3881e762a1334d0a29eca1))
+
 ## [2.32.0](https://github.com/muelley86/zaehler/compare/v2.31.0...v2.32.0) (2026-06-01)
 
 
