@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing import Annotated, Any
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
@@ -27,6 +28,20 @@ class Settings(BaseSettings):
 
     app_name: str = "Zaehlerstand"
     debug: bool = False
+
+    # Lokale Zeitzone fuer aus reinen Datumsangaben erzeugte Zeitstempel
+    # (z. B. Erst-/Tausch-Erfassung). Gespeichert wird weiterhin UTC; diese
+    # Zeitzone bestimmt nur, welche Wanduhrzeit ein "Datum" lokal bedeutet.
+    timezone: str = "Europe/Berlin"
+
+    @field_validator("timezone")
+    @classmethod
+    def _validate_timezone(cls, value: str) -> str:
+        try:
+            ZoneInfo(value)
+        except (ZoneInfoNotFoundError, ValueError) as exc:
+            raise ValueError(f"Ungueltige Zeitzone: {value!r}") from exc
+        return value
 
     database_url: str = Field(default_factory=lambda: f"sqlite:///{DATA_DIR / 'meters.db'}")
 

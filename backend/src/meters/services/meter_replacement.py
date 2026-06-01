@@ -9,11 +9,13 @@ Anfangsständen anlegen — alles in einer Transaktion.
 
 from __future__ import annotations
 
-from datetime import date, datetime, time
+from datetime import UTC, date, datetime, time
 from decimal import Decimal, InvalidOperation
+from zoneinfo import ZoneInfo
 
 from sqlalchemy.orm import Session as DbSession
 
+from meters.core.config import settings
 from meters.core.obis import RegisterDef, registers_for
 from meters.core.problem import ProblemError
 from meters.models import (
@@ -26,6 +28,15 @@ from meters.models import (
     Register,
 )
 from meters.services.audit import record
+
+
+def _local_combine(d: date, t: time) -> datetime:
+    """Kombiniert Datum + Uhrzeit in der konfigurierten lokalen Zeitzone und
+    gibt den UTC-Zeitpunkt zurueck. So zeigt ein aus einem reinen Datum
+    erzeugter Zeitstempel (Erst-/Tausch-Erfassung) lokal die erwartete
+    Wanduhrzeit (z. B. 00:00) statt UTC-Mitternacht + Offset.
+    """
+    return datetime.combine(d, t, ZoneInfo(settings.timezone)).astimezone(UTC)
 
 
 def _coerce_decimal_map(values: dict[str, Decimal | str]) -> dict[str, Decimal]:
@@ -95,7 +106,7 @@ def install_first_meter(
                 Reading(
                     register_id=register.id,
                     value=initial[d.obis_code],
-                    reading_at=datetime.combine(installed_at, time(0, 0, 1)),
+                    reading_at=_local_combine(installed_at, time(0, 0, 1)),
                     note="Anfangsstand",
                     created_by_user_id=user_id,
                 )
@@ -158,7 +169,7 @@ def replace_meter(
                 Reading(
                     register_id=register.id,
                     value=finals[register.obis_code],
-                    reading_at=datetime.combine(removed_at, time(23, 59, 0)),
+                    reading_at=_local_combine(removed_at, time(23, 59, 0)),
                     note="Endstand vor Tausch",
                     created_by_user_id=user_id,
                 )
