@@ -1,0 +1,8 @@
+{
+  "name": "zaehler-dev",
+  "private": true,
+  "description": "Lokales Dev-Onboarding für die Zählerstand-App: `npm run dev` startet Backend + Frontend.",
+  "scripts": {
+    "dev": "bash scripts/dev.sh"
+  }
+}
