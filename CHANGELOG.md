@@ -10,6 +10,13 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.30.2](https://github.com/muelley86/zaehler/compare/v2.30.1...v2.30.2) (2026-06-01)
+
+
+### Fehlerbehebungen
+
+* **timezone:** Datums-Gruppierung lokal in Liste, Charts und Verbrauchsperioden ([#150](https://github.com/muelley86/zaehler/issues/150)) ([5a9e37f](https://github.com/muelley86/zaehler/commit/5a9e37fdc7c3fe2af0f22e8c6de19334a50b1406))
+
 ## [2.30.1](https://github.com/muelley86/zaehler/compare/v2.30.0...v2.30.1) (2026-06-01)
 
 
