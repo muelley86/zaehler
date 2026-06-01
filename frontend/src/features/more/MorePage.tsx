@@ -1,4 +1,4 @@
-import { KeyRound, LayoutGrid, LogOut, Moon, Sun } from 'lucide-react';
+import { BarChart3, KeyRound, LayoutGrid, LogOut, Moon, Sun } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
@@ -74,6 +74,19 @@ export function MorePage() {
             </div>
           </div>
         </Card>
+
+        {/* Auswertungen — Hauptnavigation; auf Mobile hier erreichbar
+            (Desktop hat einen eigenen Sidebar-Eintrag). */}
+        <Section header="Auswertungen">
+          <RowGroup>
+            <Row
+              to="/auswertungen"
+              icon={<BarChart3 size={20} />}
+              label="Auswertungen"
+              sublabel="Verbrauchs- und Bestandsanalysen"
+            />
+          </RowGroup>
+        </Section>
 
         {/* App */}
         <Section header="App">
