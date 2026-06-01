@@ -83,3 +83,13 @@ def test_range_filter_limits_buckets(admin_client: TestClient) -> None:
     ends = [p["period_end"] for p in points]
     # Nur der Februar-Bucket (Januar-Delta liegt außerhalb des Zeitraums).
     assert ends == ["2024-02-29"]
+
+
+def test_period_end_uses_local_date(admin_client: TestClient) -> None:
+    # 2024-12-31T23:00:00Z == 01.01.2025 00:00 Europe/Berlin → Periode am LOKALEN Tag.
+    mp_id, register_id = _setup_water_mp(admin_client)
+    _add(admin_client, register_id, "110.000", "2024-12-31T23:00:00Z")
+    points = admin_client.get(f"/api/v1/measuring-points/{mp_id}/consumption").json()
+    ends = [p["period_end"] for p in points]
+    assert "2025-01-01" in ends
+    assert "2024-12-31" not in ends

@@ -37,7 +37,11 @@ function parseUtc(dateIso: string): Date {
  * Woche = ISO-Woche (Montag bis Sonntag).
  */
 export function bucketEndIso(dateIso: string, granularity: Granularity): string {
-  const d = parseUtc(dateIso);
+  // Lokale Kalenderkomponenten des Instants (Browser-Zeitzone), dann TZ-neutral
+  // weiterrechnen — so bucket't z. B. ein Reading um lokale Mitternacht auf den
+  // lokalen Tag statt auf den UTC-Vortag.
+  const src = new Date(dateIso);
+  const d = new Date(Date.UTC(src.getFullYear(), src.getMonth(), src.getDate()));
   if (granularity === 'day') return toIso(d);
   if (granularity === 'week') {
     const dow = (d.getUTCDay() + 6) % 7; // Montag=0 … Sonntag=6

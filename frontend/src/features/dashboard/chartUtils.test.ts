@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 
 import {
   bucketEndIso,
@@ -8,6 +8,17 @@ import {
   saveChartType,
   saveGranularity,
 } from './chartUtils';
+
+// Zeitzone fuer diese Datei auf Europe/Berlin pinnen — die Lokalzeit-Bucketing-
+// Tests sollen deterministisch sein, unabhaengig von der TZ des Test-Runners.
+// Restore in afterAll, damit andere Testdateien im selben Worker unberuehrt bleiben.
+const ORIG_TZ = process.env.TZ;
+beforeAll(() => {
+  process.env.TZ = 'Europe/Berlin';
+});
+afterAll(() => {
+  process.env.TZ = ORIG_TZ;
+});
 
 afterEach(() => {
   window.localStorage.clear();
@@ -34,6 +45,12 @@ describe('bucketEndIso', () => {
 
   it('Jahr: liefert den 31.12.', () => {
     expect(bucketEndIso('2024-03-01', 'year')).toBe('2024-12-31');
+  });
+
+  it("Instant um lokale Mitternacht bucket't auf den lokalen Tag (Browser-TZ)", () => {
+    // 2024-12-31T23:00:00Z == 01.01.2025 00:00 Europe/Berlin → lokaler Tag 01.01.2025.
+    expect(bucketEndIso('2024-12-31T23:00:00Z', 'day')).toBe('2025-01-01');
+    expect(bucketEndIso('2024-12-31T23:00:00Z', 'month')).toBe('2025-01-31');
   });
 });
 
