@@ -5,6 +5,8 @@ from decimal import Decimal
 
 from pydantic import BaseModel, Field, field_validator
 
+from meters.core.config import settings
+from meters.core.timeutil import shift_local_midnight
 from meters.schemas.common import APIModel, DecimalStr, UtcDateTime
 
 # Toleranz für Client-Server-Clock-Skew — Smartphones im Feld können
@@ -23,6 +25,17 @@ def _reject_future_timestamp(value: datetime | None) -> datetime | None:
     return value
 
 
+def _normalize_reading_at(value: datetime | None) -> datetime | None:
+    """Periodengrenzen-Normalisierung + Zukunfts-Check. Eine Erfassung exakt um
+    lokale Mitternacht gehoert fachlich ans Ende des Vortags und wird auf
+    ``Vortag 23:59:59`` (lokal) verschoben — damit der Verbrauch vollstaendig
+    der vorhergehenden Periode zugeordnet wird."""
+    if value is None:
+        return value
+    shifted = shift_local_midnight(value, settings.timezone)
+    return _reject_future_timestamp(shifted)
+
+
 class ReadingCreate(BaseModel):
     register_id: int
     value: Decimal
@@ -39,8 +52,8 @@ class ReadingCreate(BaseModel):
 
     @field_validator("reading_at")
     @classmethod
-    def _no_future_reading_at(cls, value: datetime) -> datetime:
-        result = _reject_future_timestamp(value)
+    def _normalize_and_check(cls, value: datetime) -> datetime:
+        result = _normalize_reading_at(value)
         assert result is not None
         return result
 
@@ -53,8 +66,8 @@ class ReadingUpdate(BaseModel):
 
     @field_validator("reading_at")
     @classmethod
-    def _no_future_reading_at(cls, value: datetime | None) -> datetime | None:
-        return _reject_future_timestamp(value)
+    def _normalize_and_check(cls, value: datetime | None) -> datetime | None:
+        return _normalize_reading_at(value)
 
 
 class ReadingRead(APIModel):
