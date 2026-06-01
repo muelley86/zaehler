@@ -106,6 +106,8 @@ def _group_of(
         if main is None:
             return None, "ohne Hauptstandort"
         return main.id, main.name
+    if dimension is ReportDimension.MEASURING_POINT:
+        return mp.id, mp.name
     # METER_TYPE: Gruppe == Zaehlerart; key bleibt None (Label traegt die Info).
     return None, METER_TYPE_LABELS[mp.type]
 

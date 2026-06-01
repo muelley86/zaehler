@@ -96,6 +96,17 @@ describe('ReportsPage', () => {
     await waitFor(() => expect(dimensionCalls).toContain('owner'));
   });
 
+  it('Default-Dimension ist Messstelle (erster Aggregat-Call + aktive Pill)', async () => {
+    const { dimensionCalls } = mockEndpoints();
+    renderWithRouter(<ReportsPage />);
+    await screen.findByText('10001');
+    expect(dimensionCalls[0]).toBe('measuring_point');
+    expect(screen.getByRole('button', { name: 'Messstelle' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+  });
+
   it('zeigt den partial-Hinweis, wenn das Backend partial=true meldet', async () => {
     mockEndpoints({ partial: true });
     renderWithRouter(<ReportsPage />);

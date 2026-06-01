@@ -13,6 +13,7 @@ import type {
 } from '@/lib/types';
 
 export const DIMENSION_LABELS: Record<ReportDimension, string> = {
+  measuring_point: 'Messstelle',
   kostenstelle: 'Kostenstelle',
   owner: 'Eigentümer',
   location: 'Standort',
