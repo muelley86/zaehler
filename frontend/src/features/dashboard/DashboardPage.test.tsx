@@ -11,7 +11,7 @@ import { fireEvent, screen, waitFor } from '@testing-library/react';
 
 import { renderWithRouter } from '@/tests/render';
 import { server } from '@/tests/server';
-import type { MeasuringPointRead } from '@/lib/types';
+import type { MeasuringPointRead, RegisterStateRead } from '@/lib/types';
 
 import { DashboardPage } from './DashboardPage';
 
@@ -88,6 +88,64 @@ describe('DashboardPage — globale View-Controls', () => {
 
     await waitFor(() => expect(window.localStorage.getItem('dashboard.chartType')).toBe('bar'));
     expect(balken).toHaveAttribute('aria-pressed', 'true');
+  });
+});
+
+const TANK_MP: MeasuringPointRead = {
+  ...MP,
+  name: 'Heizöl Tank',
+  type: 'heating',
+  heating_source: 'oil',
+};
+
+const TANK_STATE: RegisterStateRead = {
+  register_id: 99,
+  physical_meter_id: 9,
+  obis_code: 'heat.1',
+  label: 'Tankstand',
+  unit: 'L',
+  is_active: true,
+  accepts_deliveries: true,
+  last_reading_at: '2026-05-01T08:00:00Z',
+  last_reading_value: '2000',
+  refilled_since: '0',
+  current_value: '1800',
+};
+
+describe('DashboardPage — Bestandskorrektur', () => {
+  it('sendet reading_at als UTC-ISO (…Z), nicht als lokale Wanduhrzeit', async () => {
+    // Akkordeon (Ohne Hauptstandort → Ohne Zählerstandort) vorab aufklappen,
+    // damit die Karte + Tank-Kachel rendern.
+    window.localStorage.setItem(
+      'dashboard.expandedMainLocations',
+      JSON.stringify(['__no_main_location__']),
+    );
+    window.localStorage.setItem(
+      'dashboard.expandedLocations',
+      JSON.stringify(['__no_main_location__::__no_location__']),
+    );
+
+    const readingBodies: Array<{ reading_at?: string }> = [];
+    server.use(
+      http.get('/api/v1/measuring-points', () => HttpResponse.json([TANK_MP])),
+      http.get('/api/v1/locations', () => HttpResponse.json([])),
+      http.get('/api/v1/measuring-points/:id/state', () => HttpResponse.json([TANK_STATE])),
+      http.get('/api/v1/measuring-points/:id/consumption', () => HttpResponse.json([])),
+      http.get('/api/v1/readings', () => HttpResponse.json([])),
+      http.post('/api/v1/readings', async ({ request }) => {
+        readingBodies.push((await request.json()) as { reading_at?: string });
+        return HttpResponse.json({ id: 1 }, { status: 201 });
+      }),
+    );
+
+    renderWithRouter(<DashboardPage />);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Bestand korrigieren' }));
+    // Wert ist aus current_value vorbefüllt → direkt speichern.
+    fireEvent.click(await screen.findByRole('button', { name: /Korrektur speichern/ }));
+
+    await waitFor(() => expect(readingBodies.length).toBe(1));
+    expect(readingBodies[0]?.reading_at).toMatch(/Z$/);
   });
 });
 

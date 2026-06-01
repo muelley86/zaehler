@@ -16,7 +16,14 @@ import {
 } from '@/components/ui';
 import { PageGlows } from '@/components/PageGlows';
 import { ApiError, api } from '@/lib/api';
-import { formatDateDe, formatDateTimeDe, formatDe, nowForInput, parseDe } from '@/lib/format';
+import {
+  formatDateDe,
+  formatDateTimeDe,
+  formatDe,
+  localInputToIso,
+  nowForInput,
+  parseDe,
+} from '@/lib/format';
 import type {
   ConsumptionPoint,
   LocationRead,
@@ -1107,7 +1114,10 @@ function CorrectionForm({
       await api.post('/readings', {
         register_id: state.register_id,
         value: parseDe(value),
-        reading_at: readingAt,
+        // datetime-local liefert lokale Wanduhrzeit ohne Offset — vor dem
+        // Senden in UTC (…Z) wandeln, sonst deutet das Backend sie als UTC
+        // und die Bestandskorrektur landet um den lokalen Offset verschoben.
+        reading_at: localInputToIso(readingAt),
         note: note || null,
       });
       onSaved();
