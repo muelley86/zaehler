@@ -9,6 +9,10 @@ import {
   saveGranularity,
 } from './chartUtils';
 
+// Hinweis: Die Zeitzone wird global in vite.config.ts (`test.env.TZ`) auf
+// Europe/Berlin gepinnt — die Lokalzeit-Bucketing-Tests unten sind deshalb
+// deterministisch, unabhaengig von der TZ des Test-Runners (CI laeuft in UTC).
+
 afterEach(() => {
   window.localStorage.clear();
 });
@@ -34,6 +38,12 @@ describe('bucketEndIso', () => {
 
   it('Jahr: liefert den 31.12.', () => {
     expect(bucketEndIso('2024-03-01', 'year')).toBe('2024-12-31');
+  });
+
+  it("Instant um lokale Mitternacht bucket't auf den lokalen Tag (Browser-TZ)", () => {
+    // 2024-12-31T23:00:00Z == 01.01.2025 00:00 Europe/Berlin → lokaler Tag 01.01.2025.
+    expect(bucketEndIso('2024-12-31T23:00:00Z', 'day')).toBe('2025-01-01');
+    expect(bucketEndIso('2024-12-31T23:00:00Z', 'month')).toBe('2025-01-31');
   });
 });
 

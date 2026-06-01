@@ -2,14 +2,16 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 from dataclasses import dataclass
-from datetime import date, timedelta
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from typing import Literal
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session as DbSession
 from sqlalchemy.orm import selectinload
 
+from meters.core.config import settings
 from meters.models import MeasuringPoint, PhysicalMeter, Reading, Register
 
 
@@ -32,6 +34,14 @@ def _pairwise(readings: list[Reading]) -> Iterator[tuple[Reading, Reading]]:
     for cur in it:
         yield prev, cur
         prev = cur
+
+
+def _local_date(dt: datetime) -> date:
+    """Lokales Kalenderdatum (App-Zeitzone ``METERS_TIMEZONE``) eines in der DB
+    als naive-UTC gespeicherten Zeitstempels — fuer Verbrauchs-Perioden, damit
+    die Chart-X-Achse und CSV-Perioden den lokalen Tagen entsprechen.
+    """
+    return dt.replace(tzinfo=UTC).astimezone(ZoneInfo(settings.timezone)).date()
 
 
 def consumption_for_register(
@@ -60,8 +70,8 @@ def consumption_for_register(
             delta = prev.value + refilled - cur.value
             out.append(
                 ConsumptionPoint(
-                    period_start=prev.reading_at.date(),
-                    period_end=cur.reading_at.date(),
+                    period_start=_local_date(prev.reading_at),
+                    period_end=_local_date(cur.reading_at),
                     register_id=register.id,
                     obis_code=register.obis_code,
                     consumption=delta,
@@ -79,8 +89,8 @@ def consumption_for_register(
             delta = delta * transformer_factor
         out.append(
             ConsumptionPoint(
-                period_start=prev.reading_at.date(),
-                period_end=cur.reading_at.date(),
+                period_start=_local_date(prev.reading_at),
+                period_end=_local_date(cur.reading_at),
                 register_id=register.id,
                 obis_code=register.obis_code,
                 consumption=delta,

@@ -15,7 +15,8 @@
     "format": "prettier \"src/**/*.{ts,tsx,css,json,md}\" \"*.{ts,js,cjs,mjs,json,md}\" --write",
     "format:check": "prettier \"src/**/*.{ts,tsx,css,json,md}\" \"*.{ts,js,cjs,mjs,json,md}\" --check",
     "type-check": "tsc -b --noEmit",
-    "test": "vitest"
+    "test": "TZ=Europe/Berlin vitest",
+    "test:run": "TZ=Europe/Berlin vitest run"
   },
   "dependencies": {
     "@fontsource/inter-tight": "^5",

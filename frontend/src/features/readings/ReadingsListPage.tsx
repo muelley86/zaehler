@@ -198,7 +198,7 @@ export function ReadingsListPage() {
       if (!info) continue;
       out.push({
         kind: isCorrection(r) ? 'correction' : 'reading',
-        day: r.reading_at.slice(0, 10),
+        day: toLocalDayKey(new Date(r.reading_at)),
         date: r.reading_at,
         info,
         reading: r,
@@ -210,7 +210,7 @@ export function ReadingsListPage() {
       if (!info) continue;
       out.push({
         kind: 'delivery',
-        day: d.delivery_at.slice(0, 10),
+        day: toLocalDayKey(new Date(d.delivery_at)),
         date: d.delivery_at,
         info,
         delivery: d,
