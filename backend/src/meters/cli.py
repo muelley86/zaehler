@@ -5,6 +5,8 @@ Aufruf:
     uv run python -m meters.cli create-admin --username admin --password "<pw>"
     uv run python -m meters.cli create-admin --username admin --password "<pw>" --email admin@x.tld
     uv run python -m meters.cli reset-password --username admin --password "<pw>" --force-change
+    uv run python -m meters.cli repair-legacy-timestamps            # Dry-Run (zeigt nur an)
+    uv run python -m meters.cli repair-legacy-timestamps --apply    # schreibt die Korrektur
 """
 
 from __future__ import annotations
@@ -17,6 +19,7 @@ from sqlalchemy import inspect, select
 from meters.core.security import hash_password
 from meters.db import SessionLocal, engine
 from meters.models import User, UserRole
+from meters.services.legacy_timestamp_repair import repair_legacy_timestamps
 
 
 def _ensure_schema_initialized() -> None:
@@ -88,6 +91,40 @@ def _cmd_reset_password(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_repair_legacy_timestamps(args: argparse.Namespace) -> int:
+    """Korrigiert synthetische Readings, die vor Fix #148 naiv-UTC abgelegt
+    wurden (``Anfangsstand`` / ``Endstand vor Tausch``). Ohne ``--apply`` nur
+    Dry-Run — es wird nichts geschrieben."""
+    _ensure_schema_initialized()
+    apply = bool(args.apply)
+    with SessionLocal() as db:
+        result = repair_legacy_timestamps(db, dry_run=not apply)
+        for p in result.planned:
+            flag = "  ⚠ KOLLISION (übersprungen)" if p.collision else ""
+            print(
+                f"  #{p.reading_id} reg={p.register_id} [{p.note}] "
+                f"{p.before:%Y-%m-%d %H:%M:%S} → {p.after:%Y-%m-%d %H:%M:%S}{flag}"
+            )
+        if result.affected == 0:
+            print("Keine betroffenen Altzeilen gefunden — nichts zu tun.")
+            return 0
+        if apply:
+            db.commit()
+            print(
+                f"\nAngewendet: {result.applied} korrigiert, "
+                f"{result.skipped_collisions} wegen Kollision übersprungen."
+            )
+        else:
+            db.rollback()
+            collisions = sum(1 for p in result.planned if p.collision)
+            print(
+                f"\nDRY-RUN: {result.affected} betroffen "
+                f"({collisions} davon mit Kollision). Nichts geändert.\n"
+                "Vor dem Schreiben ein DB-Backup anlegen, dann erneut mit --apply ausführen."
+            )
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="meters.cli")
     sub = parser.add_subparsers(dest="cmd", required=True)
@@ -115,6 +152,21 @@ def main(argv: list[str] | None = None) -> int:
         help="Benutzer muss beim nächsten Login ein neues Passwort setzen.",
     )
     reset.set_defaults(func=_cmd_reset_password)
+
+    repair = sub.add_parser(
+        "repair-legacy-timestamps",
+        help=(
+            "Synthetische Readings (Anfangsstand/Endstand vor Tausch) korrigieren, "
+            "die vor dem Zeitzonen-Fix naiv-UTC gespeichert wurden. "
+            "Default: Dry-Run; --apply schreibt."
+        ),
+    )
+    repair.add_argument(
+        "--apply",
+        action="store_true",
+        help="Korrektur tatsächlich schreiben (sonst nur Dry-Run-Anzeige).",
+    )
+    repair.set_defaults(func=_cmd_repair_legacy_timestamps)
 
     args = parser.parse_args(argv)
     func = args.func
