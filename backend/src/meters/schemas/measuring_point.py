@@ -49,6 +49,8 @@ class MeasuringPointBase(BaseModel):
     market_location: str | None = Field(default=None, max_length=11, pattern=r"^\d{11}$")
     # Genauer Einbauort innerhalb des Standorts (z. B. „1. Stock, Wohnung 4b").
     installation_location: str | None = Field(default=None, max_length=200)
+    # Kostenstelle: optionale Ganzzahl 0-99999 (keine fuehrenden Nullen), alle Typen.
+    kostenstelle: int | None = Field(default=None, ge=0, le=99999)
 
     @model_validator(mode="after")
     def _tank_capacity_only_heating(self) -> Self:
@@ -128,6 +130,8 @@ class MeasuringPointUpdate(BaseModel):
     clear_market_location: bool = False
     installation_location: str | None = Field(default=None, max_length=200)
     clear_installation_location: bool = False
+    kostenstelle: int | None = Field(default=None, ge=0, le=99999)
+    clear_kostenstelle: bool = False
 
 
 class MeasuringPointRead(APIModel):
@@ -150,6 +154,7 @@ class MeasuringPointRead(APIModel):
     contract_number: str | None = None
     market_location: str | None = None
     installation_location: str | None = None
+    kostenstelle: int | None = None
     # Aktueller Eigentuemer (vom Router aus dem ``OwnerAssignment`` mit
     # ``valid_to IS NULL`` befuellt). ``None``, wenn aktuell keiner.
     current_owner_id: int | None = None

@@ -139,6 +139,7 @@ def full_dump(db: DbDep, _admin: AdminUser) -> Response:
                 "location": mp.location,
                 "is_bidirectional": mp.is_bidirectional,
                 "has_dual_tariff": mp.has_dual_tariff,
+                "kostenstelle": mp.kostenstelle,
                 "physical_meters": [
                     {
                         "id": m.id,

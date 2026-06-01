@@ -158,6 +158,7 @@ def create_measuring_point(
         contract_number=payload.contract_number,
         market_location=payload.market_location,
         installation_location=payload.installation_location,
+        kostenstelle=payload.kostenstelle,
     )
     db.add(mp)
     db.flush()
@@ -326,6 +327,15 @@ def update_measuring_point(
             "to": payload.installation_location,
         }
         mp.installation_location = payload.installation_location
+
+    # Kostenstelle: Ganzzahl 0-99999, ohne Typ-Validation. ``clear_*`` -> NULL.
+    if payload.clear_kostenstelle:
+        if mp.kostenstelle is not None:
+            diff["kostenstelle"] = {"from": mp.kostenstelle, "to": None}
+            mp.kostenstelle = None
+    elif payload.kostenstelle is not None and payload.kostenstelle != mp.kostenstelle:
+        diff["kostenstelle"] = {"from": mp.kostenstelle, "to": payload.kostenstelle}
+        mp.kostenstelle = payload.kostenstelle
 
     # Marktlokation: nur fuer Strom zulaessig.
     if payload.market_location is not None and mp.type is not MeterType.ELECTRICITY:
