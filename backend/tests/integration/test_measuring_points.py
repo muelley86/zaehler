@@ -439,3 +439,60 @@ def test_market_location_invalid_pattern(admin_client: TestClient) -> None:
         },
     )
     assert alpha.status_code == 422
+
+
+# ---------------------------------------------------------------------------
+# Kostenstelle — optionale Ganzzahl 0-99999, alle Typen erlaubt
+# ---------------------------------------------------------------------------
+
+
+def test_create_with_kostenstelle(admin_client: TestClient) -> None:
+    resp = admin_client.post(
+        "/api/v1/measuring-points",
+        json={
+            "name": "Mit Kostenstelle",
+            "type": "water",
+            "is_bidirectional": False,
+            "has_dual_tariff": False,
+            "serial_number": "KST-1",
+            "installed_at": "2024-01-01",
+            "initial_values": {},
+            "kostenstelle": 4711,
+        },
+    )
+    assert resp.status_code == 201, resp.text
+    body = resp.json()
+    assert body["kostenstelle"] == 4711
+    get = admin_client.get(f"/api/v1/measuring-points/{body['id']}")
+    assert get.json()["kostenstelle"] == 4711
+
+
+def test_patch_kostenstelle_set_and_clear(admin_client: TestClient) -> None:
+    mp = _create_electricity(admin_client)
+    mp_id = mp["id"]
+    set_resp = admin_client.patch(f"/api/v1/measuring-points/{mp_id}", json={"kostenstelle": 12345})
+    assert set_resp.status_code == 200, set_resp.text
+    assert set_resp.json()["kostenstelle"] == 12345
+    clear_resp = admin_client.patch(
+        f"/api/v1/measuring-points/{mp_id}", json={"clear_kostenstelle": True}
+    )
+    assert clear_resp.status_code == 200, clear_resp.text
+    assert clear_resp.json()["kostenstelle"] is None
+
+
+def test_kostenstelle_rejects_out_of_range(admin_client: TestClient) -> None:
+    for bad in (100000, -1):
+        resp = admin_client.post(
+            "/api/v1/measuring-points",
+            json={
+                "name": "x",
+                "type": "water",
+                "is_bidirectional": False,
+                "has_dual_tariff": False,
+                "serial_number": f"BAD-{bad}",
+                "installed_at": "2024-01-01",
+                "initial_values": {},
+                "kostenstelle": bad,
+            },
+        )
+        assert resp.status_code == 422, resp.text

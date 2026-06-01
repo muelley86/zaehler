@@ -411,6 +411,7 @@ function StammdatenReadView({
       ) : null}
       {mp.installation_location ? <FieldRow k="Einbauort" v={mp.installation_location} /> : null}
       <FieldRow k="Aktueller Eigentümer" v={mp.current_owner_name ?? '—'} />
+      {mp.kostenstelle !== null ? <FieldRow k="Kostenstelle" v={String(mp.kostenstelle)} /> : null}
       {location &&
       (location.address_street || location.address_postcode || location.address_city) ? (
         <FieldRow
@@ -462,6 +463,9 @@ function StammdatenEditForm({
   const [contractNumber, setContractNumber] = useState(mp.contract_number ?? '');
   const [marketLocation, setMarketLocation] = useState(mp.market_location ?? '');
   const [installationLocation, setInstallationLocation] = useState(mp.installation_location ?? '');
+  const [kostenstelle, setKostenstelle] = useState(
+    mp.kostenstelle !== null ? String(mp.kostenstelle) : '',
+  );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -521,6 +525,19 @@ function StammdatenEditForm({
           if (mp.installation_location !== null) body['clear_installation_location'] = true;
         } else if (trimmed !== mp.installation_location) {
           body['installation_location'] = trimmed;
+        }
+      }
+      // Kostenstelle (Ganzzahl 0-99999) fuer alle Typen, clear_* bei leerer Eingabe.
+      {
+        const trimmed = kostenstelle.trim();
+        if (trimmed === '') {
+          if (mp.kostenstelle !== null) body['clear_kostenstelle'] = true;
+        } else {
+          const parsed = Number(trimmed);
+          if (!Number.isInteger(parsed) || parsed < 0 || parsed > 99999) {
+            throw new RangeError('Kostenstelle muss eine Ganzzahl zwischen 0 und 99999 sein.');
+          }
+          if (parsed !== mp.kostenstelle) body['kostenstelle'] = parsed;
         }
       }
       const updated = await api.patch<MeasuringPointRead>(`/measuring-points/${mp.id}`, body);
@@ -612,6 +629,13 @@ function StammdatenEditForm({
         value={installationLocation}
         onChange={(e) => setInstallationLocation(e.target.value)}
         hint="z. B. 1. Stock, Wohnung 4b — leer = nicht gesetzt"
+      />
+      <TextField
+        label="Kostenstelle (optional)"
+        inputMode="numeric"
+        value={kostenstelle}
+        onChange={(e) => setKostenstelle(e.target.value.replace(/\D/g, '').slice(0, 5))}
+        hint="5-stellige Zahl (0–99999); leer = nicht gesetzt"
       />
       {error ? (
         <div className="border-danger/40 bg-danger/10 rounded-card border-hairline p-3 text-caption text-danger">

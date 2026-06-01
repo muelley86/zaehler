@@ -115,3 +115,22 @@ def test_json_dump_structure(admin_client: TestClient) -> None:
     assert any(r["value"] == "200" for r in register["readings"]), (
         "POST-Reading 200 muss im Dump auftauchen"
     )
+
+
+def test_json_dump_includes_kostenstelle(admin_client: TestClient) -> None:
+    admin_client.post(
+        "/api/v1/measuring-points",
+        json={
+            "name": "Export-Kostenstelle-MP",
+            "type": "water",
+            "is_bidirectional": False,
+            "has_dual_tariff": False,
+            "serial_number": "EXP-KST-1",
+            "installed_at": "2024-01-01",
+            "initial_values": {},
+            "kostenstelle": 4711,
+        },
+    )
+    data = admin_client.get("/api/v1/export/dump.json").json()
+    found = next(p for p in data["measuring_points"] if p["name"] == "Export-Kostenstelle-MP")
+    assert found["kostenstelle"] == 4711

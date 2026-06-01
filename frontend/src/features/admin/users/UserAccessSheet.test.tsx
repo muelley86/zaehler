@@ -50,6 +50,7 @@ function _mp(overrides: Partial<MeasuringPointRead> & { id: number; name: string
     installation_location: null,
     current_owner_id: null,
     current_owner_name: null,
+    kostenstelle: null,
     is_bidirectional: false,
     has_dual_tariff: false,
     tank_capacity: null,

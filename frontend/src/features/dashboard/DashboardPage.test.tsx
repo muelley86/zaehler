@@ -33,6 +33,7 @@ const MP: MeasuringPointRead = {
   installation_location: null,
   current_owner_id: null,
   current_owner_name: null,
+  kostenstelle: null,
   physical_meters: [],
 };
 

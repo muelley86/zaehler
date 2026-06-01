@@ -54,6 +54,9 @@ class MeasuringPoint(Base, TimestampMixin):
     # „Heizungsraum links"). Hilft, einen MP physisch zu finden, ohne dass die
     # Location-Granularitaet uebertrieben werden muss.
     installation_location: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    # Kostenstelle (5-stellige Ganzzahl 0-99999, optional) - fuer
+    # Kostenstellen-Auswertung; gilt fuer alle MP-Typen.
+    kostenstelle: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     location: Mapped[Location | None] = relationship("Location")
     physical_meters: Mapped[list[PhysicalMeter]] = relationship(

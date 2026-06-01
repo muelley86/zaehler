@@ -179,6 +179,7 @@ export interface MeasuringPointRead {
   installation_location: string | null;
   current_owner_id: number | null;
   current_owner_name: string | null;
+  kostenstelle: number | null;
   physical_meters: PhysicalMeterRead[];
 }
 

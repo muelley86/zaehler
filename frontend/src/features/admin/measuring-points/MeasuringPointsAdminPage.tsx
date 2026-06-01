@@ -319,6 +319,9 @@ function CreateFormFields({
   // Einbauort (alle Typen)
   const [installationLocation, setInstallationLocation] = useState('');
 
+  // Kostenstelle (alle Typen, optional)
+  const [kostenstelle, setKostenstelle] = useState('');
+
   // Heizung
   const [heatingSource, setHeatingSource] = useState<HeatingSource>('oil');
   const [registers, setRegisters] = useState<RegisterDraft[]>(HEATING_PRESETS.oil);
@@ -368,6 +371,13 @@ function CreateFormFields({
       }
       if (installationLocation.trim()) {
         body['installation_location'] = installationLocation.trim();
+      }
+      if (kostenstelle.trim()) {
+        const parsed = Number(kostenstelle.trim());
+        if (!Number.isInteger(parsed) || parsed < 0 || parsed > 99999) {
+          throw new RangeError('Kostenstelle muss eine Ganzzahl zwischen 0 und 99999 sein.');
+        }
+        body['kostenstelle'] = parsed;
       }
       if (type === 'heating') {
         body['heating_source'] = heatingSource;
@@ -434,6 +444,13 @@ function CreateFormFields({
         value={installationLocation}
         onChange={(e) => setInstallationLocation(e.target.value)}
         hint="z. B. 1. Stock, Wohnung 4b oder Heizungsraum links."
+      />
+      <TextField
+        label="Kostenstelle (optional)"
+        inputMode="numeric"
+        value={kostenstelle}
+        onChange={(e) => setKostenstelle(e.target.value.replace(/\D/g, '').slice(0, 5))}
+        hint="5-stellige Zahl (0–99999); leer = nicht gesetzt"
       />
       <TextField
         label="Seriennummer"
