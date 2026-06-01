@@ -10,6 +10,14 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.30.0](https://github.com/muelley86/zaehler/compare/v2.29.0...v2.30.0) (2026-06-01)
+
+
+### Funktionen
+
+* **measuring-points:** Stammdatenfeld Kostenstelle (+ Export) ([#143](https://github.com/muelley86/zaehler/issues/143)) ([53c1974](https://github.com/muelley86/zaehler/commit/53c1974a6e1b824213616249665fcbd1febc351c))
+* **nav:** Auswertungen-Menuepunkt + Platzhalterseite ([#144](https://github.com/muelley86/zaehler/issues/144)) ([88474b2](https://github.com/muelley86/zaehler/commit/88474b2b83fb73c6362b045f2a0ca1ad8e659088))
+
 ## [2.29.0](https://github.com/muelley86/zaehler/compare/v2.28.0...v2.29.0) (2026-06-01)
 
 
