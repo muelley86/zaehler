@@ -10,6 +10,14 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.30.1](https://github.com/muelley86/zaehler/compare/v2.30.0...v2.30.1) (2026-06-01)
+
+
+### Fehlerbehebungen
+
+* **dashboard:** Bestandskorrektur sendet reading_at als UTC ([#146](https://github.com/muelley86/zaehler/issues/146)) ([6ad0fe4](https://github.com/muelley86/zaehler/commit/6ad0fe40f942faa399348929b927f16706e4e6ab))
+* **meters:** Datum-Erfassungen in lokaler Zeitzone speichern ([#148](https://github.com/muelley86/zaehler/issues/148)) ([2a03534](https://github.com/muelley86/zaehler/commit/2a035348273f737cacd769796062d6c142a18a8f))
+
 ## [2.30.0](https://github.com/muelley86/zaehler/compare/v2.29.0...v2.30.0) (2026-06-01)
 
 
