@@ -2,8 +2,9 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
+from typing import Literal
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session as DbSession
@@ -114,5 +115,72 @@ def consumption_for_measuring_point(
     for meter in mp.physical_meters:
         for register in meter.registers:
             out.extend(consumption_for_register(register, transformer_factor=factor))
+    out.sort(key=lambda p: (p.period_end, p.obis_code))
+    return out
+
+
+Granularity = Literal["day", "week", "month", "year"]
+
+
+def _bucket_bounds(d: date, granularity: Granularity) -> tuple[date, date]:
+    """Start-/Enddatum des Buckets, in den ``d`` fällt.
+
+    Woche = ISO-Woche (Montag bis Sonntag). Monat/Jahr = Kalendergrenzen.
+    """
+    if granularity == "day":
+        return d, d
+    if granularity == "week":
+        monday = d - timedelta(days=d.weekday())
+        return monday, monday + timedelta(days=6)
+    if granularity == "month":
+        start = d.replace(day=1)
+        nxt = date(d.year + 1, 1, 1) if d.month == 12 else date(d.year, d.month + 1, 1)
+        return start, nxt - timedelta(days=1)
+    return date(d.year, 1, 1), date(d.year, 12, 31)
+
+
+def aggregate_consumption(
+    points: list[ConsumptionPoint],
+    *,
+    granularity: Granularity | None,
+    from_date: date | None,
+    to_date: date | None,
+) -> list[ConsumptionPoint]:
+    """Filtert Verbrauchs-Punkte nach Zeitraum und aggregiert sie je Granularität.
+
+    Filterung erfolgt über ``period_end`` (konsistent mit der bisherigen
+    Frontend-Logik). Bei ``granularity is None`` werden die gefilterten Rohpunkte
+    zurückgegeben (rückwärtskompatibel). Andernfalls wird jeder Punkt vollständig
+    dem Bucket seines ``period_end`` zugeschlagen (kein anteiliges Splitten über
+    Bucket-Grenzen) und der Verbrauch je ``(obis_code, unit, bucket)`` summiert.
+    ``register_id`` im aggregierten Punkt ist nur repräsentativ (erster Beitrag).
+    """
+    filtered = [
+        p
+        for p in points
+        if (from_date is None or p.period_end >= from_date)
+        and (to_date is None or p.period_end <= to_date)
+    ]
+    if granularity is None:
+        filtered.sort(key=lambda p: (p.period_end, p.obis_code))
+        return filtered
+
+    buckets: dict[tuple[str, str, date, date], ConsumptionPoint] = {}
+    for p in filtered:
+        start, end = _bucket_bounds(p.period_end, granularity)
+        key = (p.obis_code, p.unit, start, end)
+        existing = buckets.get(key)
+        if existing is None:
+            buckets[key] = ConsumptionPoint(
+                period_start=start,
+                period_end=end,
+                register_id=p.register_id,
+                obis_code=p.obis_code,
+                consumption=p.consumption,
+                unit=p.unit,
+            )
+        else:
+            existing.consumption += p.consumption
+    out = list(buckets.values())
     out.sort(key=lambda p: (p.period_end, p.obis_code))
     return out

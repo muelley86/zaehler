@@ -1,17 +1,7 @@
-import { memo, useCallback, useEffect, useMemo, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { ChevronDown, Download, Filter, Plus } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import {
-  CartesianGrid,
-  Legend,
-  Line,
-  LineChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from 'recharts';
 
 import {
   Button,
@@ -26,15 +16,7 @@ import {
 } from '@/components/ui';
 import { PageGlows } from '@/components/PageGlows';
 import { ApiError, api } from '@/lib/api';
-import {
-  formatDateDe,
-  formatDateTickDe,
-  formatDateTimeDe,
-  formatDe,
-  nowForInput,
-  parseDe,
-} from '@/lib/format';
-import { useChartTheme } from '@/lib/useChartTheme';
+import { formatDateDe, formatDateTimeDe, formatDe, nowForInput, parseDe } from '@/lib/format';
 import type {
   ConsumptionPoint,
   LocationRead,
@@ -44,10 +26,30 @@ import type {
   RegisterStateRead,
 } from '@/lib/types';
 import { TYPE_LABELS, TYPE_ORDER, describeMeterType } from '@/lib/meterLabels';
+import { MeterChart } from './MeterChart';
+import {
+  bucketEndIso,
+  defaultGranularity,
+  loadChartType,
+  loadGranularity,
+  saveChartType,
+  saveGranularity,
+  type ChartType,
+  type Granularity,
+} from './chartUtils';
 
-// Konstante Chart-Margin als Modul-Const, damit Recharts nicht bei jedem
-// Render eine neue Object-Referenz sieht (Recharts vergleicht per ===).
-const CHART_MARGIN = { top: 10, right: 16, bottom: 8, left: 8 } as const;
+// Globale View-Control-Optionen (Label-Tupel) als Modul-Consts.
+const GRANULARITY_OPTIONS: ReadonlyArray<[Granularity, string]> = [
+  ['day', 'Tag'],
+  ['week', 'Woche'],
+  ['month', 'Monat'],
+  ['year', 'Jahr'],
+];
+const CHART_TYPE_OPTIONS: ReadonlyArray<[ChartType, string]> = [
+  ['line', 'Linie'],
+  ['bar', 'Balken'],
+  ['area', 'Fläche'],
+];
 
 // Stabile Leer-Sentinel — wenn eine Messstelle (noch) keine Daten hat,
 // bekommt sie immer dieselbe Array-Referenz. Sonst würden React.memo-
@@ -65,6 +67,7 @@ const EXPANDED_MAIN_LOCATIONS_KEY = 'dashboard.expandedMainLocations';
 const EXPANDED_LOCATIONS_KEY = 'dashboard.expandedLocations';
 const NO_MAIN_LOCATION_KEY = '__no_main_location__';
 const NO_LOCATION_KEY = '__no_location__';
+const FILTERS_EXPANDED_KEY = 'dashboard.filtersExpanded';
 
 function loadExpandedSet(key: string): Set<string> {
   try {
@@ -83,6 +86,22 @@ function saveExpandedSet(key: string, set: Set<string>) {
     window.localStorage.setItem(key, JSON.stringify([...set]));
   } catch {
     /* QuotaExceeded / SecurityError ignorieren — non-fatal UX-State */
+  }
+}
+
+function loadFiltersExpanded(): boolean {
+  try {
+    return window.localStorage.getItem(FILTERS_EXPANDED_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function saveFiltersExpanded(open: boolean): void {
+  try {
+    window.localStorage.setItem(FILTERS_EXPANDED_KEY, open ? '1' : '0');
+  } catch {
+    /* non-fatal */
   }
 }
 
@@ -136,6 +155,39 @@ export function DashboardPage() {
   const [from, setFrom] = useState(`${currentYear}-01-01`);
   const [to, setTo] = useState(`${currentYear}-12-31`);
 
+  // Globale View-Controls (gelten für alle Karten + CSV): Diagrammtyp und
+  // Aggregations-Granularität, beide in localStorage gemerkt.
+  const [chartType, setChartType] = useState<ChartType>(() => loadChartType());
+  const [granularity, setGranularity] = useState<Granularity>(
+    () => loadGranularity() ?? defaultGranularity(`${currentYear}-01-01`, `${currentYear}-12-31`),
+  );
+  // Solange der Nutzer die Granularität nicht selbst gewählt hat, folgt sie
+  // automatisch dem Zeitraum.
+  const granularityTouched = useRef(loadGranularity() !== null);
+
+  const pickChartType = useCallback((t: ChartType) => {
+    saveChartType(t);
+    setChartType(t);
+  }, []);
+  const pickGranularity = useCallback((g: Granularity) => {
+    granularityTouched.current = true;
+    saveGranularity(g);
+    setGranularity(g);
+  }, []);
+
+  const [filtersExpanded, setFiltersExpanded] = useState<boolean>(() => loadFiltersExpanded());
+  const toggleFilters = useCallback(() => {
+    setFiltersExpanded((prev) => {
+      const next = !prev;
+      saveFiltersExpanded(next);
+      return next;
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!granularityTouched.current) setGranularity(defaultGranularity(from, to));
+  }, [from, to]);
+
   useEffect(() => {
     Promise.all([
       api.get<MeasuringPointRead[]>('/measuring-points'),
@@ -151,44 +203,69 @@ export function DashboardPage() {
       });
   }, [tick]);
 
+  // Zählerstand-Schnappschuss (zeitraum-unabhängig) — lädt, sobald die MPs da sind.
   useEffect(() => {
     if (!points) return;
     let cancelled = false;
     void Promise.all(
       points.map(async (mp) => {
-        const params = new URLSearchParams();
-        params.set('measuring_point_id', String(mp.id));
-        params.set('limit', '5000');
-        const [c, s, r] = await Promise.all([
+        const s = await api
+          .get<RegisterStateRead[]>(`/measuring-points/${mp.id}/state`)
+          .catch(() => [] as RegisterStateRead[]);
+        return [mp.id, s] as const;
+      }),
+    ).then((entries) => {
+      if (cancelled) return;
+      const sById: StatesByMP = {};
+      for (const [id, s] of entries) sById[id] = s;
+      setStates(sById);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [points]);
+
+  // Verbrauch (Backend-aggregiert je Granularität) + Readings (Backend-range-
+  // gefiltert). Lädt neu, wenn sich Zeitraum oder Granularität ändert — die
+  // schwere Aggregation passiert im Backend, das Frontend rendert nur noch.
+  useEffect(() => {
+    if (!points) return;
+    let cancelled = false;
+    const cParams = new URLSearchParams({ granularity });
+    if (from) cParams.set('from_at', from);
+    if (to) cParams.set('to_at', to);
+    void Promise.all(
+      points.map(async (mp) => {
+        const rParams = new URLSearchParams();
+        rParams.set('measuring_point_id', String(mp.id));
+        rParams.set('limit', '5000');
+        if (from) rParams.set('from_at', from);
+        // Tagesende, damit Readings am letzten Tag des Zeitraums inklusiv sind.
+        if (to) rParams.set('to_at', `${to}T23:59:59`);
+        const [c, r] = await Promise.all([
           api
-            .get<ConsumptionPoint[]>(`/measuring-points/${mp.id}/consumption`)
+            .get<ConsumptionPoint[]>(`/measuring-points/${mp.id}/consumption?${cParams}`)
             .catch(() => [] as ConsumptionPoint[]),
-          api
-            .get<RegisterStateRead[]>(`/measuring-points/${mp.id}/state`)
-            .catch(() => [] as RegisterStateRead[]),
-          api.get<ReadingRead[]>(`/readings?${params}`).catch(() => [] as ReadingRead[]),
+          api.get<ReadingRead[]>(`/readings?${rParams}`).catch(() => [] as ReadingRead[]),
         ]);
-        return [mp.id, c, s, r] as const;
+        return [mp.id, c, r] as const;
       }),
     ).then((entries) => {
       if (cancelled) return;
       const cById: ConsumptionsByMP = {};
-      const sById: StatesByMP = {};
       const rById: ReadingsByMP = {};
-      for (const [id, c, s, r] of entries) {
+      for (const [id, c, r] of entries) {
         cById[id] = c;
-        sById[id] = s;
         rById[id] = r;
       }
       setConsumptions(cById);
-      setStates(sById);
       setReadingsByMP(rById);
       setMpDataReady(true);
     });
     return () => {
       cancelled = true;
     };
-  }, [points]);
+  }, [points, from, to, granularity]);
 
   const filteredPoints = useMemo(() => {
     if (!points) return [];
@@ -201,48 +278,36 @@ export function DashboardPage() {
     });
   }, [points, mainLocationFilter, ownerFilter, locationFilter, typeFilter]);
 
+  // Verbrauch/Readings sind bereits Backend-seitig auf den Zeitraum gefiltert;
+  // hier nur noch nach den kategorialen MP-Filtern einschränken.
   const filteredConsumption = useMemo(() => {
     const out: Array<ConsumptionPoint & { mp: MeasuringPointRead }> = [];
     for (const mp of filteredPoints) {
-      const list = consumptions[mp.id] ?? [];
-      for (const p of list) {
-        if (from && p.period_end < from) continue;
-        if (to && p.period_end > to) continue;
-        out.push({ ...p, mp });
-      }
+      for (const p of consumptions[mp.id] ?? []) out.push({ ...p, mp });
     }
     return out;
-  }, [filteredPoints, consumptions, from, to]);
+  }, [filteredPoints, consumptions]);
 
-  // Pro-MP gefilterte Listen vorab in eine Map packen — React.memo vergleicht
+  // Pro-MP-Listen vorab in eine Map packen — React.memo vergleicht
   // per Reference-Identity, daher dürfen wir diese Arrays NICHT inline im
   // JSX bauen (sonst neue Reference bei jedem Render).
   const consumptionByMp = useMemo(() => {
     const out = new Map<number, ConsumptionPoint[]>();
     for (const mp of filteredPoints) {
-      const list = (consumptions[mp.id] ?? []).filter((p) => {
-        if (from && p.period_end < from) return false;
-        if (to && p.period_end > to) return false;
-        return true;
-      });
+      const list = consumptions[mp.id] ?? [];
       if (list.length > 0) out.set(mp.id, list);
     }
     return out;
-  }, [filteredPoints, consumptions, from, to]);
+  }, [filteredPoints, consumptions]);
 
   const readingsFilteredByMp = useMemo(() => {
     const out = new Map<number, ReadingRead[]>();
     for (const mp of filteredPoints) {
-      const list = (readingsByMP[mp.id] ?? []).filter((r) => {
-        const day = r.reading_at.slice(0, 10);
-        if (from && day < from) return false;
-        if (to && day > to) return false;
-        return true;
-      });
+      const list = readingsByMP[mp.id] ?? [];
       if (list.length > 0) out.set(mp.id, list);
     }
     return out;
-  }, [filteredPoints, readingsByMP, from, to]);
+  }, [filteredPoints, readingsByMP]);
 
   // Zweistufige Gruppierung: Hauptstandort > Zaehlerstandort > Karten.
   // Bei wachsendem MP-Bestand bleibt das Dashboard kompakt — Default ist
@@ -435,6 +500,9 @@ export function DashboardPage() {
     );
   }
 
+  const activeFilterCount =
+    mainLocationFilter.size + ownerFilter.size + locationFilter.size + typeFilter.size;
+
   return (
     <PageContainer>
       <LargeTitle
@@ -452,101 +520,135 @@ export function DashboardPage() {
         }
       />
 
-      <Section header="Filter">
+      <Section header="Ansicht">
         <div className="space-y-4 p-5">
-          {mainLocationOptions.length > 0 ? (
-            <FilterRow label="Hauptstandorte">
-              {mainLocationOptions.map(([id, name]) => (
-                <Pill
-                  key={`main-${id}`}
-                  active={mainLocationFilter.has(id)}
-                  onClick={() => setMainLocationFilter(toggle(mainLocationFilter, id))}
-                >
-                  {name}
-                </Pill>
-              ))}
-              <Pill
-                active={mainLocationFilter.has(null)}
-                onClick={() => setMainLocationFilter(toggle(mainLocationFilter, null))}
-              >
-                ohne Hauptstandort
-              </Pill>
-            </FilterRow>
-          ) : null}
-          {ownerOptions.length > 0 ? (
-            <FilterRow label="Eigentümer">
-              {ownerOptions.map(([id, name]) => (
-                <Pill
-                  key={`owner-${id}`}
-                  active={ownerFilter.has(id)}
-                  onClick={() => setOwnerFilter(toggle(ownerFilter, id))}
-                >
-                  {name}
-                </Pill>
-              ))}
-              <Pill
-                active={ownerFilter.has(null)}
-                onClick={() => setOwnerFilter(toggle(ownerFilter, null))}
-              >
-                ohne Eigentümer
-              </Pill>
-            </FilterRow>
-          ) : null}
-          <FilterRow label="Zählerstandorte">
-            {locationOptions.map(([id, name]) => (
-              <Pill
-                key={String(id)}
-                active={locationFilter.has(id)}
-                onClick={() => setLocationFilter(toggle(locationFilter, id))}
-              >
-                {name}
-              </Pill>
-            ))}
-            <Pill
-              active={locationFilter.has(null)}
-              onClick={() => setLocationFilter(toggle(locationFilter, null))}
-            >
-              ohne Zählerstandort
-            </Pill>
-          </FilterRow>
-          <FilterRow label="Zählerart">
-            {(Object.keys(TYPE_LABELS) as MeterType[]).map((t) => (
-              <Pill
-                key={t}
-                active={typeFilter.has(t)}
-                onClick={() => setTypeFilter(toggle(typeFilter, t))}
-              >
-                {TYPE_LABELS[t]}
-              </Pill>
-            ))}
-          </FilterRow>
           <FilterRow label="Zeitraum">
             <DateInput value={from} onChange={setFrom} aria-label="von" />
             <span className="text-tertiary">—</span>
             <DateInput value={to} onChange={setTo} aria-label="bis" />
           </FilterRow>
-          {mainLocationFilter.size ||
-          ownerFilter.size ||
-          locationFilter.size ||
-          typeFilter.size ||
-          from ||
-          to ? (
-            <button
-              type="button"
-              onClick={() => {
-                setMainLocationFilter(new Set());
-                setOwnerFilter(new Set());
-                setLocationFilter(new Set());
-                setTypeFilter(new Set());
-                setFrom('');
-                setTo('');
-              }}
-              className="text-caption font-semibold text-primary"
-            >
-              Filter zurücksetzen
-            </button>
-          ) : null}
+          <FilterRow label="Aggregation">
+            {GRANULARITY_OPTIONS.map(([g, label]) => (
+              <Pill key={g} active={granularity === g} onClick={() => pickGranularity(g)}>
+                {label}
+              </Pill>
+            ))}
+          </FilterRow>
+          <FilterRow label="Diagramm">
+            {CHART_TYPE_OPTIONS.map(([t, label]) => (
+              <Pill key={t} active={chartType === t} onClick={() => pickChartType(t)}>
+                {label}
+              </Pill>
+            ))}
+          </FilterRow>
         </div>
+      </Section>
+
+      <Section>
+        <button
+          type="button"
+          onClick={toggleFilters}
+          aria-expanded={filtersExpanded}
+          className="flex w-full items-center justify-between gap-2 px-5 py-3.5 text-left"
+        >
+          <span className="flex items-center gap-2">
+            <Filter size={16} className="text-tertiary" />
+            <span className="text-caption-bold uppercase text-tertiary">Filter</span>
+            {activeFilterCount > 0 ? (
+              <span className="rounded-full bg-primary-soft px-2 py-0.5 text-caption font-semibold text-primary-deep">
+                {activeFilterCount} aktiv
+              </span>
+            ) : null}
+          </span>
+          <ChevronDown
+            size={18}
+            className={`text-tertiary transition-transform ${filtersExpanded ? '' : '-rotate-90'}`}
+          />
+        </button>
+        {filtersExpanded ? (
+          <div className="space-y-4 border-t border-separator p-5">
+            {mainLocationOptions.length > 0 ? (
+              <FilterRow label="Hauptstandorte">
+                {mainLocationOptions.map(([id, name]) => (
+                  <Pill
+                    key={`main-${id}`}
+                    active={mainLocationFilter.has(id)}
+                    onClick={() => setMainLocationFilter(toggle(mainLocationFilter, id))}
+                  >
+                    {name}
+                  </Pill>
+                ))}
+                <Pill
+                  active={mainLocationFilter.has(null)}
+                  onClick={() => setMainLocationFilter(toggle(mainLocationFilter, null))}
+                >
+                  ohne Hauptstandort
+                </Pill>
+              </FilterRow>
+            ) : null}
+            {ownerOptions.length > 0 ? (
+              <FilterRow label="Eigentümer">
+                {ownerOptions.map(([id, name]) => (
+                  <Pill
+                    key={`owner-${id}`}
+                    active={ownerFilter.has(id)}
+                    onClick={() => setOwnerFilter(toggle(ownerFilter, id))}
+                  >
+                    {name}
+                  </Pill>
+                ))}
+                <Pill
+                  active={ownerFilter.has(null)}
+                  onClick={() => setOwnerFilter(toggle(ownerFilter, null))}
+                >
+                  ohne Eigentümer
+                </Pill>
+              </FilterRow>
+            ) : null}
+            <FilterRow label="Zählerstandorte">
+              {locationOptions.map(([id, name]) => (
+                <Pill
+                  key={String(id)}
+                  active={locationFilter.has(id)}
+                  onClick={() => setLocationFilter(toggle(locationFilter, id))}
+                >
+                  {name}
+                </Pill>
+              ))}
+              <Pill
+                active={locationFilter.has(null)}
+                onClick={() => setLocationFilter(toggle(locationFilter, null))}
+              >
+                ohne Zählerstandort
+              </Pill>
+            </FilterRow>
+            <FilterRow label="Zählerart">
+              {(Object.keys(TYPE_LABELS) as MeterType[]).map((t) => (
+                <Pill
+                  key={t}
+                  active={typeFilter.has(t)}
+                  onClick={() => setTypeFilter(toggle(typeFilter, t))}
+                >
+                  {TYPE_LABELS[t]}
+                </Pill>
+              ))}
+            </FilterRow>
+            {activeFilterCount > 0 ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setMainLocationFilter(new Set());
+                  setOwnerFilter(new Set());
+                  setLocationFilter(new Set());
+                  setTypeFilter(new Set());
+                }}
+                className="text-caption font-semibold text-primary"
+              >
+                Filter zurücksetzen
+              </button>
+            ) : null}
+          </div>
+        ) : null}
       </Section>
 
       {/*
@@ -631,6 +733,8 @@ export function DashboardPage() {
                                   consumption={consumptionByMp.get(mp.id) ?? EMPTY_CONSUMPTION}
                                   readings={readingsFilteredByMp.get(mp.id) ?? EMPTY_READINGS}
                                   state={states[mp.id] ?? EMPTY_STATES}
+                                  chartType={chartType}
+                                  granularity={granularity}
                                   onChanged={handleChanged}
                                 />
                               ))
@@ -694,21 +798,24 @@ const MeasuringPointCard = memo(function MeasuringPointCard({
   consumption,
   readings,
   state,
+  chartType,
+  granularity,
   onChanged,
 }: {
   mp: MeasuringPointRead;
   consumption: ConsumptionPoint[];
   readings: ReadingRead[];
   state: RegisterStateRead[];
+  chartType: ChartType;
+  granularity: Granularity;
   onChanged: () => void;
 }) {
-  const theme = useChartTheme();
   const [mode, setMode] = useState<'consumption' | 'level'>('consumption');
   const [correctTarget, setCorrectTarget] = useState<RegisterStateRead | null>(null);
 
   // Verbrauchs-Serie (period_end → values pro OBIS)
   const consumptionSeries = useMemo(() => {
-    const merged = new Map<string, Record<string, number | string>>();
+    const merged = new Map<string, Record<string, number | string> & { date: string }>();
     for (const p of consumption) {
       const row = merged.get(p.period_end) ?? { date: p.period_end };
       row[p.obis_code] = Number(p.consumption);
@@ -729,20 +836,24 @@ const MeasuringPointCard = memo(function MeasuringPointCard({
     return m;
   }, [mp.physical_meters]);
 
-  // Stand-Serie (reading_at → value pro OBIS)
+  // Stand-Serie: Readings je Granularitäts-Bucket gruppieren; spätere Readings
+  // im selben Bucket gewinnen (= Endstand des Buckets). Teilt damit die X-Achse
+  // mit der Backend-aggregierten Verbrauchs-Serie.
   const levelSeries = useMemo(() => {
-    const merged = new Map<string, Record<string, number | string>>();
-    for (const r of readings) {
+    const merged = new Map<string, Record<string, number | string> & { date: string }>();
+    const sorted = [...readings].sort((a, b) => a.reading_at.localeCompare(b.reading_at));
+    for (const r of sorted) {
       const code = obisByRegister.get(r.register_id);
       if (!code) continue;
-      const row = merged.get(r.reading_at) ?? { date: r.reading_at };
+      const bucket = bucketEndIso(r.reading_at, granularity);
+      const row = merged.get(bucket) ?? { date: bucket };
       row[code] = Number(r.value);
-      merged.set(r.reading_at, row);
+      merged.set(bucket, row);
     }
     return Array.from(merged.values()).sort((a, b) =>
       String(a['date']).localeCompare(String(b['date'])),
     );
-  }, [readings, obisByRegister]);
+  }, [readings, obisByRegister, granularity]);
 
   const series = mode === 'consumption' ? consumptionSeries : levelSeries;
 
@@ -777,29 +888,6 @@ const MeasuringPointCard = memo(function MeasuringPointCard({
     [labelByObis, mode],
   );
 
-  // Stabile Style-Objekte für Recharts (Tooltip/Legend) — sonst sieht
-  // Recharts bei jedem Render neue Referenzen und re-rendert die ganze
-  // Subtree, auch wenn theme & Daten gleich sind.
-  const tooltipContentStyle = useMemo(
-    () => ({
-      backgroundColor: theme.tooltipBg,
-      border: `1px solid ${theme.tooltipBorder}`,
-      borderRadius: 12,
-      color: theme.label,
-    }),
-    [theme],
-  );
-  const tooltipLabelStyle = useMemo(() => ({ color: theme.label }), [theme.label]);
-  const legendWrapperStyle = useMemo(() => ({ fontSize: 12, color: theme.label }), [theme.label]);
-  const tooltipFormatter = useCallback(
-    (value: number | string, name: string) => [
-      `${formatDe(value as number)}${unit ? ' ' + unit : ''}`,
-      seriesLabel(String(name)),
-    ],
-    [unit, seriesLabel],
-  );
-  const legendFormatter = useCallback((name: string) => seriesLabel(String(name)), [seriesLabel]);
-
   const consumptionTotals = new Map<string, { sum: number; unit: string }>();
   for (const p of consumption) {
     const e = consumptionTotals.get(p.obis_code) ?? { sum: 0, unit: p.unit };
@@ -808,11 +896,10 @@ const MeasuringPointCard = memo(function MeasuringPointCard({
   }
 
   return (
-    // min-h-[640px] = gleiche Hoehe wie MeasuringPointCardSkeleton, damit
-    // der Cutover Skeleton -> echte Card NICHT shiftet. Echte Cards mit
-    // wenig Inhalt (z. B. Strom-MP ohne Verbrauchsdaten) tragen unten
-    // etwas Whitespace — bewusster Tausch fuer 0 CLS.
-    <Card className="min-h-[640px]">
+    // min-h-[560px] = gleiche Hoehe wie MeasuringPointCardSkeleton, damit
+    // der Cutover Skeleton -> echte Card NICHT shiftet. Kompakte Karten mit
+    // wenig Inhalt tragen unten etwas Whitespace — bewusster Tausch fuer 0 CLS.
+    <Card className="min-h-[560px]">
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <TypeBadge type={mp.type} size="md" />
         <div className="min-w-0 flex-1">
@@ -850,29 +937,6 @@ const MeasuringPointCard = memo(function MeasuringPointCard({
         </div>
       ) : null}
 
-      {consumptionTotals.size > 0 ? (
-        <div className="bg-fill/60 mb-4 rounded-card border-hairline border-border p-4">
-          <div className="text-caption-bold uppercase text-tertiary">
-            Verbrauch im Zeitraum
-            {mp.transformer_factor !== null ? (
-              <span className="ml-1.5 normal-case text-tertiary">
-                (Differenzen × Wandlerfaktor {mp.transformer_factor})
-              </span>
-            ) : null}
-          </div>
-          <ul className="mt-2 space-y-1">
-            {Array.from(consumptionTotals.entries()).map(([code, t]) => (
-              <li key={code} className="flex items-baseline justify-between gap-3 text-body">
-                <span className="truncate text-label">{labelByObis.get(code) ?? code}</span>
-                <span className="num text-headline text-label">
-                  {formatDe(t.sum)} <span className="text-caption text-tertiary">{t.unit}</span>
-                </span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
-
       <div className="mb-3 flex flex-wrap items-center gap-1.5">
         <Pill active={mode === 'consumption'} onClick={() => setMode('consumption')}>
           Verbrauch
@@ -889,55 +953,32 @@ const MeasuringPointCard = memo(function MeasuringPointCard({
             : 'Keine Stände im gewählten Zeitraum.'}
         </p>
       ) : (
-        <div className="h-64 w-full">
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={series} margin={CHART_MARGIN}>
-              <CartesianGrid strokeDasharray="3 3" stroke={theme.grid} />
-              <XAxis
-                dataKey="date"
-                tick={{ fontSize: 11, fill: theme.axis }}
-                stroke={theme.axis}
-                tickFormatter={formatDateTickDe}
-              />
-              <YAxis
-                tick={{ fontSize: 11, fill: theme.axis }}
-                stroke={theme.axis}
-                tickFormatter={(v) => formatDe(v as number)}
-                {...(unit
-                  ? {
-                      label: {
-                        value: unit,
-                        angle: -90,
-                        position: 'insideLeft',
-                        offset: 10,
-                        style: { textAnchor: 'middle', fontSize: 11, fill: theme.axis },
-                      },
-                    }
-                  : {})}
-              />
-              <Tooltip
-                contentStyle={tooltipContentStyle}
-                labelStyle={tooltipLabelStyle}
-                formatter={tooltipFormatter}
-                labelFormatter={formatDateTickDe}
-              />
-              <Legend formatter={legendFormatter} wrapperStyle={legendWrapperStyle} />
-              {obisCodes.map((code, idx) => (
-                <Line
-                  key={code}
-                  type="monotone"
-                  dataKey={code}
-                  name={code}
-                  stroke={theme.palette[idx % theme.palette.length]}
-                  strokeWidth={2}
-                  dot={mode === 'level' ? { r: 3 } : false}
-                  isAnimationActive={false}
-                />
-              ))}
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
+        <MeterChart
+          mpId={mp.id}
+          series={series}
+          obisCodes={obisCodes}
+          chartType={chartType}
+          mode={mode}
+          unit={unit}
+          seriesLabel={seriesLabel}
+        />
       )}
+
+      {mode === 'consumption' && consumptionTotals.size > 0 ? (
+        <div className="mt-3 flex flex-wrap items-baseline gap-x-4 gap-y-1 border-t border-separator pt-3 text-caption text-tertiary">
+          {mp.transformer_factor !== null ? (
+            <span>× Wandlerfaktor {mp.transformer_factor}</span>
+          ) : null}
+          {Array.from(consumptionTotals.entries()).map(([code, t]) => (
+            <span key={code}>
+              Σ {labelByObis.get(code) ?? code}{' '}
+              <span className="num font-semibold text-label">
+                {formatDe(t.sum)} {t.unit}
+              </span>
+            </span>
+          ))}
+        </div>
+      ) : null}
 
       <Sheet
         open={correctTarget !== null}
@@ -1219,19 +1260,25 @@ function CurrentStateTile({ state }: { state: RegisterStateRead }) {
  * `points`). Layout muss exakt zu der spaeteren Vollseite passen, sonst
  * springt das Layout beim Hydrieren — der CLS-Hauptverursacher.
  *
- * Reservierte Slots: Filter (188) → ConsumptionSummary (260) → 3 Karten
- * à 640 px. Dieselben Höhen verwenden auch `MeasuringPointCardSkeleton`
- * (Phase 2) und die echte `MeasuringPointCard` (`min-h-[640px]`) — so
- * ist die Layout-Höhe in allen drei Phasen identisch.
+ * Reservierte Slots: Ansicht-Controls (188) → Filter-Leiste (52) →
+ * ConsumptionSummary (260) → 3 Karten à 560 px. Dieselben Höhen verwenden
+ * auch `MeasuringPointCardSkeleton` (Phase 2) und die echte
+ * `MeasuringPointCard` (`min-h-[560px]`) — so ist die Layout-Höhe identisch.
  */
 function DashboardSkeleton() {
   return (
     <>
-      {/* Filter-Section */}
+      {/* Ansicht-Controls (Zeitraum + Granularität + Diagrammtyp) */}
       <div
         aria-hidden
         className="bg-surface/50 glass rounded-card border-hairline border-border"
         style={{ minHeight: 188 }}
+      />
+      {/* Filter-Leiste (eingeklappt per Default) */}
+      <div
+        aria-hidden
+        className="bg-surface/50 glass rounded-card border-hairline border-border"
+        style={{ minHeight: 52 }}
       />
 
       <ConsumptionSummarySkeleton />
@@ -1248,7 +1295,7 @@ function DashboardSkeleton() {
 }
 
 /**
- * Card-Slot waehrend `mpDataReady === false`. Selbe Hoehe (640 px) und
+ * Card-Slot waehrend `mpDataReady === false`. Selbe Hoehe (560 px) und
  * dasselbe Compositing (`glass`) wie die echte `MeasuringPointCard`, sodass
  * der Phase-2 → Phase-3-Switch ohne Y-Verschiebung ablaeuft. Innen kein
  * MP-spezifischer Skeleton-Inhalt — aria-hidden, der sr-only-Text in
@@ -1259,7 +1306,7 @@ function MeasuringPointCardSkeleton() {
     <div
       aria-hidden
       className="glass bg-surface/50 rounded-card border-hairline border-border shadow-glass dark:shadow-glass-dark"
-      style={{ minHeight: 640 }}
+      style={{ minHeight: 560 }}
     >
       <div className="space-y-3 p-5">
         <div className="h-7 w-2/3 rounded-pill bg-fill" />

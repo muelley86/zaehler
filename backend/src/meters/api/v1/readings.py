@@ -11,9 +11,9 @@ ein Admin immer; ein Recorder nur eigene Erfassungen innerhalb 24 h.
 
 from __future__ import annotations
 
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, File, Form, Query, Request, UploadFile, status
 from fastapi.responses import FileResponse, Response
@@ -40,7 +40,7 @@ from meters.services.access import (
     restrict_mp_query,
 )
 from meters.services.audit import record
-from meters.services.consumption import consumption_for_measuring_point
+from meters.services.consumption import aggregate_consumption, consumption_for_measuring_point
 from meters.services.reading_photo import (
     delete_photo,
     photo_full_path,
@@ -498,9 +498,15 @@ def consumption(
     mp_id: int,
     db: DbDep,
     user: CurrentUser,
+    granularity: Literal["day", "week", "month", "year"] | None = Query(None),
+    from_at: date | None = Query(None),
+    to_at: date | None = Query(None),
 ) -> list[ConsumptionPoint]:
     assert_can_access_mp(db, user, mp_id)
     points = consumption_for_measuring_point(db, measuring_point_id=mp_id)
+    points = aggregate_consumption(
+        points, granularity=granularity, from_date=from_at, to_date=to_at
+    )
     return [
         ConsumptionPoint(
             period_start=p.period_start,
