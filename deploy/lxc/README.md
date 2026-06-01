@@ -254,7 +254,20 @@ Das aktualisiert in einem Lauf:
 Vor dem App-Update wird automatisch ein DB-Snapshot nach
 `/opt/zaehler/backups/` geschrieben.
 
-Nur App-Code ohne System-/Tool-Updates: `sudo zaehler upgrade-app`.
+Nur App-Code ohne System-/Tool-Updates: `sudo zaehler upgrade-app`. `upgrade-app`
+setzt dabei auch die **Zeitzone idempotent** auf `Europe/Berlin` (heilt Bestands-
+Container, die noch auf UTC stehen).
+
+**Zeitzone separat setzen** (z. B. ohne ein App-Update abzuwarten):
+
+```bash
+sudo zaehler set-timezone            # Europe/Berlin (Default)
+sudo zaehler set-timezone <zone>     # andere IANA-Zone
+```
+
+> Die System-Zeitzone betrifft nur Logs, Backup-Dateinamen und systemd-Timer.
+> Die in der App angezeigten Erfassungszeiten hängen **nicht** davon ab — die
+> regeln `METERS_TIMEZONE` (Backend) und die Browser-Zeitzone.
 
 > **Hinweis:** `zaehler` ist ein Symlink auf
 > `/opt/zaehler/repo/deploy/lxc/zaehler.sh`, den die Installation
