@@ -18,6 +18,10 @@ WorkingDirectory=/opt/zaehler/backend
 # uv und pnpm liegen im User-lokalen .local/bin
 Environment=PATH=/opt/zaehler/.local/bin:/usr/local/bin:/usr/bin:/bin
 Environment=PYTHONUNBUFFERED=1
+# Lokale Zeitzone fuer Prozess-Logs. DB und API bleiben bewusst UTC; OS-weit
+# (systemd-Timer/Backup, Dateizeitstempel) setzt der Installer zusaetzlich
+# timedatectl set-timezone Europe/Berlin.
+Environment=TZ=Europe/Berlin
 
 # Standardpfad für die SQLite-Datenbank. Der Pfad wird durch meters.env
 # überschrieben werden, falls die Datei existiert.

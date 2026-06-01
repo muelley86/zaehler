@@ -32,6 +32,22 @@ Die `data/`- und `backups/`-Verzeichnisse werden vom Skript **nie** gelöscht
 oder überschrieben. Verlierst du sie trotzdem (z. B. weil der ganze Container
 gelöscht wird), hilft nur ein externes Backup.
 
+## Zeitzone
+
+Der Installer setzt die Container-Zeitzone auf **Europe/Berlin**
+(`timedatectl set-timezone Europe/Berlin`, DST automatisch); die systemd-Unit
+setzt zusätzlich `TZ=Europe/Berlin` für den App-Prozess. Das betrifft **Logs,
+den Backup-Timer und Datei-Zeitstempel** — sie laufen damit in Lokalzeit statt
+UTC.
+
+**Wichtig:** Erfassungs-/Verbrauchsdaten werden in der DB bewusst in **UTC**
+gespeichert und vom Browser in die lokale Zeit umgerechnet — daran ändert die
+Container-Zeitzone nichts. Auf einem bestehenden Container nachträglich:
+
+```bash
+timedatectl set-timezone Europe/Berlin && systemctl restart zaehler
+```
+
 ## Update-Strategie
 
 Der `upgrade-all`-Workflow ist konservativ:
