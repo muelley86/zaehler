@@ -913,6 +913,21 @@ const MeasuringPointCard = memo(function MeasuringPointCard({
         {unit ? <span className="text-caption text-tertiary">in {unit}</span> : null}
       </div>
 
+      {consumptionTotals.size > 0 ? (
+        <div className="mb-4 grid gap-2.5 sm:grid-cols-2">
+          {Array.from(consumptionTotals.entries())
+            .sort(([a], [b]) => a.localeCompare(b))
+            .map(([code, t]) => (
+              <ConsumptionTile
+                key={code}
+                label={labelByObis.get(code) ?? code}
+                sum={t.sum}
+                unit={t.unit}
+              />
+            ))}
+        </div>
+      ) : null}
+
       {state.length > 0 ? (
         <div className="mb-4 space-y-2.5">
           {state
@@ -963,22 +978,6 @@ const MeasuringPointCard = memo(function MeasuringPointCard({
           seriesLabel={seriesLabel}
         />
       )}
-
-      {mode === 'consumption' && consumptionTotals.size > 0 ? (
-        <div className="mt-3 flex flex-wrap items-baseline gap-x-4 gap-y-1 border-t border-separator pt-3 text-caption text-tertiary">
-          {mp.transformer_factor !== null ? (
-            <span>× Wandlerfaktor {mp.transformer_factor}</span>
-          ) : null}
-          {Array.from(consumptionTotals.entries()).map(([code, t]) => (
-            <span key={code}>
-              Σ {labelByObis.get(code) ?? code}{' '}
-              <span className="num font-semibold text-label">
-                {formatDe(t.sum)} {t.unit}
-              </span>
-            </span>
-          ))}
-        </div>
-      ) : null}
 
       <Sheet
         open={correctTarget !== null}
@@ -1233,15 +1232,30 @@ function ConsumptionSummary({
   );
 }
 
-function CurrentStateTile({ state }: { state: RegisterStateRead }) {
+function ConsumptionTile({ label, sum, unit }: { label: string; sum: number; unit: string }) {
   return (
     <div className="bg-fill/60 rounded-card border-hairline border-border p-4">
+      <div className="text-caption-bold uppercase text-tertiary">{label}</div>
+      <div className="mt-1 flex items-baseline gap-1.5">
+        <span className="num text-display leading-none tracking-tighter text-label">
+          {formatDe(sum)}
+        </span>
+        <span className="text-headline text-secondary">{unit}</span>
+      </div>
+      <div className="mt-1 text-caption text-tertiary">im gewählten Zeitraum</div>
+    </div>
+  );
+}
+
+function CurrentStateTile({ state }: { state: RegisterStateRead }) {
+  return (
+    <div className="bg-fill/40 rounded-card border-hairline border-border p-3">
       <div className="text-caption-bold uppercase text-tertiary">Zählerstand {state.label}</div>
-      <div className="mt-1.5 flex items-baseline gap-1.5">
-        <span className="num text-title-1 leading-none tracking-tighter text-label">
+      <div className="mt-1 flex items-baseline gap-1.5">
+        <span className="num text-headline leading-none text-secondary">
           {state.current_value !== null ? formatDe(state.current_value) : '—'}
         </span>
-        <span className="text-body text-secondary">{state.unit}</span>
+        <span className="text-caption text-tertiary">{state.unit}</span>
       </div>
       <div className="mt-2 text-caption text-tertiary">
         {state.last_reading_at
