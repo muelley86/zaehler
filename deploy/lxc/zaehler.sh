@@ -11,6 +11,7 @@
 #      upgrade-tools      uv und pnpm auf die neueste Version bringen
 #      upgrade-app        App-Code aktualisieren (git pull, deps, migrate, restart)
 #      upgrade-all        upgrade-system + upgrade-tools + upgrade-app
+#      set-timezone [tz]  System-Zeitzone setzen (Default Europe/Berlin)
 #      backup             SQLite-Datenbank sofort sichern
 #      restore <datei>    DB aus Backup wiederherstellen
 #      status             Übersicht: Service, Versionen, DB-Größe, letztes Backup
@@ -99,6 +100,33 @@ wt_msgbox()   { whiptail --backtitle "Zählerstand-App Installer" --title "$1" -
 
 require_root() {
     [ "$(id -u)" -eq 0 ] || die "Dieses Kommando muss als root ausgeführt werden (sudo)."
+}
+
+# Setzt die System-Zeitzone idempotent (Default Europe/Berlin). Betrifft nur
+# Logs/Backups/systemd-Timer — DB/API bleiben bewusst UTC. Wird von install,
+# upgrade-app und dem set-timezone-Kommando genutzt; ist bereits-gesetzt ein
+# No-op und bricht ohne root nicht ab (warnt nur).
+ensure_timezone() {
+    local tz="${1:-Europe/Berlin}"
+    local current=""
+    if command -v timedatectl >/dev/null 2>&1; then
+        current=$(timedatectl show -p Timezone --value 2>/dev/null || echo "")
+    fi
+    [ -n "$current" ] || current=$(readlink -f /etc/localtime 2>/dev/null | sed 's#.*/zoneinfo/##')
+    if [ "$current" = "$tz" ]; then
+        log "Zeitzone bereits $tz"
+        return 0
+    fi
+    if [ "$(id -u)" -ne 0 ]; then
+        warn "Zeitzone ist '$current' statt '$tz', aber nicht als root — übersprungen."
+        warn "Fix: sudo zaehler set-timezone"
+        return 0
+    fi
+    # Fallback ohne nutzbares timedatectl (manche LXC ohne systemd-timedated):
+    # direkter /etc/localtime-Symlink.
+    timedatectl set-timezone "$tz" 2>/dev/null \
+        || ln -sf "/usr/share/zoneinfo/$tz" /etc/localtime
+    ok "Zeitzone auf $tz gesetzt (war: ${current:-unbekannt})"
 }
 
 # Führt einen Befehl als App-User aus, mit ge-source-tem Profil (PATH ~/.local/bin).
@@ -367,11 +395,7 @@ cmd_install() {
     sed -i 's/^# *de_DE.UTF-8/de_DE.UTF-8/' /etc/locale.gen
     locale-gen >/dev/null
     update-locale LANG=de_DE.UTF-8
-    # Zeitzone auf Europe/Berlin (DST automatisch). Betrifft Logs, systemd-Timer
-    # (Backup) und Datei-Zeitstempel; DB/API bleiben bewusst UTC. Fallback ohne
-    # nutzbares timedatectl (manche LXC): /etc/localtime-Symlink.
-    timedatectl set-timezone Europe/Berlin 2>/dev/null \
-        || ln -sf /usr/share/zoneinfo/Europe/Berlin /etc/localtime
+    ensure_timezone Europe/Berlin
     ok "Locale + Zeitzone konfiguriert"
 
     step "3/10  App-Benutzer und Verzeichnisse"
@@ -690,10 +714,10 @@ cmd_upgrade_app() {
         die "Abgebrochen — Frontend-Build würde sonst inkonsistent sein."
     fi
 
-    step "1/6  Backup der Datenbank"
+    step "1/8  Backup der Datenbank"
     "$REPO_DIR/deploy/lxc/backup.sh" || warn "Backup fehlgeschlagen — Update wird trotzdem fortgesetzt."
 
-    step "2/6  Code aktualisieren (git fetch + reset)"
+    step "2/8  Code aktualisieren (git fetch + reset)"
     # Idempotent: fetch + hard reset auf den gewünschten Branch (Default main).
     # Damit ist der Update-Pfad robust gegen lokal modifizierte Build-Artefakte
     # (z. B. backend/src/meters/static/ aus früheren Versionen, als das Bundle
@@ -705,16 +729,16 @@ cmd_upgrade_app() {
     as_user "cd '$REPO_DIR' && git reset --hard 'origin/$update_branch'"
     as_user "cd '$REPO_DIR' && git clean -fd -- backend/src/meters/static"
 
-    step "3/6  Backend-Abhängigkeiten"
+    step "3/8  Backend-Abhängigkeiten"
     as_user "cd '$REPO_DIR/backend' && uv sync --frozen"
 
-    step "4/6  Frontend bauen"
+    step "4/8  Frontend bauen"
     as_user "cd '$REPO_DIR/frontend' && pnpm install --frozen-lockfile && NODE_OPTIONS=--max-old-space-size=2048 pnpm build"
 
-    step "5/7  Datenbank-Migrationen"
+    step "5/8  Datenbank-Migrationen"
     as_user "cd '$REPO_DIR/backend' && uv run alembic upgrade head"
 
-    step "6/7  systemd-Unit synchronisieren (falls geändert) + CLI-Wrapper"
+    step "6/8  systemd-Unit synchronisieren (falls geändert) + CLI-Wrapper"
     local unit_src="$REPO_DIR/deploy/systemd/$SERVICE_NAME"
     local unit_dst="/etc/systemd/system/$SERVICE_NAME"
     if [ -f "$unit_src" ] && ! cmp -s "$unit_src" "$unit_dst" 2>/dev/null; then
@@ -735,7 +759,12 @@ cmd_upgrade_app() {
         ensure_cli_link
     fi
 
-    step "7/7  Service neu starten"
+    step "7/8  Zeitzone sicherstellen (Europe/Berlin)"
+    # Self-Healing: Bestands-Container, die vor dem TZ-Schritt aufgesetzt wurden,
+    # konvergieren so beim Update auf Europe/Berlin. Idempotent (bereits gesetzt = No-op).
+    ensure_timezone Europe/Berlin
+
+    step "8/8  Service neu starten"
     if [ "$(id -u)" -eq 0 ]; then
         systemctl restart "$SERVICE_NAME"
     else
@@ -1495,8 +1524,11 @@ ${C_BOLD}zaehler.sh — Verwaltungsskript für die Zählerstand-App${C_RESET}
                          (Pakete, User, uv, pnpm, Repo, Build, systemd)
     upgrade-system       Debian/Ubuntu-Pakete via apt aktualisieren
     upgrade-tools        uv und pnpm auf die neueste Version bringen
-    upgrade-app          App-Code aktualisieren (mit DB-Backup)
+    upgrade-app          App-Code aktualisieren (mit DB-Backup; setzt die
+                         Zeitzone idempotent mit)
     upgrade-all          upgrade-system → upgrade-tools → upgrade-app
+    set-timezone [zone]  System-Zeitzone setzen (Default Europe/Berlin) —
+                         betrifft nur Logs/Backups/Timer, nicht die App-Zeiten
 
   ${C_BOLD}Daten-Pflege:${C_RESET}
     backup               Sofort einen DB-Snapshot erzeugen
@@ -1554,6 +1586,12 @@ ${C_BOLD}zaehler.sh — Verwaltungsskript für die Zählerstand-App${C_RESET}
 EOF
 }
 
+cmd_set_timezone() {
+    require_root
+    ensure_timezone "${1:-Europe/Berlin}"
+    log "Hinweis: Betrifft nur Logs/Backups/Timer — App-Zeiten regeln METERS_TIMEZONE + Browser."
+}
+
 # -----------------------------------------------------------------------------
 # Dispatcher
 # -----------------------------------------------------------------------------
@@ -1564,6 +1602,7 @@ case "${1:-help}" in
     upgrade-tools)   cmd_upgrade_tools ;;
     upgrade-app)     cmd_upgrade_app ;;
     upgrade-all)     cmd_upgrade_all ;;
+    set-timezone)    cmd_set_timezone "${2:-}" ;;
     backup)              cmd_backup ;;
     restore)             cmd_restore "${2:-}" ;;
     fix-database)        cmd_fix_database ;;

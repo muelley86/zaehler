@@ -17,6 +17,7 @@ Alles läuft über ein zentrales Verwaltungsskript:
 | Nur System (apt) | `bash zaehler.sh upgrade-system` |
 | Nur Tools (uv + pnpm) | `bash zaehler.sh upgrade-tools` |
 | Nur App-Code | `bash zaehler.sh upgrade-app` |
+| Zeitzone setzen | `bash zaehler.sh set-timezone [zone]` (Default Europe/Berlin) |
 | Sofort-Backup | `bash zaehler.sh backup` |
 | Backup einspielen | `bash zaehler.sh restore <datei.gz>` |
 | Status-Bericht | `bash zaehler.sh status` |
@@ -42,11 +43,17 @@ UTC.
 
 **Wichtig:** Erfassungs-/Verbrauchsdaten werden in der DB bewusst in **UTC**
 gespeichert und vom Browser in die lokale Zeit umgerechnet — daran ändert die
-Container-Zeitzone nichts. Auf einem bestehenden Container nachträglich:
+Container-Zeitzone nichts.
+
+Auf einem bestehenden Container, der noch auf UTC steht, nachträglich:
 
 ```bash
-timedatectl set-timezone Europe/Berlin && systemctl restart zaehler
+sudo zaehler set-timezone        # Europe/Berlin (idempotent)
 ```
+
+`upgrade-app`/`upgrade-all` setzen die Zeitzone seit v2.33.1 außerdem bei jedem
+Lauf idempotent mit — Bestands-Container konvergieren also automatisch beim
+nächsten Update auf Europe/Berlin.
 
 ## Update-Strategie
 
