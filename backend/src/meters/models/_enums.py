@@ -67,6 +67,7 @@ class AuditEntityType(enum.StrEnum):
     DELIVERY = "delivery"
     SESSION = "session"
     QR_TOKEN = "qr_token"
+    REPORT_CONFIG = "report_config"
 
 
 class ReportDimension(enum.StrEnum):
@@ -88,3 +89,16 @@ class ReportGranularity(enum.StrEnum):
     MONTH = "month"
     YEAR = "year"
     TOTAL = "total"
+
+
+class ReportPeriodKind(enum.StrEnum):
+    """Zeitraum-Definition einer gespeicherten Auswertung. ``FIXED`` nutzt feste
+    ``from_date``/``to_date``; die relativen Varianten werden beim Ausfuehren in
+    der lokalen Zeitzone des Nutzers zu konkreten Daten aufgeloest."""
+
+    FIXED = "fixed"
+    CURRENT_YEAR = "current_year"
+    LAST_12_MONTHS = "last_12_months"
+    CURRENT_MONTH = "current_month"
+    LAST_MONTH = "last_month"
+    ALL = "all"

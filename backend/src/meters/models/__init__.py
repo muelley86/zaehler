@@ -7,6 +7,7 @@ from meters.models._enums import (
     MeterType,
     ReportDimension,
     ReportGranularity,
+    ReportPeriodKind,
     UserRole,
 )
 from meters.models.audit_log import AuditLog
@@ -21,6 +22,7 @@ from meters.models.physical_meter import PhysicalMeter
 from meters.models.qr_token import QrToken
 from meters.models.reading import Reading
 from meters.models.register import Register
+from meters.models.report_config import ReportConfig
 from meters.models.session import Session
 from meters.models.user import User
 from meters.models.user_measuring_point_access import UserMeasuringPointAccess
@@ -43,8 +45,10 @@ __all__ = [
     "QrToken",
     "Reading",
     "Register",
+    "ReportConfig",
     "ReportDimension",
     "ReportGranularity",
+    "ReportPeriodKind",
     "Session",
     "User",
     "UserMeasuringPointAccess",
