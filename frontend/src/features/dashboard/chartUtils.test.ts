@@ -1,4 +1,4 @@
-import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 
 import {
   bucketEndIso,
@@ -9,16 +9,9 @@ import {
   saveGranularity,
 } from './chartUtils';
 
-// Zeitzone fuer diese Datei auf Europe/Berlin pinnen — die Lokalzeit-Bucketing-
-// Tests sollen deterministisch sein, unabhaengig von der TZ des Test-Runners.
-// Restore in afterAll, damit andere Testdateien im selben Worker unberuehrt bleiben.
-const ORIG_TZ = process.env.TZ;
-beforeAll(() => {
-  process.env.TZ = 'Europe/Berlin';
-});
-afterAll(() => {
-  process.env.TZ = ORIG_TZ;
-});
+// Hinweis: Die Zeitzone wird global in vite.config.ts (`test.env.TZ`) auf
+// Europe/Berlin gepinnt — die Lokalzeit-Bucketing-Tests unten sind deshalb
+// deterministisch, unabhaengig von der TZ des Test-Runners (CI laeuft in UTC).
 
 afterEach(() => {
   window.localStorage.clear();

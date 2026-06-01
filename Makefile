@@ -25,7 +25,7 @@ test-backend:
 	cd backend && uv run pytest -q
 
 test-frontend:
-	cd frontend && pnpm exec vitest run
+	cd frontend && pnpm test:run
 
 format: format-backend format-frontend
 
