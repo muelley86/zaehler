@@ -363,11 +363,16 @@ cmd_install() {
     msg_run "Node.js ${NODE_MAJOR_REQUIRED}.x sicherstellen"
     ensure_node_lts
 
-    step "2/10  Locale auf de_DE.UTF-8 setzen"
+    step "2/10  Locale (de_DE.UTF-8) + Zeitzone (Europe/Berlin) setzen"
     sed -i 's/^# *de_DE.UTF-8/de_DE.UTF-8/' /etc/locale.gen
     locale-gen >/dev/null
     update-locale LANG=de_DE.UTF-8
-    ok "Locale konfiguriert"
+    # Zeitzone auf Europe/Berlin (DST automatisch). Betrifft Logs, systemd-Timer
+    # (Backup) und Datei-Zeitstempel; DB/API bleiben bewusst UTC. Fallback ohne
+    # nutzbares timedatectl (manche LXC): /etc/localtime-Symlink.
+    timedatectl set-timezone Europe/Berlin 2>/dev/null \
+        || ln -sf /usr/share/zoneinfo/Europe/Berlin /etc/localtime
+    ok "Locale + Zeitzone konfiguriert"
 
     step "3/10  App-Benutzer und Verzeichnisse"
     if ! id "$APP_USER" &>/dev/null; then
