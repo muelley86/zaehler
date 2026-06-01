@@ -10,6 +10,13 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.28.0](https://github.com/muelley86/zaehler/compare/v2.27.4...v2.28.0) (2026-06-01)
+
+
+### Funktionen
+
+* **dashboard:** Diagrammtyp-/Granularitaets-Auswahl + Backend-Aggregation ([#138](https://github.com/muelley86/zaehler/issues/138)) ([28de5f0](https://github.com/muelley86/zaehler/commit/28de5f0702a716f1f0b869b64469c99cc17a8f84))
+
 ## [2.27.4](https://github.com/muelley86/zaehler/compare/v2.27.3...v2.27.4) (2026-05-29)
 
 
