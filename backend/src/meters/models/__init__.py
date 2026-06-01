@@ -5,6 +5,8 @@ from meters.models._enums import (
     AuditEntityType,
     HeatingSource,
     MeterType,
+    ReportDimension,
+    ReportGranularity,
     UserRole,
 )
 from meters.models.audit_log import AuditLog
@@ -41,6 +43,8 @@ __all__ = [
     "QrToken",
     "Reading",
     "Register",
+    "ReportDimension",
+    "ReportGranularity",
     "Session",
     "User",
     "UserMeasuringPointAccess",

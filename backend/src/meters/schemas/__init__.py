@@ -50,6 +50,7 @@ from meters.schemas.reading import (
     ReadingRead,
     ReadingUpdate,
 )
+from meters.schemas.report import ReportAggregateResponse, ReportRow
 from meters.schemas.search import SearchHit, SearchMatchKind
 from meters.schemas.state import RegisterStateRead
 from meters.schemas.user import (
@@ -105,6 +106,8 @@ __all__ = [
     "RegisterStateRead",
     "RegisterUpdate",
     "ReplaceMeterRequest",
+    "ReportAggregateResponse",
+    "ReportRow",
     "SearchHit",
     "SearchMatchKind",
     "TotpActivateRequest",

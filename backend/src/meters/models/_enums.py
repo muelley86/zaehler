@@ -67,3 +67,24 @@ class AuditEntityType(enum.StrEnum):
     DELIVERY = "delivery"
     SESSION = "session"
     QR_TOKEN = "qr_token"
+
+
+class ReportDimension(enum.StrEnum):
+    """Gruppierungs-Achse einer Auswertung (messstellen-uebergreifend)."""
+
+    KOSTENSTELLE = "kostenstelle"
+    OWNER = "owner"
+    LOCATION = "location"
+    MAIN_LOCATION = "main_location"
+    METER_TYPE = "meter_type"
+
+
+class ReportGranularity(enum.StrEnum):
+    """Zeitliche Aufloesung einer Auswertung. ``TOTAL`` = eine Summe je Gruppe
+    ueber den gesamten Zeitraum (keine Zeitreihe)."""
+
+    DAY = "day"
+    WEEK = "week"
+    MONTH = "month"
+    YEAR = "year"
+    TOTAL = "total"
