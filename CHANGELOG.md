@@ -10,6 +10,15 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.32.0](https://github.com/muelley86/zaehler/compare/v2.31.0...v2.32.0) (2026-06-01)
+
+
+### Funktionen
+
+* **reports:** Auswertungen-Seite mit Vergleich und CSV-Export ([#156](https://github.com/muelley86/zaehler/issues/156)) ([5228906](https://github.com/muelley86/zaehler/commit/522890699d76e32f53b4e0af3a472ba4077156eb))
+* **reports:** geteilte Auswertungs-Konfigurationen persistieren ([#158](https://github.com/muelley86/zaehler/issues/158)) ([8163730](https://github.com/muelley86/zaehler/commit/8163730c71f370e30f8400c3790f8f93c7f6284e))
+* **reports:** messstellen-übergreifender Aggregations-Endpoint + CSV ([#154](https://github.com/muelley86/zaehler/issues/154)) ([bd71327](https://github.com/muelley86/zaehler/commit/bd71327e1d1505808992938f7f0b073bf05bc1f3))
+
 ## [2.31.0](https://github.com/muelley86/zaehler/compare/v2.30.2...v2.31.0) (2026-06-01)
 
 
