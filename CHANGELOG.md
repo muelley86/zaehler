@@ -10,6 +10,13 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.34.0](https://github.com/muelley86/zaehler/compare/v2.33.1...v2.34.0) (2026-06-01)
+
+
+### Funktionen
+
+* **readings:** 00:00-Erfassungen an Periodengrenze auf Vortag 23:59:59 normalisieren ([#163](https://github.com/muelley86/zaehler/issues/163)) ([d23259e](https://github.com/muelley86/zaehler/commit/d23259e5d216fda66a6d141dfe21e6d0ffa0ef6f))
+
 ## [2.33.1](https://github.com/muelley86/zaehler/compare/v2.33.0...v2.33.1) (2026-06-01)
 
 
