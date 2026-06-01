@@ -10,6 +10,13 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.29.0](https://github.com/muelley86/zaehler/compare/v2.28.0...v2.29.0) (2026-06-01)
+
+
+### Funktionen
+
+* **dashboard:** Verbrauch/Produktion als prominente Kachel, Zaehlerstaende dezenter ([#141](https://github.com/muelley86/zaehler/issues/141)) ([40cdc67](https://github.com/muelley86/zaehler/commit/40cdc67dfd2ae4e1f931e21b6c54b18643689e37))
+
 ## [2.28.0](https://github.com/muelley86/zaehler/compare/v2.27.4...v2.28.0) (2026-06-01)
 
 
