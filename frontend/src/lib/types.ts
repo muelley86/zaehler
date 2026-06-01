@@ -267,7 +267,8 @@ export type ReportDimension =
   | 'owner'
   | 'location'
   | 'main_location'
-  | 'meter_type';
+  | 'meter_type'
+  | 'measuring_point';
 export type ReportGranularity = 'day' | 'week' | 'month' | 'year' | 'total';
 export type ReportPeriodKind =
   | 'fixed'

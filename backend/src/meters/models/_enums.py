@@ -78,6 +78,7 @@ class ReportDimension(enum.StrEnum):
     LOCATION = "location"
     MAIN_LOCATION = "main_location"
     METER_TYPE = "meter_type"
+    MEASURING_POINT = "measuring_point"
 
 
 class ReportGranularity(enum.StrEnum):

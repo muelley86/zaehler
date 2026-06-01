@@ -38,6 +38,7 @@ import {
 import type { ComparisonRow } from './reportUtils';
 
 const DIMENSIONS: ReportDimension[] = [
+  'measuring_point',
   'kostenstelle',
   'owner',
   'location',
@@ -98,7 +99,7 @@ export function ReportsPage() {
   const [points, setPoints] = useState<MeasuringPointRead[]>([]);
   const [error, setError] = useState<string | null>(null);
 
-  const [dimension, setDimension] = useState<ReportDimension>('kostenstelle');
+  const [dimension, setDimension] = useState<ReportDimension>('measuring_point');
   const [granularity, setGranularity] = useState<ReportGranularity>('total');
   const [periodKind, setPeriodKind] = useState<ReportPeriodKind>('current_year');
   const [customFrom, setCustomFrom] = useState('');
@@ -521,9 +522,13 @@ export function ReportsPage() {
         </div>
 
         {comparison ? (
-          <ComparisonTable rows={comparison} />
+          <ComparisonTable rows={comparison} groupHeader={DIMENSION_LABELS[dimension]} />
         ) : (
-          <ResultTable rows={result?.rows ?? []} showPeriod={showPeriodCol} />
+          <ResultTable
+            rows={result?.rows ?? []}
+            showPeriod={showPeriodCol}
+            groupHeader={DIMENSION_LABELS[dimension]}
+          />
         )}
 
         {configs.length > 0 ? (
@@ -593,7 +598,15 @@ function FilterGroup<T extends number | MeterType>({
   );
 }
 
-function ResultTable({ rows, showPeriod }: { rows: ReportRow[]; showPeriod: boolean }) {
+function ResultTable({
+  rows,
+  showPeriod,
+  groupHeader,
+}: {
+  rows: ReportRow[];
+  showPeriod: boolean;
+  groupHeader: string;
+}) {
   if (rows.length === 0) {
     return (
       <EmptyState
@@ -608,7 +621,7 @@ function ResultTable({ rows, showPeriod }: { rows: ReportRow[]; showPeriod: bool
       <table className="w-full text-body-sm">
         <thead className="text-caption-bold uppercase text-tertiary">
           <tr className="border-b border-border">
-            <th className="p-2 text-left">Gruppe</th>
+            <th className="p-2 text-left">{groupHeader}</th>
             <th className="p-2 text-left">Zählerart</th>
             {showPeriod ? <th className="p-2 text-left">Periode</th> : null}
             <th className="p-2 text-right">Verbrauch</th>
@@ -634,7 +647,7 @@ function ResultTable({ rows, showPeriod }: { rows: ReportRow[]; showPeriod: bool
   );
 }
 
-function ComparisonTable({ rows }: { rows: ComparisonRow[] }) {
+function ComparisonTable({ rows, groupHeader }: { rows: ComparisonRow[]; groupHeader: string }) {
   if (rows.length === 0) {
     return (
       <EmptyState
@@ -649,7 +662,7 @@ function ComparisonTable({ rows }: { rows: ComparisonRow[] }) {
       <table className="w-full text-body-sm">
         <thead className="text-caption-bold uppercase text-tertiary">
           <tr className="border-b border-border">
-            <th className="p-2 text-left">Gruppe</th>
+            <th className="p-2 text-left">{groupHeader}</th>
             <th className="p-2 text-left">Art</th>
             <th className="p-2 text-right">Aktuell</th>
             <th className="p-2 text-right">Vergleich</th>

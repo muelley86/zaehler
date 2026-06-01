@@ -157,6 +157,21 @@ def test_dimension_meter_type(admin_client: TestClient) -> None:
     assert float(by_label["Wasser"]["consumption"]) == 20.0
 
 
+def test_dimension_measuring_point(admin_client: TestClient) -> None:
+    # Je Zähler eine Zeile: group_label = MP-Name, group_key = MP-ID, Summe im Zeitraum.
+    a = _create_mp(admin_client, name="Halle Nord", serial="W-N")
+    b = _create_mp(admin_client, name="Halle Süd", serial="W-S")
+    _add(admin_client, _registers(a)["water"], "90", "2024-06-15T12:00:00Z")
+    _add(admin_client, _registers(b)["water"], "40", "2024-06-15T12:00:00Z")
+
+    body = _agg(admin_client, dimension="measuring_point", granularity="total")
+    by_label = {r["group_label"]: r for r in body["rows"]}
+    assert set(by_label) == {"Halle Nord", "Halle Süd"}
+    assert by_label["Halle Nord"]["group_key"] == a["id"]
+    assert float(by_label["Halle Nord"]["consumption"]) == 90.0
+    assert float(by_label["Halle Süd"]["consumption"]) == 40.0
+
+
 def test_dimension_owner(admin_client: TestClient) -> None:
     owner = admin_client.post("/api/v1/owners", json={"name": "Mustermann GmbH"})
     assert owner.status_code == 201, owner.text
