@@ -10,6 +10,13 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.31.0](https://github.com/muelley86/zaehler/compare/v2.30.2...v2.31.0) (2026-06-01)
+
+
+### Funktionen
+
+* **cli:** repair-legacy-timestamps — Altdaten-Korrektur (Dry-Run-Default) ([#152](https://github.com/muelley86/zaehler/issues/152)) ([a5cca1a](https://github.com/muelley86/zaehler/commit/a5cca1a91a2f0a009574df09ca021973bbd0cdaa))
+
 ## [2.30.2](https://github.com/muelley86/zaehler/compare/v2.30.1...v2.30.2) (2026-06-01)
 
 
