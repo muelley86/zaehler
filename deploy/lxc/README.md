@@ -269,6 +269,15 @@ sudo zaehler set-timezone <zone>     # andere IANA-Zone
 > Die in der App angezeigten Erfassungszeiten hängen **nicht** davon ab — die
 > regeln `METERS_TIMEZONE` (Backend) und die Browser-Zeitzone.
 
+**Daten-Reparaturen** (laufen als App-User mit gesourcter `meters.env`; Default
+Dry-Run, `--apply` schreibt und sichert vorher automatisch):
+
+```bash
+sudo zaehler repair-midnight-readings          # zeigt betroffene 00:00-Readings
+sudo zaehler repair-midnight-readings --apply  # verschiebt sie auf Vortag 23:59:59
+sudo zaehler repair-legacy-timestamps [--apply]  # naiv-UTC-Altdaten korrigieren
+```
+
 > **Hinweis:** `zaehler` ist ein Symlink auf
 > `/opt/zaehler/repo/deploy/lxc/zaehler.sh`, den die Installation
 > automatisch in `/usr/local/bin` ablegt. Du kannst alle Kommandos

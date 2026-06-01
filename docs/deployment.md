@@ -20,6 +20,8 @@ Alles läuft über ein zentrales Verwaltungsskript:
 | Zeitzone setzen | `bash zaehler.sh set-timezone [zone]` (Default Europe/Berlin) |
 | Sofort-Backup | `bash zaehler.sh backup` |
 | Backup einspielen | `bash zaehler.sh restore <datei.gz>` |
+| 00:00-Readings → Vortag 23:59:59 | `sudo zaehler repair-midnight-readings [--apply]` (Default Dry-Run; sichert vor `--apply`) |
+| Naiv-UTC-Altdaten korrigieren | `sudo zaehler repair-legacy-timestamps [--apply]` (Default Dry-Run; sichert vor `--apply`) |
 | Status-Bericht | `bash zaehler.sh status` |
 | Weiteren Admin nachträglich anlegen | `cd /opt/zaehler/repo/backend && uv run python -m meters.cli create-admin --username admin --password '…' --force-change` |
 

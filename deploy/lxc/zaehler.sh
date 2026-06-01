@@ -14,6 +14,8 @@
 #      set-timezone [tz]  System-Zeitzone setzen (Default Europe/Berlin)
 #      backup             SQLite-Datenbank sofort sichern
 #      restore <datei>    DB aus Backup wiederherstellen
+#      repair-midnight-readings [--apply]   00:00-Readings -> Vortag 23:59:59
+#      repair-legacy-timestamps [--apply]   naiv-UTC-Readings korrigieren
 #      status             Übersicht: Service, Versionen, DB-Größe, letztes Backup
 #      help               Befehlsreferenz
 #
@@ -1539,6 +1541,13 @@ ${C_BOLD}zaehler.sh — Verwaltungsskript für die Zählerstand-App${C_RESET}
                          Admin neu anlegen, alles andere neu eintragen)
     rollback <ref>       Auf eine frühere Tag/Commit-Version zurückgehen
                          (Backup → checkout → build → restart)
+    repair-midnight-readings [--apply]
+                         00:00-Readings auf den Vortag 23:59:59 verschieben
+                         (Perioden-Zuordnung). Default: Dry-Run; --apply
+                         schreibt (sichert vorher automatisch).
+    repair-legacy-timestamps [--apply]
+                         Synthetische Readings mit naiv-UTC-Zeit korrigieren.
+                         Default: Dry-Run; --apply schreibt (sichert vorher).
 
   ${C_BOLD}Benutzer-Verwaltung:${C_RESET}
     reset-password       Passwort eines Users neu setzen (z. B. Admin
@@ -1592,6 +1601,35 @@ cmd_set_timezone() {
     log "Hinweis: Betrifft nur Logs/Backups/Timer — App-Zeiten regeln METERS_TIMEZONE + Browser."
 }
 
+# Fuehrt ein meters.cli-Reparatur-Kommando robust aus: als App-User mit Login-
+# Shell (uv im PATH) und gesourcter meters.env (richtige DATABASE_URL) — via
+# as_user. Akzeptiert genau ein optionales --apply; bei --apply wird vorher
+# automatisch ein DB-Backup gezogen.
+_run_meters_repair() {
+    require_root
+    local sub="$1"
+    local arg="${2:-}"
+    [ -d "$REPO_DIR/.git" ] || die "Kein Repository unter $REPO_DIR — bitte erst 'install' ausführen."
+    local extra=""
+    if [ "$arg" = "--apply" ]; then
+        extra="--apply"
+    elif [ -n "$arg" ]; then
+        die "Unbekanntes Argument '$arg' (nur --apply erlaubt)."
+    fi
+    if [ "$extra" = "--apply" ]; then
+        "$REPO_DIR/deploy/lxc/backup.sh" || warn "Backup fehlgeschlagen — Reparatur wird trotzdem fortgesetzt."
+    fi
+    as_user "cd '$REPO_DIR/backend' && uv run python -m meters.cli $sub $extra"
+}
+
+cmd_repair_midnight_readings() {
+    _run_meters_repair repair-midnight-readings "${1:-}"
+}
+
+cmd_repair_legacy_timestamps() {
+    _run_meters_repair repair-legacy-timestamps "${1:-}"
+}
+
 # -----------------------------------------------------------------------------
 # Dispatcher
 # -----------------------------------------------------------------------------
@@ -1607,6 +1645,8 @@ case "${1:-help}" in
     restore)             cmd_restore "${2:-}" ;;
     fix-database)        cmd_fix_database ;;
     rollback)            cmd_rollback "${2:-}" ;;
+    repair-midnight-readings)  cmd_repair_midnight_readings "${2:-}" ;;
+    repair-legacy-timestamps)  cmd_repair_legacy_timestamps "${2:-}" ;;
     reset-password)      cmd_reset_password ;;
     configure)           cmd_configure ;;
     configure-network)   cmd_configure_network ;;
