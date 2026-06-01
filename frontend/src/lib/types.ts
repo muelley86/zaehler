@@ -259,3 +259,59 @@ export interface QrTokenResolveResponse {
   measuring_point_id: number | null;
   can_assign: boolean;
 }
+
+// --- Auswertungen (Reports) -------------------------------------------------
+
+export type ReportDimension =
+  | 'kostenstelle'
+  | 'owner'
+  | 'location'
+  | 'main_location'
+  | 'meter_type';
+export type ReportGranularity = 'day' | 'week' | 'month' | 'year' | 'total';
+export type ReportPeriodKind =
+  | 'fixed'
+  | 'current_year'
+  | 'last_12_months'
+  | 'current_month'
+  | 'last_month'
+  | 'all';
+
+export interface ReportFilter {
+  main_location_ids: (number | null)[];
+  location_ids: (number | null)[];
+  owner_ids: (number | null)[];
+  kostenstellen: (number | null)[];
+  meter_types: MeterType[];
+}
+
+export interface ReportRow {
+  group_key: number | null;
+  group_label: string;
+  meter_type: MeterType;
+  unit: string;
+  period_start: string | null;
+  period_end: string | null;
+  consumption: string;
+}
+
+export interface ReportAggregateResponse {
+  dimension: ReportDimension;
+  granularity: ReportGranularity;
+  from_date: string | null;
+  to_date: string | null;
+  partial: boolean;
+  rows: ReportRow[];
+}
+
+export interface ReportConfigRead {
+  id: number;
+  name: string;
+  dimension: ReportDimension;
+  granularity: ReportGranularity;
+  period_kind: ReportPeriodKind;
+  from_date: string | null;
+  to_date: string | null;
+  filters: ReportFilter;
+  created_at: string;
+}
