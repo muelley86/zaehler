@@ -84,6 +84,9 @@ const SessionsAdminPage = lazy(() =>
 const MorePage = lazy(() =>
   import('@/features/more/MorePage').then((m) => ({ default: m.MorePage })),
 );
+const ReportsPage = lazy(() =>
+  import('@/features/reports/ReportsPage').then((m) => ({ default: m.ReportsPage })),
+);
 
 function RouteFallback(): JSX.Element {
   return <div className="flex h-full items-center justify-center text-tertiary">Lade…</div>;
@@ -167,6 +170,7 @@ export function App() {
           <Route path="/erfassen" element={<RecordReadingPage />} />
           <Route path="/q/:token" element={<QrShortRedirect />} />
           <Route path="/erfassungen" element={<ReadingsListPage />} />
+          <Route path="/auswertungen" element={<ReportsPage />} />
           <Route path="/mehr" element={<MorePage />} />
           <Route path="/passwort-aendern" element={<ChangePasswordPage />} />
           <Route path="/2fa-einrichten" element={<TwoFactorSetupPage />} />

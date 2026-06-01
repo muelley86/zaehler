@@ -13,6 +13,7 @@
 
 import { useState, type ReactNode } from 'react';
 import {
+  BarChart3,
   ClipboardList,
   Gauge,
   LayoutDashboard,
@@ -41,6 +42,7 @@ const PRIMARY_NAV: NavItem[] = [
   { to: '/', label: 'Dashboard', icon: <LayoutDashboard size={18} />, end: true },
   { to: '/erfassen', label: 'Erfassen', icon: <PencilLine size={18} /> },
   { to: '/erfassungen', label: 'Erfassungen', icon: <ClipboardList size={18} /> },
+  { to: '/auswertungen', label: 'Auswertungen', icon: <BarChart3 size={18} /> },
 ];
 
 // Sekundäre Navigation: enthält /mehr (Profil, 2FA, Theme, Logout). Auf
