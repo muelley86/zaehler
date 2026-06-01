@@ -10,6 +10,13 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.34.1](https://github.com/muelley86/zaehler/compare/v2.34.0...v2.34.1) (2026-06-01)
+
+
+### Fehlerbehebungen
+
+* **deploy:** zaehler-Wrapper für repair-midnight-readings/-legacy-timestamps ([#165](https://github.com/muelley86/zaehler/issues/165)) ([6f26831](https://github.com/muelley86/zaehler/commit/6f26831f818797bfb8a42ed9a17eac4ba820d977))
+
 ## [2.34.0](https://github.com/muelley86/zaehler/compare/v2.33.1...v2.34.0) (2026-06-01)
 
 
