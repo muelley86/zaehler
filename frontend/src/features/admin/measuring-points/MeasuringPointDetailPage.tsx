@@ -480,7 +480,8 @@ function StammdatenEditForm({
         is_bidirectional: bidi,
         has_dual_tariff: dual,
       };
-      if (mp.type === 'heating') {
+      // Fernwärme hat keinen Tank -> Feld ausgeblendet, also nicht senden.
+      if (mp.type === 'heating' && mp.heating_source !== 'district_heat') {
         if (tankCapacity.trim() === '') {
           body['clear_tank_capacity'] = true;
         } else {
@@ -614,7 +615,7 @@ function StammdatenEditForm({
           hint="leer = nicht gesetzt"
         />
       ) : null}
-      {mp.type === 'heating' ? (
+      {mp.type === 'heating' && mp.heating_source !== 'district_heat' ? (
         <TextField
           label="Tankvolumen / Vorratsmenge (optional)"
           inputMode="decimal"
@@ -1242,6 +1243,7 @@ function RegisterTable({
             meter={activeMeter}
             onClose={() => setEditing(false)}
             onChanged={onChanged}
+            allowDeliveries={mp.heating_source !== 'district_heat'}
           />
         </div>
       ) : allRegisters.length === 0 ? (
@@ -1328,10 +1330,12 @@ function HeatingRegisterEditor({
   meter,
   onClose,
   onChanged,
+  allowDeliveries = true,
 }: {
   meter: PhysicalMeterRead;
   onClose: () => void;
   onChanged: () => void;
+  allowDeliveries?: boolean;
 }) {
   const [adding, setAdding] = useState(false);
   const [draft, setDraft] = useState({
@@ -1443,11 +1447,13 @@ function HeatingRegisterEditor({
               </option>
             ))}
           </Select>
-          <ToggleRow
-            label="Nachfüllbar (Lieferungen)"
-            checked={draft.accepts_deliveries}
-            onChange={(v) => setDraft((d) => ({ ...d, accepts_deliveries: v }))}
-          />
+          {allowDeliveries ? (
+            <ToggleRow
+              label="Nachfüllbar (Lieferungen)"
+              checked={draft.accepts_deliveries}
+              onChange={(v) => setDraft((d) => ({ ...d, accepts_deliveries: v }))}
+            />
+          ) : null}
           <TextField
             label="Anfangsstand (optional)"
             inputMode="decimal"

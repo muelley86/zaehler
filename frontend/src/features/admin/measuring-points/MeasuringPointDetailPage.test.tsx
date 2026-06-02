@@ -164,6 +164,24 @@ const _heizung: MeasuringPointRead = {
   ],
 };
 
+const _fernwaerme: MeasuringPointRead = {
+  ..._heizung,
+  name: 'Fernwärme Anschluss',
+  heating_source: 'district_heat',
+  tank_capacity: null,
+  physical_meters: [
+    {
+      id: 20,
+      serial_number: 'FW-1',
+      installed_at: '2024-06-01',
+      removed_at: null,
+      registers: [
+        { id: 200, obis_code: 'heat.0', label: 'Wärmemengenzähler', unit: 'kWh', ..._baseRegister },
+      ],
+    },
+  ],
+};
+
 // --- Tests ----------------------------------------------------------------
 
 describe('MeasuringPointDetailPage Stammdaten-Card', () => {
@@ -192,6 +210,28 @@ describe('MeasuringPointDetailPage Stammdaten-Card', () => {
     expect(screen.getByRole('button', { name: /Abbrechen/i })).toBeInTheDocument();
     // Wandlerfaktor erscheint nur bei Strom.
     expect(screen.getByLabelText(/Wandlerfaktor/i)).toBeInTheDocument();
+  });
+
+  it('zeigt Tankvolumen im Edit-Formular bei Heizöl', async () => {
+    _mockMp(_heizung);
+    renderWithRouter(<MeasuringPointDetailPage />, {
+      initialEntries: ['/admin/messstellen/1'],
+    });
+    const editButtons = await screen.findAllByRole('button', { name: /^Bearbeiten$/ });
+    fireEvent.click(editButtons[0]!);
+    expect(await screen.findByLabelText(/Tankvolumen/i)).toBeInTheDocument();
+  });
+
+  it('blendet Tankvolumen im Edit-Formular bei Fernwärme aus', async () => {
+    _mockMp(_fernwaerme);
+    renderWithRouter(<MeasuringPointDetailPage />, {
+      initialEntries: ['/admin/messstellen/1'],
+    });
+    const editButtons = await screen.findAllByRole('button', { name: /^Bearbeiten$/ });
+    fireEvent.click(editButtons[0]!);
+    // Edit-Modus offen (Standort-Select da), aber kein Tankvolumen-Feld.
+    expect(await screen.findByLabelText(/Standort/i)).toBeInTheDocument();
+    expect(screen.queryByLabelText(/Tankvolumen/i)).not.toBeInTheDocument();
   });
 });
 
