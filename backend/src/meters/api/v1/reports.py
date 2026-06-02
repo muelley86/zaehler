@@ -39,6 +39,7 @@ _DIMENSION_LABELS: dict[ReportDimension, str] = {
     ReportDimension.LOCATION: "Standort",
     ReportDimension.MAIN_LOCATION: "Hauptstandort",
     ReportDimension.METER_TYPE: "Zählerart",
+    ReportDimension.MEASURING_POINT: "Messstelle",
 }
 
 
