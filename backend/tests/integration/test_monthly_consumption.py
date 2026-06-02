@@ -111,3 +111,36 @@ def test_recompute_all_returns_register_count(admin_client: TestClient, db: Sess
     n = recompute_all(db)
     db.commit()
     assert n >= 1
+
+
+# --- Cache-Invalidierung über den Session-Hook (B2b) ------------------------
+# Diese Tests rufen KEIN recompute_register explizit auf — die Tabelle muss
+# allein durch den zentralen after_commit-Hook aktuell sein.
+
+
+def test_hook_keeps_table_in_sync_on_reading_create(admin_client: TestClient, db: Session) -> None:
+    mp_id, reg_id = _setup(admin_client)
+    _add(admin_client, reg_id, "110.000", "2024-01-15T12:00:00")
+    _add(admin_client, reg_id, "160.000", "2024-02-10T12:00:00")
+
+    endpoint = {
+        date.fromisoformat(p["period_end"]): Decimal(p["consumption"])
+        for p in admin_client.get(
+            f"/api/v1/measuring-points/{mp_id}/consumption", params={"granularity": "month"}
+        ).json()
+    }
+    assert _table(db, reg_id) == endpoint  # Hook hat die Tabelle gefüllt
+    assert endpoint
+
+
+def test_hook_updates_table_on_reading_delete(admin_client: TestClient, db: Session) -> None:
+    _, reg_id = _setup(admin_client)
+    _add(admin_client, reg_id, "110.000", "2024-01-15T12:00:00")
+    r2 = admin_client.post(
+        "/api/v1/readings",
+        json={"register_id": reg_id, "value": "160.000", "reading_at": "2024-02-10T12:00:00"},
+    ).json()
+    assert date(2024, 2, 29) in _table(db, reg_id)  # Hook hat Februar-Bucket angelegt
+
+    admin_client.delete(f"/api/v1/readings/{r2['id']}")
+    assert date(2024, 2, 29) not in _table(db, reg_id)  # Hook hat ihn wieder entfernt

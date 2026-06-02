@@ -26,6 +26,7 @@ from meters.core.config import (
 from meters.core.logging import configure_logging
 from meters.core.middleware import install_origin_check, install_security_headers
 from meters.core.problem import ProblemError, install_problem_handlers
+from meters.services.monthly_consumption import register_monthly_consumption_hooks
 
 # Cache-Header für die von Vite gehashten Bundle-Dateien unter /assets.
 # Dateinamen enthalten einen Content-Hash (z. B. ``index-a1b2c3d4.js``),
@@ -73,6 +74,10 @@ def create_app() -> FastAPI:
     # Volume noch nicht existiert (erster Container-Start). Pillow-Save
     # würde sonst FileNotFoundError werfen.
     settings.media_dir.mkdir(parents=True, exist_ok=True)
+    # Cache-Invalidierung für die materialisierte Monats-Statistik: ein
+    # zentraler Session-Hook hält monthly_consumption nach jeder Ablese-
+    # Änderung aktuell (siehe services/monthly_consumption.py).
+    register_monthly_consumption_hooks()
     app.include_router(api_router)
 
     @app.get("/api/v1/health", tags=["health"])
