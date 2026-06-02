@@ -10,6 +10,18 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.38.0](https://github.com/muelley86/zaehler/compare/v2.37.0...v2.38.0) (2026-06-02)
+
+
+### Funktionen
+
+* **consumption:** materialisierte monthly_consumption-Tabelle + Recompute ([#183](https://github.com/muelley86/zaehler/issues/183)) ([05bc914](https://github.com/muelley86/zaehler/commit/05bc9140be57c56007fc99c105b0b1e2a161067d))
+
+
+### Fehlerbehebungen
+
+* **readings:** historische Monatswerte auf Monatsende 23:59:59 statt 12:00 ([#184](https://github.com/muelley86/zaehler/issues/184)) ([8de9972](https://github.com/muelley86/zaehler/commit/8de9972a7ea9b88dc860fd6e29eb06ab4ccd37d0))
+
 ## [2.37.0](https://github.com/muelley86/zaehler/compare/v2.36.0...v2.37.0) (2026-06-02)
 
 
