@@ -351,7 +351,7 @@ function ReadingsForm({
   const [values, setValues] = useState<Record<number, string>>({});
   const [readingAt, setReadingAt] = useState(nowForInput());
   const [note, setNote] = useState('');
-  const [photo, setPhoto] = useState<File | null>(null);
+  const [photos, setPhotos] = useState<File[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -362,7 +362,7 @@ function ReadingsForm({
     setValues({});
     setReadingAt(nowForInput());
     setNote('');
-    setPhoto(null);
+    setPhotos([]);
     setSuccess(null);
     setError(null);
     setPhotoWarning(null);
@@ -444,7 +444,7 @@ function ReadingsForm({
       // bekommt eine separate Warnung.
       let photoUploaded = 0;
       let gpsWasMissing = false;
-      if (photo && savedIds.length > 0) {
+      if (photos.length > 0 && savedIds.length > 0) {
         // Browser-Position einmalig als Fallback holen — Backend
         // bevorzugt EXIF-GPS und nutzt diese Werte nur, wenn das Foto
         // keine GPS-Tags hat (typisch fuer iOS-capture-Aufnahmen).
@@ -453,24 +453,26 @@ function ReadingsForm({
         // Client-side komprimieren — iPhone-Original ist oft 4–6 MB, im
         // Keller mit schwachem LTE ein Upload-Killer. Schlaegt Decode
         // fehl (Desktop-HEIC), bleibt das Original und Pillow uebernimmt.
-        const uploadFile = await compressImage(photo);
-        for (const id of savedIds) {
-          const fd = new FormData();
-          fd.append('photo', uploadFile);
-          if (fallbackGps) {
-            fd.append('gps_lat', String(fallbackGps.lat));
-            fd.append('gps_lon', String(fallbackGps.lon));
-          }
-          try {
-            await api.upload<ReadingRead>(`/readings/${id}/photo`, fd);
-            photoUploaded += 1;
-          } catch (err) {
-            const reason =
-              err instanceof ApiError ? (err.problem.detail ?? err.problem.title) : 'unbekannt';
-            setPhotoWarning(
-              `Foto konnte nicht hochgeladen werden (${reason}). Du kannst es später im Bearbeiten-Dialog nachreichen.`,
-            );
-            break;
+        const uploadFiles = await Promise.all(photos.map((p) => compressImage(p)));
+        outer: for (const id of savedIds) {
+          for (const file of uploadFiles) {
+            const fd = new FormData();
+            fd.append('photo', file);
+            if (fallbackGps) {
+              fd.append('gps_lat', String(fallbackGps.lat));
+              fd.append('gps_lon', String(fallbackGps.lon));
+            }
+            try {
+              await api.upload<ReadingRead>(`/readings/${id}/photos`, fd, 'POST');
+              photoUploaded += 1;
+            } catch (err) {
+              const reason =
+                err instanceof ApiError ? (err.problem.detail ?? err.problem.title) : 'unbekannt';
+              setPhotoWarning(
+                `Foto konnte nicht hochgeladen werden (${reason}). Du kannst es später im Bearbeiten-Dialog nachreichen.`,
+              );
+              break outer;
+            }
           }
         }
       }
@@ -479,7 +481,11 @@ function ReadingsForm({
           savedCount === 1
             ? '1 Stand gespeichert.'
             : `${savedCount} Stände gespeichert (${formatDateTimeDe(readingAt)}).`;
-        setSuccess(photoUploaded > 0 ? `${baseMsg} Foto angehängt.` : baseMsg);
+        setSuccess(
+          photoUploaded > 0
+            ? `${baseMsg} ${photos.length === 1 ? 'Foto' : `${photos.length} Fotos`} angehängt.`
+            : baseMsg,
+        );
         // Hinweis, wenn der Standort weder per EXIF noch ueber das Geraet
         // bestimmt werden konnte — z.B. weil der User Standort-Zugriff
         // verweigert hat. Der Upload selbst war erfolgreich.
@@ -490,7 +496,7 @@ function ReadingsForm({
         }
         setValues({});
         setNote('');
-        setPhoto(null);
+        setPhotos([]);
         onSaved();
       }
     } catch (err) {
@@ -541,9 +547,9 @@ function ReadingsForm({
         </div>
       </Section>
 
-      <Section header="Foto (optional)">
+      <Section header="Fotos (optional, bis zu 6)">
         <div className="p-5">
-          <PhotoPicker photo={photo} onChange={setPhoto} />
+          <PhotoPicker photos={photos} onChange={setPhotos} />
         </div>
       </Section>
 
@@ -578,50 +584,55 @@ function ReadingsForm({
   );
 }
 
-function PhotoPicker({
-  photo,
-  onChange,
-}: {
-  photo: File | null;
-  onChange: (file: File | null) => void;
-}) {
+const MAX_PHOTOS = 6;
+
+function PhotoThumb({ file, onRemove }: { file: File; onRemove: () => void }) {
+  const [url, setUrl] = useState<string | null>(null);
+  useEffect(() => {
+    const u = URL.createObjectURL(file);
+    setUrl(u);
+    return () => URL.revokeObjectURL(u);
+  }, [file]);
+  return (
+    <div className="relative">
+      {url ? (
+        <img
+          src={url}
+          alt="Vorschau"
+          className="h-20 w-20 rounded-card border-hairline border-border object-cover"
+        />
+      ) : null}
+      <button
+        type="button"
+        onClick={onRemove}
+        aria-label="Foto entfernen"
+        className="absolute -right-1.5 -top-1.5 inline-flex h-6 w-6 items-center justify-center rounded-full bg-danger text-white shadow"
+      >
+        <X size={13} />
+      </button>
+    </div>
+  );
+}
+
+function PhotoPicker({ photos, onChange }: { photos: File[]; onChange: (files: File[]) => void }) {
   // Zwei separate Inputs: Kamera mit ``capture``, Galerie ohne. Auf
   // iOS-Standalone-PWAs faellt der Picker ohne ``capture`` oft trotzdem
-  // direkt auf die Kamera zurueck, statt eine Galerie-Auswahl
-  // anzubieten. Mit zwei Inputs entscheidet der User schon per
-  // Button-Klick eindeutig.
+  // direkt auf die Kamera zurueck. Mit zwei Inputs entscheidet der User
+  // schon per Button-Klick eindeutig. Galerie erlaubt Mehrfachauswahl.
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const galleryInputRef = useRef<HTMLInputElement>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const full = photos.length >= MAX_PHOTOS;
 
-  useEffect(() => {
-    if (!photo) {
-      setPreviewUrl(null);
-      return;
-    }
-    const url = URL.createObjectURL(photo);
-    setPreviewUrl(url);
-    return () => URL.revokeObjectURL(url);
-  }, [photo]);
-
-  function onFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0] ?? null;
-    onChange(file);
-    // Kein "e.target.value = ''" hier — iOS Safari koppelt dann den
-    // Blob-Storage des frisch gewaehlten Files ab. Reset erfolgt erst
-    // beim naechsten Picker-Aufruf (siehe ``openCamera``/``openGallery``).
+  function addFiles(picked: FileList | null) {
+    if (!picked || picked.length === 0) return;
+    const room = MAX_PHOTOS - photos.length;
+    onChange([...photos, ...Array.from(picked).slice(0, room)]);
   }
 
-  function openCamera() {
-    if (!cameraInputRef.current) return;
-    cameraInputRef.current.value = '';
-    cameraInputRef.current.click();
-  }
-
-  function openGallery() {
-    if (!galleryInputRef.current) return;
-    galleryInputRef.current.value = '';
-    galleryInputRef.current.click();
+  function open(ref: React.RefObject<HTMLInputElement>) {
+    if (!ref.current) return;
+    ref.current.value = '';
+    ref.current.click();
   }
 
   return (
@@ -631,7 +642,7 @@ function PhotoPicker({
         type="file"
         accept="image/*"
         capture="environment"
-        onChange={onFileChange}
+        onChange={(e) => addFiles(e.target.files)}
         className="hidden"
         data-testid="record-photo-camera-input"
       />
@@ -639,73 +650,47 @@ function PhotoPicker({
         ref={galleryInputRef}
         type="file"
         accept="image/*"
-        onChange={onFileChange}
+        multiple
+        onChange={(e) => addFiles(e.target.files)}
         className="hidden"
         data-testid="record-photo-gallery-input"
       />
-      {previewUrl ? (
-        <div className="flex items-center gap-3">
-          <img
-            src={previewUrl}
-            alt="Vorschau"
-            className="h-24 w-24 rounded-card border-hairline border-border object-cover"
-          />
-          <div className="flex flex-1 flex-col gap-2">
-            <div className="text-caption text-tertiary">
-              {photo?.name} · {photo ? Math.round(photo.size / 1024) : 0} KB
-            </div>
-            <div className="flex flex-wrap gap-1.5">
-              <Button
-                type="button"
-                variant="bordered"
-                size="sm"
-                leftIcon={<Camera size={14} />}
-                onClick={openCamera}
-              >
-                Neu aufnehmen
-              </Button>
-              <Button
-                type="button"
-                variant="bordered"
-                size="sm"
-                leftIcon={<ImageIcon size={14} />}
-                onClick={openGallery}
-              >
-                Aus Galerie
-              </Button>
-              <Button
-                type="button"
-                variant="plain"
-                size="sm"
-                leftIcon={<X size={14} />}
-                onClick={() => onChange(null)}
-                className="text-danger"
-              >
-                Entfernen
-              </Button>
-            </div>
-          </div>
+      {photos.length > 0 ? (
+        <div className="flex flex-wrap gap-2">
+          {photos.map((file, idx) => (
+            <PhotoThumb
+              key={idx}
+              file={file}
+              onRemove={() => onChange(photos.filter((_, i) => i !== idx))}
+            />
+          ))}
         </div>
-      ) : (
-        <div className="flex flex-wrap gap-1.5">
-          <Button
-            type="button"
-            variant="bordered"
-            leftIcon={<Camera size={16} />}
-            onClick={openCamera}
-          >
-            Foto aufnehmen
-          </Button>
-          <Button
-            type="button"
-            variant="bordered"
-            leftIcon={<ImageIcon size={16} />}
-            onClick={openGallery}
-          >
-            Aus Galerie
-          </Button>
-        </div>
-      )}
+      ) : null}
+      <div className="flex flex-wrap items-center gap-1.5">
+        <Button
+          type="button"
+          variant="bordered"
+          size="sm"
+          leftIcon={<Camera size={16} />}
+          onClick={() => open(cameraInputRef)}
+          disabled={full}
+        >
+          Foto aufnehmen
+        </Button>
+        <Button
+          type="button"
+          variant="bordered"
+          size="sm"
+          leftIcon={<ImageIcon size={16} />}
+          onClick={() => open(galleryInputRef)}
+          disabled={full}
+        >
+          Aus Galerie
+        </Button>
+        <span className="text-caption text-tertiary">
+          {photos.length}/{MAX_PHOTOS}
+        </span>
+      </div>
     </div>
   );
 }

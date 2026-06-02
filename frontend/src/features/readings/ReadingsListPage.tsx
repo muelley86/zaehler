@@ -26,7 +26,14 @@ import {
   toInputDateTime,
 } from '@/lib/format';
 import { tryGetDeviceLocation } from '@/lib/geo';
-import type { DeliveryRead, Me, MeasuringPointRead, MeterType, ReadingRead } from '@/lib/types';
+import type {
+  DeliveryRead,
+  Me,
+  MeasuringPointRead,
+  MeterType,
+  ReadingPhotoRead,
+  ReadingRead,
+} from '@/lib/types';
 import { cx } from '@/components/ui/cx';
 
 import { TYPE_LABELS } from '@/lib/meterLabels';
@@ -82,8 +89,7 @@ export function ReadingsListPage() {
   const [editTarget, setEditTarget] = useState<EditTarget | null>(null);
   const [lightboxPhoto, setLightboxPhoto] = useState<{
     id: number;
-    lat: number | null;
-    lon: number | null;
+    photos: ReadingPhotoRead[];
   } | null>(null);
 
   const [locationFilter, setLocationFilter] = useState<Set<number | null>>(new Set());
@@ -573,8 +579,7 @@ export function ReadingsListPage() {
       {lightboxPhoto !== null ? (
         <PhotoLightbox
           readingId={lightboxPhoto.id}
-          lat={lightboxPhoto.lat}
-          lon={lightboxPhoto.lon}
+          photos={lightboxPhoto.photos}
           onClose={() => setLightboxPhoto(null)}
         />
       ) : null}
@@ -631,7 +636,7 @@ const ReadingItem = memo(function ReadingItem({
   me: Me | null;
   setEditTarget: (target: EditTarget) => void;
   onChanged: () => void;
-  onOpenPhoto: (photo: { id: number; lat: number | null; lon: number | null }) => void;
+  onOpenPhoto: (photo: { id: number; photos: ReadingPhotoRead[] }) => void;
 }) {
   const editable = me ? canEdit(me, reading) : false;
   const correction = kind === 'correction';
@@ -682,23 +687,17 @@ const ReadingItem = memo(function ReadingItem({
                 Korrektur
               </span>
             ) : null}
-            {reading.has_photo ? (
+            {reading.photos.length > 0 ? (
               <button
                 type="button"
-                onClick={() =>
-                  onOpenPhoto({
-                    id: reading.id,
-                    lat: reading.photo_lat,
-                    lon: reading.photo_lon,
-                  })
-                }
-                aria-label="Foto anzeigen"
-                title="Foto anzeigen"
+                onClick={() => onOpenPhoto({ id: reading.id, photos: reading.photos })}
+                aria-label="Fotos anzeigen"
+                title="Fotos anzeigen"
                 data-testid="reading-photo-indicator"
                 className="inline-flex items-center gap-1 rounded-full bg-fill px-2 py-0.5 text-caption text-primary hover:bg-fill-strong"
               >
                 <ImageIcon size={12} />
-                Foto
+                {reading.photos.length > 1 ? `Fotos (${reading.photos.length})` : 'Foto'}
               </button>
             ) : null}
           </div>
@@ -863,8 +862,8 @@ function EditForm({
   const [value, setValue] = useState(reading.value.replace('.', ','));
   const [readingAt, setReadingAt] = useState(toInputDateTime(reading.reading_at));
   const [note, setNote] = useState(reading.note ?? '');
-  const [pendingPhoto, setPendingPhoto] = useState<File | null>(null);
-  const [removePhoto, setRemovePhoto] = useState(false);
+  const [pendingPhotos, setPendingPhotos] = useState<File[]>([]);
+  const [removeIds, setRemoveIds] = useState<number[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -881,19 +880,22 @@ function EditForm({
   }
 
   async function applyPhotoChange(): Promise<void> {
-    if (pendingPhoto) {
-      const fd = new FormData();
-      fd.append('photo', pendingPhoto);
-      // Fallback fuer EXIF-Strip auf iOS: Browser-Position mitsenden.
+    for (const pid of removeIds) {
+      await api.delete(`/readings/${reading.id}/photos/${pid}`);
+    }
+    if (pendingPhotos.length > 0) {
+      // Fallback fuer EXIF-Strip auf iOS: Browser-Position einmal holen.
       // Backend nutzt sie nur, wenn das EXIF kein GPS hat.
       const fallbackGps = await tryGetDeviceLocation();
-      if (fallbackGps) {
-        fd.append('gps_lat', String(fallbackGps.lat));
-        fd.append('gps_lon', String(fallbackGps.lon));
+      for (const file of pendingPhotos) {
+        const fd = new FormData();
+        fd.append('photo', file);
+        if (fallbackGps) {
+          fd.append('gps_lat', String(fallbackGps.lat));
+          fd.append('gps_lon', String(fallbackGps.lon));
+        }
+        await api.upload<ReadingRead>(`/readings/${reading.id}/photos`, fd, 'POST');
       }
-      await api.upload<ReadingRead>(`/readings/${reading.id}/photo`, fd);
-    } else if (removePhoto && reading.has_photo) {
-      await api.delete(`/readings/${reading.id}/photo`);
     }
   }
 
@@ -962,21 +964,16 @@ function EditForm({
 
       <PhotoEditField
         readingId={reading.id}
-        hasExisting={reading.has_photo}
-        pending={pendingPhoto}
-        removeExisting={removePhoto}
-        onPick={(file) => {
-          setPendingPhoto(file);
-          setRemovePhoto(false);
-        }}
-        onRemove={() => {
-          setPendingPhoto(null);
-          setRemovePhoto(true);
-        }}
-        onUndo={() => {
-          setPendingPhoto(null);
-          setRemovePhoto(false);
-        }}
+        existing={reading.photos}
+        pending={pendingPhotos}
+        removeIds={removeIds}
+        onAdd={(files) => setPendingPhotos((prev) => [...prev, ...files])}
+        onRemovePending={(idx) => setPendingPhotos((prev) => prev.filter((_, i) => i !== idx))}
+        onToggleExisting={(pid) =>
+          setRemoveIds((prev) =>
+            prev.includes(pid) ? prev.filter((x) => x !== pid) : [...prev, pid],
+          )
+        }
       />
 
       <div className="flex gap-2">
@@ -991,74 +988,54 @@ function EditForm({
   );
 }
 
+const MAX_PHOTOS_PER_READING = 6;
+
 function PhotoEditField({
   readingId,
-  hasExisting,
+  existing,
   pending,
-  removeExisting,
-  onPick,
-  onRemove,
-  onUndo,
+  removeIds,
+  onAdd,
+  onRemovePending,
+  onToggleExisting,
 }: {
   readingId: number;
-  hasExisting: boolean;
-  pending: File | null;
-  removeExisting: boolean;
-  onPick: (file: File) => void;
-  onRemove: () => void;
-  onUndo: () => void;
+  existing: ReadingPhotoRead[];
+  pending: File[];
+  removeIds: number[];
+  onAdd: (files: File[]) => void;
+  onRemovePending: (idx: number) => void;
+  onToggleExisting: (photoId: number) => void;
 }) {
   // Zwei separate Inputs: ``capture`` zwingt iOS in die Kamera, ohne
-  // ``capture`` greift der System-Picker — auf iOS-PWAs ist nur eine
-  // explizite Trennung verlaesslich.
+  // ``capture`` greift der System-Picker (Mehrfachauswahl).
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const galleryInputRef = useRef<HTMLInputElement>(null);
-  const [pendingUrl, setPendingUrl] = useState<string | null>(null);
+  // Aktuelle Gesamtzahl = behaltene Bestands-Fotos + neue.
+  const keptExisting = existing.filter((p) => !removeIds.includes(p.id)).length;
+  const total = keptExisting + pending.length;
+  const full = total >= MAX_PHOTOS_PER_READING;
 
-  useEffect(() => {
-    if (!pending) {
-      setPendingUrl(null);
-      return;
-    }
-    const url = URL.createObjectURL(pending);
-    setPendingUrl(url);
-    return () => URL.revokeObjectURL(url);
-  }, [pending]);
-
-  function onFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (file) onPick(file);
-    // Reset des Inputs erfolgt erst beim naechsten Click — direkt nach
-    // onChange wuerde iOS Safari den Blob-Storage des frisch gewaehlten
-    // Files abkoppeln und der Upload waere leer (422).
+  function addFiles(picked: FileList | null) {
+    if (!picked || picked.length === 0) return;
+    onAdd(Array.from(picked).slice(0, MAX_PHOTOS_PER_READING - total));
   }
 
-  function openCamera() {
-    if (!cameraInputRef.current) return;
-    cameraInputRef.current.value = '';
-    cameraInputRef.current.click();
+  function open(ref: React.RefObject<HTMLInputElement>) {
+    if (!ref.current) return;
+    ref.current.value = '';
+    ref.current.click();
   }
-
-  function openGallery() {
-    if (!galleryInputRef.current) return;
-    galleryInputRef.current.value = '';
-    galleryInputRef.current.click();
-  }
-
-  const showPending = pending !== null;
-  const showRemovedHint = !showPending && removeExisting;
-  const showExisting = !showPending && !removeExisting && hasExisting;
-  const showAddCta = !showPending && !removeExisting && !hasExisting;
 
   return (
     <div className="space-y-2">
-      <div className="text-caption-bold uppercase text-tertiary">Foto</div>
+      <div className="text-caption-bold uppercase text-tertiary">Fotos ({total}/6)</div>
       <input
         ref={cameraInputRef}
         type="file"
         accept="image/*"
         capture="environment"
-        onChange={onFileChange}
+        onChange={(e) => addFiles(e.target.files)}
         className="hidden"
         data-testid="edit-photo-camera-input"
       />
@@ -1066,117 +1043,92 @@ function PhotoEditField({
         ref={galleryInputRef}
         type="file"
         accept="image/*"
-        onChange={onFileChange}
+        multiple
+        onChange={(e) => addFiles(e.target.files)}
         className="hidden"
         data-testid="edit-photo-gallery-input"
       />
-      {showExisting ? (
-        <div className="flex items-center gap-3">
-          <img
-            src={`/api/v1/readings/${readingId}/photo`}
-            alt="Aktuelles Foto"
-            className="h-24 w-24 rounded-card border-hairline border-border object-cover"
-          />
-          <div className="flex flex-wrap gap-1.5">
-            <Button
-              type="button"
-              variant="bordered"
-              size="sm"
-              leftIcon={<Camera size={14} />}
-              onClick={openCamera}
-            >
-              Neu aufnehmen
-            </Button>
-            <Button
-              type="button"
-              variant="bordered"
-              size="sm"
-              leftIcon={<ImageIcon size={14} />}
-              onClick={openGallery}
-            >
-              Aus Galerie
-            </Button>
-            <Button
-              type="button"
-              variant="plain"
-              size="sm"
-              leftIcon={<X size={14} />}
-              onClick={onRemove}
-              className="text-danger"
-            >
-              Entfernen
-            </Button>
-          </div>
-        </div>
+      <div className="flex flex-wrap gap-2">
+        {existing.map((p) => {
+          const markedForRemoval = removeIds.includes(p.id);
+          return (
+            <div key={p.id} className="relative">
+              <img
+                src={`/api/v1/readings/${readingId}/photos/${p.id}`}
+                alt="Foto"
+                className={cx(
+                  'h-20 w-20 rounded-card border-hairline border-border object-cover',
+                  markedForRemoval && 'opacity-30',
+                )}
+              />
+              <button
+                type="button"
+                onClick={() => onToggleExisting(p.id)}
+                aria-label={markedForRemoval ? 'Doch behalten' : 'Foto entfernen'}
+                className={cx(
+                  'absolute -right-1.5 -top-1.5 inline-flex h-6 w-6 items-center justify-center rounded-full text-white shadow',
+                  markedForRemoval ? 'bg-secondary' : 'bg-danger',
+                )}
+              >
+                <X size={13} />
+              </button>
+            </div>
+          );
+        })}
+        {pending.map((file, idx) => (
+          <PendingThumb key={idx} file={file} onRemove={() => onRemovePending(idx)} />
+        ))}
+      </div>
+      <div className="flex flex-wrap items-center gap-1.5">
+        <Button
+          type="button"
+          variant="bordered"
+          size="sm"
+          leftIcon={<Camera size={14} />}
+          onClick={() => open(cameraInputRef)}
+          disabled={full}
+        >
+          Foto aufnehmen
+        </Button>
+        <Button
+          type="button"
+          variant="bordered"
+          size="sm"
+          leftIcon={<ImageIcon size={14} />}
+          onClick={() => open(galleryInputRef)}
+          disabled={full}
+        >
+          Aus Galerie
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function PendingThumb({ file, onRemove }: { file: File; onRemove: () => void }) {
+  const [url, setUrl] = useState<string | null>(null);
+  useEffect(() => {
+    const u = URL.createObjectURL(file);
+    setUrl(u);
+    return () => URL.revokeObjectURL(u);
+  }, [file]);
+  return (
+    <div className="relative">
+      {url ? (
+        <img
+          src={url}
+          alt="Neu"
+          className="h-20 w-20 rounded-card border-hairline border-primary object-cover"
+        />
       ) : null}
-      {showPending && pendingUrl ? (
-        <div className="flex items-center gap-3">
-          <img
-            src={pendingUrl}
-            alt="Neue Vorschau"
-            className="h-24 w-24 rounded-card border-hairline border-border object-cover"
-          />
-          <div className="flex flex-wrap gap-1.5">
-            <Button
-              type="button"
-              variant="bordered"
-              size="sm"
-              leftIcon={<Camera size={14} />}
-              onClick={openCamera}
-            >
-              Neu aufnehmen
-            </Button>
-            <Button
-              type="button"
-              variant="bordered"
-              size="sm"
-              leftIcon={<ImageIcon size={14} />}
-              onClick={openGallery}
-            >
-              Aus Galerie
-            </Button>
-            <Button
-              type="button"
-              variant="plain"
-              size="sm"
-              leftIcon={<X size={14} />}
-              onClick={onUndo}
-            >
-              Verwerfen
-            </Button>
-          </div>
-        </div>
-      ) : null}
-      {showRemovedHint ? (
-        <div className="flex items-center justify-between gap-3 rounded-card border-hairline border-border bg-fill p-3 text-caption text-secondary">
-          <span>Foto wird beim Speichern entfernt.</span>
-          <Button type="button" variant="plain" size="sm" onClick={onUndo}>
-            Doch behalten
-          </Button>
-        </div>
-      ) : null}
-      {showAddCta ? (
-        <div className="flex flex-wrap gap-1.5">
-          <Button
-            type="button"
-            variant="bordered"
-            size="sm"
-            leftIcon={<Camera size={14} />}
-            onClick={openCamera}
-          >
-            Foto aufnehmen
-          </Button>
-          <Button
-            type="button"
-            variant="bordered"
-            size="sm"
-            leftIcon={<ImageIcon size={14} />}
-            onClick={openGallery}
-          >
-            Aus Galerie
-          </Button>
-        </div>
-      ) : null}
+      <button
+        type="button"
+        onClick={onRemove}
+        aria-label="Verwerfen"
+        className="absolute -right-1.5 -top-1.5 inline-flex h-6 w-6 items-center justify-center rounded-full bg-danger text-white shadow"
+      >
+        <X size={13} />
+      </button>
     </div>
   );
 }

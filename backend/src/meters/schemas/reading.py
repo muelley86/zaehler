@@ -70,6 +70,12 @@ class ReadingUpdate(BaseModel):
         return _normalize_reading_at(value)
 
 
+class ReadingPhotoRead(APIModel):
+    id: int
+    photo_lat: float | None = None
+    photo_lon: float | None = None
+
+
 class ReadingRead(APIModel):
     id: int
     register_id: int
@@ -80,8 +86,7 @@ class ReadingRead(APIModel):
     created_by_user_id: int | None
     created_by_username: str | None = None
     has_photo: bool = False
-    photo_lat: float | None = None
-    photo_lon: float | None = None
+    photos: list[ReadingPhotoRead] = Field(default_factory=list)
 
 
 class ConsumptionPoint(APIModel):

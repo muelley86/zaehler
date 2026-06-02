@@ -193,6 +193,11 @@ export interface ReadingRead {
   created_by_user_id: number | null;
   created_by_username: string | null;
   has_photo: boolean;
+  photos: ReadingPhotoRead[];
+}
+
+export interface ReadingPhotoRead {
+  id: number;
   photo_lat: number | null;
   photo_lon: number | null;
 }

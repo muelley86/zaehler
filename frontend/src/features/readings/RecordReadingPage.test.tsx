@@ -214,7 +214,7 @@ describe('RecordReadingPage', () => {
           { status: 201 },
         );
       }),
-      http.put('/api/v1/readings/:id/photo', ({ params }) => {
+      http.post('/api/v1/readings/:id/photos', ({ params }) => {
         // Body nicht lesen — request.arrayBuffer()/formData() ist mit
         // FormData in jsdom flaky (haengt CI gelegentlich). Es reicht
         // zu wissen, dass der PUT mit der erwarteten ID stattfand.
@@ -305,7 +305,7 @@ describe('RecordReadingPage', () => {
           { status: 201 },
         ),
       ),
-      http.put('/api/v1/readings/:id/photo', ({ params }) => {
+      http.post('/api/v1/readings/:id/photos', ({ params }) => {
         photoUrls.push(String(params['id']));
         return HttpResponse.json({
           id: 888,
@@ -357,7 +357,7 @@ describe('RecordReadingPage', () => {
           { status: 201 },
         ),
       ),
-      http.put('/api/v1/readings/:id/photo', () =>
+      http.post('/api/v1/readings/:id/photos', () =>
         HttpResponse.json(
           { title: 'Unsupported image format', status: 415, detail: 'HEIC nicht erlaubt.' },
           { status: 415 },

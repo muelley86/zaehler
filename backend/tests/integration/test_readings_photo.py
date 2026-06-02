@@ -1,7 +1,8 @@
-"""Integrationstests für die Foto-Endpunkte am Reading.
+"""Integrationstests für die Foto-Endpunkte am Reading (1->N, bis zu 6 Fotos).
 
-Deckt Lifecycle (PUT/GET/DELETE), Berechtigungen (Recorder/Admin, 24h-
-Fenster, MP-Filter), Validierung (MIME/Größe) und EXIF-Roundtrip ab.
+Deckt Lifecycle (POST/GET/DELETE je Foto), das 6er-Limit, Berechtigungen
+(Recorder/Admin, 24h-Fenster, MP-Filter), Validierung (MIME/Größe) und
+EXIF/GPS-Roundtrip ab.
 """
 
 from __future__ import annotations
@@ -10,6 +11,7 @@ from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from io import BytesIO
 from pathlib import Path
+from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
@@ -19,7 +21,13 @@ from sqlalchemy.orm import Session
 
 from meters.core.config import settings
 from meters.main import app
-from meters.models import MeasuringPoint, Reading, User, UserMeasuringPointAccess
+from meters.models import (
+    MeasuringPoint,
+    Reading,
+    ReadingPhoto,
+    User,
+    UserMeasuringPointAccess,
+)
 
 
 def _setup_water_mp(admin_client: TestClient) -> int:
@@ -36,8 +44,8 @@ def _setup_water_mp(admin_client: TestClient) -> int:
         },
     )
     assert resp.status_code == 201, resp.text
-    body: dict[str, object] = resp.json()
-    register_id: int = body["physical_meters"][0]["registers"][0]["id"]  # type: ignore[index]
+    body: dict[str, Any] = resp.json()
+    register_id: int = body["physical_meters"][0]["registers"][0]["id"]
     return register_id
 
 
@@ -75,7 +83,6 @@ def _make_jpeg(*, with_exif: bool = True, size: tuple[int, int] = (400, 300)) ->
         exif = img.getexif()
         exif[0x010E] = "Zaehler-Test"  # ImageDescription
         exif[0x0110] = "PyTest-Camera"  # Model
-        # GPS-Sub-IFD: Berlin-Zentrum als Sample
         gps = exif.get_ifd(0x8825)
         gps[1] = "N"
         gps[2] = (52.0, 30.0, 0.0)
@@ -91,104 +98,113 @@ def _photo_files_in_media_dir() -> list[Path]:
     return list(settings.media_dir.glob("*.jpg"))
 
 
-def test_put_photo_sets_has_photo_and_persists_file(admin_client: TestClient) -> None:
+def _add_photo(
+    client: TestClient,
+    rid: int,
+    *,
+    with_exif: bool = False,
+    size: tuple[int, int] = (400, 300),
+    data: dict[str, str] | None = None,
+) -> Any:
+    return client.post(
+        f"/api/v1/readings/{rid}/photos",
+        files={"photo": ("meter.jpg", _make_jpeg(with_exif=with_exif, size=size), "image/jpeg")},
+        data=data or {},
+    )
+
+
+def _photo_paths(db: Session, rid: int) -> list[str]:
+    db.expire_all()
+    return list(
+        db.scalars(
+            select(ReadingPhoto.photo_path)
+            .where(ReadingPhoto.reading_id == rid)
+            .order_by(ReadingPhoto.sort_index)
+        )
+    )
+
+
+# --- Lifecycle + Limit -----------------------------------------------------
+
+
+def test_add_photo_sets_has_photo_and_persists_file(admin_client: TestClient) -> None:
     register_id = _setup_water_mp(admin_client)
     rid = _create_reading(admin_client, register_id)
 
-    resp = admin_client.put(
-        f"/api/v1/readings/{rid}/photo",
-        files={"photo": ("meter.jpg", _make_jpeg(), "image/jpeg")},
-    )
+    resp = _add_photo(admin_client, rid)
     assert resp.status_code == 200, resp.text
     body = resp.json()
     assert body["id"] == rid
     assert body["has_photo"] is True
+    assert len(body["photos"]) == 1
 
     files = _photo_files_in_media_dir()
     assert any(f.name.startswith(f"{rid}-") and f.name.endswith(".jpg") for f in files)
 
 
-def test_put_photo_replaces_previous_file(admin_client: TestClient, db: Session) -> None:
+def test_add_up_to_six_then_rejects_seventh(admin_client: TestClient) -> None:
     register_id = _setup_water_mp(admin_client)
     rid = _create_reading(admin_client, register_id)
-
-    first = admin_client.put(
-        f"/api/v1/readings/{rid}/photo",
-        files={"photo": ("a.jpg", _make_jpeg(size=(300, 200)), "image/jpeg")},
-    )
-    assert first.status_code == 200
-    db.expire_all()
-    first_basename = db.get(Reading, rid).photo_path  # type: ignore[union-attr]
-    assert first_basename is not None
-    first_path = settings.media_dir / first_basename
-    assert first_path.is_file()
-
-    second = admin_client.put(
-        f"/api/v1/readings/{rid}/photo",
-        files={"photo": ("b.jpg", _make_jpeg(size=(500, 400)), "image/jpeg")},
-    )
-    assert second.status_code == 200
-    db.expire_all()
-    second_basename = db.get(Reading, rid).photo_path  # type: ignore[union-attr]
-    assert second_basename is not None
-    assert second_basename != first_basename
-    assert not first_path.exists()
-    assert (settings.media_dir / second_basename).is_file()
+    for i in range(6):
+        resp = _add_photo(admin_client, rid)
+        assert resp.status_code == 200, resp.text
+        assert len(resp.json()["photos"]) == i + 1
+    seventh = _add_photo(admin_client, rid)
+    assert seventh.status_code == 409, seventh.text
+    assert len(seventh.json().get("photos", [])) == 0  # 409 -> ProblemDetails, keine photos
 
 
-def test_delete_photo_clears_field_and_removes_file(admin_client: TestClient, db: Session) -> None:
+def test_delete_one_photo_keeps_others(admin_client: TestClient, db: Session) -> None:
     register_id = _setup_water_mp(admin_client)
     rid = _create_reading(admin_client, register_id)
-    admin_client.put(
-        f"/api/v1/readings/{rid}/photo",
-        files={"photo": ("a.jpg", _make_jpeg(), "image/jpeg")},
-    )
-    db.expire_all()
-    basename = db.get(Reading, rid).photo_path  # type: ignore[union-attr]
-    assert basename is not None
+    ids = [_add_photo(admin_client, rid).json()["photos"][-1]["id"] for _ in range(3)]
+    paths_before = _photo_paths(db, rid)
+    assert len(paths_before) == 3
 
-    resp = admin_client.delete(f"/api/v1/readings/{rid}/photo")
+    middle = ids[1]
+    resp = admin_client.delete(f"/api/v1/readings/{rid}/photos/{middle}")
     assert resp.status_code == 204
+    remaining = _photo_paths(db, rid)
+    assert len(remaining) == 2
+    # Genau die mittlere Datei ist weg, die anderen bleiben.
+    for p in remaining:
+        assert (settings.media_dir / p).is_file()
 
-    db.expire_all()
-    assert db.get(Reading, rid).photo_path is None  # type: ignore[union-attr]
-    assert not (settings.media_dir / basename).exists()
 
-
-def test_delete_photo_idempotent_when_no_photo(admin_client: TestClient) -> None:
+def test_delete_photo_idempotent_when_unknown(admin_client: TestClient) -> None:
     register_id = _setup_water_mp(admin_client)
     rid = _create_reading(admin_client, register_id)
-    resp = admin_client.delete(f"/api/v1/readings/{rid}/photo")
+    resp = admin_client.delete(f"/api/v1/readings/{rid}/photos/999999")
     assert resp.status_code == 204
 
 
 def test_get_photo_returns_jpeg_with_no_store_cache(admin_client: TestClient) -> None:
     register_id = _setup_water_mp(admin_client)
     rid = _create_reading(admin_client, register_id)
-    admin_client.put(
-        f"/api/v1/readings/{rid}/photo",
-        files={"photo": ("a.jpg", _make_jpeg(), "image/jpeg")},
-    )
+    pid = _add_photo(admin_client, rid).json()["photos"][0]["id"]
 
-    resp = admin_client.get(f"/api/v1/readings/{rid}/photo")
+    resp = admin_client.get(f"/api/v1/readings/{rid}/photos/{pid}")
     assert resp.status_code == 200
     assert resp.headers["content-type"].startswith("image/jpeg")
     assert resp.headers["cache-control"] == "private, no-store"
     assert len(resp.content) > 0
 
 
-def test_get_photo_404_when_missing(admin_client: TestClient) -> None:
+def test_get_photo_404_when_unknown(admin_client: TestClient) -> None:
     register_id = _setup_water_mp(admin_client)
     rid = _create_reading(admin_client, register_id)
-    resp = admin_client.get(f"/api/v1/readings/{rid}/photo")
+    resp = admin_client.get(f"/api/v1/readings/{rid}/photos/999999")
     assert resp.status_code == 404
+
+
+# --- Validierung -----------------------------------------------------------
 
 
 def test_reject_heic_format(admin_client: TestClient) -> None:
     register_id = _setup_water_mp(admin_client)
     rid = _create_reading(admin_client, register_id)
-    resp = admin_client.put(
-        f"/api/v1/readings/{rid}/photo",
+    resp = admin_client.post(
+        f"/api/v1/readings/{rid}/photos",
         files={"photo": ("foto.heic", b"\x00\x00\x00\x20ftypheic", "image/heic")},
     )
     assert resp.status_code == 415
@@ -198,8 +214,8 @@ def test_reject_heic_format(admin_client: TestClient) -> None:
 def test_reject_non_image_mime(admin_client: TestClient) -> None:
     register_id = _setup_water_mp(admin_client)
     rid = _create_reading(admin_client, register_id)
-    resp = admin_client.put(
-        f"/api/v1/readings/{rid}/photo",
+    resp = admin_client.post(
+        f"/api/v1/readings/{rid}/photos",
         files={"photo": ("notes.txt", b"hello", "text/plain")},
     )
     assert resp.status_code == 415
@@ -208,27 +224,31 @@ def test_reject_non_image_mime(admin_client: TestClient) -> None:
 def test_reject_oversized_upload(admin_client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
     register_id = _setup_water_mp(admin_client)
     rid = _create_reading(admin_client, register_id)
-    # Limit auf 50 Bytes setzen — die kleinste valide JPEG ist deutlich
-    # größer, also greift der 413-Check sicher.
     monkeypatch.setattr(settings, "photo_max_upload_bytes", 50)
-    resp = admin_client.put(
-        f"/api/v1/readings/{rid}/photo",
-        files={"photo": ("a.jpg", _make_jpeg(), "image/jpeg")},
-    )
+    resp = _add_photo(admin_client, rid)
     assert resp.status_code == 413
 
 
-def test_recorder_without_mp_access_gets_404_on_put(
+def test_reject_decompression_bomb(
+    admin_client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    register_id = _setup_water_mp(admin_client)
+    rid = _create_reading(admin_client, register_id)
+    monkeypatch.setattr(Image, "MAX_IMAGE_PIXELS", 10)
+    resp = _add_photo(admin_client, rid, size=(400, 300))
+    assert resp.status_code == 413, resp.text
+
+
+# --- Berechtigungen --------------------------------------------------------
+
+
+def test_recorder_without_mp_access_gets_404_on_post(
     admin_client: TestClient,
     recorder_client: TestClient,
 ) -> None:
     register_id = _setup_water_mp(admin_client)
     rid = _create_reading(admin_client, register_id)
-    # Recorder hat KEINEN MP-Zugriff: Existenz-Leak verhindern → 404.
-    resp = recorder_client.put(
-        f"/api/v1/readings/{rid}/photo",
-        files={"photo": ("a.jpg", _make_jpeg(), "image/jpeg")},
-    )
+    resp = _add_photo(recorder_client, rid)
     assert resp.status_code == 404
 
 
@@ -252,220 +272,95 @@ def test_recorder_outside_24h_window_cannot_modify_photo(
     db.commit()
     rid = reading.id
 
+    # Admin legt ein Foto an (Admin unterliegt keinem 24h-Block).
+    pid = _add_photo(admin_client, rid).json()["photos"][0]["id"]
+
     with TestClient(app) as recorder:
         login = recorder.post(
             "/api/v1/auth/login",
             json={"username": "recorder", "password": "recorder-pass-1234"},
         )
         assert login.status_code == 200
-
-        put = recorder.put(
-            f"/api/v1/readings/{rid}/photo",
-            files={"photo": ("a.jpg", _make_jpeg(), "image/jpeg")},
-        )
-        assert put.status_code == 403
-        delete = recorder.delete(f"/api/v1/readings/{rid}/photo")
-        assert delete.status_code == 403
-
-    # Admin legt das Foto an — Recorder darf es danach trotzdem ansehen
-    # (kein 24h-Block auf GET, nur auf Mutationen).
-    admin_client.put(
-        f"/api/v1/readings/{rid}/photo",
-        files={"photo": ("a.jpg", _make_jpeg(), "image/jpeg")},
-    )
-    with TestClient(app) as recorder:
-        recorder.post(
-            "/api/v1/auth/login",
-            json={"username": "recorder", "password": "recorder-pass-1234"},
-        )
-        get = recorder.get(f"/api/v1/readings/{rid}/photo")
-        assert get.status_code == 200
+        assert _add_photo(recorder, rid).status_code == 403
+        assert recorder.delete(f"/api/v1/readings/{rid}/photos/{pid}").status_code == 403
+        # GET bleibt erlaubt (kein 24h-Block auf Lesezugriff).
+        assert recorder.get(f"/api/v1/readings/{rid}/photos/{pid}").status_code == 200
 
 
-def test_exif_with_gps_is_preserved_after_reencode(admin_client: TestClient) -> None:
+# --- GPS / EXIF ------------------------------------------------------------
+
+
+def test_exif_gps_is_preserved_and_extracted(admin_client: TestClient) -> None:
     register_id = _setup_water_mp(admin_client)
     rid = _create_reading(admin_client, register_id)
-    admin_client.put(
-        f"/api/v1/readings/{rid}/photo",
-        files={"photo": ("with-gps.jpg", _make_jpeg(with_exif=True), "image/jpeg")},
-    )
-    resp = admin_client.get(f"/api/v1/readings/{rid}/photo")
-    assert resp.status_code == 200
+    body = _add_photo(admin_client, rid, with_exif=True).json()
+    photo = body["photos"][0]
+    assert abs(photo["photo_lat"] - 52.5) < 1e-4
+    assert abs(photo["photo_lon"] - 13.4) < 1e-4
 
-    rendered = Image.open(BytesIO(resp.content))
-    exif = rendered.getexif()
-    assert exif.get(0x010E) == "Zaehler-Test"
-    gps = exif.get_ifd(0x8825)
-    assert gps, "GPS-Sub-IFD darf nach Reencode nicht leer sein."
-    assert gps.get(1) == "N"
-    assert gps.get(3) == "E"
-
-
-def test_delete_reading_also_removes_photo_file(admin_client: TestClient, db: Session) -> None:
-    register_id = _setup_water_mp(admin_client)
-    rid = _create_reading(admin_client, register_id)
-    admin_client.put(
-        f"/api/v1/readings/{rid}/photo",
-        files={"photo": ("a.jpg", _make_jpeg(), "image/jpeg")},
-    )
-    db.expire_all()
-    basename = db.get(Reading, rid).photo_path  # type: ignore[union-attr]
-    assert basename is not None
-    assert (settings.media_dir / basename).is_file()
-
-    resp = admin_client.delete(f"/api/v1/readings/{rid}")
-    assert resp.status_code == 204
-    assert not (settings.media_dir / basename).exists()
-
-
-def test_put_photo_returns_404_for_unknown_reading(admin_client: TestClient) -> None:
-    resp = admin_client.put(
-        "/api/v1/readings/99999/photo",
-        files={"photo": ("a.jpg", _make_jpeg(), "image/jpeg")},
-    )
-    assert resp.status_code == 404
-
-
-# ---------------------------------------------------------------------------
-# GPS-Extraktion: photo_lat / photo_lon in ReadingRead
-# ---------------------------------------------------------------------------
-
-
-def test_upload_extracts_gps_into_reading_fields(admin_client: TestClient) -> None:
-    """Test-JPEG aus ``_make_jpeg(with_exif=True)`` hat GPS = Berlin (52, 13).
-    Nach Upload muessen ``photo_lat``/``photo_lon`` im Reading gesetzt sein.
-    """
-    register_id = _setup_water_mp(admin_client)
-    rid = _create_reading(admin_client, register_id, at="2025-07-01T11:00:00")
-    resp = admin_client.put(
-        f"/api/v1/readings/{rid}/photo",
-        files={"photo": ("with-gps.jpg", _make_jpeg(with_exif=True), "image/jpeg")},
-    )
-    assert resp.status_code == 200, resp.text
-    body = resp.json()
-    assert body["photo_lat"] is not None
-    assert body["photo_lon"] is not None
-    # Test-Fixture setzt 52°30'0" N und 13°24'0" E.
-    assert abs(body["photo_lat"] - 52.5) < 1e-4
-    assert abs(body["photo_lon"] - 13.4) < 1e-4
+    img = admin_client.get(f"/api/v1/readings/{rid}/photos/{photo['id']}")
+    rendered = Image.open(BytesIO(img.content))
+    gps = rendered.getexif().get_ifd(0x8825)
+    assert gps.get(1) == "N" and gps.get(3) == "E"
 
 
 def test_upload_without_gps_leaves_coords_null(admin_client: TestClient) -> None:
     register_id = _setup_water_mp(admin_client)
-    rid = _create_reading(admin_client, register_id, at="2025-07-01T12:00:00")
-    resp = admin_client.put(
-        f"/api/v1/readings/{rid}/photo",
-        files={"photo": ("no-gps.jpg", _make_jpeg(with_exif=False), "image/jpeg")},
-    )
-    assert resp.status_code == 200, resp.text
-    body = resp.json()
-    assert body["photo_lat"] is None
-    assert body["photo_lon"] is None
-
-
-def test_replacing_photo_updates_gps_fields(admin_client: TestClient) -> None:
-    register_id = _setup_water_mp(admin_client)
-    rid = _create_reading(admin_client, register_id, at="2025-07-01T13:00:00")
-    # Erst MIT GPS hochladen
-    admin_client.put(
-        f"/api/v1/readings/{rid}/photo",
-        files={"photo": ("with.jpg", _make_jpeg(with_exif=True), "image/jpeg")},
-    )
-    # Dann mit einem GPS-freien Foto ersetzen — Felder muessen wieder NULL werden.
-    resp = admin_client.put(
-        f"/api/v1/readings/{rid}/photo",
-        files={"photo": ("without.jpg", _make_jpeg(with_exif=False), "image/jpeg")},
-    )
-    assert resp.status_code == 200, resp.text
-    body = resp.json()
-    assert body["has_photo"] is True
-    assert body["photo_lat"] is None
-    assert body["photo_lon"] is None
+    rid = _create_reading(admin_client, register_id)
+    photo = _add_photo(admin_client, rid, with_exif=False).json()["photos"][0]
+    assert photo["photo_lat"] is None
+    assert photo["photo_lon"] is None
 
 
 def test_form_gps_used_when_exif_missing(admin_client: TestClient) -> None:
-    """Foto OHNE EXIF-GPS + Form-Felder gps_lat/gps_lon → Form-Werte landen
-    in der DB (Fallback fuer iOS-Strip-Verhalten)."""
     register_id = _setup_water_mp(admin_client)
-    rid = _create_reading(admin_client, register_id, at="2025-08-01T10:00:00")
-    resp = admin_client.put(
-        f"/api/v1/readings/{rid}/photo",
-        files={"photo": ("no-gps.jpg", _make_jpeg(with_exif=False), "image/jpeg")},
-        data={"gps_lat": "48.137154", "gps_lon": "11.576124"},
-    )
-    assert resp.status_code == 200, resp.text
-    body = resp.json()
-    assert body["photo_lat"] is not None
-    assert body["photo_lon"] is not None
-    assert abs(body["photo_lat"] - 48.137154) < 1e-6
-    assert abs(body["photo_lon"] - 11.576124) < 1e-6
+    rid = _create_reading(admin_client, register_id)
+    photo = _add_photo(
+        admin_client, rid, with_exif=False, data={"gps_lat": "48.137154", "gps_lon": "11.576124"}
+    ).json()["photos"][0]
+    assert abs(photo["photo_lat"] - 48.137154) < 1e-6
+    assert abs(photo["photo_lon"] - 11.576124) < 1e-6
 
 
 def test_exif_gps_wins_over_form_gps(admin_client: TestClient) -> None:
-    """Foto MIT EXIF-GPS (Berlin) + abweichende Form-Felder (Muenchen) →
-    EXIF gewinnt, Form-Werte werden ignoriert."""
     register_id = _setup_water_mp(admin_client)
-    rid = _create_reading(admin_client, register_id, at="2025-08-01T11:00:00")
-    resp = admin_client.put(
-        f"/api/v1/readings/{rid}/photo",
-        files={"photo": ("berlin.jpg", _make_jpeg(with_exif=True), "image/jpeg")},
-        data={"gps_lat": "48.137154", "gps_lon": "11.576124"},
-    )
-    assert resp.status_code == 200, resp.text
-    body = resp.json()
-    # Test-Fixture EXIF: ~52.5 / 13.4 (Berlin), nicht 48.1 / 11.5 (Muenchen).
-    assert abs(body["photo_lat"] - 52.5) < 1e-4
-    assert abs(body["photo_lon"] - 13.4) < 1e-4
+    rid = _create_reading(admin_client, register_id)
+    photo = _add_photo(
+        admin_client, rid, with_exif=True, data={"gps_lat": "48.137154", "gps_lon": "11.576124"}
+    ).json()["photos"][0]
+    assert abs(photo["photo_lat"] - 52.5) < 1e-4
+    assert abs(photo["photo_lon"] - 13.4) < 1e-4
 
 
 def test_invalid_form_gps_is_ignored(admin_client: TestClient) -> None:
-    """Foto ohne EXIF + Form-Werte ausserhalb [-90,90]/[-180,180] →
-    photo_lat/photo_lon bleiben None."""
-    register_id = _setup_water_mp(admin_client)
-    rid = _create_reading(admin_client, register_id, at="2025-08-01T12:00:00")
-    resp = admin_client.put(
-        f"/api/v1/readings/{rid}/photo",
-        files={"photo": ("no-gps.jpg", _make_jpeg(with_exif=False), "image/jpeg")},
-        data={"gps_lat": "200", "gps_lon": "11.5"},
-    )
-    assert resp.status_code == 200, resp.text
-    body = resp.json()
-    assert body["photo_lat"] is None
-    assert body["photo_lon"] is None
-
-
-def test_delete_photo_clears_gps_fields(admin_client: TestClient, db: Session) -> None:
-    register_id = _setup_water_mp(admin_client)
-    rid = _create_reading(admin_client, register_id, at="2025-07-01T14:00:00")
-    admin_client.put(
-        f"/api/v1/readings/{rid}/photo",
-        files={"photo": ("with.jpg", _make_jpeg(with_exif=True), "image/jpeg")},
-    )
-    resp = admin_client.delete(f"/api/v1/readings/{rid}/photo")
-    assert resp.status_code == 204
-    db.expire_all()
-    reloaded = db.get(Reading, rid)
-    assert reloaded is not None
-    assert reloaded.photo_path is None
-    assert reloaded.photo_lat is None
-    assert reloaded.photo_lon is None
-
-
-def test_reject_decompression_bomb(
-    admin_client: TestClient, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """Tier-1-Härtung: Pillow-DecompressionBombError wird als 413 abgefangen.
-
-    Das Pixel-Limit wird in der Produktion NICHT gesenkt (Default-Cap deckt
-    Handyfotos ab); hier setzen wir es nur testweise drastisch herab, damit ein
-    normales Testfoto das 2-fache MAX_IMAGE_PIXELS überschreitet und greift —
-    sauberes 413 statt unbehandeltem 500.
-    """
     register_id = _setup_water_mp(admin_client)
     rid = _create_reading(admin_client, register_id)
-    monkeypatch.setattr(Image, "MAX_IMAGE_PIXELS", 10)
-    resp = admin_client.put(
-        f"/api/v1/readings/{rid}/photo",
-        files={"photo": ("bomb.jpg", _make_jpeg(size=(400, 300)), "image/jpeg")},
-    )
-    assert resp.status_code == 413, resp.text
+    photo = _add_photo(
+        admin_client, rid, with_exif=False, data={"gps_lat": "200", "gps_lon": "11.5"}
+    ).json()["photos"][0]
+    assert photo["photo_lat"] is None
+    assert photo["photo_lon"] is None
+
+
+# --- Cascade + Edge --------------------------------------------------------
+
+
+def test_delete_reading_also_removes_photo_files(admin_client: TestClient, db: Session) -> None:
+    register_id = _setup_water_mp(admin_client)
+    rid = _create_reading(admin_client, register_id)
+    _add_photo(admin_client, rid)
+    _add_photo(admin_client, rid)
+    paths = _photo_paths(db, rid)
+    assert len(paths) == 2
+    for p in paths:
+        assert (settings.media_dir / p).is_file()
+
+    resp = admin_client.delete(f"/api/v1/readings/{rid}")
+    assert resp.status_code == 204
+    for p in paths:
+        assert not (settings.media_dir / p).exists()
+
+
+def test_add_photo_returns_404_for_unknown_reading(admin_client: TestClient) -> None:
+    resp = _add_photo(admin_client, 99999)
+    assert resp.status_code == 404
