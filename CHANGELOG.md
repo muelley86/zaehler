@@ -10,6 +10,13 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.34.2](https://github.com/muelley86/zaehler/compare/v2.34.1...v2.34.2) (2026-06-02)
+
+
+### Fehlerbehebungen
+
+* **reports:** CSV-Export für Dimension "Messstelle" (fehlendes Label) ([#167](https://github.com/muelley86/zaehler/issues/167)) ([3a87158](https://github.com/muelley86/zaehler/commit/3a8715806009f69924b2f1cd8e8451a5b59e36a6))
+
 ## [2.34.1](https://github.com/muelley86/zaehler/compare/v2.34.0...v2.34.1) (2026-06-01)
 
 
