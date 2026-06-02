@@ -10,6 +10,14 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.36.0](https://github.com/muelley86/zaehler/compare/v2.35.1...v2.36.0) (2026-06-02)
+
+
+### Funktionen
+
+* **import:** Zählerstand-Import aus Excel/CSV (Endpoints + Admin-UI) ([#177](https://github.com/muelley86/zaehler/issues/177)) ([3c03226](https://github.com/muelley86/zaehler/commit/3c03226020ee1789eeb6ee527fea27fd8bf9dc42))
+* **readings:** bis zu 6 Fotos je Erfassung ([#179](https://github.com/muelley86/zaehler/issues/179)) ([7da5ab1](https://github.com/muelley86/zaehler/commit/7da5ab1c43c0190dd7ca0fd2ab178ba7a9a577b8))
+
 ## [2.35.1](https://github.com/muelley86/zaehler/compare/v2.35.0...v2.35.1) (2026-06-02)
 
 
