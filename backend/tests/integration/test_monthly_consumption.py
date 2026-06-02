@@ -14,7 +14,9 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from meters.cli import _refresh_monthly_cache
 from meters.models import MonthlyConsumption
+from meters.services.consumption import aggregate_consumption, consumption_for_measuring_point
 from meters.services.monthly_consumption import recompute_all, recompute_register
 
 
@@ -148,6 +150,41 @@ def test_consumption_endpoint_reads_from_table(admin_client: TestClient, db: Ses
         f"/api/v1/measuring-points/{mp_id}/consumption", params={"granularity": "month"}
     ).json()
     assert Decimal("999") in {Decimal(p["consumption"]) for p in points}
+
+
+def test_refresh_monthly_cache_rebuilds_stale_rows(admin_client: TestClient, db: Session) -> None:
+    """``_refresh_monthly_cache`` ist der Pfad, den die Repair-CLIs nach ``--apply``
+    nutzen — sie laufen ohne ``create_app()``, also OHNE den Session-Hook, der den
+    Cache sonst automatisch pflegt. Der Helper muss einen veralteten Monats-Cache
+    wieder mit den Roh-Readings in Deckung bringen (Regression: vorher blieb der
+    Cache nach einem CLI-Timestamp-Repair stale → falsche Monats-Diagramme)."""
+    mp_id, reg_id = _setup(admin_client)
+    _add(admin_client, reg_id, "110.000", "2024-01-15T12:00:00")
+    _add(admin_client, reg_id, "160.000", "2024-02-10T12:00:00")
+
+    # Cache absichtlich verfälschen: NUR MonthlyConsumption ändern — das ignoriert
+    # der Hook, der Cache bleibt also stale (wie nach einem CLI-Repair ohne Hook).
+    db.expire_all()
+    stale_rows = list(
+        db.scalars(select(MonthlyConsumption).where(MonthlyConsumption.register_id == reg_id))
+    )
+    assert stale_rows
+    for r in stale_rows:
+        r.consumption = Decimal("999")
+    db.commit()
+    assert Decimal("999") in _table(db, reg_id).values()  # wirklich stale
+
+    n = _refresh_monthly_cache(db, {reg_id})
+    assert n == 1
+
+    # Cache deckt sich wieder mit der unabhängigen On-the-fly-Monatsaggregation.
+    raw = consumption_for_measuring_point(db, measuring_point_id=mp_id)
+    expected = {
+        p.period_end: p.consumption
+        for p in aggregate_consumption(raw, granularity="month", from_date=None, to_date=None)
+    }
+    assert _table(db, reg_id) == expected
+    assert Decimal("999") not in _table(db, reg_id).values()
 
 
 def test_hook_updates_table_on_reading_delete(admin_client: TestClient, db: Session) -> None:

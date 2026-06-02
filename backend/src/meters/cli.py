@@ -18,13 +18,14 @@ import argparse
 import sys
 
 from sqlalchemy import inspect, select
+from sqlalchemy.orm import Session
 
 from meters.core.security import hash_password
 from meters.db import SessionLocal, engine
 from meters.models import User, UserRole
 from meters.services.legacy_timestamp_repair import repair_legacy_timestamps
 from meters.services.midnight_repair import repair_midnight_readings
-from meters.services.monthly_consumption import recompute_all
+from meters.services.monthly_consumption import recompute_all, recompute_register
 
 
 def _ensure_schema_initialized() -> None:
@@ -96,6 +97,23 @@ def _cmd_reset_password(args: argparse.Namespace) -> int:
     return 0
 
 
+def _refresh_monthly_cache(db: Session, register_ids: set[int]) -> int:
+    """Berechnet den materialisierten Monats-Cache (``monthly_consumption``) der
+    betroffenen Register neu und committed.
+
+    Die Repair-Kommandos verschieben ``reading_at`` (mitunter über eine
+    Monatsgrenze) und laufen als eigener Prozess OHNE ``create_app()`` — der
+    Session-Hook, der ``monthly_consumption`` sonst nach jeder Ablese-Änderung
+    automatisch pflegt, ist hier also NICHT aktiv. Ohne diesen Schritt bliebe der
+    Cache stale: Tag/Woche/Jahr (on-the-fly) stimmen sofort, die Monats-Diagramme
+    zeigten aber bis zur nächsten Änderung je Register falsche Werte.
+    """
+    for register_id in register_ids:
+        recompute_register(db, register_id)
+    db.commit()
+    return len(register_ids)
+
+
 def _cmd_repair_legacy_timestamps(args: argparse.Namespace) -> int:
     """Korrigiert synthetische Readings, die vor Fix #148 naiv-UTC abgelegt
     wurden (``Anfangsstand`` / ``Endstand vor Tausch``). Ohne ``--apply`` nur
@@ -115,9 +133,12 @@ def _cmd_repair_legacy_timestamps(args: argparse.Namespace) -> int:
             return 0
         if apply:
             db.commit()
+            touched = {p.register_id for p in result.planned if not p.collision}
+            n = _refresh_monthly_cache(db, touched)
             print(
                 f"\nAngewendet: {result.applied} korrigiert, "
-                f"{result.skipped_collisions} wegen Kollision übersprungen."
+                f"{result.skipped_collisions} wegen Kollision übersprungen.\n"
+                f"Monats-Cache für {n} Register neu berechnet."
             )
         else:
             db.rollback()
@@ -149,9 +170,12 @@ def _cmd_repair_midnight_readings(args: argparse.Namespace) -> int:
             return 0
         if apply:
             db.commit()
+            touched = {p.register_id for p in result.planned if not p.collision}
+            n = _refresh_monthly_cache(db, touched)
             print(
                 f"\nAngewendet: {result.applied} korrigiert, "
-                f"{result.skipped_collisions} wegen Kollision übersprungen."
+                f"{result.skipped_collisions} wegen Kollision übersprungen.\n"
+                f"Monats-Cache für {n} Register neu berechnet."
             )
         else:
             db.rollback()
