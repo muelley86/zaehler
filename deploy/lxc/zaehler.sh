@@ -737,8 +737,14 @@ cmd_upgrade_app() {
     step "4/8  Frontend bauen"
     as_user "cd '$REPO_DIR/frontend' && pnpm install --frozen-lockfile && NODE_OPTIONS=--max-old-space-size=2048 pnpm build"
 
-    step "5/8  Datenbank-Migrationen"
+    step "5/8  Datenbank-Migrationen + Monats-Cache"
     as_user "cd '$REPO_DIR/backend' && uv run alembic upgrade head"
+    # monthly_consumption ist ein materialisierter Cache (nur die Monats-Diagramme
+    # lesen daraus). Migrationen legen die Tabelle leer an -> ohne Backfill bleiben
+    # die Monats-Charts leer ("Keine Verbrauchsdaten"). recompute-monthly ist
+    # idempotent (delete+reinsert je Register), also bei jedem Update sicher; hält
+    # den Cache zugleich gegen Drift robust.
+    as_user "cd '$REPO_DIR/backend' && uv run python -m meters.cli recompute-monthly"
 
     step "6/8  systemd-Unit synchronisieren (falls geändert) + CLI-Wrapper"
     local unit_src="$REPO_DIR/deploy/systemd/$SERVICE_NAME"
@@ -1548,6 +1554,9 @@ ${C_BOLD}zaehler.sh — Verwaltungsskript für die Zählerstand-App${C_RESET}
     repair-legacy-timestamps [--apply]
                          Synthetische Readings mit naiv-UTC-Zeit korrigieren.
                          Default: Dry-Run; --apply schreibt (sichert vorher).
+    recompute-monthly    Monats-Cache (monthly_consumption) neu berechnen —
+                         Backfill für die Monats-Diagramme. Läuft bei
+                         upgrade-app automatisch mit; idempotent.
 
   ${C_BOLD}Benutzer-Verwaltung:${C_RESET}
     reset-password       Passwort eines Users neu setzen (z. B. Admin
@@ -1630,6 +1639,16 @@ cmd_repair_legacy_timestamps() {
     _run_meters_repair repair-legacy-timestamps "${1:-}"
 }
 
+# Backfill/Neuberechnung des materialisierten Monats-Caches (monthly_consumption).
+# Idempotent — gefahrlos manuell auszufuehren, wenn die Monats-Diagramme leer
+# sind (z. B. nach einem Restore). Beim regulaeren upgrade-app laeuft das ohnehin
+# automatisch mit (Step 5/8).
+cmd_recompute_monthly() {
+    require_root
+    [ -d "$REPO_DIR/.git" ] || die "Kein Repository unter $REPO_DIR — bitte erst 'install' ausführen."
+    as_user "cd '$REPO_DIR/backend' && uv run python -m meters.cli recompute-monthly"
+}
+
 # -----------------------------------------------------------------------------
 # Dispatcher
 # -----------------------------------------------------------------------------
@@ -1647,6 +1666,7 @@ case "${1:-help}" in
     rollback)            cmd_rollback "${2:-}" ;;
     repair-midnight-readings)  cmd_repair_midnight_readings "${2:-}" ;;
     repair-legacy-timestamps)  cmd_repair_legacy_timestamps "${2:-}" ;;
+    recompute-monthly)         cmd_recompute_monthly ;;
     reset-password)      cmd_reset_password ;;
     configure)           cmd_configure ;;
     configure-network)   cmd_configure_network ;;
