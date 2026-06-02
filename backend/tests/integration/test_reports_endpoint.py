@@ -238,3 +238,24 @@ def test_csv_export(admin_client: TestClient) -> None:
     assert "Kostenstelle,80008,Wasser,m³,,," in text
     data_line = next(line for line in text.splitlines() if line.startswith("Kostenstelle,80008"))
     assert float(data_line.rsplit(",", 1)[1]) == 42.0
+
+
+def test_csv_export_dimension_measuring_point(admin_client: TestClient) -> None:
+    # Regression: Dimension "Messstelle" hatte kein CSV-Label -> KeyError -> 500.
+    a = _create_mp(admin_client, name="Halle Nord", serial="W-N")
+    _add(admin_client, _registers(a)["water"], "42", "2024-06-15T12:00:00Z")
+    resp = admin_client.get(
+        "/api/v1/reports/aggregate.csv",
+        params={"dimension": "measuring_point", "granularity": "total"},
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.headers["content-type"].startswith("text/csv")
+    assert "Messstelle,Halle Nord,Wasser,m³,,," in resp.text
+
+
+def test_all_dimensions_have_csv_label() -> None:
+    # Wächter: jede ReportDimension braucht ein CSV-Label, sonst 500 beim Export.
+    from meters.api.v1.reports import _DIMENSION_LABELS
+    from meters.models import ReportDimension
+
+    assert set(_DIMENSION_LABELS) == set(ReportDimension)
