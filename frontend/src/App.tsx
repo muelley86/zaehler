@@ -63,6 +63,11 @@ const OwnersAdminPage = lazy(() =>
 const AuditLogPage = lazy(() =>
   import('@/features/admin/audit/AuditLogPage').then((m) => ({ default: m.AuditLogPage })),
 );
+const ImportReadingsPage = lazy(() =>
+  import('@/features/admin/import/ImportReadingsPage').then((m) => ({
+    default: m.ImportReadingsPage,
+  })),
+);
 const QrCodesAdminPage = lazy(() =>
   import('@/features/admin/qr-codes/QrCodesAdminPage').then((m) => ({
     default: m.QrCodesAdminPage,
@@ -192,6 +197,7 @@ export function App() {
             <Route path="eigentuemer" element={<OwnersAdminPage />} />
             <Route path="benutzer" element={<UsersAdminPage />} />
             <Route path="qr-codes" element={<QrCodesAdminPage />} />
+            <Route path="import" element={<ImportReadingsPage />} />
             <Route path="audit" element={<AuditLogPage />} />
             <Route path="system" element={<SystemAdminPage />} />
             <Route path="sessions" element={<SessionsAdminPage />} />

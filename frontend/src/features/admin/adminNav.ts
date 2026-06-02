@@ -21,6 +21,7 @@ import {
   QrCode,
   ScrollText,
   Shield,
+  Upload,
   User,
   Users,
 } from 'lucide-react';
@@ -88,6 +89,13 @@ export const ADMIN_SECTIONS: AdminNavItem[] = [
     icon: createElement(QrCode, { size: 18 }),
     description: 'Token-Vorrat und Druck',
     color: 'primary',
+  },
+  {
+    to: '/admin/import',
+    label: 'Import',
+    icon: createElement(Upload, { size: 18 }),
+    description: 'Historische Zählerstände aus Excel/CSV',
+    color: 'electricity',
   },
   {
     to: '/admin/audit',

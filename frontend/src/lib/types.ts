@@ -316,3 +316,37 @@ export interface ReportConfigRead {
   filters: ReportFilter;
   created_at: string;
 }
+
+// --- Zählerstand-Import (Excel/CSV) ---------------------------------------
+
+export interface ImportCell {
+  reading_date: string;
+  raw: string;
+  value: string | null;
+  error: string | null;
+}
+
+export interface ImportRow {
+  index: number;
+  raw_name: string;
+  matched_mp_id: number | null;
+  cells: ImportCell[];
+}
+
+export interface ImportPreviewResponse {
+  reading_dates: string[];
+  rows: ImportRow[];
+  ignored_columns: string[];
+}
+
+export interface ImportCommitFailure {
+  register_id: number;
+  reading_date: string;
+  reason: string;
+}
+
+export interface ImportCommitResponse {
+  created: number;
+  skipped_existing: number;
+  failed: ImportCommitFailure[];
+}
