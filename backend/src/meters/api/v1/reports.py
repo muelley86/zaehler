@@ -20,7 +20,7 @@ from fastapi.responses import StreamingResponse
 
 from meters.api.deps import CurrentUser, DbDep
 from meters.models import MeterType, ReportDimension, UserRole
-from meters.schemas.common import format_decimal_de
+from meters.schemas.common import csv_guard_formula, format_decimal_de
 from meters.schemas.report import ReportAggregateResponse, ReportRow
 from meters.services.consumption import Granularity
 from meters.services.report_aggregation import (
@@ -139,9 +139,9 @@ def aggregate_csv(
         writer.writerow(
             [
                 dim_label,
-                r.group_label,
+                csv_guard_formula(r.group_label),
                 METER_TYPE_LABELS[r.meter_type],
-                r.unit,
+                csv_guard_formula(r.unit),
                 r.period_start.strftime("%d.%m.%Y") if r.period_start else "",
                 r.period_end.strftime("%d.%m.%Y") if r.period_end else "",
                 format_decimal_de(r.consumption),
