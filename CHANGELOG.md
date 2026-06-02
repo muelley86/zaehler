@@ -10,6 +10,14 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.39.0](https://github.com/muelley86/zaehler/compare/v2.38.0...v2.39.0) (2026-06-02)
+
+
+### Funktionen
+
+* **consumption:** Cache-Invalidierung für monthly_consumption (B2b) ([#186](https://github.com/muelley86/zaehler/issues/186)) ([ac4f12a](https://github.com/muelley86/zaehler/commit/ac4f12a8852383a8301c92a40694f3b1821dc24f))
+* **consumption:** Monats-Lese-Pfade auf monthly_consumption umstellen (B2c) ([#188](https://github.com/muelley86/zaehler/issues/188)) ([c28a1fb](https://github.com/muelley86/zaehler/commit/c28a1fb39d26cd4dd0aa5a185f1514763e0132b9))
+
 ## [2.38.0](https://github.com/muelley86/zaehler/compare/v2.37.0...v2.38.0) (2026-06-02)
 
 
