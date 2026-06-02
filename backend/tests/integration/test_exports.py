@@ -146,6 +146,42 @@ def test_json_dump_structure(admin_client: TestClient) -> None:
     )
 
 
+def test_json_dump_serializes_location_as_name(admin_client: TestClient) -> None:
+    """Regression: ``MeasuringPoint.location`` ist eine Relationship (Location-
+    ORM-Objekt), kein String. Früher landete das Objekt direkt im Payload und
+    ``json.dumps`` kippte mit TypeError → 500, sobald eine MP einen Standort
+    hatte. Der Dump muss 200 liefern und den Standort als Name-String führen."""
+    loc = admin_client.post("/api/v1/locations", json={"name": "Heizraum-Export"}).json()
+    admin_client.post(
+        "/api/v1/measuring-points",
+        json={
+            "name": "Export-Standort-MP",
+            "type": "water",
+            "is_bidirectional": False,
+            "has_dual_tariff": False,
+            "location_id": loc["id"],
+            "serial_number": "EXP-LOC-1",
+            "installed_at": "2024-01-01",
+            "initial_values": {},
+        },
+    )
+
+    resp = admin_client.get("/api/v1/export/dump.json")
+    assert resp.status_code == 200, resp.text
+    data = resp.json()
+    found = next(p for p in data["measuring_points"] if p["name"] == "Export-Standort-MP")
+    assert found["location"] == "Heizraum-Export"
+
+
+def test_json_dump_location_null_when_unset(admin_client: TestClient) -> None:
+    """MP ohne Standort serialisiert ``location`` als ``null`` (nicht als leeres
+    ORM-Objekt) — und darf den Dump natürlich nicht zum 500 bringen."""
+    _create_water_mp(admin_client)
+    data = admin_client.get("/api/v1/export/dump.json").json()
+    found = next(p for p in data["measuring_points"] if p["name"] == "Wasser-Export-MP")
+    assert found["location"] is None
+
+
 def test_json_dump_includes_kostenstelle(admin_client: TestClient) -> None:
     admin_client.post(
         "/api/v1/measuring-points",

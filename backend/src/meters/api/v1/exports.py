@@ -123,6 +123,7 @@ def full_dump(db: DbDep, _admin: AdminUser) -> Response:
     points = list(
         db.scalars(
             select(MeasuringPoint).options(
+                selectinload(MeasuringPoint.location),
                 selectinload(MeasuringPoint.physical_meters)
                 .selectinload(PhysicalMeter.registers)
                 .selectinload(Register.readings),
@@ -137,7 +138,10 @@ def full_dump(db: DbDep, _admin: AdminUser) -> Response:
                 "id": mp.id,
                 "name": mp.name,
                 "type": mp.type.value,
-                "location": mp.location,
+                # ``location`` ist seit dem Locations-Feature eine Relationship
+                # (Location-ORM-Objekt), kein String mehr — den Namen
+                # serialisieren, sonst kippt json.dumps mit TypeError (500).
+                "location": mp.location.name if mp.location else None,
                 "is_bidirectional": mp.is_bidirectional,
                 "has_dual_tariff": mp.has_dual_tariff,
                 "kostenstelle": mp.kostenstelle,
