@@ -438,4 +438,42 @@ describe('RecordReadingPage', () => {
     await waitFor(() => expect(select.value).toBe('2'));
     expect(screen.queryByText('Bezug')).not.toBeInTheDocument();
   });
+
+  it('historischer Monatswert: reading_at wird ans Monatsende gelegt', async () => {
+    _mockListEndpoints([_mp()]);
+    const bodies: { reading_at: string }[] = [];
+    server.use(
+      http.post('/api/v1/readings', async ({ request }) => {
+        bodies.push((await request.json()) as { reading_at: string });
+        return HttpResponse.json(
+          {
+            id: 1,
+            register_id: 100,
+            value: '5',
+            reading_at: '2024-05-31T12:00:00Z',
+            note: null,
+            created_at: '2024-05-31T12:00:00Z',
+            created_by_user_id: 1,
+            created_by_username: 'admin',
+            has_photo: false,
+            photos: [],
+          },
+          { status: 201 },
+        );
+      }),
+    );
+
+    const user = userEvent.setup();
+    renderWithRouter(<RecordReadingPage />);
+    await screen.findByText('Bezug');
+
+    await user.click(screen.getByRole('button', { name: 'Historischer Monatswert' }));
+    fireEvent.change(screen.getByLabelText(/Abrechnungsmonat/i), { target: { value: '2024-05' } });
+    await user.type(screen.getByPlaceholderText(/leer = nicht erfassen/i), '5');
+    await user.click(screen.getByRole('button', { name: /^Speichern$/i }));
+
+    await waitFor(() => expect(bodies).toHaveLength(1));
+    // 2024-05 -> Monatsende 31.05. (lokal Mittag), Datum stabil unabhängig von TZ.
+    expect(bodies[0]!.reading_at).toMatch(/^2024-05-31/);
+  });
 });
