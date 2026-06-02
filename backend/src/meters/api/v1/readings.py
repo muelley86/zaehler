@@ -43,6 +43,7 @@ from meters.services.access import (
 )
 from meters.services.audit import record
 from meters.services.consumption import aggregate_consumption, consumption_for_measuring_point
+from meters.services.monthly_consumption import monthly_points_for_measuring_point
 from meters.services.reading_photo import (
     delete_photo,
     photo_full_path,
@@ -518,7 +519,13 @@ def consumption(
     to_at: date | None = Query(None),
 ) -> list[ConsumptionPoint]:
     assert_can_access_mp(db, user, mp_id)
-    points = consumption_for_measuring_point(db, measuring_point_id=mp_id)
+    # Monats-Granularität aus der materialisierten Tabelle lesen (schnell, ohne
+    # alle Readings zu laden); andere Granularitäten weiterhin on-the-fly. Beide
+    # nutzen dieselbe Interpolations-Logik -> identische Werte.
+    if granularity == "month":
+        points = monthly_points_for_measuring_point(db, mp_id)
+    else:
+        points = consumption_for_measuring_point(db, measuring_point_id=mp_id)
     points = aggregate_consumption(
         points, granularity=granularity, from_date=from_at, to_date=to_at
     )

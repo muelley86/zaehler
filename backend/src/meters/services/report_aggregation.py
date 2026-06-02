@@ -36,6 +36,7 @@ from meters.services.consumption import (
     aggregate_consumption,
     consumption_for_measuring_point,
 )
+from meters.services.monthly_consumption import monthly_points_for_measuring_point
 from meters.services.owner_assignment import current_assignments_bulk
 
 # Deutsche Labels fuer die Zaehlerart-Dimension (Backend liefert das Label mit,
@@ -161,7 +162,12 @@ def aggregate_report(
 
         group_key, group_label = _group_of(mp, dimension, (owner_id, owner_name))
 
-        points = consumption_for_measuring_point(db, measuring_point_id=mp.id)
+        # Monats-Granularität aus der materialisierten Tabelle (schnell, kein
+        # Readings-Laden); sonst on-the-fly. Gleiche Interpolation -> gleiche Werte.
+        if granularity == "month":
+            points = monthly_points_for_measuring_point(db, mp.id)
+        else:
+            points = consumption_for_measuring_point(db, measuring_point_id=mp.id)
         points = [p for p in points if _is_consumption_register(p.obis_code)]
         points = aggregate_consumption(
             points, granularity=granularity, from_date=from_date, to_date=to_date
