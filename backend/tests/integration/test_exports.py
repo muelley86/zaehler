@@ -90,6 +90,31 @@ def test_csv_export_has_expected_columns(admin_client: TestClient) -> None:
     )
 
 
+def test_csv_export_escapes_formula_injection(admin_client: TestClient) -> None:
+    """Notiz, die mit ``=`` beginnt, darf in Excel nicht als Formel laufen —
+    sie wird mit Apostroph entschärft. Die Zahl-Spalte bleibt unangetastet."""
+    mp = _create_water_mp(admin_client)
+    register_id = mp["physical_meters"][0]["registers"][0]["id"]
+    admin_client.post(
+        "/api/v1/readings",
+        json={
+            "register_id": register_id,
+            "value": "200.5",
+            "reading_at": "2024-07-01T08:00:00",
+            "note": "=1+2",
+        },
+    )
+
+    resp = admin_client.get("/api/v1/export/readings.csv")
+    assert resp.status_code == 200, resp.text
+    reader = csv.DictReader(io.StringIO(resp.content.decode("utf-8-sig")), delimiter=";")
+    rows = list(reader)
+    matching = [r for r in rows if r["note"] == "'=1+2"]
+    assert len(matching) == 1, f"Notiz muss mit Apostroph entschärft sein, Zeilen: {rows}"
+    # Zahl-Spalte bleibt unverändert (kein Apostroph-Präfix).
+    assert matching[0]["value"] == "200,5"
+
+
 def test_json_dump_structure(admin_client: TestClient) -> None:
     """JSON-Dump enthält die volle Hierarchie: MeasuringPoints → Meter
     → Register → Readings (kein Subset, kein Datenverlust)."""

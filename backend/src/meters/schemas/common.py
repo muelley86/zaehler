@@ -24,6 +24,20 @@ def format_decimal_de(value: Decimal) -> str:
     return format(value, "f").replace(".", ",")
 
 
+def csv_guard_formula(value: str) -> str:
+    """Schutz vor CSV-Formel-Injection in Excel/LibreOffice: Werte, die mit
+    ``=`` ``+`` ``-`` ``@`` beginnen, werden mit einem Apostroph geprefixt, damit
+    Tabellen sie als Text statt als Formel interpretieren. Spiegelt den Frontend-
+    ``csvField``-Helper.
+
+    **Nur auf freie Textfelder anwenden** — NICHT auf formatierte Zahlen
+    (führendes Minus!) oder Datumswerte.
+    """
+    if value[:1] in {"=", "+", "-", "@"}:
+        return "'" + value
+    return value
+
+
 def to_utc_iso(dt: datetime | None) -> str | None:
     """Naive UTC-``datetime`` → ISO-8601-String mit ``Z``. ``None`` → ``None``.
 

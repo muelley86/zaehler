@@ -26,7 +26,7 @@ from meters.models import (
     Register,
     UserRole,
 )
-from meters.schemas.common import format_decimal_de, to_utc_iso
+from meters.schemas.common import csv_guard_formula, format_decimal_de, to_utc_iso
 from meters.services.access import restrict_mp_query
 
 router = APIRouter(prefix="/export", tags=["export"])
@@ -87,15 +87,15 @@ def readings_csv(db: DbDep, user: CurrentUser) -> StreamingResponse:
                 r.id,
                 _format_de(r.reading_at),
                 format_decimal_de(r.value),
-                register.unit,
-                register.obis_code,
+                csv_guard_formula(register.unit),
+                csv_guard_formula(register.obis_code),
                 register.id,
                 meter.id,
-                meter.serial_number,
+                csv_guard_formula(meter.serial_number),
                 meter.measuring_point_id,
-                r.note or "",
+                csv_guard_formula(r.note or ""),
                 _format_de(r.created_at, with_seconds=True),
-                r.created_by.username if r.created_by else "",
+                csv_guard_formula(r.created_by.username if r.created_by else ""),
             ]
         )
 

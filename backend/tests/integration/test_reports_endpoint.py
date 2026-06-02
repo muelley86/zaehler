@@ -280,6 +280,19 @@ def test_csv_export_german_number_and_date_format(admin_client: TestClient) -> N
     assert cols[5] == "29.02.2024", cols
 
 
+def test_csv_export_escapes_formula_injection(admin_client: TestClient) -> None:
+    # MP-Name, der mit "=" beginnt, darf in Excel nicht als Formel laufen ->
+    # group_label wird mit Apostroph entschärft.
+    a = _create_mp(admin_client, name="=Tricky", serial="W-T")
+    _add(admin_client, _registers(a)["water"], "5", "2024-06-15T12:00:00Z")
+    resp = admin_client.get(
+        "/api/v1/reports/aggregate.csv",
+        params={"dimension": "measuring_point", "granularity": "total"},
+    )
+    assert resp.status_code == 200, resp.text
+    assert "Messstelle;'=Tricky;Wasser;m³;;;" in resp.text
+
+
 def test_all_dimensions_have_csv_label() -> None:
     # Wächter: jede ReportDimension braucht ein CSV-Label, sonst 500 beim Export.
     from meters.api.v1.reports import _DIMENSION_LABELS
