@@ -1,8 +1,13 @@
+import { Droplet, Thermometer, type LucideIcon } from 'lucide-react';
+
 import { cx } from './cx';
 
 export type MeterType = 'electricity' | 'water' | 'heating';
 
-const META: Record<MeterType, { label: string; symbol: string; gradient: string; glow: string }> = {
+const META: Record<
+  MeterType,
+  { label: string; symbol?: string; Icon?: LucideIcon; gradient: string; glow: string }
+> = {
   electricity: {
     label: 'Strom',
     symbol: '⚡',
@@ -11,17 +16,20 @@ const META: Record<MeterType, { label: string; symbol: string; gradient: string;
   },
   water: {
     label: 'Wasser',
-    symbol: '◈',
+    Icon: Droplet,
     gradient: 'bg-type-water',
     glow: 'shadow-glow-water',
   },
   heating: {
     label: 'Heizung',
-    symbol: '◆',
+    Icon: Thermometer,
     gradient: 'bg-type-heating',
     glow: 'shadow-glow-heating',
   },
 };
+
+// Icon-Kantenlänge je Badge-Größe (passend zu h-7 / h-9 / h-12).
+const ICON_SIZE: Record<'sm' | 'md' | 'lg', number> = { sm: 16, md: 20, lg: 26 };
 
 export function TypeBadge({
   type,
@@ -33,6 +41,7 @@ export function TypeBadge({
   className?: string;
 }) {
   const meta = META[type];
+  const Icon = meta.Icon;
   return (
     <div
       role="img"
@@ -47,7 +56,7 @@ export function TypeBadge({
         className,
       )}
     >
-      {meta.symbol}
+      {Icon ? <Icon size={ICON_SIZE[size]} aria-hidden /> : meta.symbol}
     </div>
   );
 }
