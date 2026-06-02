@@ -16,6 +16,7 @@ from meters.models.delivery import Delivery
 from meters.models.location import Location
 from meters.models.main_location import MainLocation
 from meters.models.measuring_point import MeasuringPoint
+from meters.models.monthly_consumption import MonthlyConsumption
 from meters.models.owner import Owner
 from meters.models.owner_assignment import OwnerAssignment
 from meters.models.physical_meter import PhysicalMeter
@@ -39,6 +40,7 @@ __all__ = [
     "MainLocation",
     "MeasuringPoint",
     "MeterType",
+    "MonthlyConsumption",
     "Owner",
     "OwnerAssignment",
     "PendingTotpChallenge",
