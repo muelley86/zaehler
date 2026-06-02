@@ -10,6 +10,13 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.35.0](https://github.com/muelley86/zaehler/compare/v2.34.4...v2.35.0) (2026-06-02)
+
+
+### Funktionen
+
+* **ui:** Wasser-/Heizung-Badge mit Tropfen- bzw. Thermometer-Icon ([#173](https://github.com/muelley86/zaehler/issues/173)) ([3605178](https://github.com/muelley86/zaehler/commit/36051784e823d9f295c8dd3d770305daa2887969))
+
 ## [2.34.4](https://github.com/muelley86/zaehler/compare/v2.34.3...v2.34.4) (2026-06-02)
 
 
