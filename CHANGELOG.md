@@ -10,6 +10,15 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.39.1](https://github.com/muelley86/zaehler/compare/v2.39.0...v2.39.1) (2026-06-02)
+
+
+### Fehlerbehebungen
+
+* **cli:** repair-midnight/-legacy-timestamps berechnen monthly_consumption neu ([#191](https://github.com/muelley86/zaehler/issues/191)) ([ff56ab5](https://github.com/muelley86/zaehler/commit/ff56ab5ef2766600c401ebc38121787ffdd5169c))
+* **deploy:** monthly_consumption-Backfill in upgrade-app + recompute-monthly-Wrapper ([#192](https://github.com/muelley86/zaehler/issues/192)) ([25a5cd8](https://github.com/muelley86/zaehler/commit/25a5cd8a4c77ffd8774497aaa74b842f11c1dd52))
+* **export:** dump.json serialisiert Standort als Name statt ORM-Objekt ([#190](https://github.com/muelley86/zaehler/issues/190)) ([3a209b5](https://github.com/muelley86/zaehler/commit/3a209b5a8882e3f63329efc9b3e9b065c9ae13ac))
+
 ## [2.39.0](https://github.com/muelley86/zaehler/compare/v2.38.0...v2.39.0) (2026-06-02)
 
 
