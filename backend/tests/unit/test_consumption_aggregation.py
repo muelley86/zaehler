@@ -9,7 +9,23 @@ from __future__ import annotations
 from datetime import date
 from decimal import Decimal
 
-from meters.services.consumption import ConsumptionPoint, aggregate_consumption
+from meters.services.consumption import (
+    ConsumptionPoint,
+    aggregate_consumption,
+    split_across_buckets,
+)
+
+
+def _interval(start: str, end: str, consumption: str) -> ConsumptionPoint:
+    """ConsumptionPoint über ein echtes Intervall (period_start != period_end)."""
+    return ConsumptionPoint(
+        period_start=date.fromisoformat(start),
+        period_end=date.fromisoformat(end),
+        register_id=1,
+        obis_code="water",
+        consumption=Decimal(consumption),
+        unit="m³",
+    )
 
 
 def _p(
@@ -109,3 +125,51 @@ def test_result_sorted_by_period_end_then_obis() -> None:
 
 def test_empty_input() -> None:
     assert aggregate_consumption([], granularity="month", from_date=None, to_date=None) == []
+
+
+# --- Tages-Interpolation über Bucket-Grenzen (split_across_buckets) ----------
+
+
+def test_split_across_month_boundary_by_days() -> None:
+    # Analog-Szenario: 15.05 -> 05.06, Verbrauch 21 -> Mai 16 Tage, Juni 5 Tage.
+    # total_days = (05.06 - 15.05) = 21; Mai: 16.05..31.05 = 16 Tage, Juni: 5.
+    parts = split_across_buckets(_interval("2024-05-15", "2024-06-05", "21"), "month")
+    by_end = {p.period_end: p.consumption for p in parts}
+    assert by_end[date(2024, 5, 31)] == Decimal("16")
+    assert by_end[date(2024, 6, 30)] == Decimal("5")
+
+
+def test_split_conserves_total_with_rounding() -> None:
+    # 10 / 21 Tage geht nicht glatt auf -> Rundungsrest darf nichts verlieren.
+    parts = split_across_buckets(_interval("2024-05-15", "2024-06-05", "10"), "month")
+    assert sum((p.consumption for p in parts), Decimal("0")) == Decimal("10")
+
+
+def test_split_within_single_month_is_not_divided() -> None:
+    parts = split_across_buckets(_interval("2024-05-05", "2024-05-20", "8"), "month")
+    assert len(parts) == 1
+    assert parts[0].period_start == date(2024, 5, 1)
+    assert parts[0].period_end == date(2024, 5, 31)
+    assert parts[0].consumption == Decimal("8")
+
+
+def test_month_end_reading_lands_in_single_month() -> None:
+    # Digital-Szenario: aufeinanderfolgende Monatsend-Werte -> kein Split.
+    parts = split_across_buckets(_interval("2024-04-30", "2024-05-31", "100"), "month")
+    assert len(parts) == 1
+    assert parts[0].period_end == date(2024, 5, 31)
+    assert parts[0].consumption == Decimal("100")
+
+
+def test_aggregate_interpolates_real_intervals() -> None:
+    # End-to-end über aggregate_consumption: ein Intervall über die Monatsgrenze
+    # wird taggenau auf Mai/Juni verteilt.
+    out = aggregate_consumption(
+        [_interval("2024-05-15", "2024-06-05", "21")],
+        granularity="month",
+        from_date=None,
+        to_date=None,
+    )
+    by_end = {p.period_end: p.consumption for p in out}
+    assert by_end[date(2024, 5, 31)] == Decimal("16")
+    assert by_end[date(2024, 6, 30)] == Decimal("5")

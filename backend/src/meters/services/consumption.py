@@ -149,6 +149,66 @@ def _bucket_bounds(d: date, granularity: Granularity) -> tuple[date, date]:
     return date(d.year, 1, 1), date(d.year, 12, 31)
 
 
+def split_across_buckets(
+    point: ConsumptionPoint, granularity: Granularity
+) -> list[ConsumptionPoint]:
+    """Verteilt den Verbrauch eines Ablese-Intervalls **taggenau** auf die
+    Buckets, die ``(period_start, period_end]`` überspannt (lineare Interpolation
+    = konstanter Tagesverbrauch). Reicht ein Intervall über eine Monatsgrenze,
+    landet der Verbrauch anteilig nach Tagen in beiden Monaten — damit die
+    Monats-/Tages-Diagramme korrekt bleiben.
+
+    Liegt das Intervall ganz in einem Bucket (oder Null-Spanne, z. B. ein
+    Monatsend-Wert direkt auf der Grenze), gibt es genau einen Punkt zurück
+    (kein Split). Der Rundungsrest wird dem letzten Bucket zugeschlagen, sodass
+    die Summe der Teilbeträge **exakt** dem Original-Verbrauch entspricht.
+    """
+    total_days = (point.period_end - point.period_start).days
+    if total_days <= 0:
+        start, end = _bucket_bounds(point.period_end, granularity)
+        return [
+            ConsumptionPoint(
+                period_start=start,
+                period_end=end,
+                register_id=point.register_id,
+                obis_code=point.obis_code,
+                consumption=point.consumption,
+                unit=point.unit,
+            )
+        ]
+
+    # Jeden Tag d mit period_start < d <= period_end dem Bucket von d zuordnen.
+    order: list[tuple[date, date]] = []
+    days_in: dict[tuple[date, date], int] = {}
+    for i in range(1, total_days + 1):
+        bounds = _bucket_bounds(point.period_start + timedelta(days=i), granularity)
+        if bounds not in days_in:
+            days_in[bounds] = 0
+            order.append(bounds)
+        days_in[bounds] += 1
+
+    out: list[ConsumptionPoint] = []
+    allocated = Decimal("0")
+    for idx, bounds in enumerate(order):
+        if idx < len(order) - 1:
+            amount = point.consumption * days_in[bounds] / total_days
+            allocated += amount
+        else:
+            # Letzter Bucket bekommt den Rest -> Summe exakt erhalten.
+            amount = point.consumption - allocated
+        out.append(
+            ConsumptionPoint(
+                period_start=bounds[0],
+                period_end=bounds[1],
+                register_id=point.register_id,
+                obis_code=point.obis_code,
+                consumption=amount,
+                unit=point.unit,
+            )
+        )
+    return out
+
+
 def aggregate_consumption(
     points: list[ConsumptionPoint],
     *,
@@ -160,37 +220,36 @@ def aggregate_consumption(
 
     Filterung erfolgt über ``period_end`` (konsistent mit der bisherigen
     Frontend-Logik). Bei ``granularity is None`` werden die gefilterten Rohpunkte
-    zurückgegeben (rückwärtskompatibel). Andernfalls wird jeder Punkt vollständig
-    dem Bucket seines ``period_end`` zugeschlagen (kein anteiliges Splitten über
-    Bucket-Grenzen) und der Verbrauch je ``(obis_code, unit, bucket)`` summiert.
-    ``register_id`` im aggregierten Punkt ist nur repräsentativ (erster Beitrag).
+    zurückgegeben (rückwärtskompatibel). Andernfalls wird jeder Punkt über
+    :func:`split_across_buckets` **taggenau** auf die überspannten Buckets
+    verteilt (lineare Interpolation; Intervalle innerhalb eines Buckets bzw.
+    Null-Spannen bleiben ungeteilt) und der Verbrauch je ``(obis_code, unit,
+    bucket)`` summiert. ``register_id`` im aggregierten Punkt ist nur
+    repräsentativ (erster Beitrag).
     """
-    filtered = [
-        p
-        for p in points
-        if (from_date is None or p.period_end >= from_date)
-        and (to_date is None or p.period_end <= to_date)
-    ]
+
+    def in_range(d: date) -> bool:
+        return (from_date is None or d >= from_date) and (to_date is None or d <= to_date)
+
     if granularity is None:
+        filtered = [p for p in points if in_range(p.period_end)]
         filtered.sort(key=lambda p: (p.period_end, p.obis_code))
         return filtered
 
+    # Erst taggenau auf Buckets verteilen, DANN nach Bucket-Periode filtern —
+    # so liefert ein Zeitraum-Filter genau die anteiligen Bucket-Beträge im
+    # Zeitraum (nicht das ganze Intervall, dessen period_end zufällig drin liegt).
     buckets: dict[tuple[str, str, date, date], ConsumptionPoint] = {}
-    for p in filtered:
-        start, end = _bucket_bounds(p.period_end, granularity)
-        key = (p.obis_code, p.unit, start, end)
-        existing = buckets.get(key)
-        if existing is None:
-            buckets[key] = ConsumptionPoint(
-                period_start=start,
-                period_end=end,
-                register_id=p.register_id,
-                obis_code=p.obis_code,
-                consumption=p.consumption,
-                unit=p.unit,
-            )
-        else:
-            existing.consumption += p.consumption
+    for p in points:
+        for sp in split_across_buckets(p, granularity):
+            if not in_range(sp.period_end):
+                continue
+            key = (sp.obis_code, sp.unit, sp.period_start, sp.period_end)
+            existing = buckets.get(key)
+            if existing is None:
+                buckets[key] = sp
+            else:
+                existing.consumption += sp.consumption
     out = list(buckets.values())
     out.sort(key=lambda p: (p.period_end, p.obis_code))
     return out
