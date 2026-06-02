@@ -10,6 +10,14 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.37.0](https://github.com/muelley86/zaehler/compare/v2.36.0...v2.37.0) (2026-06-02)
+
+
+### Funktionen
+
+* **consumption:** Verbrauch über Monatsgrenzen taggenau interpolieren ([#180](https://github.com/muelley86/zaehler/issues/180)) ([b447a40](https://github.com/muelley86/zaehler/commit/b447a40c6061c1e19ecf2c0cdf6ee893e19dda07))
+* **readings:** Umschalter "Aktueller Stand" / "Historischer Monatswert" ([#182](https://github.com/muelley86/zaehler/issues/182)) ([f5aaa28](https://github.com/muelley86/zaehler/commit/f5aaa28c46f4c25ab3f378ac265106c9c597c750))
+
 ## [2.36.0](https://github.com/muelley86/zaehler/compare/v2.35.1...v2.36.0) (2026-06-02)
 
 
