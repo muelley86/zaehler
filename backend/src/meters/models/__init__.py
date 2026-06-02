@@ -21,6 +21,7 @@ from meters.models.owner_assignment import OwnerAssignment
 from meters.models.physical_meter import PhysicalMeter
 from meters.models.qr_token import QrToken
 from meters.models.reading import Reading
+from meters.models.reading_photo import ReadingPhoto
 from meters.models.register import Register
 from meters.models.report_config import ReportConfig
 from meters.models.session import Session
@@ -44,6 +45,7 @@ __all__ = [
     "PhysicalMeter",
     "QrToken",
     "Reading",
+    "ReadingPhoto",
     "Register",
     "ReportConfig",
     "ReportDimension",

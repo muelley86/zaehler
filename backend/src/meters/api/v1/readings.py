@@ -28,12 +28,14 @@ from meters.models import (
     AuditEntityType,
     PhysicalMeter,
     Reading,
+    ReadingPhoto,
     Register,
     User,
     UserRole,
 )
 from meters.schemas import ConsumptionPoint, ReadingCreate, ReadingRead, ReadingUpdate
 from meters.schemas.common import to_utc_iso
+from meters.schemas.reading import ReadingPhotoRead
 from meters.services.access import (
     assert_can_access_mp,
     assert_can_access_register,
@@ -69,9 +71,11 @@ def _to_read(reading: Reading) -> ReadingRead:
         created_at=reading.created_at,
         created_by_user_id=reading.created_by_user_id,
         created_by_username=reading.created_by.username if reading.created_by else None,
-        has_photo=reading.photo_path is not None,
-        photo_lat=reading.photo_lat,
-        photo_lon=reading.photo_lon,
+        has_photo=len(reading.photos) > 0,
+        photos=[
+            ReadingPhotoRead(id=p.id, photo_lat=p.photo_lat, photo_lon=p.photo_lon)
+            for p in reading.photos
+        ],
     )
 
 
@@ -185,7 +189,7 @@ def list_readings(
 ) -> list[ReadingRead]:
     stmt = (
         select(Reading)
-        .options(selectinload(Reading.created_by))
+        .options(selectinload(Reading.created_by), selectinload(Reading.photos))
         .order_by(Reading.reading_at.desc(), Reading.id.desc())
     )
     # Recorder: immer per Join über Register/PhysicalMeter filtern, damit
@@ -373,16 +377,23 @@ def delete_reading(
         },
         ip_address=client_ip(request),
     )
-    photo_basename = reading.photo_path
+    # Alle Foto-Basenames vor dem Löschen merken (DB-Cascade entfernt die
+    # reading_photo-Zeilen, aber nicht die Dateien).
+    photo_basenames = [p.photo_path for p in reading.photos]
     db.delete(reading)
     db.commit()
-    # Datei erst nach erfolgreichem DB-Commit löschen — andernfalls wäre
-    # das Foto weg, das Reading aber noch da.
-    delete_photo(photo_basename)
+    # Dateien erst nach erfolgreichem DB-Commit löschen — andernfalls wären
+    # die Fotos weg, das Reading aber noch da.
+    for basename in photo_basenames:
+        delete_photo(basename)
 
 
-@router.put("/readings/{reading_id}/photo", response_model=ReadingRead)
-def upload_reading_photo(
+# Bis zu 6 Fotos je Erfassung (z. B. Zählwerk, Plombe, Umgebung, Schild).
+MAX_PHOTOS_PER_READING = 6
+
+
+@router.post("/readings/{reading_id}/photos", response_model=ReadingRead)
+def add_reading_photo(
     reading_id: int,
     request: Request,
     db: DbDep,
@@ -397,86 +408,90 @@ def upload_reading_photo(
     assert_can_access_register(db, user, reading.register_id)
     if not _can_edit(user, reading):
         raise ProblemError(status_code=403, title="Cannot edit this reading")
+    if len(reading.photos) >= MAX_PHOTOS_PER_READING:
+        raise ProblemError(
+            status_code=409,
+            title="Zu viele Fotos",
+            detail=f"Maximal {MAX_PHOTOS_PER_READING} Fotos je Erfassung.",
+        )
 
-    previous = reading.photo_path
     new_basename, gps = save_photo(reading.id, photo)
     # Fallback: wenn das EXIF keine GPS-Tags hatte, akzeptiere die vom
     # Client (Browser-Geolocation) mitgegebenen Koordinaten — mobile
-    # Safari strippt EXIF-GPS aus per ``capture``-Input aufgenommenen
-    # Fotos, deshalb braucht der Client einen Zweitkanal.
+    # Safari strippt EXIF-GPS aus per ``capture``-Input aufgenommenen Fotos.
     if gps is None:
         gps = validate_gps(gps_lat, gps_lon)
-    reading.photo_path = new_basename
-    reading.photo_lat = gps[0] if gps is not None else None
-    reading.photo_lon = gps[1] if gps is not None else None
+    next_index = max((p.sort_index for p in reading.photos), default=-1) + 1
+    db.add(
+        ReadingPhoto(
+            reading_id=reading.id,
+            photo_path=new_basename,
+            photo_lat=gps[0] if gps is not None else None,
+            photo_lon=gps[1] if gps is not None else None,
+            sort_index=next_index,
+        )
+    )
     record(
         db,
         user_id=user.id,
         action=AuditAction.UPDATE,
         entity_type=AuditEntityType.READING,
         entity_id=reading.id,
-        diff={"photo": {"action": "replaced" if previous else "set"}},
+        diff={"photo": {"action": "added", "count": len(reading.photos) + 1}},
         ip_address=client_ip(request),
     )
     db.commit()
     db.refresh(reading)
-    # Altes Foto erst nach DB-Commit entfernen — vermeidet Daten-Verlust,
-    # falls das Commit fehlschlägt.
-    if previous and previous != new_basename:
-        delete_photo(previous)
     return _to_read(reading)
 
 
-@router.delete("/readings/{reading_id}/photo", status_code=204)
+@router.delete("/readings/{reading_id}/photos/{photo_id}", status_code=204)
 def delete_reading_photo(
     reading_id: int,
+    photo_id: int,
     request: Request,
     db: DbDep,
     user: CurrentUser,
 ) -> None:
-    reading = db.get(Reading, reading_id)
-    if reading is None:
-        raise ProblemError(status_code=404, title="Reading not found")
+    photo = db.get(ReadingPhoto, photo_id)
+    if photo is None or photo.reading_id != reading_id:
+        # Nicht (mehr) vorhanden — idempotent als 204 zurückgeben.
+        return
+    reading = photo.reading
     assert_can_access_register(db, user, reading.register_id)
     if not _can_edit(user, reading):
         raise ProblemError(status_code=403, title="Cannot edit this reading")
-    if reading.photo_path is None:
-        # Kein Foto vorhanden — idempotent als 204 zurückgeben.
-        return
-    previous = reading.photo_path
-    reading.photo_path = None
-    reading.photo_lat = None
-    reading.photo_lon = None
+    basename = photo.photo_path
+    db.delete(photo)
     record(
         db,
         user_id=user.id,
         action=AuditAction.UPDATE,
         entity_type=AuditEntityType.READING,
         entity_id=reading.id,
-        diff={"photo": {"action": "removed"}},
+        diff={"photo": {"action": "removed", "photo_id": photo_id}},
         ip_address=client_ip(request),
     )
     db.commit()
-    delete_photo(previous)
+    delete_photo(basename)
 
 
-@router.get("/readings/{reading_id}/photo")
+@router.get("/readings/{reading_id}/photos/{photo_id}")
 def get_reading_photo(
     reading_id: int,
+    photo_id: int,
     db: DbDep,
     user: CurrentUser,
 ) -> Response:
-    reading = db.get(Reading, reading_id)
-    if reading is None:
-        raise ProblemError(status_code=404, title="Reading not found")
+    photo = db.get(ReadingPhoto, photo_id)
+    if photo is None or photo.reading_id != reading_id:
+        raise ProblemError(status_code=404, title="No photo for this reading")
     # Auslieferung läuft über die API (nicht StaticFiles), damit der
     # Recorder-MP-Filter greift — sonst könnten User mit der URL fremde
     # Fotos laden.
-    assert_can_access_register(db, user, reading.register_id)
-    if reading.photo_path is None:
-        raise ProblemError(status_code=404, title="No photo for this reading")
+    assert_can_access_register(db, user, photo.reading.register_id)
     try:
-        path = photo_full_path(reading.photo_path)
+        path = photo_full_path(photo.photo_path)
     except ValueError as exc:
         raise ProblemError(status_code=404, title="Photo file not found") from exc
     if not path.is_file():

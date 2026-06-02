@@ -20,6 +20,7 @@ from meters.db import Base, TimestampMixin
 from meters.db.types import DecimalText
 
 if TYPE_CHECKING:
+    from meters.models.reading_photo import ReadingPhoto
     from meters.models.register import Register
     from meters.models.user import User
 
@@ -35,13 +36,10 @@ class Reading(Base, TimestampMixin):
     value: Mapped[Decimal] = mapped_column(DecimalText(32), nullable=False)
     reading_at: Mapped[datetime] = mapped_column(nullable=False, index=True)
     note: Mapped[str | None] = mapped_column(String(500))
-    photo_path: Mapped[str | None] = mapped_column(String(255))
-    # GPS-Koordinaten aus dem EXIF des Fotos. Werden beim Upload einmal
-    # extrahiert und in der DB abgelegt, damit das Anzeige-UI sie ohne
-    # Re-Parsen des Bildes anzeigen kann. Beide NULL = kein Foto oder
-    # Foto ohne GPS-Tags.
-    photo_lat: Mapped[float | None] = mapped_column(nullable=True)
-    photo_lon: Mapped[float | None] = mapped_column(nullable=True)
+    # Fotos liegen seit der 1->N-Umstellung in ``reading_photo`` (bis zu 6 je
+    # Erfassung). Die fruehere Einzel-Spalte ``photo_path``/``photo_lat``/
+    # ``photo_lon`` bleibt in der DB bestehen (nicht mehr gemappt), wird aber
+    # nicht mehr beschrieben — Bereinigung in einer spaeteren Migration.
     # NOT NULL erzwingt CLAUDE.md-Invariante "wird IMMER gesetzt".
     # ondelete=SET NULL kombiniert mit NOT NULL ist effektives RESTRICT:
     # ein User-Hard-Delete scheitert, solange noch Readings dranhängen.
@@ -51,3 +49,9 @@ class Reading(Base, TimestampMixin):
 
     register: Mapped[Register] = relationship("Register", back_populates="readings")
     created_by: Mapped[User] = relationship("User")
+    photos: Mapped[list[ReadingPhoto]] = relationship(
+        "ReadingPhoto",
+        back_populates="reading",
+        cascade="all, delete-orphan",
+        order_by="ReadingPhoto.sort_index",
+    )
