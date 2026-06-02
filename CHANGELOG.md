@@ -10,6 +10,13 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.34.4](https://github.com/muelley86/zaehler/compare/v2.34.3...v2.34.4) (2026-06-02)
+
+
+### Fehlerbehebungen
+
+* **export:** CSV-Formel-Injection in Backend-Exporten verhindern ([#171](https://github.com/muelley86/zaehler/issues/171)) ([cc511e8](https://github.com/muelley86/zaehler/commit/cc511e81706b35d28bb0e024d893e2ead04cb6ac))
+
 ## [2.34.3](https://github.com/muelley86/zaehler/compare/v2.34.2...v2.34.3) (2026-06-02)
 
 
