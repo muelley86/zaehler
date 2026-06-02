@@ -57,14 +57,16 @@ function activeRegistersOf(mp: MeasuringPointRead): ActiveRegister[] {
   return out;
 }
 
-/** datetime-local-String für den letzten Tag des Monats "YYYY-MM" um 12:00 lokal.
- * 12:00 vermeidet die Mitternacht-Normalisierung und hält das Datum stabil. */
+/** datetime-local-String für den letzten Tag des Monats "YYYY-MM" um 23:59:59 lokal
+ * (Monatsende = Ende des Tages, konsistent mit der App-„Periodenende"-Konvention).
+ * 23:59:59 ist nicht Mitternacht -> keine Mitternacht-Normalisierung; das lokale
+ * Datum bleibt über _local_date in jeder Zeitzone stabil. */
 function monthEndInput(month: string): string {
   const [y, m] = month.split('-').map(Number);
   if (!y || !m) return '';
   const lastDay = new Date(y, m, 0).getDate(); // Tag 0 des Folgemonats = Monatsletzter
   const pad = (n: number) => String(n).padStart(2, '0');
-  return `${y}-${pad(m)}-${pad(lastDay)}T12:00`;
+  return `${y}-${pad(m)}-${pad(lastDay)}T23:59:59`;
 }
 
 export function RecordReadingPage() {

@@ -199,6 +199,21 @@ def test_commit_reports_invalid_register_without_aborting(admin_client: TestClie
     assert body["failed"][0]["register_id"] == 999999
 
 
+def test_reading_at_is_local_end_of_day() -> None:
+    # Historische Monatswerte landen am Tagesende (23:59:59 lokal), nicht 12:00.
+    from datetime import UTC, date
+    from zoneinfo import ZoneInfo
+
+    from meters.core.config import settings
+    from meters.services.consumption import _local_date
+    from meters.services.import_readings import _reading_at
+
+    dt = _reading_at(date(2024, 1, 31))  # naive UTC
+    local = dt.replace(tzinfo=UTC).astimezone(ZoneInfo(settings.timezone))
+    assert (local.hour, local.minute, local.second) == (23, 59, 59)
+    assert _local_date(dt) == date(2024, 1, 31)  # Datum bleibt stabil
+
+
 def test_import_is_admin_only(recorder_client: TestClient) -> None:
     content = _xlsx(["Messstelle", date(2024, 1, 31)], [["X", 1]])
     assert _upload(recorder_client, "x.xlsx", content).status_code == 403
