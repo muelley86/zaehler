@@ -270,9 +270,9 @@ def test_recorder_export_csv_filtered(
     resp = recorder_client.get("/api/v1/export/readings.csv")
     assert resp.status_code == 200
     body = resp.text
-    # CSV sollte nur den Eintrag von MP A enthalten
-    assert f",{reg_a}," in body
-    assert f",{reg_b}," not in body
+    # CSV sollte nur den Eintrag von MP A enthalten (Semikolon-Delimiter).
+    assert f";{reg_a};" in body
+    assert f";{reg_b};" not in body
 
 
 def test_recorder_export_dump_json_returns_403(recorder_client: TestClient) -> None:

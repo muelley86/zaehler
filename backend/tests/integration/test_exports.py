@@ -46,8 +46,11 @@ def test_csv_export_has_expected_columns(admin_client: TestClient) -> None:
     resp = admin_client.get("/api/v1/export/readings.csv")
     assert resp.status_code == 200, resp.text
     assert resp.headers["content-type"].startswith("text/csv")
-
-    reader = csv.DictReader(io.StringIO(resp.text))
+    # Deutsches Excel-CSV: UTF-8-BOM + Semikolon-Delimiter. utf-8-sig entfernt
+    # die BOM beim Dekodieren, sonst hieße die erste Spalte "﻿id".
+    assert resp.content.startswith(b"\xef\xbb\xbf")
+    text = resp.content.decode("utf-8-sig")
+    reader = csv.DictReader(io.StringIO(text), delimiter=";")
     rows = list(reader)
     expected_cols = {
         "id",
@@ -70,8 +73,9 @@ def test_csv_export_has_expected_columns(admin_client: TestClient) -> None:
 
     # Mindestens unsere zwei Readings (Anfangsstand + manueller POST)
     assert len(rows) >= 2
-    matching = [r for r in rows if r["value"] == "123.456"]
-    assert len(matching) == 1, "POST-Reading 123.456 muss exakt einmal im CSV stehen"
+    # Wert mit Komma-Dezimal (deutsches Format), nicht Punkt.
+    matching = [r for r in rows if r["value"] == "123,456"]
+    assert len(matching) == 1, "POST-Reading 123,456 muss exakt einmal im CSV stehen"
     assert matching[0]["unit"] == "m³"
     # Datum im deutschen Format DD.MM.YYYY HH:MM (Anwender öffnen das CSV in
     # Excel/LibreOffice, dort wird ISO 8601 nicht erkannt).

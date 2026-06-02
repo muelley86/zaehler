@@ -26,7 +26,7 @@ from meters.models import (
     Register,
     UserRole,
 )
-from meters.schemas.common import to_utc_iso
+from meters.schemas.common import format_decimal_de, to_utc_iso
 from meters.services.access import restrict_mp_query
 
 router = APIRouter(prefix="/export", tags=["export"])
@@ -60,7 +60,9 @@ def readings_csv(db: DbDep, user: CurrentUser) -> StreamingResponse:
     rows = list(db.scalars(stmt))
 
     buffer = io.StringIO()
-    writer = csv.writer(buffer, lineterminator="\n")
+    # Semikolon-Delimiter + Komma-Dezimal + UTF-8-BOM für Excel (DE-Locale);
+    # Datum ist via _format_de bereits deutsch.
+    writer = csv.writer(buffer, delimiter=";", lineterminator="\n")
     writer.writerow(
         [
             "id",
@@ -84,7 +86,7 @@ def readings_csv(db: DbDep, user: CurrentUser) -> StreamingResponse:
             [
                 r.id,
                 _format_de(r.reading_at),
-                format(r.value, "f"),
+                format_decimal_de(r.value),
                 register.unit,
                 register.obis_code,
                 register.id,
@@ -97,9 +99,8 @@ def readings_csv(db: DbDep, user: CurrentUser) -> StreamingResponse:
             ]
         )
 
-    buffer.seek(0)
     return StreamingResponse(
-        iter([buffer.getvalue()]),
+        iter(["﻿" + buffer.getvalue()]),
         media_type="text/csv; charset=utf-8",
         headers={"Content-Disposition": 'attachment; filename="readings.csv"'},
     )

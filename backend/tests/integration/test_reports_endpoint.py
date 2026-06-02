@@ -233,11 +233,13 @@ def test_csv_export(admin_client: TestClient) -> None:
     assert resp.status_code == 200, resp.text
     assert resp.headers["content-type"].startswith("text/csv")
     text = resp.text
-    assert "Dimension,Gruppe,Zählerart,Einheit" in text
-    # Zeile: Kostenstelle,80008,Wasser,m³,,,42  (Gesamt-Modus -> keine Perioden)
-    assert "Kostenstelle,80008,Wasser,m³,,," in text
-    data_line = next(line for line in text.splitlines() if line.startswith("Kostenstelle,80008"))
-    assert float(data_line.rsplit(",", 1)[1]) == 42.0
+    # Deutsches Excel-CSV: Semikolon-Delimiter + UTF-8-BOM.
+    assert text.startswith("﻿")
+    assert "Dimension;Gruppe;Zählerart;Einheit" in text
+    # Zeile: Kostenstelle;80008;Wasser;m³;;;42  (Gesamt-Modus -> keine Perioden)
+    assert "Kostenstelle;80008;Wasser;m³;;;" in text
+    data_line = next(line for line in text.splitlines() if line.startswith("Kostenstelle;80008"))
+    assert float(data_line.rsplit(";", 1)[1]) == 42.0
 
 
 def test_csv_export_dimension_measuring_point(admin_client: TestClient) -> None:
@@ -250,7 +252,32 @@ def test_csv_export_dimension_measuring_point(admin_client: TestClient) -> None:
     )
     assert resp.status_code == 200, resp.text
     assert resp.headers["content-type"].startswith("text/csv")
-    assert "Messstelle,Halle Nord,Wasser,m³,,," in resp.text
+    assert "Messstelle;Halle Nord;Wasser;m³;;;" in resp.text
+
+
+def test_csv_export_german_number_and_date_format(admin_client: TestClient) -> None:
+    # Deutsches Excel-Format: ; -Trennung, Komma-Dezimal, Perioden als TT.MM.JJJJ.
+    a = _create_mp(admin_client, name="A", serial="SN-A", kostenstelle=90009)
+    reg = _registers(a)["water"]
+    _add(admin_client, reg, "10", "2024-01-15T12:00:00Z")
+    _add(admin_client, reg, "12.5", "2024-02-15T12:00:00Z")  # Verbrauch 2,5
+
+    resp = admin_client.get(
+        "/api/v1/reports/aggregate.csv",
+        params={"dimension": "kostenstelle", "granularity": "month"},
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.text.startswith("﻿")
+    # Zwei Monats-Buckets: Januar (10) und Februar (2,5). Den Februar-Bucket
+    # gezielt prüfen: Komma-Dezimal + Periode_bis als TT.MM.JJJJ (29.02.2024).
+    feb = next(
+        line
+        for line in resp.text.splitlines()
+        if line.startswith("Kostenstelle;90009") and line.endswith(";2,5")
+    )
+    cols = feb.split(";")
+    assert cols[-1] == "2,5"  # Komma-Dezimal, kein Punkt
+    assert cols[5] == "29.02.2024", cols
 
 
 def test_all_dimensions_have_csv_label() -> None:

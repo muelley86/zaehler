@@ -81,9 +81,23 @@ function toggle<T>(set: Set<T>, value: T): Set<T> {
   return next;
 }
 
+function csvField(value: string): string {
+  // Schutz gegen CSV-Formel-Injection in Excel/Calc: Werte, die mit ``=``,
+  // ``+``, ``-`` oder ``@`` beginnen, werden mit einem Apostroph prefixed.
+  let safe = value;
+  if (/^[=+\-@]/.test(safe)) {
+    safe = `'${safe}`;
+  }
+  if (/[;"\n\r]/.test(safe)) {
+    return `"${safe.replace(/"/g, '""')}"`;
+  }
+  return safe;
+}
+
 function downloadCsv(filename: string, rows: string[][]): void {
-  const body = rows.map((r) => r.map((c) => `"${c.replace(/"/g, '""')}"`).join(',')).join('\n');
-  const blob = new Blob([body], { type: 'text/csv;charset=utf-8' });
+  // Semikolon-Delimiter + UTF-8-BOM für deutsches Excel (sonst Umlaut-Müll).
+  const body = rows.map((r) => r.map(csvField).join(';')).join('\n');
+  const blob = new Blob(['﻿' + body], { type: 'text/csv;charset=utf-8' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
@@ -331,9 +345,10 @@ export function ReportsPage() {
         r.group_label,
         TYPE_LABELS[r.meter_type],
         r.unit,
-        String(r.a),
-        String(r.b),
-        String(r.delta),
+        // Komma-Dezimal für deutsches Excel.
+        String(r.a).replace('.', ','),
+        String(r.b).replace('.', ','),
+        String(r.delta).replace('.', ','),
       ]);
     }
     downloadCsv('auswertung-vergleich.csv', rows);

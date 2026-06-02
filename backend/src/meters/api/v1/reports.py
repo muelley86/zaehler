@@ -20,6 +20,7 @@ from fastapi.responses import StreamingResponse
 
 from meters.api.deps import CurrentUser, DbDep
 from meters.models import MeterType, ReportDimension, UserRole
+from meters.schemas.common import format_decimal_de
 from meters.schemas.report import ReportAggregateResponse, ReportRow
 from meters.services.consumption import Granularity
 from meters.services.report_aggregation import (
@@ -127,7 +128,9 @@ def aggregate_csv(
     rows = _run(db, user, dimension, granularity, from_at, to_at, filters)
 
     buffer = io.StringIO()
-    writer = csv.writer(buffer, lineterminator="\n")
+    # Semikolon-Delimiter + Komma-Dezimal + deutsche Daten + UTF-8-BOM: das CSV
+    # wird in Excel/LibreOffice (DE-Locale) geöffnet; siehe schemas.common.
+    writer = csv.writer(buffer, delimiter=";", lineterminator="\n")
     writer.writerow(
         ["Dimension", "Gruppe", "Zählerart", "Einheit", "Periode_von", "Periode_bis", "Verbrauch"]
     )
@@ -139,14 +142,14 @@ def aggregate_csv(
                 r.group_label,
                 METER_TYPE_LABELS[r.meter_type],
                 r.unit,
-                r.period_start.isoformat() if r.period_start else "",
-                r.period_end.isoformat() if r.period_end else "",
-                format(r.consumption, "f"),
+                r.period_start.strftime("%d.%m.%Y") if r.period_start else "",
+                r.period_end.strftime("%d.%m.%Y") if r.period_end else "",
+                format_decimal_de(r.consumption),
             ]
         )
-    buffer.seek(0)
+    # BOM voranstellen, sonst rät deutsches Excel auf Windows-1252 -> Umlaut-Müll.
     return StreamingResponse(
-        iter([buffer.getvalue()]),
+        iter(["﻿" + buffer.getvalue()]),
         media_type="text/csv; charset=utf-8",
         headers={"Content-Disposition": 'attachment; filename="auswertung.csv"'},
     )
