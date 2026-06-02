@@ -170,11 +170,13 @@ def build_preview(db: Session, *, filename: str, content: bytes) -> ImportPrevie
 
 
 def _reading_at(reading_date: date) -> datetime:
-    """Monats-/Datums-Wert -> Zeitstempel um 12:00 lokal, als naive UTC
-    gespeichert (wie alle Readings). Mittag vermeidet den Mitternacht-Shift und
-    hält das lokale Kalenderdatum stabil (siehe consumption._local_date)."""
-    local_noon = datetime.combine(reading_date, time(12, 0), tzinfo=ZoneInfo(settings.timezone))
-    return local_noon.astimezone(UTC).replace(tzinfo=None)
+    """Historischer Monatswert -> Zeitstempel am **Tagesende** (23:59:59 lokal),
+    als naive UTC gespeichert (wie alle Readings). Einheitlich mit dem Erfassen-
+    Toggle „Historischer Monatswert" und der App-„Periodenende"-Konvention. Nicht
+    Mitternacht -> kein Mitternacht-Shift; das lokale Kalenderdatum bleibt über
+    consumption._local_date stabil."""
+    local_eod = datetime.combine(reading_date, time(23, 59, 59), tzinfo=ZoneInfo(settings.timezone))
+    return local_eod.astimezone(UTC).replace(tzinfo=None)
 
 
 def commit_readings(
