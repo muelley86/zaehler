@@ -9,6 +9,7 @@ Aufruf:
     uv run python -m meters.cli repair-legacy-timestamps --apply    # schreibt die Korrektur
     uv run python -m meters.cli repair-midnight-readings            # Dry-Run (zeigt nur an)
     uv run python -m meters.cli repair-midnight-readings --apply    # schreibt die Korrektur
+    uv run python -m meters.cli recompute-monthly                   # Backfill monthly_consumption
 """
 
 from __future__ import annotations
@@ -23,6 +24,7 @@ from meters.db import SessionLocal, engine
 from meters.models import User, UserRole
 from meters.services.legacy_timestamp_repair import repair_legacy_timestamps
 from meters.services.midnight_repair import repair_midnight_readings
+from meters.services.monthly_consumption import recompute_all
 
 
 def _ensure_schema_initialized() -> None:
@@ -162,6 +164,18 @@ def _cmd_repair_midnight_readings(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_recompute_monthly(_args: argparse.Namespace) -> int:
+    """Backfill der materialisierten Monats-Statistik (``monthly_consumption``)
+    für alle Register. Einmalig nach dem Deploy auszuführen, das die Lese-Pfade
+    auf die Tabelle umstellt; danach hält der Session-Hook sie automatisch aktuell."""
+    _ensure_schema_initialized()
+    with SessionLocal() as db:
+        count = recompute_all(db)
+        db.commit()
+    print(f"monthly_consumption neu berechnet für {count} Register.")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="meters.cli")
     sub = parser.add_subparsers(dest="cmd", required=True)
@@ -218,6 +232,15 @@ def main(argv: list[str] | None = None) -> int:
         help="Korrektur tatsächlich schreiben (sonst nur Dry-Run-Anzeige).",
     )
     midnight.set_defaults(func=_cmd_repair_midnight_readings)
+
+    recompute = sub.add_parser(
+        "recompute-monthly",
+        help=(
+            "Materialisierte Monats-Statistik (monthly_consumption) für alle "
+            "Register neu berechnen (Backfill, einmalig nach dem Deploy)."
+        ),
+    )
+    recompute.set_defaults(func=_cmd_recompute_monthly)
 
     args = parser.parse_args(argv)
     func = args.func

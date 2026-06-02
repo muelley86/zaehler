@@ -19,7 +19,11 @@ from sqlalchemy.orm import Session, selectinload
 
 from meters.db import SessionLocal
 from meters.models import Delivery, MonthlyConsumption, PhysicalMeter, Reading, Register
-from meters.services.consumption import consumption_for_register, split_across_buckets
+from meters.services.consumption import (
+    ConsumptionPoint,
+    consumption_for_register,
+    split_across_buckets,
+)
 
 _logger = logging.getLogger("meters.monthly_consumption")
 
@@ -68,6 +72,32 @@ def recompute_all(db: Session) -> int:
     for register_id in register_ids:
         recompute_register(db, register_id)
     return len(register_ids)
+
+
+def monthly_points_for_measuring_point(
+    db: Session, measuring_point_id: int
+) -> list[ConsumptionPoint]:
+    """Liest die materialisierten Monatswerte aller Register einer Messstelle aus
+    ``monthly_consumption`` und gibt sie als ``ConsumptionPoint``-Liste zurück —
+    formgleich zu ``consumption_for_measuring_point`` (aber bereits monatlich
+    gebucketet). Lese-Pfad-Ersatz für die Monats-Granularität (B2c)."""
+    rows = db.scalars(
+        select(MonthlyConsumption)
+        .join(Register, MonthlyConsumption.register_id == Register.id)
+        .join(PhysicalMeter, Register.physical_meter_id == PhysicalMeter.id)
+        .where(PhysicalMeter.measuring_point_id == measuring_point_id)
+    )
+    return [
+        ConsumptionPoint(
+            period_start=row.period_start,
+            period_end=row.period_end,
+            register_id=row.register_id,
+            obis_code=row.obis_code,
+            consumption=row.consumption,
+            unit=row.unit,
+        )
+        for row in rows
+    ]
 
 
 # --- Cache-Invalidierung (B2b) ---------------------------------------------

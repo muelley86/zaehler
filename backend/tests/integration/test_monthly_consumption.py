@@ -133,6 +133,23 @@ def test_hook_keeps_table_in_sync_on_reading_create(admin_client: TestClient, db
     assert endpoint
 
 
+def test_consumption_endpoint_reads_from_table(admin_client: TestClient, db: Session) -> None:
+    # Beweist B2c: der Monats-Endpoint liest die Tabelle (nicht on-the-fly).
+    # Wir verfälschen die materialisierte Zeile -> der Endpoint muss sie liefern.
+    mp_id, reg_id = _setup(admin_client)
+    _add(admin_client, reg_id, "110.000", "2024-01-31T12:00:00")  # Hook füllt Januar
+    db.expire_all()
+    row = db.scalar(select(MonthlyConsumption).where(MonthlyConsumption.register_id == reg_id))
+    assert row is not None
+    row.consumption = Decimal("999")
+    db.commit()  # kein Recompute (nur MonthlyConsumption geändert)
+
+    points = admin_client.get(
+        f"/api/v1/measuring-points/{mp_id}/consumption", params={"granularity": "month"}
+    ).json()
+    assert Decimal("999") in {Decimal(p["consumption"]) for p in points}
+
+
 def test_hook_updates_table_on_reading_delete(admin_client: TestClient, db: Session) -> None:
     _, reg_id = _setup(admin_client)
     _add(admin_client, reg_id, "110.000", "2024-01-15T12:00:00")
