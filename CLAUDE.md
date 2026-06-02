@@ -10,7 +10,7 @@ Wasserzählerständen für einen Privathaushalt. Läuft in einem LXC-Container
 auf eigener Hardware. Keine Cloud, keine externen Abhängigkeiten zur Laufzeit.
 
 ## Tech-Stack
-- Backend: Python 3.13, FastAPI, SQLAlchemy 2.x, Alembic, Pydantic v2
+- Backend: Python 3.13, FastAPI, SQLAlchemy 2.x, Alembic, Pydantic v2, openpyxl (Excel-Import)
 - DB: SQLite (Datei unter ./data/meters.db)
 - Frontend: React 18 + Vite + TypeScript, Tailwind CSS
 - Charts: Recharts
@@ -95,7 +95,9 @@ Drei Ebenen: MeasuringPoint → PhysicalMeter → Register → Reading
 - Register: id, physical_meter_id, obis_code, label, unit, is_active
 
 - Reading: id, register_id, value (Decimal), reading_date,
-  note, photo_path (optional), created_at, created_by_user_id
+  note, created_at, created_by_user_id
+  (Fotos liegen seit der 1→N-Umstellung in der Kind-Tabelle `reading_photo`,
+  bis zu 6 je Erfassung — die frühere Einzelspalte `photo_path` ist abgelöst.)
 
 Werte als Decimal speichern, NIEMALS Float (Rundungsfehler bei
 Zählerständen). reading_date strikt von created_at trennen –
@@ -215,6 +217,11 @@ aktuell gültigen PhysicalMeter abgefragt.
   (Konfiguration: max_value pro Register, default 99999.9)
 - Eigenverbrauch PV NICHT berechnen (aus Bezug+Einspeisung allein
   nicht ableitbar, dafür wäre ein Smart-Meter-Reader nötig)
+- Monats-/Bucket-Aggregation interpoliert **taggenau**: ein Verbrauchs-Delta,
+  das über eine Monatsgrenze reicht, wird linear (konstanter Tagesverbrauch)
+  anteilig auf die Monate verteilt (`split_across_buckets`). Monatswerte werden
+  in `monthly_consumption` materialisiert (Cache) — siehe Sektion „Weitere
+  Features → Metering".
 
 ## Zählerwechsel-Workflow
 
@@ -243,12 +250,13 @@ Atomar in einer Transaktion:
 ## UI-Anforderungen
 - Mobile-first (Erfassung am Zählerschrank mit dem Handy)
 - Eingabe großer Touch-Targets, numerische Tastatur bei Zahlenfeldern
-- Foto-Upload optional (vom Zählerstand zur Beweissicherung)
+- Foto-Upload optional (vom Zählerstand zur Beweissicherung), bis zu 6 Fotos je Erfassung
 - Plausibilitätscheck beim Speichern: neuer Wert >= letzter Wert
   (außer Rollover oder Zählerwechsel) – Warnung, nicht harter Block
 - Übersichtsdashboard mit Verbrauchsdiagrammen pro MeasuringPoint
   (Tag/Monat/Jahr aggregiert)
-- Export als CSV (alle Readings) und JSON (vollständiger Dump)
+- Export als CSV (alle Readings) und JSON (vollständiger Dump); CSV im
+  deutschen Excel-Format (`;`-Delimiter, Komma-Dezimal, UTF-8-BOM)
 - Login-Seite, "Passwort ändern"-Dialog, erzwungene Änderung beim
   ersten Login
 - Admin-Bereich: User-Verwaltung (Liste, anlegen, deaktivieren,
@@ -300,6 +308,11 @@ Atomar in einer Transaktion:
 - **Heizöl-Tank** (`models/delivery.py`, `api/v1/deliveries.py`): MeasuringPoint-Type `oil` mit Tankstand + Betriebsstunden + Lieferungen, eigene Bestandskorrektur. Berechtigungs-Filter wie für andere MPs.
 - **2FA / TOTP** (`services/totp.py`, `models/backup_code.py`): pro User aktivierbar, 10 Single-Use-Backup-Codes, AuditLog-Events.
 - **Locations** (`models/location.py`, `api/v1/locations.py`): zentral verwaltet, MeasuringPoint hat optionale `location_id` (ersetzt das frühere freie `location`-String-Feld der Spec).
+- **Wärme / Fernwärme**: `MeterType.heating` mit `heating_source` (oil | gas | wood_chips | wood | district_heat). Bei **Fernwärme** (`district_heat`) blendet das MP-Formular Tankvolumen und die Nachfüllen-Option (`accepts_deliveries`) aus — es gibt keinen Vorrat, nur einen Wärmemengenzähler.
+- **Zählerstand-Import** (`api/v1/imports.py`, `services/import_readings.py`, Dep `openpyxl`): admin-only Import historischer Stände aus Excel/CSV (Layout: je Zeile eine Messstelle = erste Spalte MP-Name, je Spalte ein Monat = Datums-Überschrift). `POST /imports/readings/preview` parst + matcht MP-Namen automatisch (casefold) → `POST /imports/readings/commit` legt Readings an, **idempotent** (dedupe über `UNIQUE(register_id, reading_at)`, bestehende übersprungen). UI: Admin ▸ Import (Mapping je Zeile auf MP + Register). `reading_at` = Datum @ 23:59:59 lokal.
+- **Bis zu 6 Fotos je Erfassung** (`models/reading_photo.py`): Fotos liegen in der Kind-Tabelle `reading_photo` (1→N, `sort_index`) statt der früheren Einzelspalten am Reading. Endpoints: `POST /readings/{id}/photos` (max. 6 → sonst 409), `GET`/`DELETE /readings/{id}/photos/{photo_id}`. Frontend: Mehrfach-Picker (Kamera/Galerie) + Carousel-Lightbox; GPS-Extraktion pro Foto wie zuvor.
+- **CSV-Exporte im deutschen Excel-Format** (`schemas/common.py::format_decimal_de` + `csv_guard_formula`): alle Backend-CSV-Exporte (Auswertung, Erfassungen) nutzen `;`-Delimiter, Komma-Dezimal, vorangestellte UTF-8-BOM und Formel-Injection-Schutz (`'`-Präfix bei führendem `= + - @`). Die Frontend-CSVs (Dashboard/Erfassungen/Reports-Vergleich) ebenso.
+- **Metering / Monats-Statistik** (`services/consumption.py::split_across_buckets`, `services/monthly_consumption.py`, Tabelle `monthly_consumption`): Der Verbrauch zwischen zwei Ablesungen wird **taggenau** (lineare Interpolation) über Monatsgrenzen verteilt — Ablesungen mitten im Monat landen so anteilig in beiden Monaten; Stände genau auf der Monatsgrenze (digitale Monatsend-Werte) bleiben ungeteilt. Die Monats-Werte werden in `monthly_consumption` **materialisiert** (Cache; `Reading` bleibt die Wahrheit), gepflegt von einem zentralen SQLAlchemy-Session-Hook (`register_monthly_consumption_hooks`, in `create_app` registriert) nach jeder Ablese-Änderung. `granularity=month` (consumption-Endpoint + report_aggregation) liest aus der Tabelle, andere Granularitäten on-the-fly. **Deploy-Schritt:** nach Migrationen, die die Tabelle (neu) anlegen/leeren, einmalig `uv run python -m meters.cli recompute-monthly` (Backfill) ausführen, sonst sind die Monats-Diagramme leer bis zur nächsten Änderung je MP. Erfassen-Toggle „Aktueller Stand" vs „Historischer Monatswert" (Monats-Picker → `reading_at` = Monatsende 23:59:59 lokal, App-Periodenende-Konvention).
 
 ## Konventionen
 - Python: ruff (lint+format), mypy strict, type hints überall
