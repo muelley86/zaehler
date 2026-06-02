@@ -12,6 +12,18 @@ DecimalStr = Annotated[
 ]
 
 
+def format_decimal_de(value: Decimal) -> str:
+    """Decimal als deutscher Dezimalstring: Komma statt Punkt, kein Tausender-
+    Trennzeichen. Für CSV-Exporte (Excel/LibreOffice, DE-Locale).
+
+    ``format(value, "f")`` erzeugt nie Tausender-Trennzeichen und nie
+    wissenschaftliche Notation — es muss nur der Dezimalpunkt zum Komma werden.
+    JSON-Dumps bleiben bewusst Punkt-Dezimal (Maschinen-Format, siehe
+    :data:`DecimalStr`).
+    """
+    return format(value, "f").replace(".", ",")
+
+
 def to_utc_iso(dt: datetime | None) -> str | None:
     """Naive UTC-``datetime`` → ISO-8601-String mit ``Z``. ``None`` → ``None``.
 
