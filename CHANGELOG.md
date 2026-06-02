@@ -10,6 +10,13 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.34.3](https://github.com/muelley86/zaehler/compare/v2.34.2...v2.34.3) (2026-06-02)
+
+
+### Fehlerbehebungen
+
+* **export:** deutsches Excel-CSV (Semikolon, Komma-Dezimal, UTF-8-BOM) ([#169](https://github.com/muelley86/zaehler/issues/169)) ([ced670a](https://github.com/muelley86/zaehler/commit/ced670adebf87c9123a6b7d1170464760f4be5b2))
+
 ## [2.34.2](https://github.com/muelley86/zaehler/compare/v2.34.1...v2.34.2) (2026-06-02)
 
 
