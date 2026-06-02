@@ -96,6 +96,24 @@ describe('MeasuringPointsAdminPage Wizard', () => {
     expect(labels).toEqual(['Betriebsstunden', 'Vorrat']);
   });
 
+  it('blendet Tankvolumen und Nachfüllbar-Schalter bei Fernwärme aus', async () => {
+    _mockEmptyData();
+    const user = userEvent.setup();
+    renderWithRouter(<MeasuringPointsAdminPage />);
+
+    await user.click(await screen.findByRole('button', { name: /Messstelle anlegen/i }));
+    await user.click(await screen.findByRole('button', { name: /Heizung/i }));
+
+    // Heizöl (Default): Tankvolumen + Nachfüllbar sichtbar.
+    expect(screen.getByLabelText(/Tankvolumen/i)).toBeInTheDocument();
+    expect(screen.getAllByText('Nachfüllbar (Lieferungen)').length).toBeGreaterThan(0);
+
+    // Auf Fernwärme wechseln: beides verschwindet.
+    await user.selectOptions(screen.getByLabelText(/Energieträger/i), 'district_heat');
+    expect(screen.queryByLabelText(/Tankvolumen/i)).not.toBeInTheDocument();
+    expect(screen.queryByText('Nachfüllbar (Lieferungen)')).not.toBeInTheDocument();
+  });
+
   it('verlinkt jede MP-Card auf die Detail-Page', async () => {
     server.use(
       http.get('/api/v1/measuring-points', () =>

@@ -381,7 +381,11 @@ function CreateFormFields({
       }
       if (type === 'heating') {
         body['heating_source'] = heatingSource;
-        if (tankCapacity.trim()) body['tank_capacity'] = parseDe(tankCapacity);
+        // Fernwärme: kein Tankvolumen (Feld ist ausgeblendet) — ggf. veraltet
+        // eingetippten Wert nicht mitschicken.
+        if (heatingSource !== 'district_heat' && tankCapacity.trim()) {
+          body['tank_capacity'] = parseDe(tankCapacity);
+        }
         body['registers'] = registers.map((r) => {
           const out: Record<string, unknown> = {
             label: r.label,
@@ -519,15 +523,22 @@ function CreateFormFields({
               </option>
             ))}
           </Select>
-          <TextField
-            label="Tankvolumen / Vorratsmenge (optional)"
-            inputMode="decimal"
-            value={tankCapacity}
-            onChange={(e) => setTankCapacity(e.target.value)}
-            hint="für Prozent-Anzeige des Vorrats"
-            numeric
+          {/* Fernwärme hat keinen Vorratstank und kein Nachfüllen -> beides ausblenden. */}
+          {heatingSource !== 'district_heat' ? (
+            <TextField
+              label="Tankvolumen / Vorratsmenge (optional)"
+              inputMode="decimal"
+              value={tankCapacity}
+              onChange={(e) => setTankCapacity(e.target.value)}
+              hint="für Prozent-Anzeige des Vorrats"
+              numeric
+            />
+          ) : null}
+          <RegisterDraftList
+            registers={registers}
+            onChange={setRegisters}
+            allowDeliveries={heatingSource !== 'district_heat'}
           />
-          <RegisterDraftList registers={registers} onChange={setRegisters} />
         </>
       ) : null}
 
@@ -568,9 +579,11 @@ function ToggleRow({
 function RegisterDraftList({
   registers,
   onChange,
+  allowDeliveries = true,
 }: {
   registers: RegisterDraft[];
   onChange: (rs: RegisterDraft[]) => void;
+  allowDeliveries?: boolean;
 }) {
   function update(idx: number, patch: Partial<RegisterDraft>) {
     onChange(registers.map((r, i) => (i === idx ? { ...r, ...patch } : r)));
@@ -614,11 +627,13 @@ function RegisterDraftList({
                   </option>
                 ))}
               </Select>
-              <ToggleRow
-                label="Nachfüllbar (Lieferungen)"
-                checked={r.accepts_deliveries}
-                onChange={(v) => update(idx, { accepts_deliveries: v })}
-              />
+              {allowDeliveries ? (
+                <ToggleRow
+                  label="Nachfüllbar (Lieferungen)"
+                  checked={r.accepts_deliveries}
+                  onChange={(v) => update(idx, { accepts_deliveries: v })}
+                />
+              ) : null}
               <TextField
                 label="Anfangsstand (optional)"
                 inputMode="decimal"
