@@ -57,6 +57,16 @@ function activeRegistersOf(mp: MeasuringPointRead): ActiveRegister[] {
   return out;
 }
 
+/** datetime-local-String für den letzten Tag des Monats "YYYY-MM" um 12:00 lokal.
+ * 12:00 vermeidet die Mitternacht-Normalisierung und hält das Datum stabil. */
+function monthEndInput(month: string): string {
+  const [y, m] = month.split('-').map(Number);
+  if (!y || !m) return '';
+  const lastDay = new Date(y, m, 0).getDate(); // Tag 0 des Folgemonats = Monatsletzter
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${y}-${pad(m)}-${pad(lastDay)}T12:00`;
+}
+
 export function RecordReadingPage() {
   const [points, setPoints] = useState<MeasuringPointRead[] | null>(null);
   const [stateByRegister, setStateByRegister] = useState<Map<number, RegisterStateRead>>(
@@ -350,6 +360,11 @@ function ReadingsForm({
   // Pro MP eigene Form-State, damit Wechsel der MP die Eingaben löscht.
   const [values, setValues] = useState<Record<number, string>>({});
   const [readingAt, setReadingAt] = useState(nowForInput());
+  // Ablese-Modus: "current" = aktueller Stand (Datum/Zeit frei), "historical" =
+  // historischer Monatswert (z. B. im Digitalzähler gespeicherter Monatsend-
+  // Stand) -> reading_at wird ans Monatsende gelegt.
+  const [readingMode, setReadingMode] = useState<'current' | 'historical'>('current');
+  const [historicalMonth, setHistoricalMonth] = useState(() => nowForInput().slice(0, 7));
   const [note, setNote] = useState('');
   const [photos, setPhotos] = useState<File[]>([]);
   const [busy, setBusy] = useState(false);
@@ -361,6 +376,8 @@ function ReadingsForm({
   useEffect(() => {
     setValues({});
     setReadingAt(nowForInput());
+    setReadingMode('current');
+    setHistoricalMonth(nowForInput().slice(0, 7));
     setNote('');
     setPhotos([]);
     setSuccess(null);
@@ -374,6 +391,11 @@ function ReadingsForm({
     setValues((prev) => ({ ...prev, [registerId]: v }));
   }, []);
 
+  // Effektiver Ablese-Zeitpunkt als datetime-local-String: im Historisch-Modus
+  // der letzte Tag des gewählten Monats (12:00 lokal), sonst die freie Eingabe.
+  const effectiveReadingInput =
+    readingMode === 'historical' ? monthEndInput(historicalMonth) : readingAt;
+
   async function postOne(
     registerId: number,
     numeric: string,
@@ -382,7 +404,7 @@ function ReadingsForm({
     return api.post<ReadingRead>('/readings', {
       register_id: registerId,
       value: numeric,
-      reading_at: localInputToIso(readingAt),
+      reading_at: localInputToIso(effectiveReadingInput),
       note: note || null,
       acknowledge_warnings: acknowledge,
     });
@@ -480,7 +502,7 @@ function ReadingsForm({
         const baseMsg =
           savedCount === 1
             ? '1 Stand gespeichert.'
-            : `${savedCount} Stände gespeichert (${formatDateTimeDe(readingAt)}).`;
+            : `${savedCount} Stände gespeichert (${formatDateTimeDe(effectiveReadingInput)}).`;
         setSuccess(
           photoUploaded > 0
             ? `${baseMsg} ${photos.length === 1 ? 'Foto' : `${photos.length} Fotos`} angehängt.`
@@ -530,13 +552,53 @@ function ReadingsForm({
 
       <Section header="Zeitpunkt & Notiz">
         <div className="space-y-3 p-5">
-          <TextField
-            label="Ablesedatum"
-            type="datetime-local"
-            value={readingAt}
-            onChange={(e) => setReadingAt(e.target.value)}
-            required
-          />
+          <div>
+            <span className="mb-1.5 block text-caption-bold uppercase text-tertiary">Ablesung</span>
+            <div className="flex gap-1.5">
+              <button
+                type="button"
+                onClick={() => setReadingMode('current')}
+                className={cx(
+                  'flex-1 rounded-pill border-hairline px-3 py-2 text-body-sm font-semibold',
+                  readingMode === 'current'
+                    ? 'border-primary bg-primary text-white'
+                    : 'border-border bg-fill text-secondary',
+                )}
+              >
+                Aktueller Stand
+              </button>
+              <button
+                type="button"
+                onClick={() => setReadingMode('historical')}
+                className={cx(
+                  'flex-1 rounded-pill border-hairline px-3 py-2 text-body-sm font-semibold',
+                  readingMode === 'historical'
+                    ? 'border-primary bg-primary text-white'
+                    : 'border-border bg-fill text-secondary',
+                )}
+              >
+                Historischer Monatswert
+              </button>
+            </div>
+          </div>
+          {readingMode === 'current' ? (
+            <TextField
+              label="Ablesedatum"
+              type="datetime-local"
+              value={readingAt}
+              onChange={(e) => setReadingAt(e.target.value)}
+              required
+            />
+          ) : (
+            <TextField
+              label="Abrechnungsmonat"
+              type="month"
+              value={historicalMonth}
+              onChange={(e) => setHistoricalMonth(e.target.value)}
+              hint="Im Zähler gespeicherter Monatsend-Stand — wird dem Monatsende zugeordnet."
+              required
+            />
+          )}
           <TextField
             label="Notiz (optional)"
             type="text"
