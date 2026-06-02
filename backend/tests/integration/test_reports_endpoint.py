@@ -259,8 +259,11 @@ def test_csv_export_german_number_and_date_format(admin_client: TestClient) -> N
     # Deutsches Excel-Format: ; -Trennung, Komma-Dezimal, Perioden als TT.MM.JJJJ.
     a = _create_mp(admin_client, name="A", serial="SN-A", kostenstelle=90009)
     reg = _registers(a)["water"]
-    _add(admin_client, reg, "10", "2024-01-15T12:00:00Z")
-    _add(admin_client, reg, "12.5", "2024-02-15T12:00:00Z")  # Verbrauch 2,5
+    # Monatsgrenz-genaue Stände, damit der Februar-Verbrauch ungeteilt 2,5 ist
+    # (die Tages-Interpolation würde ein über die Grenze reichendes Intervall
+    # sonst anteilig aufteilen).
+    _add(admin_client, reg, "10", "2024-01-31T12:00:00Z")
+    _add(admin_client, reg, "12.5", "2024-02-29T12:00:00Z")  # Verbrauch 2,5 (ganz im Februar)
 
     resp = admin_client.get(
         "/api/v1/reports/aggregate.csv",

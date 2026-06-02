@@ -49,11 +49,13 @@ def test_monthly_granularity_aggregates(admin_client: TestClient) -> None:
     assert resp.status_code == 200, resp.text
     points = resp.json()
     by_end = {p["period_end"]: p for p in points}
-    # Januar summiert: 10 + 20 = 30, Bucket-Ende = 31.01.
-    assert by_end["2024-01-31"]["consumption"] == "30.000"
+    # Deltas: 10 (01-01→01-15, Jan), 20 (01-15→01-25, Jan), 30 (01-25→02-10).
+    # Das 3. Delta überspannt die Monatsgrenze und wird taggenau verteilt:
+    # 16 Tage (Jan 26-31 = 6, Feb 1-10 = 10) -> Jan 30*6/16=11.25, Feb 18.75.
+    # Januar = 10 + 20 + 11.25 = 41.25; Februar = 18.75; Summe bleibt 60.
+    assert float(by_end["2024-01-31"]["consumption"]) == 41.25
     assert by_end["2024-01-31"]["period_start"] == "2024-01-01"
-    # Februar: 30, Bucket-Ende = 29.02. (Schaltjahr)
-    assert by_end["2024-02-29"]["consumption"] == "30.000"
+    assert float(by_end["2024-02-29"]["consumption"]) == 18.75
 
 
 def test_no_granularity_returns_raw_points(admin_client: TestClient) -> None:
