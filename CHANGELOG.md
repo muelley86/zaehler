@@ -10,6 +10,13 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.35.1](https://github.com/muelley86/zaehler/compare/v2.35.0...v2.35.1) (2026-06-02)
+
+
+### Fehlerbehebungen
+
+* **measuring-points:** Tankvolumen/Nachfüllen bei Fernwärme ausblenden ([#175](https://github.com/muelley86/zaehler/issues/175)) ([232c4ab](https://github.com/muelley86/zaehler/commit/232c4ab83ce90a1d0203f2e6dd16be45f8c9922b))
+
 ## [2.35.0](https://github.com/muelley86/zaehler/compare/v2.34.4...v2.35.0) (2026-06-02)
 
 
