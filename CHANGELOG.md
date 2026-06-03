@@ -10,6 +10,13 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.47.0](https://github.com/muelley86/zaehler/compare/v2.46.0...v2.47.0) (2026-06-03)
+
+
+### Funktionen
+
+* **readings:** Erfassungen standardmäßig auf die letzten 50 begrenzen ([#210](https://github.com/muelley86/zaehler/issues/210)) ([5d4a25c](https://github.com/muelley86/zaehler/commit/5d4a25cae98cdd885aa0c22538c394adf8818da9))
+
 ## [2.46.0](https://github.com/muelley86/zaehler/compare/v2.45.0...v2.46.0) (2026-06-03)
 
 
