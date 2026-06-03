@@ -8,12 +8,14 @@ import {
   Card,
   EmptyState,
   LargeTitle,
+  MultiSelectDropdown,
   Pill,
   Section,
   Sheet,
   TextField,
   TypeBadge,
 } from '@/components/ui';
+import type { DropdownOption } from '@/components/ui';
 import { PageGlows } from '@/components/PageGlows';
 import { ApiError, api } from '@/lib/api';
 import {
@@ -576,72 +578,63 @@ export function DashboardPage() {
         </button>
         {filtersExpanded ? (
           <div className="space-y-4 border-t border-separator p-5">
-            {mainLocationOptions.length > 0 ? (
-              <FilterRow label="Hauptstandorte">
-                {mainLocationOptions.map(([id, name]) => (
-                  <Pill
-                    key={`main-${id}`}
-                    active={mainLocationFilter.has(id)}
-                    onClick={() => setMainLocationFilter(toggle(mainLocationFilter, id))}
-                  >
-                    {name}
-                  </Pill>
-                ))}
-                <Pill
-                  active={mainLocationFilter.has(null)}
-                  onClick={() => setMainLocationFilter(toggle(mainLocationFilter, null))}
-                >
-                  ohne Hauptstandort
-                </Pill>
-              </FilterRow>
-            ) : null}
-            {ownerOptions.length > 0 ? (
-              <FilterRow label="Eigentümer">
-                {ownerOptions.map(([id, name]) => (
-                  <Pill
-                    key={`owner-${id}`}
-                    active={ownerFilter.has(id)}
-                    onClick={() => setOwnerFilter(toggle(ownerFilter, id))}
-                  >
-                    {name}
-                  </Pill>
-                ))}
-                <Pill
-                  active={ownerFilter.has(null)}
-                  onClick={() => setOwnerFilter(toggle(ownerFilter, null))}
-                >
-                  ohne Eigentümer
-                </Pill>
-              </FilterRow>
-            ) : null}
-            <FilterRow label="Zählerstandorte">
-              {locationOptions.map(([id, name]) => (
-                <Pill
-                  key={String(id)}
-                  active={locationFilter.has(id)}
-                  onClick={() => setLocationFilter(toggle(locationFilter, id))}
-                >
-                  {name}
-                </Pill>
-              ))}
-              <Pill
-                active={locationFilter.has(null)}
-                onClick={() => setLocationFilter(toggle(locationFilter, null))}
-              >
-                ohne Zählerstandort
-              </Pill>
-            </FilterRow>
-            <FilterRow label="Zählerart">
-              {(Object.keys(TYPE_LABELS) as MeterType[]).map((t) => (
-                <Pill
-                  key={t}
-                  active={typeFilter.has(t)}
-                  onClick={() => setTypeFilter(toggle(typeFilter, t))}
-                >
-                  {TYPE_LABELS[t]}
-                </Pill>
-              ))}
-            </FilterRow>
+            <div className="flex flex-wrap items-center gap-2">
+              {mainLocationOptions.length > 0 ? (
+                <MultiSelectDropdown
+                  label="Hauptstandorte"
+                  options={[
+                    ...mainLocationOptions.map(
+                      ([id, name]): DropdownOption<number | null> => ({ value: id, label: name }),
+                    ),
+                    {
+                      value: null,
+                      label: 'ohne Hauptstandort',
+                    } satisfies DropdownOption<number | null>,
+                  ]}
+                  selected={mainLocationFilter}
+                  onChange={setMainLocationFilter}
+                />
+              ) : null}
+              {ownerOptions.length > 0 ? (
+                <MultiSelectDropdown
+                  label="Eigentümer"
+                  options={[
+                    ...ownerOptions.map(
+                      ([id, name]): DropdownOption<number | null> => ({ value: id, label: name }),
+                    ),
+                    {
+                      value: null,
+                      label: 'ohne Eigentümer',
+                    } satisfies DropdownOption<number | null>,
+                  ]}
+                  selected={ownerFilter}
+                  onChange={setOwnerFilter}
+                />
+              ) : null}
+              <MultiSelectDropdown
+                label="Zählerstandorte"
+                options={[
+                  ...locationOptions.map(
+                    ([id, name]): DropdownOption<number | null> => ({ value: id, label: name }),
+                  ),
+                  {
+                    value: null,
+                    label: 'ohne Zählerstandort',
+                  } satisfies DropdownOption<number | null>,
+                ]}
+                selected={locationFilter}
+                onChange={setLocationFilter}
+              />
+              <MultiSelectDropdown
+                label="Zählerart"
+                options={(Object.keys(TYPE_LABELS) as MeterType[]).map((t) => ({
+                  value: t,
+                  label: TYPE_LABELS[t],
+                }))}
+                selected={typeFilter}
+                onChange={setTypeFilter}
+              />
+            </div>
             {activeFilterCount > 0 ? (
               <button
                 type="button"
@@ -1369,13 +1362,6 @@ function ConsumptionSummarySkeleton() {
       </div>
     </div>
   );
-}
-
-function toggle<T>(set: Set<T>, value: T): Set<T> {
-  const next = new Set(set);
-  if (next.has(value)) next.delete(value);
-  else next.add(value);
-  return next;
 }
 
 function csvField(value: string): string {

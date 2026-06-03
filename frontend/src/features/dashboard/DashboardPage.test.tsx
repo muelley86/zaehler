@@ -150,21 +150,20 @@ describe('DashboardPage — Bestandskorrektur', () => {
 });
 
 describe('DashboardPage — einklappbarer Filter', () => {
-  it('ist per Default eingeklappt und zeigt nach Aufklappen alle Filter; Badge zählt aktive', async () => {
+  it('ist per Default eingeklappt; nach Aufklappen filtert das Dropdown, Badge zählt aktive', async () => {
     mockEndpoints();
     renderWithRouter(<DashboardPage />);
     await screen.findByRole('button', { name: 'Monat' });
 
-    // Eingeklappt: kategoriale Filter-Pills sind nicht im DOM.
-    expect(screen.queryByRole('button', { name: 'Wasser' })).toBeNull();
+    // Eingeklappt: die Filter-Dropdowns sind nicht im DOM.
+    expect(screen.queryByRole('button', { name: 'Zählerart' })).toBeNull();
 
+    // Filter-Sektion aufklappen.
     fireEvent.click(screen.getByRole('button', { name: /Filter/ }));
 
-    const wasser = await screen.findByRole('button', { name: 'Wasser' });
-    expect(wasser).toBeInTheDocument();
-
-    // Filter aktivieren → Badge erscheint.
-    fireEvent.click(wasser);
+    // Zählerart-Dropdown öffnen und "Wasser" ankreuzen → Badge "1 aktiv".
+    fireEvent.click(await screen.findByRole('button', { name: 'Zählerart' }));
+    fireEvent.click(await screen.findByRole('checkbox', { name: 'Wasser' }));
     expect(await screen.findByText('1 aktiv')).toBeInTheDocument();
   });
 });
