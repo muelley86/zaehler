@@ -81,6 +81,11 @@ type Item =
       sortKey: string;
     };
 
+// Standardmäßig nur die neuesten 50 Treffer rendern; „Weitere 50" / „Alle"
+// blättern client-seitig nach (die Filter wirken weiterhin auf den ganzen
+// geladenen Bestand).
+const PAGE_SIZE = 50;
+
 export function ReadingsListPage() {
   const { me } = useAuth();
   const [points, setPoints] = useState<MeasuringPointRead[] | null>(null);
@@ -109,6 +114,10 @@ export function ReadingsListPage() {
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [kindFilter, setKindFilter] = useState<Set<ItemKind>>(new Set());
 
+  // Anzahl gerenderter Treffer (Anzeige-Cap). Bei Filter-/Suchänderung wieder
+  // auf PAGE_SIZE zurück (siehe Effekt unten).
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+
   // Mehrfach-Auswahl zum Sammel-Löschen. Keys decken sich mit den React-Keys
   // der Liste: "r-<id>" für Readings/Korrekturen, "d-<id>" für Lieferungen.
   const [selectMode, setSelectMode] = useState(false);
@@ -119,6 +128,11 @@ export function ReadingsListPage() {
     const timer = window.setTimeout(() => setDebouncedSearch(search), 250);
     return () => window.clearTimeout(timer);
   }, [search]);
+
+  // Bei jeder Filter-/Suchänderung wieder bei den letzten PAGE_SIZE starten.
+  useEffect(() => {
+    setVisibleCount(PAGE_SIZE);
+  }, [locationFilter, typeFilter, mpFilter, obisFilter, kindFilter, debouncedSearch, from, to]);
 
   useEffect(() => {
     api
@@ -323,15 +337,19 @@ export function ReadingsListPage() {
   }
 
   // Tag-Gruppen für die Anzeige
+  // Anzeige-Cap: nur die ersten `visibleCount` der (nach Datum desc sortierten)
+  // gefilterten Treffer rendern.
+  const visible = useMemo(() => filtered.slice(0, visibleCount), [filtered, visibleCount]);
+
   const groupedByDay = useMemo(() => {
     const groups = new Map<string, Item[]>();
-    for (const item of filtered) {
+    for (const item of visible) {
       const arr = groups.get(item.day) ?? [];
       arr.push(item);
       groups.set(item.day, arr);
     }
     return Array.from(groups.entries()).sort((a, b) => b[0].localeCompare(a[0]));
-  }, [filtered]);
+  }, [visible]);
 
   const counts = useMemo(() => {
     const c: Record<ItemKind, number> = { reading: 0, correction: 0, delivery: 0 };
@@ -648,6 +666,26 @@ export function ReadingsListPage() {
           ))}
         </div>
       )}
+
+      {filtered.length > visible.length ? (
+        <div className="flex flex-col items-center gap-2 pt-1">
+          <div className="text-caption text-tertiary">
+            {visible.length} von {filtered.length} angezeigt
+          </div>
+          <div className="flex gap-2">
+            <Button
+              variant="bordered"
+              size="sm"
+              onClick={() => setVisibleCount((c) => c + PAGE_SIZE)}
+            >
+              Weitere {PAGE_SIZE} anzeigen
+            </Button>
+            <Button variant="tinted" size="sm" onClick={() => setVisibleCount(filtered.length)}>
+              Alle anzeigen ({filtered.length})
+            </Button>
+          </div>
+        </div>
+      ) : null}
 
       <Sheet
         open={editTarget !== null}
