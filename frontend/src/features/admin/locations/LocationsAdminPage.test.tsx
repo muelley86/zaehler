@@ -65,20 +65,21 @@ describe('LocationsAdminPage — Hauptstandort-Filter', () => {
     expect(screen.getByText('Garage')).toBeInTheDocument();
     expect(screen.getByText('Wiese')).toBeInTheDocument();
 
-    // Auf "Haus West" filtern → nur Keller bleibt
-    await user.click(screen.getByRole('button', { name: 'Haus West' }));
+    // Hauptstandort-Dropdown öffnen, "Haus West" ankreuzen → nur Keller bleibt
+    await user.click(screen.getByRole('button', { name: 'Hauptstandort' }));
+    await user.click(await screen.findByRole('checkbox', { name: 'Haus West' }));
     expect(screen.getByText('Keller')).toBeInTheDocument();
     expect(screen.queryByText('Garage')).not.toBeInTheDocument();
     expect(screen.queryByText('Wiese')).not.toBeInTheDocument();
 
-    // Zurücksetzen → wieder alle drei
-    await user.click(screen.getByRole('button', { name: 'Zurücksetzen' }));
+    // "Haus West" wieder abwählen → wieder alle drei
+    await user.click(screen.getByRole('checkbox', { name: 'Haus West' }));
     expect(screen.getByText('Keller')).toBeInTheDocument();
     expect(screen.getByText('Garage')).toBeInTheDocument();
     expect(screen.getByText('Wiese')).toBeInTheDocument();
 
-    // "ohne Hauptstandort" → nur Wiese
-    await user.click(screen.getByRole('button', { name: 'ohne Hauptstandort' }));
+    // "ohne Hauptstandort" ankreuzen → nur Wiese
+    await user.click(screen.getByRole('checkbox', { name: 'ohne Hauptstandort' }));
     expect(screen.getByText('Wiese')).toBeInTheDocument();
     expect(screen.queryByText('Keller')).not.toBeInTheDocument();
     expect(screen.queryByText('Garage')).not.toBeInTheDocument();

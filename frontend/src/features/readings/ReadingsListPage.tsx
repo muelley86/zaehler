@@ -6,14 +6,16 @@ import { useAuth } from '@/features/auth/auth-context';
 import { PhotoLightbox } from '@/features/readings/PhotoLightbox';
 import {
   Button,
+  Dropdown,
   EmptyState,
   LargeTitle,
-  Pill,
+  MultiSelectDropdown,
   Section,
   Sheet,
   TextField,
   TypeBadge,
 } from '@/components/ui';
+import type { DropdownOption } from '@/components/ui';
 import { PageGlows } from '@/components/PageGlows';
 import { ApiError, api, isPlausibilityWarning } from '@/lib/api';
 import {
@@ -481,81 +483,64 @@ export function ReadingsListPage() {
             onChange={(e) => setSearch(e.target.value)}
             trailing={<Search size={16} className="text-tertiary" />}
           />
-          <FilterRow label="Standorte">
-            {locations.map(([id, name]) => (
-              <Pill
-                key={String(id)}
-                active={locationFilter.has(id)}
-                onClick={() => setLocationFilter(toggle(locationFilter, id))}
-              >
-                {name}
-              </Pill>
-            ))}
-            <Pill
-              active={locationFilter.has(null)}
-              onClick={() => setLocationFilter(toggle(locationFilter, null))}
-            >
-              ohne Standort
-            </Pill>
-          </FilterRow>
-          <FilterRow label="Zählerart">
-            {(Object.keys(TYPE_LABELS) as MeterType[]).map((t) => (
-              <Pill
-                key={t}
-                active={typeFilter.has(t)}
-                onClick={() => setTypeFilter(toggle(typeFilter, t))}
-              >
-                {TYPE_LABELS[t]}
-              </Pill>
-            ))}
-          </FilterRow>
-          <FilterRow label="Messstellen">
-            {points.map((mp) => (
-              <Pill
-                key={mp.id}
-                active={mpFilter.has(mp.id)}
-                onClick={() => setMpFilter(toggle(mpFilter, mp.id))}
-              >
-                {mp.name}
-              </Pill>
-            ))}
-          </FilterRow>
-          <FilterRow label="OBIS">
-            {obisCodes.map((code) => (
-              <Pill
-                key={code}
-                active={obisFilter.has(code)}
-                onClick={() => setObisFilter(toggle(obisFilter, code))}
-              >
-                {code}
-              </Pill>
-            ))}
-          </FilterRow>
-          <FilterRow label="Zeitraum">
-            <DateInput value={from} onChange={setFrom} aria-label="von" />
-            <span className="text-tertiary">—</span>
-            <DateInput value={to} onChange={setTo} aria-label="bis" />
-          </FilterRow>
-          <FilterRow label="Art">
-            <Pill
-              active={kindFilter.has('reading')}
-              onClick={() => setKindFilter(toggle(kindFilter, 'reading'))}
-            >
-              Erfassungen ({counts.reading})
-            </Pill>
-            <Pill
-              active={kindFilter.has('correction')}
-              onClick={() => setKindFilter(toggle(kindFilter, 'correction'))}
-            >
-              Bestandskorrekturen ({counts.correction})
-            </Pill>
-            <Pill
-              active={kindFilter.has('delivery')}
-              onClick={() => setKindFilter(toggle(kindFilter, 'delivery'))}
-            >
-              Lieferungen ({counts.delivery})
-            </Pill>
-          </FilterRow>
+          <div className="flex flex-wrap items-center gap-2">
+            <MultiSelectDropdown
+              label="Standorte"
+              options={[
+                ...locations.map(
+                  ([id, name]): DropdownOption<number | null> => ({ value: id, label: name }),
+                ),
+                { value: null, label: 'ohne Standort' },
+              ]}
+              selected={locationFilter}
+              onChange={setLocationFilter}
+            />
+            <MultiSelectDropdown
+              label="Zählerart"
+              options={(Object.keys(TYPE_LABELS) as MeterType[]).map((t) => ({
+                value: t,
+                label: TYPE_LABELS[t],
+              }))}
+              selected={typeFilter}
+              onChange={setTypeFilter}
+            />
+            <MultiSelectDropdown
+              label="Messstellen"
+              options={points.map((mp) => ({ value: mp.id, label: mp.name }))}
+              selected={mpFilter}
+              onChange={setMpFilter}
+            />
+            <MultiSelectDropdown
+              label="OBIS"
+              options={obisCodes.map((code) => ({ value: code, label: code }))}
+              selected={obisFilter}
+              onChange={setObisFilter}
+            />
+            <Dropdown label="Zeitraum" badge={from || to ? 1 : 0}>
+              <div className="flex flex-col gap-2 p-3">
+                <label className="flex flex-col gap-1 text-caption text-tertiary">
+                  von
+                  <DateInput value={from} onChange={setFrom} aria-label="von" />
+                </label>
+                <label className="flex flex-col gap-1 text-caption text-tertiary">
+                  bis
+                  <DateInput value={to} onChange={setTo} aria-label="bis" />
+                </label>
+              </div>
+            </Dropdown>
+            <MultiSelectDropdown
+              label="Art"
+              options={
+                [
+                  { value: 'reading', label: `Erfassungen (${counts.reading})` },
+                  { value: 'correction', label: `Bestandskorrekturen (${counts.correction})` },
+                  { value: 'delivery', label: `Lieferungen (${counts.delivery})` },
+                ] satisfies DropdownOption<ItemKind>[]
+              }
+              selected={kindFilter}
+              onChange={setKindFilter}
+            />
+          </div>
           {locationFilter.size ||
           typeFilter.size ||
           mpFilter.size ||
@@ -1362,15 +1347,6 @@ function DeliveryEditForm({
         </Button>
       </div>
     </form>
-  );
-}
-
-function FilterRow({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <div className="mb-1.5 text-caption-bold uppercase text-tertiary">{label}</div>
-      <div className="flex flex-wrap items-center gap-1.5">{children}</div>
-    </div>
   );
 }
 

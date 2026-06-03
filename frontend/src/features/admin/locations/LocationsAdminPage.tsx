@@ -7,11 +7,12 @@ import {
   Card,
   EmptyState,
   LargeTitle,
-  Pill,
+  MultiSelectDropdown,
   Section,
   Sheet,
   TextField,
 } from '@/components/ui';
+import type { DropdownOption } from '@/components/ui';
 import { LocationMap } from '@/components/LocationMap';
 import { LocationMapSheet } from '@/components/LocationMapSheet';
 import { ApiError, api } from '@/lib/api';
@@ -96,34 +97,26 @@ export function LocationsAdminPage() {
       <CreateForm onCreated={refresh} mainLocations={mainLocations} />
 
       {mainLocationPills.length > 0 ? (
-        <div className="flex flex-wrap items-center gap-1.5">
-          {mainLocationPills.map(([id, name]) => (
-            <Pill
-              key={id}
-              active={mainFilter.has(id)}
-              onClick={() => setMainFilter(toggle(mainFilter, id))}
-            >
-              {name}
-            </Pill>
-          ))}
-          {hasUnassigned ? (
-            <Pill
-              active={mainFilter.has(null)}
-              onClick={() => setMainFilter(toggle(mainFilter, null))}
-            >
-              ohne Hauptstandort
-            </Pill>
-          ) : null}
-          {mainFilter.size > 0 ? (
-            <button
-              type="button"
-              onClick={() => setMainFilter(new Set())}
-              className="text-caption font-semibold text-primary"
-            >
-              Zurücksetzen
-            </button>
-          ) : null}
-        </div>
+        <MultiSelectDropdown
+          label="Hauptstandort"
+          options={[
+            ...mainLocationPills.map(
+              ([id, name]): DropdownOption<number | null> => ({
+                value: id,
+                label: name,
+              }),
+            ),
+            ...(hasUnassigned
+              ? [
+                  { value: null, label: 'ohne Hauptstandort' } satisfies DropdownOption<
+                    number | null
+                  >,
+                ]
+              : []),
+          ]}
+          selected={mainFilter}
+          onChange={setMainFilter}
+        />
       ) : null}
 
       {locations && locations.length === 0 ? (
@@ -869,13 +862,4 @@ function CreateForm({
       </form>
     </Section>
   );
-}
-
-// Set-Toggle für die Hauptstandort-Filter-Pills (leeres Set = alle sichtbar),
-// analog zum gleichnamigen Helfer in MeasuringPointsAdminPage.tsx.
-function toggle<T>(set: Set<T>, value: T): Set<T> {
-  const next = new Set(set);
-  if (next.has(value)) next.delete(value);
-  else next.add(value);
-  return next;
 }
