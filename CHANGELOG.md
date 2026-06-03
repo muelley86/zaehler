@@ -10,6 +10,18 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.51.0](https://github.com/muelley86/zaehler/compare/v2.50.0...v2.51.0) (2026-06-03)
+
+
+### Funktionen
+
+* **export:** Voll-Backup der SQLite-DB als Download (admin-only) ([#218](https://github.com/muelley86/zaehler/issues/218)) ([6acee78](https://github.com/muelley86/zaehler/commit/6acee7873a1f9634da42e7e81d41dfc3653d3511))
+
+
+### Performance
+
+* **dashboard:** Sammel-Endpoint statt Per-MP-Fan-out (1 Request statt ~150) ([#220](https://github.com/muelley86/zaehler/issues/220)) ([d7840f9](https://github.com/muelley86/zaehler/commit/d7840f9587899e3a76c73cc3b7169124420d44a9))
+
 ## [2.50.0](https://github.com/muelley86/zaehler/compare/v2.49.0...v2.50.0) (2026-06-03)
 
 
