@@ -10,6 +10,13 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.41.0](https://github.com/muelley86/zaehler/compare/v2.40.0...v2.41.0) (2026-06-03)
+
+
+### Funktionen
+
+* **measuring-points:** Filter nach Messstellen-Typ in der Admin-Liste ([#196](https://github.com/muelley86/zaehler/issues/196)) ([08d9682](https://github.com/muelley86/zaehler/commit/08d96826b791c259c01194fd9e12594c2c5eeb66))
+
 ## [2.40.0](https://github.com/muelley86/zaehler/compare/v2.39.1...v2.40.0) (2026-06-03)
 
 
