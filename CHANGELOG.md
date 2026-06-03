@@ -10,6 +10,13 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.43.0](https://github.com/muelley86/zaehler/compare/v2.42.0...v2.43.0) (2026-06-03)
+
+
+### Funktionen
+
+* **filters:** einheitliche, zugeklappte Filter-Dropdowns überall ([#200](https://github.com/muelley86/zaehler/issues/200)) ([8187353](https://github.com/muelley86/zaehler/commit/8187353e83a8873557794657faeb188568ff5295))
+
 ## [2.42.0](https://github.com/muelley86/zaehler/compare/v2.41.0...v2.42.0) (2026-06-03)
 
 
