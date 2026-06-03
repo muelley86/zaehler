@@ -12,7 +12,16 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { BarChart3, Download, Save, Trash2 } from 'lucide-react';
 
 import { useAuth } from '@/features/auth/auth-context';
-import { Button, EmptyState, LargeTitle, Pill, Section, Select, Switch } from '@/components/ui';
+import {
+  Button,
+  EmptyState,
+  LargeTitle,
+  MultiSelectDropdown,
+  Pill,
+  Section,
+  Select,
+  Switch,
+} from '@/components/ui';
 import { PageGlows } from '@/components/PageGlows';
 import { ApiError, api } from '@/lib/api';
 import { formatDe } from '@/lib/format';
@@ -72,13 +81,6 @@ function numOptions(
   return [...map.entries()]
     .map(([id, label]) => ({ id, label }))
     .sort((a, b) => a.label.localeCompare(b.label));
-}
-
-function toggle<T>(set: Set<T>, value: T): Set<T> {
-  const next = new Set(set);
-  if (next.has(value)) next.delete(value);
-  else next.add(value);
-  return next;
 }
 
 function csvField(value: string): string {
@@ -479,36 +481,67 @@ export function ReportsPage() {
           </button>
           {filtersOpen ? (
             <div className="space-y-3 border-t border-border p-3">
-              <FilterGroup
-                title="Zählerart"
-                options={typeOptions.map((t) => ({ id: t, label: TYPE_LABELS[t] }))}
-                selected={typeFilter}
-                onToggle={(v) => setTypeFilter((s) => toggle(s, v))}
-              />
-              <FilterGroup
-                title="Kostenstelle"
-                options={kostenstelleOptions}
-                selected={kostenstelleFilter}
-                onToggle={(v) => setKostenstelleFilter((s) => toggle(s, v))}
-              />
-              <FilterGroup
-                title="Eigentümer"
-                options={ownerOptions}
-                selected={ownerFilter}
-                onToggle={(v) => setOwnerFilter((s) => toggle(s, v))}
-              />
-              <FilterGroup
-                title="Hauptstandort"
-                options={mainLocationOptions}
-                selected={mainLocationFilter}
-                onToggle={(v) => setMainLocationFilter((s) => toggle(s, v))}
-              />
-              <FilterGroup
-                title="Standort"
-                options={locationOptions}
-                selected={locationFilter}
-                onToggle={(v) => setLocationFilter((s) => toggle(s, v))}
-              />
+              <div className="flex flex-wrap items-center gap-2">
+                {typeOptions.length > 0 ? (
+                  <MultiSelectDropdown
+                    label="Zählerart"
+                    options={typeOptions.map((t) => ({ value: t, label: TYPE_LABELS[t] }))}
+                    selected={typeFilter}
+                    onChange={setTypeFilter}
+                  />
+                ) : null}
+                {kostenstelleOptions.length > 0 ? (
+                  <MultiSelectDropdown
+                    label="Kostenstelle"
+                    options={kostenstelleOptions.map((o) => ({ value: o.id, label: o.label }))}
+                    selected={kostenstelleFilter}
+                    onChange={setKostenstelleFilter}
+                  />
+                ) : null}
+                {ownerOptions.length > 0 ? (
+                  <MultiSelectDropdown
+                    label="Eigentümer"
+                    options={ownerOptions.map((o) => ({ value: o.id, label: o.label }))}
+                    selected={ownerFilter}
+                    onChange={setOwnerFilter}
+                  />
+                ) : null}
+                {mainLocationOptions.length > 0 ? (
+                  <MultiSelectDropdown
+                    label="Hauptstandort"
+                    options={mainLocationOptions.map((o) => ({ value: o.id, label: o.label }))}
+                    selected={mainLocationFilter}
+                    onChange={setMainLocationFilter}
+                  />
+                ) : null}
+                {locationOptions.length > 0 ? (
+                  <MultiSelectDropdown
+                    label="Standort"
+                    options={locationOptions.map((o) => ({ value: o.id, label: o.label }))}
+                    selected={locationFilter}
+                    onChange={setLocationFilter}
+                  />
+                ) : null}
+              </div>
+              {typeFilter.size ||
+              kostenstelleFilter.size ||
+              ownerFilter.size ||
+              mainLocationFilter.size ||
+              locationFilter.size ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTypeFilter(new Set());
+                    setKostenstelleFilter(new Set());
+                    setOwnerFilter(new Set());
+                    setMainLocationFilter(new Set());
+                    setLocationFilter(new Set());
+                  }}
+                  className="text-caption font-semibold text-primary"
+                >
+                  Filter zurücksetzen
+                </button>
+              ) : null}
             </div>
           ) : null}
         </Section>
@@ -577,37 +610,6 @@ export function ReportsPage() {
             </ul>
           </Section>
         ) : null}
-      </div>
-    </div>
-  );
-}
-
-function FilterGroup<T extends number | MeterType>({
-  title,
-  options,
-  selected,
-  onToggle,
-}: {
-  title: string;
-  options: { id: T; label: string }[];
-  selected: Set<T>;
-  onToggle: (value: T) => void;
-}) {
-  if (options.length === 0) return null;
-  return (
-    <div>
-      <div className="mb-1.5 text-caption-bold uppercase text-tertiary">{title}</div>
-      <div className="flex flex-wrap gap-2">
-        {options.map((o) => (
-          <Pill
-            key={String(o.id)}
-            size="sm"
-            active={selected.has(o.id)}
-            onClick={() => onToggle(o.id)}
-          >
-            {o.label}
-          </Pill>
-        ))}
       </div>
     </div>
   );
