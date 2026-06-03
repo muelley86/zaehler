@@ -10,6 +10,13 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.49.0](https://github.com/muelley86/zaehler/compare/v2.48.0...v2.49.0) (2026-06-03)
+
+
+### Funktionen
+
+* **entries:** serverseitiger Entries-Endpoint für Erfassungs-Pagination ([#214](https://github.com/muelley86/zaehler/issues/214)) ([93b0159](https://github.com/muelley86/zaehler/commit/93b01595919b50d726b3ceb1ce17704fb316c1a3))
+
 ## [2.48.0](https://github.com/muelley86/zaehler/compare/v2.47.0...v2.48.0) (2026-06-03)
 
 
