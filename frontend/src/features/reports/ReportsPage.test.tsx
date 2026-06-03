@@ -6,7 +6,8 @@
 
 import { http, HttpResponse } from 'msw';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 
 import { renderWithRouter } from '@/tests/render';
 import { server } from '@/tests/server';
@@ -125,5 +126,29 @@ describe('ReportsPage', () => {
     renderWithRouter(<ReportsPage />);
     await screen.findByText('10001');
     expect(screen.queryByRole('button', { name: /Speichern/ })).not.toBeInTheDocument();
+  });
+
+  it('Filter-Dropdown sendet den gewählten Filter als Query-Param', async () => {
+    const urls: string[] = [];
+    server.use(
+      http.get('/api/v1/measuring-points', () => HttpResponse.json([MP])),
+      http.get('/api/v1/report-configs', () => HttpResponse.json([])),
+      http.get('/api/v1/reports/aggregate', ({ request }) => {
+        urls.push(request.url);
+        return HttpResponse.json(response());
+      }),
+    );
+    const user = userEvent.setup();
+    renderWithRouter(<ReportsPage />);
+    await screen.findByText('10001');
+
+    // Filter aufklappen und das Kostenstelle-Dropdown im Filterbereich öffnen
+    // (entkoppelt von der gleichnamigen Gruppierungs-Dimension-Pill).
+    await user.click(screen.getByRole('button', { name: /Messstellen eingrenzen/ }));
+    const filterSection = screen.getByText('Messstellen eingrenzen').closest('section')!;
+    await user.click(within(filterSection).getByRole('button', { name: 'Kostenstelle' }));
+    await user.click(await screen.findByRole('checkbox', { name: '10001' }));
+
+    await waitFor(() => expect(urls.some((u) => u.includes('kostenstelle=10001'))).toBe(true));
   });
 });
