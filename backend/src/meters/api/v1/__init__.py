@@ -5,6 +5,7 @@ from fastapi import APIRouter
 from meters.api.v1 import (
     audit,
     auth,
+    dashboard,
     deliveries,
     entries,
     exports,
@@ -30,6 +31,7 @@ router.include_router(main_locations.router)
 router.include_router(owners.router)
 router.include_router(measuring_points.router)
 router.include_router(physical_meters.router)
+router.include_router(dashboard.router)
 router.include_router(readings.router)
 router.include_router(deliveries.router)
 router.include_router(entries.router)

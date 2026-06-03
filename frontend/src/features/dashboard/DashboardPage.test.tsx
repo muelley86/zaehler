@@ -2,15 +2,20 @@
  * Smoke-Tests für die globalen Dashboard-View-Controls und den einklappbaren
  * Filter. Recharts-Internals werden bewusst NICHT geprüft (ResponsiveContainer
  * hat in jsdom keine Maße) — Fokus liegt auf Steuer-State, localStorage-
- * Persistenz, Refetch-Query-Parametern und der Filter-Collapse-Mechanik.
+ * Persistenz, dem gebündelten `/dashboard`-Refetch und der Collapse-Mechanik.
+ *
+ * AbortSignal-Strip: Das Dashboard lädt `/dashboard` mit einem AbortSignal; unter
+ * jsdom akzeptiert undici-`fetch` (MSW) die jsdom-AbortSignal-Instanz nicht — wir
+ * strippen es pro Test über einen `api.get`-Spy (siehe ReadingsListPage.test.tsx).
  */
 
 import { http, HttpResponse } from 'msw';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 
 import { renderWithRouter } from '@/tests/render';
 import { server } from '@/tests/server';
+import { api } from '@/lib/api';
 import type { MeasuringPointRead, RegisterStateRead } from '@/lib/types';
 
 import { DashboardPage } from './DashboardPage';
@@ -37,25 +42,31 @@ const MP: MeasuringPointRead = {
   physical_meters: [],
 };
 
-/** Registriert alle vom Dashboard aufgerufenen Endpoints. Liefert die Liste
- *  der je consumption-Request gesehenen `granularity`-Werte zurück. */
+/** Registriert die vom Dashboard aufgerufenen Endpoints (MPs, Locations, der
+ *  gebündelte /dashboard-Load). Liefert die je /dashboard-Request gesehenen
+ *  `granularity`-Werte zurück. */
 function mockEndpoints(): { granularityCalls: string[] } {
   const granularityCalls: string[] = [];
   server.use(
     http.get('/api/v1/measuring-points', () => HttpResponse.json([MP])),
     http.get('/api/v1/locations', () => HttpResponse.json([])),
-    http.get('/api/v1/measuring-points/:id/state', () => HttpResponse.json([])),
-    http.get('/api/v1/measuring-points/:id/consumption', ({ request }) => {
+    http.get('/api/v1/dashboard', ({ request }) => {
       const g = new URL(request.url).searchParams.get('granularity');
       if (g) granularityCalls.push(g);
-      return HttpResponse.json([]);
+      return HttpResponse.json({ items: [] });
     }),
-    http.get('/api/v1/readings', () => HttpResponse.json([])),
   );
   return { granularityCalls };
 }
 
+beforeEach(() => {
+  // AbortSignal unter jsdom strippen (siehe Datei-Kommentar).
+  const realGet = api.get;
+  vi.spyOn(api, 'get').mockImplementation(<T,>(path: string): Promise<T> => realGet<T>(path));
+});
+
 afterEach(() => {
+  vi.restoreAllMocks();
   window.localStorage.clear();
 });
 
@@ -67,7 +78,7 @@ describe('DashboardPage — globale View-Controls', () => {
     expect(monat).toHaveAttribute('aria-pressed', 'true');
   });
 
-  it('Granularität umschalten persistiert und löst Refetch mit dem Query-Param aus', async () => {
+  it('Granularität umschalten persistiert und löst /dashboard-Refetch mit dem Query-Param aus', async () => {
     const { granularityCalls } = mockEndpoints();
     renderWithRouter(<DashboardPage />);
     const tag = await screen.findByRole('button', { name: 'Tag' });
@@ -88,6 +99,36 @@ describe('DashboardPage — globale View-Controls', () => {
 
     await waitFor(() => expect(window.localStorage.getItem('dashboard.chartType')).toBe('bar'));
     expect(balken).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('zeigt während eines Refetch ein Lade-Feedback, das danach verschwindet', async () => {
+    // Den zweiten /dashboard-Request (nach dem Granularitäts-Klick) gaten, damit
+    // das „Aktualisiere…"-Feedback deterministisch sichtbar wird — kein Timing.
+    let calls = 0;
+    let release: () => void = () => {};
+    server.use(
+      http.get('/api/v1/measuring-points', () => HttpResponse.json([MP])),
+      http.get('/api/v1/locations', () => HttpResponse.json([])),
+      http.get('/api/v1/dashboard', async () => {
+        calls += 1;
+        if (calls >= 2) {
+          await new Promise<void>((resolve) => {
+            release = resolve;
+          });
+        }
+        return HttpResponse.json({ items: [] });
+      }),
+    );
+
+    renderWithRouter(<DashboardPage />);
+    const tag = await screen.findByRole('button', { name: 'Tag' });
+    await waitFor(() => expect(screen.queryByText('Aktualisiere…')).toBeNull());
+
+    fireEvent.click(tag);
+    expect(await screen.findByText('Aktualisiere…')).toBeInTheDocument();
+
+    release();
+    await waitFor(() => expect(screen.queryByText('Aktualisiere…')).toBeNull());
   });
 });
 
@@ -129,9 +170,11 @@ describe('DashboardPage — Bestandskorrektur', () => {
     server.use(
       http.get('/api/v1/measuring-points', () => HttpResponse.json([TANK_MP])),
       http.get('/api/v1/locations', () => HttpResponse.json([])),
-      http.get('/api/v1/measuring-points/:id/state', () => HttpResponse.json([TANK_STATE])),
-      http.get('/api/v1/measuring-points/:id/consumption', () => HttpResponse.json([])),
-      http.get('/api/v1/readings', () => HttpResponse.json([])),
+      http.get('/api/v1/dashboard', () =>
+        HttpResponse.json({
+          items: [{ measuring_point_id: 1, consumption: [], readings: [], state: [TANK_STATE] }],
+        }),
+      ),
       http.post('/api/v1/readings', async ({ request }) => {
         readingBodies.push((await request.json()) as { reading_at?: string });
         return HttpResponse.json({ id: 1 }, { status: 201 });
