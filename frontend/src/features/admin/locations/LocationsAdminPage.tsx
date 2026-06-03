@@ -2,7 +2,16 @@ import { useEffect, useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
 import { Crosshair, Map as MapIcon, MapPin, Pencil, Trash2 } from 'lucide-react';
 
-import { Button, Card, EmptyState, LargeTitle, Section, Sheet, TextField } from '@/components/ui';
+import {
+  Button,
+  Card,
+  EmptyState,
+  LargeTitle,
+  Pill,
+  Section,
+  Sheet,
+  TextField,
+} from '@/components/ui';
 import { LocationMap } from '@/components/LocationMap';
 import { LocationMapSheet } from '@/components/LocationMapSheet';
 import { ApiError, api } from '@/lib/api';
@@ -21,6 +30,7 @@ export function LocationsAdminPage() {
   const [tick, setTick] = useState(0);
   const [editing, setEditing] = useState<LocationRead | null>(null);
   const [mapTarget, setMapTarget] = useState<LocationRead | null>(null);
+  const [mainFilter, setMainFilter] = useState<Set<number | null>>(new Set());
 
   useEffect(() => {
     api
@@ -53,6 +63,27 @@ export function LocationsAdminPage() {
     return map;
   }, [points]);
 
+  // Pills aus den geladenen Standorten ableiten — nur Hauptstandorte, die
+  // tatsächlich vorkommen (analog zum Standort-Filter in ReadingsListPage).
+  const mainLocationPills = useMemo(() => {
+    const map = new Map<number, string>();
+    (locations ?? []).forEach((loc) => {
+      if (loc.main_location_id !== null && !map.has(loc.main_location_id)) {
+        map.set(loc.main_location_id, loc.main_location_name ?? `#${loc.main_location_id}`);
+      }
+    });
+    return Array.from(map.entries());
+  }, [locations]);
+  const hasUnassigned = (locations ?? []).some((l) => l.main_location_id === null);
+
+  const filtered = useMemo(
+    () =>
+      (locations ?? []).filter(
+        (loc) => mainFilter.size === 0 || mainFilter.has(loc.main_location_id),
+      ),
+    [locations, mainFilter],
+  );
+
   return (
     <>
       <LargeTitle title="Zählerstandorte" />
@@ -64,6 +95,37 @@ export function LocationsAdminPage() {
 
       <CreateForm onCreated={refresh} mainLocations={mainLocations} />
 
+      {mainLocationPills.length > 0 ? (
+        <div className="flex flex-wrap items-center gap-1.5">
+          {mainLocationPills.map(([id, name]) => (
+            <Pill
+              key={id}
+              active={mainFilter.has(id)}
+              onClick={() => setMainFilter(toggle(mainFilter, id))}
+            >
+              {name}
+            </Pill>
+          ))}
+          {hasUnassigned ? (
+            <Pill
+              active={mainFilter.has(null)}
+              onClick={() => setMainFilter(toggle(mainFilter, null))}
+            >
+              ohne Hauptstandort
+            </Pill>
+          ) : null}
+          {mainFilter.size > 0 ? (
+            <button
+              type="button"
+              onClick={() => setMainFilter(new Set())}
+              className="text-caption font-semibold text-primary"
+            >
+              Zurücksetzen
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+
       {locations && locations.length === 0 ? (
         <EmptyState
           icon={<MapPin size={32} />}
@@ -71,18 +133,23 @@ export function LocationsAdminPage() {
           description="Standorte helfen, Messstellen sauber zu gruppieren."
         />
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2">
-          {(locations ?? []).map((loc) => (
-            <LocationCard
-              key={loc.id}
-              loc={loc}
-              mpCount={mpCountByLocation.get(loc.id) ?? 0}
-              onEdit={() => setEditing(loc)}
-              onShowMap={() => setMapTarget(loc)}
-              onChanged={refresh}
-            />
-          ))}
-        </div>
+        <>
+          <div className="grid gap-4 sm:grid-cols-2">
+            {filtered.map((loc) => (
+              <LocationCard
+                key={loc.id}
+                loc={loc}
+                mpCount={mpCountByLocation.get(loc.id) ?? 0}
+                onEdit={() => setEditing(loc)}
+                onShowMap={() => setMapTarget(loc)}
+                onChanged={refresh}
+              />
+            ))}
+          </div>
+          {filtered.length === 0 ? (
+            <div className="text-tertiary">Keine Standorte für diesen Hauptstandort.</div>
+          ) : null}
+        </>
       )}
 
       <Sheet open={editing !== null} onClose={() => setEditing(null)} title="Standort bearbeiten">
@@ -802,4 +869,13 @@ function CreateForm({
       </form>
     </Section>
   );
+}
+
+// Set-Toggle für die Hauptstandort-Filter-Pills (leeres Set = alle sichtbar),
+// analog zum gleichnamigen Helfer in MeasuringPointsAdminPage.tsx.
+function toggle<T>(set: Set<T>, value: T): Set<T> {
+  const next = new Set(set);
+  if (next.has(value)) next.delete(value);
+  else next.add(value);
+  return next;
 }
