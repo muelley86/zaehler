@@ -10,6 +10,13 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.44.0](https://github.com/muelley86/zaehler/compare/v2.43.1...v2.44.0) (2026-06-03)
+
+
+### Funktionen
+
+* **dashboard:** Filter als einheitliche Dropdowns statt Pill-Reihen ([#204](https://github.com/muelley86/zaehler/issues/204)) ([f8a7655](https://github.com/muelley86/zaehler/commit/f8a76556cb7d74d98b4114aec9e9cd476e0be823))
+
 ## [2.43.1](https://github.com/muelley86/zaehler/compare/v2.43.0...v2.43.1) (2026-06-03)
 
 
