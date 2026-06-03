@@ -10,6 +10,13 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.45.0](https://github.com/muelley86/zaehler/compare/v2.44.0...v2.45.0) (2026-06-03)
+
+
+### Funktionen
+
+* **readings:** suchbare Messstellen-Auswahl beim Erfassen ([#206](https://github.com/muelley86/zaehler/issues/206)) ([6e5c0ee](https://github.com/muelley86/zaehler/commit/6e5c0eef3ef5f6c8d3f2a198eb6448f105d7c4d2))
+
 ## [2.44.0](https://github.com/muelley86/zaehler/compare/v2.43.1...v2.44.0) (2026-06-03)
 
 
