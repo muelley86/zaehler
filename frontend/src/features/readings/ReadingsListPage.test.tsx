@@ -7,11 +7,13 @@
  * 2. „Alle auswählen" markiert alle löschbaren Einträge und sendet alle IDs.
  * 3. Vor dem Löschen wird window.confirm gefragt; bei Ablehnung kein Request.
  *
- * Hinweis zur AbortSignal-Umgehung: Die Liste lädt Readings/Lieferungen mit
- * einem AbortSignal (Cancel bei Filterwechsel). Unter jsdom akzeptiert Nodes
- * undici-`fetch` (von MSW genutzt) jsdoms AbortSignal-Instanz nicht. Wir
- * strippen das Signal daher pro Test über einen `api.get`-Spy — fürs
- * Lösch-Verhalten irrelevant.
+ * Die Liste lädt serverseitig paginiert/gefiltert über GET /entries (Readings +
+ * Lieferungen gemischt). Der Mock unten ist query-aware (limit/offset/meter_type).
+ *
+ * Hinweis zur AbortSignal-Umgehung: Die Liste lädt mit einem AbortSignal (Cancel
+ * bei Filterwechsel). Unter jsdom akzeptiert Nodes undici-`fetch` (von MSW
+ * genutzt) jsdoms AbortSignal-Instanz nicht. Wir strippen das Signal daher pro
+ * Test über einen `api.get`-Spy — fürs Verhalten irrelevant.
  */
 
 import { http, HttpResponse } from 'msw';
@@ -97,8 +99,18 @@ function _mockEndpoints(initial: ReturnType<typeof _reading>[]) {
   bulkBody = null;
   server.use(
     http.get('/api/v1/measuring-points', () => HttpResponse.json([_MP])),
-    http.get('/api/v1/readings', () => HttpResponse.json(current)),
-    http.get('/api/v1/deliveries', () => HttpResponse.json([])),
+    http.get('/api/v1/entries', ({ request }) => {
+      const url = new URL(request.url);
+      const types = url.searchParams.getAll('meter_type');
+      const limit = Number(url.searchParams.get('limit') ?? '50');
+      const offset = Number(url.searchParams.get('offset') ?? '0');
+      // Alle Test-Readings hängen an _MP (electricity).
+      const matched = types.length > 0 && !types.includes('electricity') ? [] : current;
+      const items = matched
+        .slice(offset, offset + limit)
+        .map((r) => ({ kind: 'reading', reading: r, delivery: null, previous_value: null }));
+      return HttpResponse.json({ items, total: matched.length });
+    }),
     http.post('/api/v1/readings/bulk-delete', async ({ request }) => {
       const body = (await request.json()) as { ids: number[] };
       bulkBody = body;
@@ -185,7 +197,8 @@ describe('ReadingsListPage — Mehrfach-Löschen', () => {
     // Zählerart-Dropdown öffnen, "Wasser" wählen → Strom-Erfassung fällt raus.
     await user.click(screen.getByRole('button', { name: 'Zählerart' }));
     await user.click(await screen.findByRole('checkbox', { name: 'Wasser' }));
-    expect(screen.getByText('Keine Treffer.')).toBeInTheDocument();
+    // Server-Refetch mit meter_type=water → leer.
+    expect(await screen.findByText('Keine Treffer.')).toBeInTheDocument();
     expect(screen.queryByText('Strom Hauptzähler')).not.toBeInTheDocument();
   });
 

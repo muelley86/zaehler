@@ -31,6 +31,8 @@ import { tryGetDeviceLocation } from '@/lib/geo';
 import type {
   BulkDeleteResult,
   DeliveryRead,
+  EntriesPage,
+  EntryRead,
   Me,
   MeasuringPointRead,
   MeterType,
@@ -70,6 +72,7 @@ type Item =
       date: string;
       info: RegisterIndex;
       reading: ReadingRead;
+      previous: number | null;
       sortKey: string;
     }
   | {
@@ -81,18 +84,59 @@ type Item =
       sortKey: string;
     };
 
-// Standardmäßig nur die neuesten 50 Treffer rendern; „Weitere 50" / „Alle"
-// blättern client-seitig nach (die Filter wirken weiterhin auf den ganzen
-// geladenen Bestand).
+// Server-Einträge (Readings/Lieferungen) → gerenderte Items, angereichert mit
+// Register-Metadaten aus dem registerIndex. Reihenfolge bleibt (Server liefert
+// nach Datum absteigend sortiert). Vorwert/kind kommen vom Server.
+function entriesToItems(entries: EntryRead[], registerIndex: Map<number, RegisterIndex>): Item[] {
+  const out: Item[] = [];
+  for (const e of entries) {
+    if (e.kind === 'delivery') {
+      const d = e.delivery;
+      if (!d) continue;
+      const info = registerIndex.get(d.register_id);
+      if (!info) continue;
+      out.push({
+        kind: 'delivery',
+        day: toLocalDayKey(new Date(d.delivery_at)),
+        date: d.delivery_at,
+        info,
+        delivery: d,
+        sortKey: `${d.delivery_at}-${String(d.id).padStart(8, '0')}`,
+      });
+    } else {
+      const r = e.reading;
+      if (!r) continue;
+      const info = registerIndex.get(r.register_id);
+      if (!info) continue;
+      out.push({
+        kind: e.kind,
+        day: toLocalDayKey(new Date(r.reading_at)),
+        date: r.reading_at,
+        info,
+        reading: r,
+        previous: e.previous_value !== null ? Number(e.previous_value) : null,
+        sortKey: `${r.reading_at}-${String(r.id).padStart(8, '0')}`,
+      });
+    }
+  }
+  return out;
+}
+
+// Seitengröße der serverseitigen Pagination; „Weitere 50" lädt die nächste
+// Seite vom Server nach, „Alle" lädt alle Treffer.
 const PAGE_SIZE = 50;
 
 export function ReadingsListPage() {
   const { me } = useAuth();
   const [points, setPoints] = useState<MeasuringPointRead[] | null>(null);
-  const [readings, setReadings] = useState<ReadingRead[]>([]);
-  const [deliveries, setDeliveries] = useState<DeliveryRead[]>([]);
+  // Serverseitig paginierte, gefilterte Einträge (Readings + Lieferungen gemischt).
+  const [entries, setEntries] = useState<EntryRead[]>([]);
+  const [total, setTotal] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
+  // Generationszähler: jede Filter-/Refresh-Neuladung erhöht ihn; späte
+  // „Weitere/Alle"-Antworten einer alten Generation werden verworfen.
+  const genRef = useRef(0);
 
   const [editTarget, setEditTarget] = useState<EditTarget | null>(null);
   const [lightboxPhoto, setLightboxPhoto] = useState<{
@@ -114,10 +158,6 @@ export function ReadingsListPage() {
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [kindFilter, setKindFilter] = useState<Set<ItemKind>>(new Set());
 
-  // Anzahl gerenderter Treffer (Anzeige-Cap). Bei Filter-/Suchänderung wieder
-  // auf PAGE_SIZE zurück (siehe Effekt unten).
-  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
-
   // Mehrfach-Auswahl zum Sammel-Löschen. Keys decken sich mit den React-Keys
   // der Liste: "r-<id>" für Readings/Korrekturen, "d-<id>" für Lieferungen.
   const [selectMode, setSelectMode] = useState(false);
@@ -129,11 +169,6 @@ export function ReadingsListPage() {
     return () => window.clearTimeout(timer);
   }, [search]);
 
-  // Bei jeder Filter-/Suchänderung wieder bei den letzten PAGE_SIZE starten.
-  useEffect(() => {
-    setVisibleCount(PAGE_SIZE);
-  }, [locationFilter, typeFilter, mpFilter, obisFilter, kindFilter, debouncedSearch, from, to]);
-
   useEffect(() => {
     api
       .get<MeasuringPointRead[]>('/measuring-points')
@@ -143,32 +178,48 @@ export function ReadingsListPage() {
       });
   }, []);
 
-  useEffect(() => {
-    const controller = new AbortController();
-    const readingParams = new URLSearchParams();
-    readingParams.set('limit', '5000');
-    if (from) readingParams.set('from_at', `${from}T00:00:00`);
-    if (to) readingParams.set('to_at', `${to}T23:59:59`);
-    api
-      .get<ReadingRead[]>(`/readings?${readingParams}`, controller.signal)
-      .then(setReadings)
-      .catch((err: unknown) => {
-        if (err instanceof DOMException && err.name === 'AbortError') return;
-        if (err instanceof ApiError) setError(err.problem.detail ?? err.problem.title);
+  // Baut die /entries-Query aus allen Filtern. Ändert sich die Referenz (= ein
+  // Filter hat sich geändert), lädt der Effekt unten Seite 0 neu.
+  const buildEntriesQuery = useCallback(
+    (offset: number, limit: number) => {
+      const p = new URLSearchParams();
+      mpFilter.forEach((id) => p.append('measuring_point_id', String(id)));
+      locationFilter.forEach((id) => {
+        if (id === null) p.set('location_none', 'true');
+        else p.append('location_id', String(id));
       });
-    const deliveryParams = new URLSearchParams();
-    deliveryParams.set('limit', '5000');
-    if (from) deliveryParams.set('from_date', from);
-    if (to) deliveryParams.set('to_date', to);
+      typeFilter.forEach((t) => p.append('meter_type', t));
+      obisFilter.forEach((code) => p.append('obis', code));
+      kindFilter.forEach((k) => p.append('kind', k));
+      if (from) p.set('from_at', `${from}T00:00:00`);
+      if (to) p.set('to_at', `${to}T23:59:59`);
+      const needle = debouncedSearch.trim();
+      if (needle) p.set('search', needle);
+      p.set('limit', String(limit));
+      p.set('offset', String(offset));
+      return p.toString();
+    },
+    [mpFilter, locationFilter, typeFilter, obisFilter, kindFilter, from, to, debouncedSearch],
+  );
+
+  // Erste Seite (neu) bei jeder Filter-/Such-/Datums-Änderung und nach Refresh.
+  useEffect(() => {
+    genRef.current += 1;
+    const gen = genRef.current;
+    const controller = new AbortController();
     api
-      .get<DeliveryRead[]>(`/deliveries?${deliveryParams}`, controller.signal)
-      .then(setDeliveries)
+      .get<EntriesPage>(`/entries?${buildEntriesQuery(0, PAGE_SIZE)}`, controller.signal)
+      .then((page) => {
+        if (gen !== genRef.current) return;
+        setEntries(page.items);
+        setTotal(page.total);
+      })
       .catch((err: unknown) => {
         if (err instanceof DOMException && err.name === 'AbortError') return;
         if (err instanceof ApiError) setError(err.problem.detail ?? err.problem.title);
       });
     return () => controller.abort();
-  }, [from, to, tick]);
+  }, [buildEntriesQuery, tick]);
 
   // Stabile Referenz für memoizierte Item-Komponenten.
   const refresh = useCallback(() => setTick((t) => t + 1), []);
@@ -200,89 +251,18 @@ export function ReadingsListPage() {
     return index;
   }, [points]);
 
-  // Vorwert pro Reading-ID (chronologisch im selben Register).
-  const prevValueByReading = useMemo<Map<number, number | null>>(() => {
-    const byRegister = new Map<number, ReadingRead[]>();
-    for (const r of readings) {
-      const list = byRegister.get(r.register_id) ?? [];
-      list.push(r);
-      byRegister.set(r.register_id, list);
-    }
-    const out = new Map<number, number | null>();
-    for (const list of byRegister.values()) {
-      list.sort((a, b) => a.reading_at.localeCompare(b.reading_at));
-      let prev: number | null = null;
-      for (const r of list) {
-        out.set(r.id, prev);
-        prev = Number(r.value);
-      }
-    }
-    return out;
-  }, [readings]);
+  // Geladene Einträge → gerenderte Items (Server liefert bereits gefiltert
+  // und nach Datum sortiert; Vorwert/kind kommen mit).
+  const items = useMemo<Item[]>(
+    () => entriesToItems(entries, registerIndex),
+    [entries, registerIndex],
+  );
 
-  const items = useMemo<Item[]>(() => {
-    const out: Item[] = [];
-    for (const r of readings) {
-      const info = registerIndex.get(r.register_id);
-      if (!info) continue;
-      out.push({
-        kind: isCorrection(r) ? 'correction' : 'reading',
-        day: toLocalDayKey(new Date(r.reading_at)),
-        date: r.reading_at,
-        info,
-        reading: r,
-        sortKey: `${r.reading_at}-${String(r.id).padStart(8, '0')}`,
-      });
-    }
-    for (const d of deliveries) {
-      const info = registerIndex.get(d.register_id);
-      if (!info) continue;
-      out.push({
-        kind: 'delivery',
-        day: toLocalDayKey(new Date(d.delivery_at)),
-        date: d.delivery_at,
-        info,
-        delivery: d,
-        sortKey: `${d.delivery_at}-${String(d.id).padStart(8, '0')}`,
-      });
-    }
-    out.sort((a, b) => b.sortKey.localeCompare(a.sortKey));
-    return out;
-  }, [readings, deliveries, registerIndex]);
-
-  const filtered = useMemo(() => {
-    const needle = debouncedSearch ? debouncedSearch.toLowerCase() : '';
-    return items.filter((item) => {
-      const { info } = item;
-      if (locationFilter.size > 0 && !locationFilter.has(info.locationId)) return false;
-      if (typeFilter.size > 0 && !typeFilter.has(info.mpType)) return false;
-      if (mpFilter.size > 0 && !mpFilter.has(info.mpId)) return false;
-      if (obisFilter.size > 0 && !obisFilter.has(info.obisCode)) return false;
-      if (kindFilter.size > 0 && !kindFilter.has(item.kind)) return false;
-      if (needle) {
-        const note =
-          item.kind === 'delivery' ? (item.delivery.note ?? '') : (item.reading.note ?? '');
-        const haystack =
-          note +
-          ' ' +
-          info.mpName +
-          ' ' +
-          (info.locationName ?? '') +
-          ' ' +
-          info.serialNumber +
-          ' ' +
-          info.obisCode;
-        if (!haystack.toLowerCase().includes(needle)) return false;
-      }
-      return true;
-    });
-  }, [items, locationFilter, typeFilter, mpFilter, obisFilter, debouncedSearch, kindFilter]);
-
-  // Keys aller aktuell gefilterten, für den User löschbaren Einträge —
-  // Basis für „Alle auswählen" und die Checkbox-Sichtbarkeit pro Zeile.
+  // Keys aller geladenen, für den User löschbaren Einträge — Basis für
+  // „Alle auswählen" (= alle geladenen) und die Checkbox-Sichtbarkeit pro Zeile.
   const selectableKeys = useMemo(
-    () => filtered.filter((it) => itemEditable(it, me)).map(itemKey),
-    [filtered, me],
+    () => items.filter((it) => itemEditable(it, me)).map(itemKey),
+    [items, me],
   );
   const allSelected = selectableKeys.length > 0 && selectableKeys.every((k) => selected.has(k));
 
@@ -336,26 +316,45 @@ export function ReadingsListPage() {
     }
   }
 
-  // Tag-Gruppen für die Anzeige
-  // Anzeige-Cap: nur die ersten `visibleCount` der (nach Datum desc sortierten)
-  // gefilterten Treffer rendern.
-  const visible = useMemo(() => filtered.slice(0, visibleCount), [filtered, visibleCount]);
-
+  // Tag-Gruppen für die Anzeige (über die aktuell geladenen Einträge).
   const groupedByDay = useMemo(() => {
     const groups = new Map<string, Item[]>();
-    for (const item of visible) {
+    for (const item of items) {
       const arr = groups.get(item.day) ?? [];
       arr.push(item);
       groups.set(item.day, arr);
     }
     return Array.from(groups.entries()).sort((a, b) => b[0].localeCompare(a[0]));
-  }, [visible]);
-
-  const counts = useMemo(() => {
-    const c: Record<ItemKind, number> = { reading: 0, correction: 0, delivery: 0 };
-    for (const item of items) c[item.kind] += 1;
-    return c;
   }, [items]);
+
+  // Nächste Seite serverseitig nachladen bzw. alle Treffer laden.
+  async function loadMore(): Promise<void> {
+    const gen = genRef.current;
+    try {
+      const page = await api.get<EntriesPage>(
+        `/entries?${buildEntriesQuery(entries.length, PAGE_SIZE)}`,
+      );
+      if (gen !== genRef.current) return;
+      setEntries((prev) => [...prev, ...page.items]);
+      setTotal(page.total);
+    } catch (err) {
+      if (err instanceof ApiError) setError(err.problem.detail ?? err.problem.title);
+    }
+  }
+
+  async function loadAll(): Promise<void> {
+    const gen = genRef.current;
+    try {
+      const page = await api.get<EntriesPage>(
+        `/entries?${buildEntriesQuery(0, Math.max(total, 1))}`,
+      );
+      if (gen !== genRef.current) return;
+      setEntries(page.items);
+      setTotal(page.total);
+    } catch (err) {
+      if (err instanceof ApiError) setError(err.problem.detail ?? err.problem.title);
+    }
+  }
 
   const locations = useMemo(() => {
     const map = new Map<number | null, string>();
@@ -373,7 +372,19 @@ export function ReadingsListPage() {
     return Array.from(set).sort();
   }, [registerIndex]);
 
-  function downloadCsv() {
+  async function downloadCsv() {
+    // CSV soll die volle gefilterte Menge enthalten (nicht nur die geladene
+    // Seite) → einmalig alle Treffer vom Server holen.
+    let csvItems: Item[];
+    try {
+      const page = await api.get<EntriesPage>(
+        `/entries?${buildEntriesQuery(0, Math.max(total, 1))}`,
+      );
+      csvItems = entriesToItems(page.items, registerIndex);
+    } catch (err) {
+      if (err instanceof ApiError) window.alert(err.problem.detail ?? err.problem.title);
+      return;
+    }
     const header = [
       'Datum',
       'Art',
@@ -390,7 +401,7 @@ export function ReadingsListPage() {
       'Erfasst_am',
     ];
     const lines = [header.join(';')];
-    for (const item of filtered) {
+    for (const item of csvItems) {
       const { info } = item;
       if (item.kind === 'delivery') {
         const d = item.delivery;
@@ -475,7 +486,7 @@ export function ReadingsListPage() {
               size="sm"
               leftIcon={selectMode ? <X size={14} /> : <ListChecks size={14} />}
               onClick={() => (selectMode ? exitSelectMode() : setSelectMode(true))}
-              disabled={!selectMode && filtered.length === 0}
+              disabled={!selectMode && items.length === 0}
             >
               {selectMode ? 'Abbrechen' : 'Auswählen'}
             </Button>
@@ -483,10 +494,10 @@ export function ReadingsListPage() {
               variant="tinted"
               size="sm"
               leftIcon={<Download size={14} />}
-              onClick={downloadCsv}
-              disabled={filtered.length === 0}
+              onClick={() => void downloadCsv()}
+              disabled={total === 0}
             >
-              CSV ({filtered.length})
+              CSV ({total})
             </Button>
           </div>
         }
@@ -550,9 +561,9 @@ export function ReadingsListPage() {
               label="Art"
               options={
                 [
-                  { value: 'reading', label: `Erfassungen (${counts.reading})` },
-                  { value: 'correction', label: `Bestandskorrekturen (${counts.correction})` },
-                  { value: 'delivery', label: `Lieferungen (${counts.delivery})` },
+                  { value: 'reading', label: 'Erfassungen' },
+                  { value: 'correction', label: 'Bestandskorrekturen' },
+                  { value: 'delivery', label: 'Lieferungen' },
                 ] satisfies DropdownOption<ItemKind>[]
               }
               selected={kindFilter}
@@ -584,9 +595,6 @@ export function ReadingsListPage() {
               Filter zurücksetzen
             </button>
           ) : null}
-          <div className="text-caption text-tertiary">
-            {readings.length} Stände + {deliveries.length} Lieferungen geladen (je max 5000)
-          </div>
         </div>
       </Section>
 
@@ -624,7 +632,7 @@ export function ReadingsListPage() {
         </div>
       ) : null}
 
-      {filtered.length === 0 ? (
+      {items.length === 0 ? (
         <EmptyState title="Keine Treffer." />
       ) : (
         <div className="space-y-5">
@@ -650,7 +658,7 @@ export function ReadingsListPage() {
                       reading={item.reading}
                       info={item.info}
                       kind={item.kind}
-                      previous={prevValueByReading.get(item.reading.id) ?? null}
+                      previous={item.previous}
                       me={me}
                       setEditTarget={setEditTarget}
                       onChanged={refresh}
@@ -667,21 +675,17 @@ export function ReadingsListPage() {
         </div>
       )}
 
-      {filtered.length > visible.length ? (
+      {entries.length < total ? (
         <div className="flex flex-col items-center gap-2 pt-1">
           <div className="text-caption text-tertiary">
-            {visible.length} von {filtered.length} angezeigt
+            {entries.length} von {total} angezeigt
           </div>
           <div className="flex gap-2">
-            <Button
-              variant="bordered"
-              size="sm"
-              onClick={() => setVisibleCount((c) => c + PAGE_SIZE)}
-            >
+            <Button variant="bordered" size="sm" onClick={() => void loadMore()}>
               Weitere {PAGE_SIZE} anzeigen
             </Button>
-            <Button variant="tinted" size="sm" onClick={() => setVisibleCount(filtered.length)}>
-              Alle anzeigen ({filtered.length})
+            <Button variant="tinted" size="sm" onClick={() => void loadAll()}>
+              Alle anzeigen ({total})
             </Button>
           </div>
         </div>
@@ -1408,10 +1412,6 @@ function toggle<T>(set: Set<T>, value: T): Set<T> {
   if (next.has(value)) next.delete(value);
   else next.add(value);
   return next;
-}
-
-function isCorrection(reading: ReadingRead): boolean {
-  return (reading.note ?? '').trim().toLowerCase().startsWith('bestandskorrektur');
 }
 
 function canEdit(me: Me, reading: ReadingRead): boolean {

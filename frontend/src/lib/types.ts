@@ -207,6 +207,18 @@ export interface BulkDeleteResult {
   skipped: { id: number; reason: string }[];
 }
 
+export interface EntryRead {
+  kind: 'reading' | 'correction' | 'delivery';
+  reading: ReadingRead | null;
+  delivery: DeliveryRead | null;
+  previous_value: string | null;
+}
+
+export interface EntriesPage {
+  items: EntryRead[];
+  total: number;
+}
+
 export interface ConsumptionPoint {
   period_start: string;
   period_end: string;
