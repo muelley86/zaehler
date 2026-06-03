@@ -10,6 +10,13 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.42.0](https://github.com/muelley86/zaehler/compare/v2.41.0...v2.42.0) (2026-06-03)
+
+
+### Funktionen
+
+* **locations:** Filter nach Hauptstandort in der Zählerstandorte-Liste ([#198](https://github.com/muelley86/zaehler/issues/198)) ([6e079a0](https://github.com/muelley86/zaehler/commit/6e079a0afb5ccce79e651eff0bdece247794de1a))
+
 ## [2.41.0](https://github.com/muelley86/zaehler/compare/v2.40.0...v2.41.0) (2026-06-03)
 
 
