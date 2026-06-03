@@ -4,7 +4,7 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Annotated
 
-from pydantic import BaseModel, ConfigDict, PlainSerializer
+from pydantic import BaseModel, ConfigDict, Field, PlainSerializer
 
 DecimalStr = Annotated[
     Decimal,
@@ -85,3 +85,28 @@ class ProblemDetails(BaseModel):
     status: int
     detail: str | None = None
     instance: str | None = None
+
+
+class BulkDeleteRequest(BaseModel):
+    """Sammel-Löschung über eine konkrete Liste von Entity-IDs."""
+
+    ids: list[int] = Field(min_length=1, max_length=5000)
+
+
+class BulkDeleteSkipped(BaseModel):
+    """Ein nicht gelöschter Eintrag samt Grund.
+
+    ``reason``: ``not_found`` (existiert nicht / bereits entfernt),
+    ``forbidden`` (keine Edit-Berechtigung, z. B. 24h-Fenster abgelaufen),
+    ``no_access`` (Recorder ohne Zugriff auf die zugehörige Messstelle).
+    """
+
+    id: int
+    reason: str
+
+
+class BulkDeleteResult(BaseModel):
+    """Ergebnis einer Best-Effort-Sammel-Löschung."""
+
+    deleted: int
+    skipped: list[BulkDeleteSkipped]

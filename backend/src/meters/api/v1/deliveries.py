@@ -23,7 +23,14 @@ from meters.models import (
     Register,
     UserRole,
 )
-from meters.schemas import DeliveryCreate, DeliveryRead, DeliveryUpdate
+from meters.schemas import (
+    BulkDeleteRequest,
+    BulkDeleteResult,
+    BulkDeleteSkipped,
+    DeliveryCreate,
+    DeliveryRead,
+    DeliveryUpdate,
+)
 from meters.schemas.common import to_utc_iso
 from meters.services.access import assert_can_access_register, restrict_mp_query
 from meters.services.audit import record
@@ -216,3 +223,42 @@ def delete_delivery(
     )
     db.delete(delivery)
     db.commit()
+
+
+@router.post("/deliveries/bulk-delete", response_model=BulkDeleteResult)
+def bulk_delete_deliveries(
+    payload: BulkDeleteRequest,
+    request: Request,
+    db: DbDep,
+    admin: AdminUser,
+) -> BulkDeleteResult:
+    """Sammel-Löschung mehrerer Lieferungen (admin-only, Best-Effort).
+
+    Nicht gefundene IDs werden übersprungen und gemeldet statt den Batch
+    abzubrechen. Pro gelöschter Lieferung entsteht ein Audit-``DELETE``.
+    """
+    ip = client_ip(request)
+    skipped: list[BulkDeleteSkipped] = []
+    deleted = 0
+    for delivery_id in dict.fromkeys(payload.ids):
+        delivery = db.get(Delivery, delivery_id)
+        if delivery is None:
+            skipped.append(BulkDeleteSkipped(id=delivery_id, reason="not_found"))
+            continue
+        record(
+            db,
+            user_id=admin.id,
+            action=AuditAction.DELETE,
+            entity_type=AuditEntityType.DELIVERY,
+            entity_id=delivery.id,
+            diff={
+                "register_id": delivery.register_id,
+                "delivery_at": to_utc_iso(delivery.delivery_at),
+                "amount": format(delivery.amount, "f"),
+            },
+            ip_address=ip,
+        )
+        db.delete(delivery)
+        deleted += 1
+    db.commit()
+    return BulkDeleteResult(deleted=deleted, skipped=skipped)

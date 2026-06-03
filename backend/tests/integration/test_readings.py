@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from fastapi.testclient import TestClient
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from meters.models import MeasuringPoint, User, UserMeasuringPointAccess
@@ -400,3 +400,136 @@ def test_reading_at_naive_local_time_two_hours_ahead_rejected(
     body = resp.json()
     assert "errors" in body
     assert any("Zukunft" in str(e) for e in body["errors"])
+
+
+def _second_water_mp(admin_client: TestClient) -> int:
+    """Zweite Wasser-MP (anderer Serial) für No-Access-Szenarien."""
+    resp = admin_client.post(
+        "/api/v1/measuring-points",
+        json={
+            "name": "Wasser Hof",
+            "type": "water",
+            "is_bidirectional": False,
+            "has_dual_tariff": False,
+            "serial_number": "W-0002",
+            "installed_at": "2024-01-01",
+            "initial_values": {"water": "10.000"},
+        },
+    )
+    assert resp.status_code == 201, resp.text
+    body: dict[str, object] = resp.json()
+    register_id: int = body["physical_meters"][0]["registers"][0]["id"]  # type: ignore[index]
+    return register_id
+
+
+def _create_reading(admin_client: TestClient, register_id: int, value: str, at: str) -> int:
+    resp = admin_client.post(
+        "/api/v1/readings",
+        json={"register_id": register_id, "value": value, "reading_at": at},
+    )
+    assert resp.status_code == 201, resp.text
+    return int(resp.json()["id"])
+
+
+def test_bulk_delete_readings_admin(admin_client: TestClient, db: Session) -> None:
+    """Admin löscht mehrere Erfassungen auf einmal; pro Eintrag ein Audit-DELETE."""
+    from meters.models import AuditAction, AuditEntityType, AuditLog
+
+    register_id = _setup_water_mp(admin_client)
+    ids = [
+        _create_reading(admin_client, register_id, "110", "2025-01-01T12:00:00"),
+        _create_reading(admin_client, register_id, "120", "2025-02-01T12:00:00"),
+        _create_reading(admin_client, register_id, "130", "2025-03-01T12:00:00"),
+    ]
+
+    resp = admin_client.post("/api/v1/readings/bulk-delete", json={"ids": ids})
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["deleted"] == 3
+    assert body["skipped"] == []
+
+    # Die MP-Anlage erzeugt eine Initial-Erfassung — nur die 3 erzeugten IDs
+    # dürfen weg sein.
+    remaining = {r["id"] for r in admin_client.get("/api/v1/readings").json()}
+    assert remaining.isdisjoint(ids)
+    audit_count = db.scalar(
+        select(func.count())
+        .select_from(AuditLog)
+        .where(
+            AuditLog.action == AuditAction.DELETE,
+            AuditLog.entity_type == AuditEntityType.READING,
+        )
+    )
+    assert audit_count == 3
+
+
+def test_bulk_delete_readings_skips_unknown(admin_client: TestClient) -> None:
+    """Unbekannte IDs werden übersprungen (not_found), der Rest gelöscht."""
+    register_id = _setup_water_mp(admin_client)
+    a = _create_reading(admin_client, register_id, "110", "2025-01-01T12:00:00")
+    b = _create_reading(admin_client, register_id, "120", "2025-02-01T12:00:00")
+
+    resp = admin_client.post("/api/v1/readings/bulk-delete", json={"ids": [a, 999999, b]})
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["deleted"] == 2
+    assert body["skipped"] == [{"id": 999999, "reason": "not_found"}]
+    remaining = {r["id"] for r in admin_client.get("/api/v1/readings").json()}
+    assert remaining.isdisjoint({a, b})
+
+
+def test_bulk_delete_readings_empty_list_rejected(admin_client: TestClient) -> None:
+    """Leere ID-Liste verstößt gegen min_length → 422."""
+    resp = admin_client.post("/api/v1/readings/bulk-delete", json={"ids": []})
+    assert resp.status_code == 422
+
+
+def test_bulk_delete_readings_recorder_permissions(
+    admin_client: TestClient,
+    recorder_client: TestClient,
+    recorder_user: User,
+    admin_user: User,
+    db: Session,
+) -> None:
+    """Recorder löscht im Batch nur eigene <24h auf zugänglichen MPs;
+    fremde/alte → forbidden, nicht-zugängliche MP → no_access."""
+    from datetime import UTC, datetime, timedelta
+    from decimal import Decimal
+
+    from meters.models import Reading
+
+    register_id = _setup_water_mp(admin_client)
+    _grant_recorder_access_to_first_mp(db, recorder=recorder_user, granted_by=admin_user)
+    # Zweite MP NACH dem Grant anlegen → Recorder hat hierauf KEINEN Zugriff.
+    other_register_id = _second_water_mp(admin_client)
+
+    # A: eigene, frische Erfassung des Recorders → löschbar
+    a = _create_reading(recorder_client, register_id, "150", "2025-05-01T12:00:00")
+    # B: Erfassung des Admins (nicht des Recorders) → forbidden
+    b = _create_reading(admin_client, register_id, "160", "2025-06-01T12:00:00")
+    # D: Erfassung auf nicht-zugänglicher MP → no_access
+    d = _create_reading(admin_client, other_register_id, "20", "2025-06-01T12:00:00")
+    # C: eigene Erfassung des Recorders, aber künstlich > 24h alt → forbidden
+    old = Reading(
+        register_id=register_id,
+        value=Decimal("170"),
+        reading_at=datetime(2025, 4, 1, 12, 0, 0),
+        created_by_user_id=recorder_user.id,
+    )
+    db.add(old)
+    db.flush()
+    old.created_at = datetime.now(UTC) - timedelta(hours=25)
+    db.commit()
+    c = old.id
+
+    resp = recorder_client.post("/api/v1/readings/bulk-delete", json={"ids": [a, b, c, d]})
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["deleted"] == 1
+    reasons = {item["id"]: item["reason"] for item in body["skipped"]}
+    assert reasons == {b: "forbidden", c: "forbidden", d: "no_access"}
+
+    # Nur A ist weg; B, C, D bestehen weiter (neben den Initial-Erfassungen).
+    remaining = {r["id"] for r in admin_client.get("/api/v1/readings").json()}
+    assert a not in remaining
+    assert {b, c, d} <= remaining
