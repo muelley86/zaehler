@@ -6,6 +6,7 @@ from meters.api.v1 import (
     audit,
     auth,
     deliveries,
+    entries,
     exports,
     imports,
     locations,
@@ -31,6 +32,7 @@ router.include_router(measuring_points.router)
 router.include_router(physical_meters.router)
 router.include_router(readings.router)
 router.include_router(deliveries.router)
+router.include_router(entries.router)
 router.include_router(exports.router)
 router.include_router(imports.router)
 router.include_router(audit.router)
