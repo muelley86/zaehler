@@ -398,6 +398,18 @@ sudo zaehler backup
 
 Ausgabe nennt den Pfad: `Backup erstellt: /opt/zaehler/backups/meters-….db.gz`.
 
+### Backup über die App-UI laden (ohne SSH)
+
+Als Admin in der App unter **System & Backup → „Backup laden"**. Das zieht
+denselben konsistenten Online-Snapshot wie `zaehler backup` und lädt ihn als
+`meters-<datum>.db.gz` direkt im Browser herunter — praktisch, wenn du keinen
+Shell-Zugriff hast oder den Bestand schnell auf einen Arbeitsrechner holen
+willst. Das Ergebnis ist 1:1 das Format, das `zaehler restore` und das lokale
+Einspielen (siehe unten) erwarten.
+
+> Das Backup enthält Passwort-Hashes und TOTP-Secrets. Der Download ist
+> admin-only und `no-store`; behandle die Datei entsprechend vertraulich.
+
 ### Inhalt eines Backups inspizieren (ohne zu ersetzen)
 
 ```bash
@@ -453,6 +465,26 @@ sudo systemctl stop zaehler.service
 sudo mv /opt/zaehler/data/meters.db.broken-<datum> /opt/zaehler/data/meters.db
 sudo systemctl start zaehler.service
 ```
+
+### Lokal einspielen (Entwicklung / Test)
+
+Ein heruntergeladenes Backup (`meters-<datum>.db.gz`, z. B. über die App-UI
+geladen) in die lokale Dev-Umgebung übernehmen, um mit echten Daten zu testen:
+
+```bash
+# 1. Dev-Server stoppen (sonst lockt er die DB / WAL).
+# 2. Aktuelle Dev-DB inkl. WAL/SHM zur Seite legen:
+cd <repo>/data
+mv meters.db meters.db.bak 2>/dev/null; rm -f meters.db-wal meters.db-shm
+# 3. Backup entpacken (Pfad anpassen):
+gunzip -c ~/Downloads/meters-<datum>.db.gz > <repo>/data/meters.db
+# 4. Server wieder starten.
+```
+
+Die WAL-/SHM-Dateien **müssen** vor dem Ersetzen weg, sonst spielt SQLite ein
+altes WAL auf die neue DB (Korruption). Ein `alembic upgrade head` oder
+`recompute-monthly` ist **nicht** nötig: Der Snapshot ist bereits auf dem
+Schema-Stand der Quell-Instanz inklusive des materialisierten Monats-Caches.
 
 ### Empfehlung: zusätzliche Off-Site-Sicherung
 

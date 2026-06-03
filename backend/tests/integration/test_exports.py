@@ -1,14 +1,17 @@
-"""Tests für die CSV- und JSON-Export-Endpoints.
+"""Tests für die CSV-, JSON- und SQLite-Backup-Export-Endpoints.
 
 Schützen vor Refactor-Regressionen — z. B. ob neue Spalten in das CSV
 aufgenommen oder Decimal-Werte versehentlich zu Floats konvertiert
-werden.
+werden, und ob das Voll-Backup ein gültiges, befülltes SQLite liefert.
 """
 
 from __future__ import annotations
 
 import csv
+import gzip
 import io
+import sqlite3
+import tempfile
 from typing import Any, cast
 
 from fastapi.testclient import TestClient
@@ -199,3 +202,37 @@ def test_json_dump_includes_kostenstelle(admin_client: TestClient) -> None:
     data = admin_client.get("/api/v1/export/dump.json").json()
     found = next(p for p in data["measuring_points"] if p["name"] == "Export-Kostenstelle-MP")
     assert found["kostenstelle"] == 4711
+
+
+def test_backup_download_returns_valid_sqlite(admin_client: TestClient) -> None:
+    """Das Voll-Backup liefert einen gzip-komprimierten, konsistenten SQLite-
+    Snapshot, der die zuvor angelegten Daten enthält (WAL-sicherer Hot-Backup)."""
+    _create_water_mp(admin_client)
+
+    resp = admin_client.get("/api/v1/export/backup.db.gz")
+    assert resp.status_code == 200, resp.text
+    assert resp.headers["content-type"] == "application/gzip"
+    disposition = resp.headers["content-disposition"]
+    assert "meters-" in disposition and ".db.gz" in disposition
+
+    raw = gzip.decompress(resp.content)
+    # SQLite-Magic-Header → der Snapshot ist eine echte DB-Datei, kein Teil-Dump.
+    assert raw.startswith(b"SQLite format 3\x00")
+
+    # Snapshot in eine Temp-Datei schreiben und prüfen, dass die eben angelegte
+    # Messstelle enthalten ist (bestätigt den konsistenten Hot-Backup inkl. WAL).
+    with tempfile.NamedTemporaryFile(suffix=".db") as tmp:
+        tmp.write(raw)
+        tmp.flush()
+        con = sqlite3.connect(tmp.name)
+        try:
+            names = [row[0] for row in con.execute("SELECT name FROM measuring_point")]
+        finally:
+            con.close()
+    assert "Wasser-Export-MP" in names
+
+
+def test_backup_forbidden_for_non_admin(recorder_client: TestClient) -> None:
+    """Das Voll-Backup enthält Passwort-Hashes/TOTP-Secrets → strikt admin-only."""
+    resp = recorder_client.get("/api/v1/export/backup.db.gz")
+    assert resp.status_code == 403, resp.text

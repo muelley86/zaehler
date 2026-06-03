@@ -20,11 +20,24 @@ export function SystemAdminPage() {
       <Section header="Backup">
         <Card padded={false}>
           <PlaceholderRow
-            title="Voll-Dump exportieren"
-            description="Lädt die komplette Datenbank als JSON-Datei (admin-only)."
+            title="Voll-Backup (Datenbank)"
+            description="Lädt einen konsistenten Snapshot der SQLite-Datenbank als gzip (admin-only) — vollständig & verlustfrei (User, Eigentümer, Standorte, Lieferungen, Audit). Wiederherstellen: Datei entpacken und data/meters.db ersetzen (App gestoppt) — Details in deploy/lxc/README.md."
             action={
               <Button
                 variant="filled"
+                size="sm"
+                onClick={() => window.open('/api/v1/export/backup.db.gz', '_blank')}
+              >
+                Backup laden
+              </Button>
+            }
+          />
+          <PlaceholderRow
+            title="Daten-Export (JSON)"
+            description="Menschenlesbarer Teil-Export der Messstellen, Zähler und Ablesungen (admin-only) — kein vollständiges Backup."
+            action={
+              <Button
+                variant="tinted"
                 size="sm"
                 onClick={() => window.open('/api/v1/export/dump.json', '_blank')}
               >
