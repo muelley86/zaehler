@@ -228,6 +228,19 @@ export interface ConsumptionPoint {
   unit: string;
 }
 
+// Gebündelter Dashboard-Endpoint: Verbrauch + Ablesungen + Bestand je Messstelle
+// in einer Antwort (statt drei Requests pro MP).
+export interface DashboardMeasuringPoint {
+  measuring_point_id: number;
+  consumption: ConsumptionPoint[];
+  readings: ReadingRead[];
+  state: RegisterStateRead[];
+}
+
+export interface DashboardResponse {
+  items: DashboardMeasuringPoint[];
+}
+
 export interface AuditLogRead {
   id: number;
   user_id: number | null;

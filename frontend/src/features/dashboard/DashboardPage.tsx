@@ -1,6 +1,6 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
-import { ChevronDown, Download, Filter, Plus } from 'lucide-react';
+import { ChevronDown, Download, Filter, Loader2, Plus } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 import {
@@ -28,6 +28,7 @@ import {
 } from '@/lib/format';
 import type {
   ConsumptionPoint,
+  DashboardResponse,
   LocationRead,
   MeasuringPointRead,
   MeterType,
@@ -150,6 +151,10 @@ export function DashboardPage() {
   // fertig ist. Bis dahin zeigen wir Skeleton-Karten in derselben Hoehe wie
   // die spaeteren echten Karten — so wandert beim Cutover nichts (CLS).
   const [mpDataReady, setMpDataReady] = useState(false);
+  // Läuft, solange der gebündelte Dashboard-Request offen ist — gibt sichtbares
+  // Feedback beim Zeitraum-/Granularitäts-Wechsel, statt die alten Charts
+  // kommentarlos stehen zu lassen, bis die Antwort da ist.
+  const [refreshing, setRefreshing] = useState(false);
 
   // Stabile Refresh-Referenz für memoizierte Sub-Komponenten.
   const handleChanged = useCallback(() => setTick((t) => t + 1), []);
@@ -212,69 +217,42 @@ export function DashboardPage() {
       });
   }, [tick]);
 
-  // Zählerstand-Schnappschuss (zeitraum-unabhängig) — lädt, sobald die MPs da sind.
+  // Gebündelter Dashboard-Load: Verbrauch + Readings + Bestand aller
+  // (zugänglichen) Messstellen in EINEM Request (`GET /dashboard`) statt
+  // Fan-out je MP — sonst hunderte Roundtrips, die auf schwacher Hardware
+  // (LXC) das Dashboard minutenlang „einfrieren" lassen. Lädt neu bei
+  // Zeitraum-/Granularitäts-Wechsel und nach Datenänderungen (tick).
+  // AbortController: ein neuer Wechsel bricht den offenen Request ab, nur das
+  // jüngste Ergebnis zählt; `refreshing` gibt sichtbares Lade-Feedback.
   useEffect(() => {
-    if (!points) return;
-    let cancelled = false;
-    void Promise.all(
-      points.map(async (mp) => {
-        const s = await api
-          .get<RegisterStateRead[]>(`/measuring-points/${mp.id}/state`)
-          .catch(() => [] as RegisterStateRead[]);
-        return [mp.id, s] as const;
-      }),
-    ).then((entries) => {
-      if (cancelled) return;
-      const sById: StatesByMP = {};
-      for (const [id, s] of entries) sById[id] = s;
-      setStates(sById);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [points]);
-
-  // Verbrauch (Backend-aggregiert je Granularität) + Readings (Backend-range-
-  // gefiltert). Lädt neu, wenn sich Zeitraum oder Granularität ändert — die
-  // schwere Aggregation passiert im Backend, das Frontend rendert nur noch.
-  useEffect(() => {
-    if (!points) return;
-    let cancelled = false;
-    const cParams = new URLSearchParams({ granularity });
-    if (from) cParams.set('from_at', from);
-    if (to) cParams.set('to_at', to);
-    void Promise.all(
-      points.map(async (mp) => {
-        const rParams = new URLSearchParams();
-        rParams.set('measuring_point_id', String(mp.id));
-        rParams.set('limit', '5000');
-        if (from) rParams.set('from_at', from);
-        // Tagesende, damit Readings am letzten Tag des Zeitraums inklusiv sind.
-        if (to) rParams.set('to_at', `${to}T23:59:59`);
-        const [c, r] = await Promise.all([
-          api
-            .get<ConsumptionPoint[]>(`/measuring-points/${mp.id}/consumption?${cParams}`)
-            .catch(() => [] as ConsumptionPoint[]),
-          api.get<ReadingRead[]>(`/readings?${rParams}`).catch(() => [] as ReadingRead[]),
-        ]);
-        return [mp.id, c, r] as const;
-      }),
-    ).then((entries) => {
-      if (cancelled) return;
-      const cById: ConsumptionsByMP = {};
-      const rById: ReadingsByMP = {};
-      for (const [id, c, r] of entries) {
-        cById[id] = c;
-        rById[id] = r;
-      }
-      setConsumptions(cById);
-      setReadingsByMP(rById);
-      setMpDataReady(true);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [points, from, to, granularity]);
+    const controller = new AbortController();
+    setRefreshing(true);
+    const params = new URLSearchParams({ granularity });
+    if (from) params.set('from_at', from);
+    if (to) params.set('to_at', to);
+    api
+      .get<DashboardResponse>(`/dashboard?${params}`, controller.signal)
+      .then((data) => {
+        if (controller.signal.aborted) return;
+        const cById: ConsumptionsByMP = {};
+        const rById: ReadingsByMP = {};
+        const sById: StatesByMP = {};
+        for (const item of data.items) {
+          cById[item.measuring_point_id] = item.consumption;
+          rById[item.measuring_point_id] = item.readings;
+          sById[item.measuring_point_id] = item.state;
+        }
+        setConsumptions(cById);
+        setReadingsByMP(rById);
+        setStates(sById);
+        setMpDataReady(true);
+        setRefreshing(false);
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setRefreshing(false);
+      });
+    return () => controller.abort();
+  }, [from, to, granularity, tick]);
 
   const filteredPoints = useMemo(() => {
     if (!points) return [];
@@ -544,6 +522,16 @@ export function DashboardPage() {
                 {label}
               </Pill>
             ))}
+            {refreshing ? (
+              <span
+                className="ml-1 flex items-center gap-1.5 text-caption text-tertiary"
+                role="status"
+                aria-live="polite"
+              >
+                <Loader2 size={14} className="animate-spin" />
+                Aktualisiere…
+              </span>
+            ) : null}
           </FilterRow>
           <FilterRow label="Diagramm">
             {CHART_TYPE_OPTIONS.map(([t, label]) => (
