@@ -10,6 +10,13 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.50.0](https://github.com/muelley86/zaehler/compare/v2.49.0...v2.50.0) (2026-06-03)
+
+
+### Funktionen
+
+* **readings:** Erfassungen serverseitig paginiert/gefiltert über /entries ([#216](https://github.com/muelley86/zaehler/issues/216)) ([802e570](https://github.com/muelley86/zaehler/commit/802e570be152271205d93a61cdee5ef66aea4902))
+
 ## [2.49.0](https://github.com/muelley86/zaehler/compare/v2.48.0...v2.49.0) (2026-06-03)
 
 
