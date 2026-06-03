@@ -1,6 +1,6 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
-import { Camera, Download, ImageIcon, Pencil, Search, Trash2, X } from 'lucide-react';
+import { Camera, Download, ImageIcon, ListChecks, Pencil, Search, Trash2, X } from 'lucide-react';
 
 import { useAuth } from '@/features/auth/auth-context';
 import { PhotoLightbox } from '@/features/readings/PhotoLightbox';
@@ -27,6 +27,7 @@ import {
 } from '@/lib/format';
 import { tryGetDeviceLocation } from '@/lib/geo';
 import type {
+  BulkDeleteResult,
   DeliveryRead,
   Me,
   MeasuringPointRead,
@@ -105,6 +106,12 @@ export function ReadingsListPage() {
   // Pipeline (über tausende Readings) wird debounced.
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [kindFilter, setKindFilter] = useState<Set<ItemKind>>(new Set());
+
+  // Mehrfach-Auswahl zum Sammel-Löschen. Keys decken sich mit den React-Keys
+  // der Liste: "r-<id>" für Readings/Korrekturen, "d-<id>" für Lieferungen.
+  const [selectMode, setSelectMode] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     const timer = window.setTimeout(() => setDebouncedSearch(search), 250);
@@ -255,6 +262,64 @@ export function ReadingsListPage() {
     });
   }, [items, locationFilter, typeFilter, mpFilter, obisFilter, debouncedSearch, kindFilter]);
 
+  // Keys aller aktuell gefilterten, für den User löschbaren Einträge —
+  // Basis für „Alle auswählen" und die Checkbox-Sichtbarkeit pro Zeile.
+  const selectableKeys = useMemo(
+    () => filtered.filter((it) => itemEditable(it, me)).map(itemKey),
+    [filtered, me],
+  );
+  const allSelected = selectableKeys.length > 0 && selectableKeys.every((k) => selected.has(k));
+
+  // Stabiler Toggle-Callback → memoisierte Items rendern beim Markieren nur
+  // dann neu, wenn sich ihr eigenes `selected`-Flag ändert.
+  const onToggleSelect = useCallback((key: string) => {
+    setSelected((s) => toggle(s, key));
+  }, []);
+
+  function exitSelectMode() {
+    setSelectMode(false);
+    setSelected(new Set());
+  }
+
+  async function deleteSelected() {
+    const n = selected.size;
+    if (n === 0) return;
+    if (
+      !window.confirm(
+        `${n} ${n === 1 ? 'Eintrag' : 'Einträge'} wirklich löschen? ` +
+          `Das kann nicht rückgängig gemacht werden.`,
+      )
+    )
+      return;
+    const rIds = [...selected].filter((k) => k.startsWith('r-')).map((k) => Number(k.slice(2)));
+    const dIds = [...selected].filter((k) => k.startsWith('d-')).map((k) => Number(k.slice(2)));
+    setDeleting(true);
+    try {
+      let skipped = 0;
+      if (rIds.length > 0) {
+        skipped += (await api.post<BulkDeleteResult>('/readings/bulk-delete', { ids: rIds }))
+          .skipped.length;
+      }
+      if (dIds.length > 0) {
+        skipped += (await api.post<BulkDeleteResult>('/deliveries/bulk-delete', { ids: dIds }))
+          .skipped.length;
+      }
+      setSelected(new Set());
+      setSelectMode(false);
+      refresh();
+      if (skipped > 0) {
+        window.alert(
+          `${skipped} Eintrag/Einträge nicht gelöscht ` +
+            `(keine Berechtigung oder bereits entfernt).`,
+        );
+      }
+    } catch (err) {
+      if (err instanceof ApiError) window.alert(err.problem.detail ?? err.problem.title);
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   // Tag-Gruppen für die Anzeige
   const groupedByDay = useMemo(() => {
     const groups = new Map<string, Item[]>();
@@ -384,15 +449,26 @@ export function ReadingsListPage() {
       <LargeTitle
         title="Erfassungen"
         trailing={
-          <Button
-            variant="tinted"
-            size="sm"
-            leftIcon={<Download size={14} />}
-            onClick={downloadCsv}
-            disabled={filtered.length === 0}
-          >
-            CSV ({filtered.length})
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant={selectMode ? 'tinted' : 'plain'}
+              size="sm"
+              leftIcon={selectMode ? <X size={14} /> : <ListChecks size={14} />}
+              onClick={() => (selectMode ? exitSelectMode() : setSelectMode(true))}
+              disabled={!selectMode && filtered.length === 0}
+            >
+              {selectMode ? 'Abbrechen' : 'Auswählen'}
+            </Button>
+            <Button
+              variant="tinted"
+              size="sm"
+              leftIcon={<Download size={14} />}
+              onClick={downloadCsv}
+              disabled={filtered.length === 0}
+            >
+              CSV ({filtered.length})
+            </Button>
+          </div>
         }
       />
 
@@ -511,6 +587,40 @@ export function ReadingsListPage() {
         </div>
       </Section>
 
+      {selectMode ? (
+        <div className="bg-surface-solid/95 shadow-card sticky top-2 z-20 flex flex-wrap items-center gap-2 rounded-card border-hairline border-border p-3 backdrop-blur">
+          <span className="text-body-sm font-semibold text-label">{selected.size} ausgewählt</span>
+          <div className="ml-auto flex flex-wrap items-center gap-2">
+            <Button
+              variant="bordered"
+              size="sm"
+              onClick={() => setSelected(new Set(selectableKeys))}
+              disabled={selectableKeys.length === 0 || allSelected}
+            >
+              Alle auswählen
+            </Button>
+            <Button
+              variant="bordered"
+              size="sm"
+              onClick={() => setSelected(new Set())}
+              disabled={selected.size === 0}
+            >
+              Keine
+            </Button>
+            <Button
+              variant="tinted"
+              size="sm"
+              leftIcon={<Trash2 size={14} />}
+              onClick={() => void deleteSelected()}
+              disabled={selected.size === 0 || deleting}
+              className="hover:bg-danger/10 text-danger"
+            >
+              Löschen ({selected.size})
+            </Button>
+          </div>
+        </div>
+      ) : null}
+
       {filtered.length === 0 ? (
         <EmptyState title="Keine Treffer." />
       ) : (
@@ -527,6 +637,9 @@ export function ReadingsListPage() {
                       me={me}
                       setEditTarget={setEditTarget}
                       onChanged={refresh}
+                      selectMode={selectMode}
+                      selected={selected.has(`d-${item.delivery.id}`)}
+                      onToggleSelect={onToggleSelect}
                     />
                   ) : (
                     <ReadingItem
@@ -539,6 +652,9 @@ export function ReadingsListPage() {
                       setEditTarget={setEditTarget}
                       onChanged={refresh}
                       onOpenPhoto={setLightboxPhoto}
+                      selectMode={selectMode}
+                      selected={selected.has(`r-${item.reading.id}`)}
+                      onToggleSelect={onToggleSelect}
                     />
                   ),
                 )}
@@ -628,6 +744,9 @@ const ReadingItem = memo(function ReadingItem({
   setEditTarget,
   onChanged,
   onOpenPhoto,
+  selectMode,
+  selected,
+  onToggleSelect,
 }: {
   reading: ReadingRead;
   info: RegisterIndex;
@@ -637,6 +756,9 @@ const ReadingItem = memo(function ReadingItem({
   setEditTarget: (target: EditTarget) => void;
   onChanged: () => void;
   onOpenPhoto: (photo: { id: number; photos: ReadingPhotoRead[] }) => void;
+  selectMode: boolean;
+  selected: boolean;
+  onToggleSelect: (key: string) => void;
 }) {
   const editable = me ? canEdit(me, reading) : false;
   const correction = kind === 'correction';
@@ -675,6 +797,16 @@ const ReadingItem = memo(function ReadingItem({
   return (
     <li className="px-5 py-3.5">
       <div className="flex items-start gap-3">
+        {selectMode ? (
+          <input
+            type="checkbox"
+            checked={selected}
+            disabled={!editable}
+            onChange={() => onToggleSelect(`r-${reading.id}`)}
+            className="mt-1 h-4 w-4 accent-primary disabled:opacity-30"
+            aria-label={`Erfassung ${info.mpName} ${info.obisCode} vom ${formatDateTimeDe(reading.reading_at)} auswählen`}
+          />
+        ) : null}
         <TypeBadge type={info.mpType} size="sm" />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-baseline gap-2">
@@ -761,12 +893,18 @@ const DeliveryItem = memo(function DeliveryItem({
   me,
   setEditTarget,
   onChanged,
+  selectMode,
+  selected,
+  onToggleSelect,
 }: {
   delivery: DeliveryRead;
   info: RegisterIndex;
   me: Me | null;
   setEditTarget: (target: EditTarget) => void;
   onChanged: () => void;
+  selectMode: boolean;
+  selected: boolean;
+  onToggleSelect: (key: string) => void;
 }) {
   const editable = me?.role === 'admin';
   const [busy, setBusy] = useState(false);
@@ -797,6 +935,16 @@ const DeliveryItem = memo(function DeliveryItem({
   return (
     <li className="bg-[color-mix(in_oklch,var(--primary),transparent_94%)] px-5 py-3.5">
       <div className="flex items-start gap-3">
+        {selectMode ? (
+          <input
+            type="checkbox"
+            checked={selected}
+            disabled={!editable}
+            onChange={() => onToggleSelect(`d-${delivery.id}`)}
+            className="mt-1 h-4 w-4 accent-primary disabled:opacity-30"
+            aria-label={`Lieferung ${info.mpName} vom ${formatDateTimeDe(delivery.delivery_at)} auswählen`}
+          />
+        ) : null}
         <TypeBadge type={info.mpType} size="sm" />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-baseline gap-2">
@@ -1258,6 +1406,18 @@ function canEdit(me: Me, reading: ReadingRead): boolean {
   const created = new Date(reading.created_at);
   const ageHours = (Date.now() - created.getTime()) / 3600_000;
   return ageHours <= 24;
+}
+
+// Auswahl-Key pro Listen-Eintrag (deckt sich mit den React-Keys der Liste).
+function itemKey(item: Item): string {
+  return item.kind === 'delivery' ? `d-${item.delivery.id}` : `r-${item.reading.id}`;
+}
+
+// Darf der aktuelle User diesen Eintrag löschen? (gleiche Regel wie Einzel-
+// Löschen: Admin überall, Recorder nur eigene Readings <24h; Lieferungen Admin.)
+function itemEditable(item: Item, me: Me | null): boolean {
+  if (!me) return false;
+  return item.kind === 'delivery' ? me.role === 'admin' : canEdit(me, item.reading);
 }
 
 function csvField(value: string): string {

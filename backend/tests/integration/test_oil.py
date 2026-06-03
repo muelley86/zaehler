@@ -390,3 +390,48 @@ def test_replace_meter_inherits_custom_heating_registers(admin_client: TestClien
     # accepts_deliveries muss am Tank-Register erhalten bleiben
     tank = next(r for r in new_meter["registers"] if r["label"] == "Tankstand")
     assert tank["accepts_deliveries"] is True
+
+
+def test_bulk_delete_deliveries_admin(admin_client: TestClient) -> None:
+    """Admin löscht mehrere Lieferungen auf einmal; Best-Effort-Summary."""
+    mp = _create_oil(admin_client)
+    tank_id = _tank_register(mp)["id"]
+    ids = []
+    for d, amt in [
+        ("2024-02-15T12:00:00", "1500"),
+        ("2024-04-15T12:00:00", "1200"),
+        ("2024-06-15T12:00:00", "900"),
+    ]:
+        created = admin_client.post(
+            f"/api/v1/registers/{tank_id}/deliveries",
+            json={"delivery_at": d, "amount": amt},
+        )
+        ids.append(created.json()["id"])
+
+    resp = admin_client.post("/api/v1/deliveries/bulk-delete", json={"ids": [*ids, 999999]})
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["deleted"] == 3
+    assert body["skipped"] == [{"id": 999999, "reason": "not_found"}]
+    assert admin_client.get(f"/api/v1/registers/{tank_id}/deliveries").json() == []
+
+
+def test_bulk_delete_deliveries_recorder_forbidden(
+    admin_client: TestClient,
+    recorder_client: TestClient,
+    db: Session,
+    admin_user: User,
+    recorder_user: User,
+) -> None:
+    """Lieferungen sind admin-only — Recorder bekommt 403, nichts wird gelöscht."""
+    mp = _create_oil(admin_client)
+    _grant_recorder_access_to_first_mp(db, recorder=recorder_user, granted_by=admin_user)
+    tank_id = _tank_register(mp)["id"]
+    created = admin_client.post(
+        f"/api/v1/registers/{tank_id}/deliveries",
+        json={"delivery_at": "2024-04-01T12:00:00", "amount": "500"},
+    ).json()
+
+    resp = recorder_client.post("/api/v1/deliveries/bulk-delete", json={"ids": [created["id"]]})
+    assert resp.status_code == 403
+    assert len(admin_client.get(f"/api/v1/registers/{tank_id}/deliveries").json()) == 1

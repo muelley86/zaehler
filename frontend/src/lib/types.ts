@@ -202,6 +202,11 @@ export interface ReadingPhotoRead {
   photo_lon: number | null;
 }
 
+export interface BulkDeleteResult {
+  deleted: number;
+  skipped: { id: number; reason: string }[];
+}
+
 export interface ConsumptionPoint {
   period_start: string;
   period_end: string;

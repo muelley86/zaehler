@@ -33,7 +33,15 @@ from meters.models import (
     User,
     UserRole,
 )
-from meters.schemas import ConsumptionPoint, ReadingCreate, ReadingRead, ReadingUpdate
+from meters.schemas import (
+    BulkDeleteRequest,
+    BulkDeleteResult,
+    BulkDeleteSkipped,
+    ConsumptionPoint,
+    ReadingCreate,
+    ReadingRead,
+    ReadingUpdate,
+)
 from meters.schemas.common import to_utc_iso
 from meters.schemas.reading import ReadingPhotoRead
 from meters.services.access import (
@@ -387,6 +395,62 @@ def delete_reading(
     # die Fotos weg, das Reading aber noch da.
     for basename in photo_basenames:
         delete_photo(basename)
+
+
+@router.post("/readings/bulk-delete", response_model=BulkDeleteResult)
+def bulk_delete_readings(
+    payload: BulkDeleteRequest,
+    request: Request,
+    db: DbDep,
+    user: CurrentUser,
+) -> BulkDeleteResult:
+    """Sammel-Löschung mehrerer Erfassungen über eine Liste von IDs.
+
+    Best-Effort: nicht gefundene oder nicht erlaubte IDs werden übersprungen
+    (mit Grund gemeldet), statt den ganzen Batch abzubrechen — robust gegen
+    Races und gemischte Auswahl. Berechtigung pro Eintrag wie beim Einzel-
+    Löschen (Admin überall, Recorder nur eigene innerhalb 24 h auf zugänglichen
+    MPs). Pro tatsächlich gelöschtem Reading entsteht ein Audit-``DELETE``.
+    """
+    ip = client_ip(request)
+    skipped: list[BulkDeleteSkipped] = []
+    photo_basenames: list[str] = []
+    deleted = 0
+    # Doppelte IDs entstören, Reihenfolge erhalten.
+    for reading_id in dict.fromkeys(payload.ids):
+        reading = db.get(Reading, reading_id)
+        if reading is None:
+            skipped.append(BulkDeleteSkipped(id=reading_id, reason="not_found"))
+            continue
+        try:
+            assert_can_access_register(db, user, reading.register_id)
+        except ProblemError:
+            skipped.append(BulkDeleteSkipped(id=reading_id, reason="no_access"))
+            continue
+        if not _can_edit(user, reading):
+            skipped.append(BulkDeleteSkipped(id=reading_id, reason="forbidden"))
+            continue
+        record(
+            db,
+            user_id=user.id,
+            action=AuditAction.DELETE,
+            entity_type=AuditEntityType.READING,
+            entity_id=reading.id,
+            diff={
+                "register_id": reading.register_id,
+                "value": format(reading.value, "f"),
+                "reading_at": to_utc_iso(reading.reading_at),
+            },
+            ip_address=ip,
+        )
+        photo_basenames.extend(p.photo_path for p in reading.photos)
+        db.delete(reading)
+        deleted += 1
+    db.commit()
+    # Foto-Dateien erst nach erfolgreichem Commit löschen (siehe delete_reading).
+    for basename in photo_basenames:
+        delete_photo(basename)
+    return BulkDeleteResult(deleted=deleted, skipped=skipped)
 
 
 # Bis zu 6 Fotos je Erfassung (z. B. Zählwerk, Plombe, Umgebung, Schild).
