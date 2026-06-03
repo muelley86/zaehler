@@ -188,4 +188,25 @@ describe('ReadingsListPage — Mehrfach-Löschen', () => {
     expect(screen.getByText('Keine Treffer.')).toBeInTheDocument();
     expect(screen.queryByText('Strom Hauptzähler')).not.toBeInTheDocument();
   });
+
+  it('zeigt standardmäßig 50 Treffer und blättert auf alle', async () => {
+    const many = Array.from({ length: 60 }, (_, i) => {
+      const month = i < 28 ? '01' : i < 56 ? '02' : '03';
+      const day = String((i % 28) + 1).padStart(2, '0');
+      return _reading(1000 + i, String(100 + i), `2025-${month}-${day}T12:00:00`);
+    });
+    _mockEndpoints(many);
+    const user = userEvent.setup();
+    renderWithRouter(<ReadingsListPage />);
+
+    // Standardmäßig 50 von 60 sichtbar + Blättern-Steuerung.
+    expect(await screen.findByText(/50 von 60 angezeigt/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Weitere 50 anzeigen' })).toBeInTheDocument();
+
+    // Alle anzeigen → Blättern-Steuerung verschwindet.
+    await user.click(screen.getByRole('button', { name: /Alle anzeigen \(60\)/ }));
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: 'Weitere 50 anzeigen' })).toBeNull(),
+    );
+  });
 });
