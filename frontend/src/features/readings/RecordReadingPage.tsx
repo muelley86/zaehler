@@ -10,6 +10,7 @@ import {
   Pill,
   Section,
   Select,
+  SingleSelectDropdown,
   TextField,
   TypeBadge,
 } from '@/components/ui';
@@ -265,13 +266,12 @@ export function RecordReadingPage() {
           <div className="p-5">
             <div className="flex items-stretch gap-2">
               <div className="flex-1">
-                <Select value={mpId ?? ''} onChange={(e) => setMpId(Number(e.target.value))}>
-                  {recordableMPs.map((mp) => (
-                    <option key={mp.id} value={mp.id}>
-                      {mp.name}
-                    </option>
-                  ))}
-                </Select>
+                <SingleSelectDropdown
+                  options={recordableMPs.map((mp) => ({ value: mp.id, label: mp.name }))}
+                  value={mpId}
+                  onChange={setMpId}
+                  placeholder="Messstelle wählen"
+                />
               </div>
               <button
                 type="button"
