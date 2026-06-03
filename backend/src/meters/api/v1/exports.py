@@ -8,17 +8,25 @@ Backup-Artefakt (siehe ``deploy/lxc/backup.sh``).
 from __future__ import annotations
 
 import csv
+import gzip
 import io
 import json
+import shutil
+import sqlite3
+import tempfile
 from datetime import UTC, datetime
 from decimal import Decimal
+from pathlib import Path
 
 from fastapi import APIRouter
-from fastapi.responses import Response, StreamingResponse
+from fastapi.responses import FileResponse, Response, StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
+from starlette.background import BackgroundTask
 
 from meters.api.deps import AdminUser, CurrentUser, DbDep
+from meters.core.problem import ProblemError
+from meters.db import engine
 from meters.models import (
     MeasuringPoint,
     PhysicalMeter,
@@ -187,4 +195,62 @@ def full_dump(db: DbDep, _admin: AdminUser) -> Response:
         content=body,
         media_type="application/json",
         headers={"Content-Disposition": 'attachment; filename="meters-dump.json"'},
+    )
+
+
+@router.get("/backup.db.gz")
+def full_backup(_admin: AdminUser) -> FileResponse:
+    """Konsistenter, gzip-komprimierter Snapshot der SQLite-Datenbank (admin-only).
+
+    Im Gegensatz zu :func:`full_dump` (menschenlesbarer Teil-Export als JSON) ist
+    dies das echte, **verlustfreie** Voll-Backup — exakt die SQLite-Datei inkl.
+    User/Sessions/Audit/Eigentümer/Standorte/Lieferungen/Monats-Cache. Erzeugt
+    über SQLites Online-Backup-API (wie ``deploy/lxc/backup.sh``): WAL-sicher,
+    blockiert keine laufenden Schreibvorgänge.
+
+    Enthält bcrypt-Hashes und TOTP-Secrets → niemals an Nicht-Admins,
+    ``Cache-Control: no-store``. Restore-Anleitung: ``deploy/lxc/README.md``.
+    """
+    db_path = engine.url.database
+    if engine.dialect.name != "sqlite" or not db_path:
+        raise ProblemError(
+            status_code=409,
+            title="Backup nur für SQLite-Datenbanken verfügbar",
+        )
+    src_path = Path(db_path)
+    if not src_path.is_file():
+        raise ProblemError(status_code=404, title="Datenbankdatei nicht gefunden")
+
+    tmp_dir = Path(tempfile.mkdtemp(prefix="meters-backup-"))
+    snapshot = tmp_dir / "snapshot.db"
+    gz_path = tmp_dir / "backup.db.gz"
+
+    # Konsistenter Hot-Snapshot über eine eigene Connection — die parallelen
+    # Schreiber der App (WAL-Modus) bleiben unberührt.
+    source = sqlite3.connect(str(src_path))
+    try:
+        dest = sqlite3.connect(str(snapshot))
+        try:
+            source.backup(dest)
+        finally:
+            dest.close()
+    finally:
+        source.close()
+
+    with open(snapshot, "rb") as f_in, gzip.open(gz_path, "wb") as f_out:
+        shutil.copyfileobj(f_in, f_out)
+    snapshot.unlink(missing_ok=True)
+
+    stamp = datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
+
+    def _cleanup() -> None:
+        # Temp-Verzeichnis samt gzip nach dem Senden wegräumen.
+        shutil.rmtree(tmp_dir, ignore_errors=True)
+
+    return FileResponse(
+        gz_path,
+        media_type="application/gzip",
+        filename=f"meters-{stamp}.db.gz",
+        headers={"Cache-Control": "private, no-store"},
+        background=BackgroundTask(_cleanup),
     )

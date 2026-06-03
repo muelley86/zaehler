@@ -19,6 +19,7 @@ Alles läuft über ein zentrales Verwaltungsskript:
 | Nur App-Code | `bash zaehler.sh upgrade-app` |
 | Zeitzone setzen | `bash zaehler.sh set-timezone [zone]` (Default Europe/Berlin) |
 | Sofort-Backup | `bash zaehler.sh backup` |
+| Voll-Backup über die App-UI laden | Admin ▸ **System & Backup ▸ „Backup laden"** (gzip-SQLite-Snapshot, ohne SSH) — siehe [README](../deploy/lxc/README.md) |
 | Backup einspielen | `bash zaehler.sh restore <datei.gz>` |
 | 00:00-Readings → Vortag 23:59:59 | `sudo zaehler repair-midnight-readings [--apply]` (Default Dry-Run; sichert vor `--apply`) |
 | Naiv-UTC-Altdaten korrigieren | `sudo zaehler repair-legacy-timestamps [--apply]` (Default Dry-Run; sichert vor `--apply`) |
