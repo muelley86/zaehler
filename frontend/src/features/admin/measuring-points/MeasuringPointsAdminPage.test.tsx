@@ -37,6 +37,38 @@ function _mockEmptyData() {
   );
 }
 
+function _mp(overrides: Record<string, unknown>) {
+  return {
+    id: 1,
+    name: 'MP',
+    type: 'electricity',
+    heating_source: null,
+    location_id: null,
+    location_name: null,
+    main_location_id: null,
+    main_location_name: null,
+    contract_number: null,
+    market_location: null,
+    installation_location: null,
+    current_owner_id: null,
+    current_owner_name: null,
+    is_bidirectional: false,
+    has_dual_tariff: false,
+    transformer_factor: null,
+    tank_capacity: null,
+    physical_meters: [],
+    ...overrides,
+  };
+}
+
+function _mockList(mps: ReturnType<typeof _mp>[]) {
+  server.use(
+    http.get('/api/v1/measuring-points', () => HttpResponse.json(mps)),
+    http.get('/api/v1/locations', () => HttpResponse.json([])),
+    http.get('/api/v1/owners', () => HttpResponse.json([])),
+  );
+}
+
 describe('MeasuringPointsAdminPage Wizard', () => {
   it('zeigt nach Klick auf "Messstelle anlegen" drei Typ-Karten', async () => {
     _mockEmptyData();
@@ -164,5 +196,32 @@ describe('MeasuringPointsAdminPage Wizard', () => {
     await user.click(await screen.findByRole('button', { name: /Wasser/i }));
     const within_form = within(screen.getByRole('button', { name: /Anlegen/i }).closest('form')!);
     expect(within_form.queryByLabelText(/Wandlerfaktor/i)).not.toBeInTheDocument();
+  });
+
+  it('filtert die Liste per Typ-Pill und setzt zurück', async () => {
+    _mockList([
+      _mp({ id: 1, name: 'Hauptzähler Strom', type: 'electricity' }),
+      _mp({ id: 2, name: 'Gartenwasser', type: 'water' }),
+      _mp({ id: 3, name: 'Ölheizung', type: 'heating', heating_source: 'oil' }),
+    ]);
+    const user = userEvent.setup();
+    renderWithRouter(<MeasuringPointsAdminPage />);
+
+    // Alle drei Cards initial sichtbar
+    expect(await screen.findByText('Hauptzähler Strom')).toBeInTheDocument();
+    expect(screen.getByText('Gartenwasser')).toBeInTheDocument();
+    expect(screen.getByText('Ölheizung')).toBeInTheDocument();
+
+    // Auf Typ-Pill "Wasser" filtern → nur die Wasser-Card bleibt
+    await user.click(screen.getByRole('button', { name: 'Wasser' }));
+    expect(screen.getByText('Gartenwasser')).toBeInTheDocument();
+    expect(screen.queryByText('Hauptzähler Strom')).not.toBeInTheDocument();
+    expect(screen.queryByText('Ölheizung')).not.toBeInTheDocument();
+
+    // Zurücksetzen → wieder alle drei
+    await user.click(screen.getByRole('button', { name: 'Zurücksetzen' }));
+    expect(screen.getByText('Hauptzähler Strom')).toBeInTheDocument();
+    expect(screen.getByText('Gartenwasser')).toBeInTheDocument();
+    expect(screen.getByText('Ölheizung')).toBeInTheDocument();
   });
 });
