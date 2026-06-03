@@ -46,7 +46,14 @@ describe('MultiSelectDropdown', () => {
     expect(screen.queryByRole('checkbox', { name: 'Alpha' })).not.toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Test' }));
-    await user.click(screen.getByRole('checkbox', { name: 'Alpha' }));
+
+    // Panel wird per Portal außerhalb des Trigger-Wrappers gerendert — sonst
+    // würde es vom overflow-hidden/Stacking der Filterkarte verdeckt.
+    const trigger = screen.getByRole('button', { name: 'Test' });
+    const alpha = screen.getByRole('checkbox', { name: 'Alpha' });
+    expect(trigger.closest('div')?.contains(alpha)).toBe(false);
+
+    await user.click(alpha);
     expect(screen.getByText('1')).toBeInTheDocument(); // Badge
     await user.click(screen.getByRole('checkbox', { name: 'Gamma' }));
     expect(screen.getByText('2')).toBeInTheDocument();
