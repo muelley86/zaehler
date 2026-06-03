@@ -10,6 +10,13 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.48.0](https://github.com/muelley86/zaehler/compare/v2.47.0...v2.48.0) (2026-06-03)
+
+
+### Funktionen
+
+* **cli:** relabel-register-unit zum Umbenennen der Register-Einheit ([#212](https://github.com/muelley86/zaehler/issues/212)) ([280a421](https://github.com/muelley86/zaehler/commit/280a421fe2d499d35120ef011abb11bf558083de))
+
 ## [2.47.0](https://github.com/muelley86/zaehler/compare/v2.46.0...v2.47.0) (2026-06-03)
 
 
