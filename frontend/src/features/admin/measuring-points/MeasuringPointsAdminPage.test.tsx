@@ -198,7 +198,7 @@ describe('MeasuringPointsAdminPage Wizard', () => {
     expect(within_form.queryByLabelText(/Wandlerfaktor/i)).not.toBeInTheDocument();
   });
 
-  it('filtert die Liste per Typ-Pill und setzt zurück', async () => {
+  it('filtert die Liste per Typ-Dropdown und setzt zurück', async () => {
     _mockList([
       _mp({ id: 1, name: 'Hauptzähler Strom', type: 'electricity' }),
       _mp({ id: 2, name: 'Gartenwasser', type: 'water' }),
@@ -212,14 +212,15 @@ describe('MeasuringPointsAdminPage Wizard', () => {
     expect(screen.getByText('Gartenwasser')).toBeInTheDocument();
     expect(screen.getByText('Ölheizung')).toBeInTheDocument();
 
-    // Auf Typ-Pill "Wasser" filtern → nur die Wasser-Card bleibt
-    await user.click(screen.getByRole('button', { name: 'Wasser' }));
+    // Typ-Dropdown öffnen, "Wasser" ankreuzen → nur die Wasser-Card bleibt
+    await user.click(screen.getByRole('button', { name: 'Typ' }));
+    await user.click(await screen.findByRole('checkbox', { name: 'Wasser' }));
     expect(screen.getByText('Gartenwasser')).toBeInTheDocument();
     expect(screen.queryByText('Hauptzähler Strom')).not.toBeInTheDocument();
     expect(screen.queryByText('Ölheizung')).not.toBeInTheDocument();
 
-    // Zurücksetzen → wieder alle drei
-    await user.click(screen.getByRole('button', { name: 'Zurücksetzen' }));
+    // "Wasser" wieder abwählen → wieder alle drei
+    await user.click(screen.getByRole('checkbox', { name: 'Wasser' }));
     expect(screen.getByText('Hauptzähler Strom')).toBeInTheDocument();
     expect(screen.getByText('Gartenwasser')).toBeInTheDocument();
     expect(screen.getByText('Ölheizung')).toBeInTheDocument();

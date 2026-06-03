@@ -173,4 +173,19 @@ describe('ReadingsListPage — Mehrfach-Löschen', () => {
 
     expect(bulkBody).toBeNull();
   });
+
+  it('filtert die Liste über das Zählerart-Dropdown', async () => {
+    _mockEndpoints([_reading(501, '120', '2025-05-01T12:00:00')]);
+    const user = userEvent.setup();
+    renderWithRouter(<ReadingsListPage />);
+
+    // Die Strom-Erfassung ist initial sichtbar.
+    expect(await screen.findByText('Strom Hauptzähler')).toBeInTheDocument();
+
+    // Zählerart-Dropdown öffnen, "Wasser" wählen → Strom-Erfassung fällt raus.
+    await user.click(screen.getByRole('button', { name: 'Zählerart' }));
+    await user.click(await screen.findByRole('checkbox', { name: 'Wasser' }));
+    expect(screen.getByText('Keine Treffer.')).toBeInTheDocument();
+    expect(screen.queryByText('Strom Hauptzähler')).not.toBeInTheDocument();
+  });
 });

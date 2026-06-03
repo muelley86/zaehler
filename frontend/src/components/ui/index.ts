@@ -1,7 +1,10 @@
 export { Button } from './Button';
 export { Card } from './Card';
+export { Dropdown } from './Dropdown';
 export { EmptyState } from './EmptyState';
 export { LargeTitle } from './LargeTitle';
+export { MultiSelectDropdown } from './MultiSelectDropdown';
+export type { DropdownOption } from './MultiSelectDropdown';
 export { Pill } from './Pill';
 export { Row, RowGroup } from './Row';
 export { Section } from './Section';

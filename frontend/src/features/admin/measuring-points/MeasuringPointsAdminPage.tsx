@@ -20,7 +20,7 @@ import {
   Button,
   Card,
   LargeTitle,
-  Pill,
+  MultiSelectDropdown,
   Section,
   Select,
   Switch,
@@ -154,26 +154,15 @@ export function MeasuringPointsAdminPage() {
       <CreateForm locations={locations} owners={owners} onCreated={refresh} />
 
       {points && points.length > 0 ? (
-        <div className="flex flex-wrap items-center gap-1.5">
-          {(Object.keys(TYPE_LABELS) as MeterType[]).map((t) => (
-            <Pill
-              key={t}
-              active={typeFilter.has(t)}
-              onClick={() => setTypeFilter(toggle(typeFilter, t))}
-            >
-              {TYPE_LABELS[t]}
-            </Pill>
-          ))}
-          {typeFilter.size > 0 ? (
-            <button
-              type="button"
-              onClick={() => setTypeFilter(new Set())}
-              className="text-caption font-semibold text-primary"
-            >
-              Zurücksetzen
-            </button>
-          ) : null}
-        </div>
+        <MultiSelectDropdown
+          label="Typ"
+          options={(Object.keys(TYPE_LABELS) as MeterType[]).map((t) => ({
+            value: t,
+            label: TYPE_LABELS[t],
+          }))}
+          selected={typeFilter}
+          onChange={setTypeFilter}
+        />
       ) : null}
 
       <div className="space-y-3">
@@ -697,13 +686,4 @@ function RegisterDraftList({
       </Button>
     </div>
   );
-}
-
-// Set-Toggle für die Typ-Filter-Pills (leeres Set = alle Typen sichtbar),
-// analog zum gleichnamigen Helfer in ReadingsListPage.tsx.
-function toggle<T>(set: Set<T>, value: T): Set<T> {
-  const next = new Set(set);
-  if (next.has(value)) next.delete(value);
-  else next.add(value);
-  return next;
 }
