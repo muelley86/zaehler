@@ -10,6 +10,13 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.43.1](https://github.com/muelley86/zaehler/compare/v2.43.0...v2.43.1) (2026-06-03)
+
+
+### Fehlerbehebungen
+
+* **filters:** Dropdown-Panel per Portal rendern (nicht mehr abgeschnitten) ([#202](https://github.com/muelley86/zaehler/issues/202)) ([ebb4eb2](https://github.com/muelley86/zaehler/commit/ebb4eb2b5a435816a4ecff82af11504e6953942a))
+
 ## [2.43.0](https://github.com/muelley86/zaehler/compare/v2.42.0...v2.43.0) (2026-06-03)
 
 
