@@ -10,6 +10,18 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.40.0](https://github.com/muelley86/zaehler/compare/v2.39.1...v2.40.0) (2026-06-03)
+
+
+### Funktionen
+
+* **readings:** Mehrfach-Auswahl zum Sammel-Löschen von Erfassungen ([#195](https://github.com/muelley86/zaehler/issues/195)) ([3b46191](https://github.com/muelley86/zaehler/commit/3b46191ad78eebd071a509aa6cfba196052d920f))
+
+
+### Dokumentation
+
+* CLAUDE.md um Import, Mehrfach-Fotos, DE-CSV und Metering ergänzen ([#189](https://github.com/muelley86/zaehler/issues/189)) ([650f869](https://github.com/muelley86/zaehler/commit/650f869f8c417dfcedb7d36737af02b1f45e7830))
+
 ## [2.39.1](https://github.com/muelley86/zaehler/compare/v2.39.0...v2.39.1) (2026-06-02)
 
 
