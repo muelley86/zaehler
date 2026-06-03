@@ -10,6 +10,7 @@ export { Row, RowGroup } from './Row';
 export { Section } from './Section';
 export { Select } from './Select';
 export { Sheet } from './Sheet';
+export { SingleSelectDropdown } from './SingleSelectDropdown';
 export { Switch } from './Switch';
 export { TextField } from './TextField';
 export { TypeBadge, TYPE_META } from './TypeBadge';

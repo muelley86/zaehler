@@ -178,8 +178,8 @@ describe('RecordReadingPage', () => {
       }),
     ]);
     renderWithRouter(<RecordReadingPage />, { initialEntries: ['/erfassen?mp=2'] });
-    // Register-Label aus MP 2 muss erscheinen, nicht das aus MP 1.
-    expect(await screen.findByText('Wasser')).toBeInTheDocument();
+    // MP 2 ist vorgewählt: Picker-Trigger zeigt Wasser, MP-1-Register "Bezug" fehlt.
+    expect(await screen.findByRole('button', { name: 'Wasser' })).toBeInTheDocument();
     expect(screen.queryByText('Bezug')).not.toBeInTheDocument();
   });
 
@@ -428,15 +428,14 @@ describe('RecordReadingPage', () => {
 
     // Default-MP (Strom) wird zuerst geladen.
     expect(await screen.findByText('Bezug')).toBeInTheDocument();
-    const select = screen.getByRole<HTMLSelectElement>('combobox');
-    expect(select.value).toBe('1');
+    expect(screen.getByRole('button', { name: 'Strom' })).toBeInTheDocument();
 
     // Scan simulieren: navigate setzt ?mp=2.
     await user.click(screen.getByRole('button', { name: 'simulate-scan' }));
 
-    // MP 2 muss aktiv werden — Bezug-Register verschwindet, Select springt auf 2.
-    await waitFor(() => expect(select.value).toBe('2'));
-    expect(screen.queryByText('Bezug')).not.toBeInTheDocument();
+    // MP 2 muss aktiv werden — Bezug-Register verschwindet, Trigger zeigt Wasser.
+    await waitFor(() => expect(screen.queryByText('Bezug')).not.toBeInTheDocument());
+    expect(screen.getByRole('button', { name: 'Wasser' })).toBeInTheDocument();
   });
 
   it('historischer Monatswert: reading_at wird ans Monatsende gelegt', async () => {
