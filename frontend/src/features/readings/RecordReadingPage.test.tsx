@@ -280,7 +280,7 @@ describe('RecordReadingPage', () => {
         success({ coords: { latitude: 48.137154, longitude: 11.576124 } });
       },
     );
-    Object.defineProperty(global.navigator, 'geolocation', {
+    Object.defineProperty(globalThis.navigator, 'geolocation', {
       configurable: true,
       value: { getCurrentPosition: getCurrentPositionMock },
     });
