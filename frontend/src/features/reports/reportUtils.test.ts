@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { ReportRow } from '@/lib/types';
 
-import { buildAggregateQuery, diffRows, resolvePeriod } from './reportUtils';
+import { PERIOD_KIND_LABELS, buildAggregateQuery, diffRows, resolvePeriod } from './reportUtils';
 
 describe('resolvePeriod', () => {
   const today = new Date(2024, 5, 15); // 15. Juni 2024 (lokal)
@@ -22,9 +22,13 @@ describe('resolvePeriod', () => {
       to: '2024-06-30',
     });
   });
-  it('all/fixed → ohne Grenzen', () => {
+  it('all/fixed/shared_range → ohne Grenzen (Aufrufer injiziert ggf. den globalen Bereich)', () => {
     expect(resolvePeriod('all', today)).toEqual({ from: null, to: null });
     expect(resolvePeriod('fixed', today)).toEqual({ from: null, to: null });
+    expect(resolvePeriod('shared_range', today)).toEqual({ from: null, to: null });
+  });
+  it('Label für shared_range', () => {
+    expect(PERIOD_KIND_LABELS.shared_range).toBe('Aktueller Zeitraum');
   });
   it('Jahreswechsel: last_month im Januar → Dezember Vorjahr', () => {
     expect(resolvePeriod('last_month', new Date(2024, 0, 10))).toEqual({

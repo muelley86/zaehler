@@ -24,11 +24,16 @@ import {
   Search,
   Settings,
 } from 'lucide-react';
-import { NavLink, useNavigate } from 'react-router-dom';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 
 import { GlobalSearchSheet } from '@/features/_shell/GlobalSearchSheet';
 import { useAuth } from '@/features/auth/auth-context';
+import { GlobalDateRange } from './GlobalDateRange';
 import { cx } from './ui/cx';
+
+// Datums-relevante Routen: nur hier zeigt der mobile Header die Datums-Leiste
+// (auf Erfassen-Formular/Mehr/Admin wäre sie nutzlos und nähme Platz).
+const DATE_ROUTES = ['/', '/erfassungen', '/auswertungen'];
 
 interface NavItem {
   to: string;
@@ -93,8 +98,10 @@ function Avatar({ name, role }: { name: string; role: string }) {
 export function AppShell({ children }: { children: ReactNode }) {
   const { me, logout } = useAuth();
   const navigate = useNavigate();
+  const { pathname } = useLocation();
   const isAdmin = me?.role === 'admin';
   const [searchOpen, setSearchOpen] = useState(false);
+  const showMobileDateBar = DATE_ROUTES.includes(pathname);
 
   async function handleLogout() {
     await logout();
@@ -150,6 +157,11 @@ export function AppShell({ children }: { children: ReactNode }) {
           <Search size={18} className="shrink-0 opacity-70" />
           Suchen
         </button>
+
+        {/* Globaler Datumsbereich — direkt unter „Suchen", immer sichtbar. */}
+        <div className="mb-3 border-b-hairline border-separator pb-3">
+          <GlobalDateRange variant="sidebar" />
+        </div>
 
         <nav className="flex flex-col gap-0.5">
           {PRIMARY_NAV.map((n) => (
@@ -257,6 +269,14 @@ export function AppShell({ children }: { children: ReactNode }) {
             <span className="text-caption text-tertiary">{me?.username}</span>
           </div>
         </header>
+
+        {/* Mobile Datums-Leiste — nur auf datums-relevanten Seiten, direkt
+            unter dem Sticky-Header. */}
+        {showMobileDateBar ? (
+          <div className="border-b-hairline border-border bg-surface px-4 py-2 md:hidden">
+            <GlobalDateRange variant="mobile" />
+          </div>
+        ) : null}
 
         <main className="min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden pb-24 md:pb-8">
           {children}

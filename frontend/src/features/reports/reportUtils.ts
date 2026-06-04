@@ -36,6 +36,7 @@ export const PERIOD_KIND_LABELS: Record<ReportPeriodKind, string> = {
   last_month: 'Letzter Monat',
   all: 'Gesamter Zeitraum',
   fixed: 'Benutzerdefiniert',
+  shared_range: 'Aktueller Zeitraum',
 };
 
 function pad(n: number): string {
@@ -72,6 +73,9 @@ export function resolvePeriod(kind: ReportPeriodKind, today: Date): Period {
     case 'all':
       return { from: null, to: null };
     case 'fixed':
+      return { from: null, to: null };
+    case 'shared_range':
+      // Der globale Datumsbereich wird vom Aufrufer (ReportsPage) injiziert.
       return { from: null, to: null };
   }
 }

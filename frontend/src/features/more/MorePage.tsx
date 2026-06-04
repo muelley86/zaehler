@@ -108,9 +108,9 @@ export function MorePage() {
           </RowGroup>
         </Section>
 
-        {/* Filter — persönliche Einstellung: gesetzte Filter für die laufende
-            Browser-Session merken. Datum gilt dann seitenübergreifend
-            (Dashboard ⇄ Erfassungen), übrige Filter je Seite. Aus = Reset. */}
+        {/* Filter — persönliche Einstellung: übrige Filter (Zählerart, Standort,
+            …) je Seite für die laufende Browser-Session merken. Der
+            Datumsbereich ist davon unabhängig immer global (Navigation). */}
         <Section header="Filter">
           <RowGroup>
             <Row
@@ -118,7 +118,7 @@ export function MorePage() {
               label="Filter merken"
               sublabel={
                 rememberFilters
-                  ? 'Datum gilt seitenübergreifend, übrige Filter je Seite (diese Sitzung)'
+                  ? 'Übrige Filter je Seite für diese Sitzung merken'
                   : 'Filter werden nicht gespeichert'
               }
               trailing={

@@ -37,7 +37,6 @@ import type {
 } from '@/lib/types';
 import { TYPE_LABELS, TYPE_ORDER, describeMeterType } from '@/lib/meterLabels';
 import { useFilterPrefs } from '@/features/prefs/filter-prefs-context';
-import { useSharedDateRange } from '@/features/prefs/useSharedDateRange';
 import { setCodec, useStickyState } from '@/lib/useStickyState';
 import { MeterChart } from './MeterChart';
 import {
@@ -173,7 +172,7 @@ export function DashboardPage() {
 
   // „Filter merken": wenn aktiv, werden die kategorialen Filter je Seite in
   // sessionStorage gespiegelt; sonst verhalten sie sich wie normales useState.
-  const { rememberFilters } = useFilterPrefs();
+  const { rememberFilters, dateRange } = useFilterPrefs();
   const [locationFilter, setLocationFilter] = useStickyState<Set<number | null>>(
     FILTER_NS + 'location',
     new Set(),
@@ -198,16 +197,10 @@ export function DashboardPage() {
     rememberFilters,
     TYPE_CODEC,
   );
-  // Default: laufendes Kalenderjahr — Uebersicht bleibt fokussiert,
-  // User kann das Range manuell aufweiten (z. B. Mehrjahres-Vergleich).
-  // Der Datumsbereich gilt — bei aktiver Option — seitenübergreifend
-  // (Dashboard ⇄ Erfassungen); `from`/`to` bleiben lokale Aliase, damit alle
-  // abhängigen Effekte/Helfer unverändert weiterlaufen.
+  // Der Datumsbereich kommt global aus dem FilterPrefsContext (Navigation);
+  // `from`/`to` bleiben lokale Aliase, damit alle abhängigen Effekte/Helfer
+  // (Granularitäts-Default, /dashboard-Load, CSV) unverändert weiterlaufen.
   const currentYear = new Date().getFullYear();
-  const dateRange = useSharedDateRange({
-    from: `${currentYear}-01-01`,
-    to: `${currentYear}-12-31`,
-  });
   const from = dateRange.from;
   const to = dateRange.to;
 
@@ -533,9 +526,6 @@ export function DashboardPage() {
 
   const activeFilterCount =
     mainLocationFilter.size + ownerFilter.size + locationFilter.size + typeFilter.size;
-  // Datumsbereich gilt als „nicht-Standard", wenn er vom laufenden Kalenderjahr
-  // abweicht — dann soll „Filter zurücksetzen" ebenfalls erreichbar sein.
-  const rangeIsDefault = from === `${currentYear}-01-01` && to === `${currentYear}-12-31`;
 
   return (
     <PageContainer>
@@ -556,11 +546,6 @@ export function DashboardPage() {
 
       <Section header="Ansicht">
         <div className="space-y-4 p-5">
-          <FilterRow label="Zeitraum">
-            <DateInput value={from} onChange={dateRange.setFrom} aria-label="von" />
-            <span className="text-tertiary">—</span>
-            <DateInput value={to} onChange={dateRange.setTo} aria-label="bis" />
-          </FilterRow>
           <FilterRow label="Aggregation">
             {GRANULARITY_OPTIONS.map(([g, label]) => (
               <Pill key={g} active={granularity === g} onClick={() => pickGranularity(g)}>
@@ -668,7 +653,7 @@ export function DashboardPage() {
                 onChange={setTypeFilter}
               />
             </div>
-            {activeFilterCount > 0 || !rangeIsDefault ? (
+            {activeFilterCount > 0 ? (
               <button
                 type="button"
                 onClick={() => {
@@ -676,7 +661,6 @@ export function DashboardPage() {
                   setOwnerFilter(new Set());
                   setLocationFilter(new Set());
                   setTypeFilter(new Set());
-                  dateRange.reset();
                 }}
                 className="text-caption font-semibold text-primary"
               >
@@ -802,25 +786,6 @@ function FilterRow({ label, children }: { label: string; children: React.ReactNo
       <div className="mb-2 text-caption-bold uppercase text-tertiary">{label}</div>
       <div className="flex flex-wrap items-center gap-1.5">{children}</div>
     </div>
-  );
-}
-
-function DateInput({
-  value,
-  onChange,
-  ...rest
-}: {
-  value: string;
-  onChange: (s: string) => void;
-} & Omit<React.InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange' | 'type'>) {
-  return (
-    <input
-      type="date"
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      className="num rounded-pill border-hairline border-border bg-fill px-3 py-1.5 text-body-sm text-label outline-none focus:border-primary focus:bg-surface-solid"
-      {...rest}
-    />
   );
 }
 
@@ -1313,7 +1278,7 @@ function CurrentStateTile({ state }: { state: RegisterStateRead }) {
  * `points`). Layout muss exakt zu der spaeteren Vollseite passen, sonst
  * springt das Layout beim Hydrieren — der CLS-Hauptverursacher.
  *
- * Reservierte Slots: Ansicht-Controls (188) → Filter-Leiste (52) →
+ * Reservierte Slots: Ansicht-Controls (136) → Filter-Leiste (52) →
  * ConsumptionSummary (260) → 3 Karten à 560 px. Dieselben Höhen verwenden
  * auch `MeasuringPointCardSkeleton` (Phase 2) und die echte
  * `MeasuringPointCard` (`min-h-[560px]`) — so ist die Layout-Höhe identisch.
@@ -1321,11 +1286,11 @@ function CurrentStateTile({ state }: { state: RegisterStateRead }) {
 function DashboardSkeleton() {
   return (
     <>
-      {/* Ansicht-Controls (Zeitraum + Granularität + Diagrammtyp) */}
+      {/* Ansicht-Controls (Granularität + Diagrammtyp; Datum ist global) */}
       <div
         aria-hidden
         className="bg-surface/50 glass rounded-card border-hairline border-border"
-        style={{ minHeight: 188 }}
+        style={{ minHeight: 136 }}
       />
       {/* Filter-Leiste (eingeklappt per Default) */}
       <div

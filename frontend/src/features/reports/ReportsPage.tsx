@@ -63,6 +63,7 @@ const PERIOD_KINDS: ReportPeriodKind[] = [
   'current_month',
   'last_month',
   'all',
+  'shared_range',
   'fixed',
 ];
 
@@ -139,7 +140,7 @@ export function ReportsPage() {
   // „Filter merken": Reports merkt seine Arbeits-Filter je Seite (sessionStorage)
   // — das Datum bleibt hier seiteneigen (eigenes periodKind-Modell, kein
   // geteilter Datumsbereich). Default aus = unverändertes useState-Verhalten.
-  const { rememberFilters } = useFilterPrefs();
+  const { rememberFilters, dateRange } = useFilterPrefs();
   const [dimension, setDimension] = useStickyState<ReportDimension>(
     FILTER_NS + 'dimension',
     'measuring_point',
@@ -232,8 +233,12 @@ export function ReportsPage() {
 
   const period = useMemo(() => {
     if (periodKind === 'fixed') return { from: customFrom || null, to: customTo || null };
+    // „Aktueller Zeitraum" folgt dem globalen Datumsbereich aus der Navigation.
+    if (periodKind === 'shared_range') {
+      return { from: dateRange.from || null, to: dateRange.to || null };
+    }
     return resolvePeriod(periodKind, new Date());
-  }, [periodKind, customFrom, customTo]);
+  }, [periodKind, customFrom, customTo, dateRange.from, dateRange.to]);
 
   // Im Vergleichsmodus werden beide Perioden als Gesamt-Summe gegenübergestellt.
   const effGranularity: ReportGranularity = compare ? 'total' : granularity;

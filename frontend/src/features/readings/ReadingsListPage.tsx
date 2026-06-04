@@ -6,7 +6,6 @@ import { useAuth } from '@/features/auth/auth-context';
 import { PhotoLightbox } from '@/features/readings/PhotoLightbox';
 import {
   Button,
-  Dropdown,
   EmptyState,
   LargeTitle,
   MultiSelectDropdown,
@@ -43,7 +42,6 @@ import { cx } from '@/components/ui/cx';
 
 import { TYPE_LABELS } from '@/lib/meterLabels';
 import { useFilterPrefs } from '@/features/prefs/filter-prefs-context';
-import { useSharedDateRange } from '@/features/prefs/useSharedDateRange';
 import { setCodec, stringCodec, useStickyState } from '@/lib/useStickyState';
 
 type ItemKind = 'reading' | 'correction' | 'delivery';
@@ -165,7 +163,7 @@ export function ReadingsListPage() {
 
   // „Filter merken": wenn aktiv, je Seite in sessionStorage gespiegelt; sonst
   // verhalten sich diese wie normales useState (unverändertes Verhalten).
-  const { rememberFilters } = useFilterPrefs();
+  const { rememberFilters, dateRange } = useFilterPrefs();
   const [locationFilter, setLocationFilter] = useStickyState<Set<number | null>>(
     FILTER_NS + 'location',
     new Set(),
@@ -190,10 +188,9 @@ export function ReadingsListPage() {
     rememberFilters,
     OBIS_CODEC,
   );
-  // Datumsbereich gilt — bei aktiver Option — seitenübergreifend (Dashboard ⇄
-  // Erfassungen); `from`/`to` bleiben lokale Aliase, damit buildEntriesQuery und
-  // die abhängigen Effekte unverändert weiterlaufen.
-  const dateRange = useSharedDateRange({ from: '', to: '' });
+  // Datumsbereich kommt global aus dem FilterPrefsContext (Navigation);
+  // `from`/`to` bleiben lokale Aliase, damit buildEntriesQuery und die
+  // abhängigen Effekte unverändert weiterlaufen.
   const from = dateRange.from;
   const to = dateRange.to;
   const [search, setSearch] = useStickyState<string>(
@@ -601,18 +598,6 @@ export function ReadingsListPage() {
               selected={obisFilter}
               onChange={setObisFilter}
             />
-            <Dropdown label="Zeitraum" badge={from || to ? 1 : 0}>
-              <div className="flex flex-col gap-2 p-3">
-                <label className="flex flex-col gap-1 text-caption text-tertiary">
-                  von
-                  <DateInput value={from} onChange={dateRange.setFrom} aria-label="von" />
-                </label>
-                <label className="flex flex-col gap-1 text-caption text-tertiary">
-                  bis
-                  <DateInput value={to} onChange={dateRange.setTo} aria-label="bis" />
-                </label>
-              </div>
-            </Dropdown>
             <MultiSelectDropdown
               label="Art"
               options={
@@ -630,8 +615,6 @@ export function ReadingsListPage() {
           typeFilter.size ||
           mpFilter.size ||
           obisFilter.size ||
-          from ||
-          to ||
           search ||
           kindFilter.size ? (
             <button
@@ -641,7 +624,6 @@ export function ReadingsListPage() {
                 setTypeFilter(new Set());
                 setMpFilter(new Set());
                 setObisFilter(new Set());
-                dateRange.reset();
                 setKindFilter(new Set());
                 setSearch('');
               }}
@@ -791,25 +773,6 @@ function PageContainer({ children }: { children: React.ReactNode }) {
       <PageGlows accent="electricity" />
       <div className="relative z-10 space-y-5 p-4 pb-12 md:p-7">{children}</div>
     </div>
-  );
-}
-
-function DateInput({
-  value,
-  onChange,
-  ...rest
-}: {
-  value: string;
-  onChange: (s: string) => void;
-} & Omit<React.InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange' | 'type'>) {
-  return (
-    <input
-      type="date"
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      className="num rounded-pill border-hairline border-border bg-fill px-3 py-1.5 text-body-sm text-label outline-none focus:border-primary focus:bg-surface-solid"
-      {...rest}
-    />
   );
 }
 

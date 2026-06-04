@@ -1,26 +1,28 @@
 /**
- * FilterPrefs-Context — haelt zwei Dinge:
- *  - `rememberFilters`: die persoenliche Ein/Aus-Einstellung „Filter merken"
- *    (dauerhaft in localStorage).
- *  - `sharedRange`: den seitenuebergreifend geteilten Datumsbereich
- *    (nur diese Browser-Session, in sessionStorage). `null` = „noch nicht
- *    gesetzt" → jede Seite nutzt ihren eigenen Default.
+ * FilterPrefs-Context:
+ *  - `dateRange`: der globale Datumsbereich. **Immer vorhanden** (nie null),
+ *    seitenübergreifend (Dashboard, Erfassungen, Auswertungen via Option) und
+ *    sitzungspersistent (sessionStorage) — unabhängig von „Filter merken".
+ *  - `rememberFilters`: die persoenliche Ein/Aus-Einstellung „Filter merken",
+ *    die nur noch die ÜBRIGEN (Nicht-Datums-)Filter steuert (localStorage).
  *
  * Hook + Context-Definition liegen — analog zu `auth-context.ts` — getrennt vom
- * Provider-Component, damit Vites Fast-Refresh nicht durch zusaetzliche
- * Nicht-Component-Exports gestoert wird.
+ * Provider-Component, damit Vites Fast-Refresh nicht gestört wird.
  */
 
 import { createContext, useContext } from 'react';
 
-export type SharedDateRange = { from: string; to: string } | null;
+import type { DateRange } from '@/lib/dateRange';
 
 export interface FilterPrefsState {
   rememberFilters: boolean;
   setRememberFilters: (on: boolean) => void;
-  sharedRange: SharedDateRange;
-  setSharedRange: (next: SharedDateRange) => void;
-  clearSharedRange: () => void;
+  dateRange: DateRange;
+  setDateRange: (next: DateRange) => void;
+  setFrom: (v: string) => void;
+  setTo: (v: string) => void;
+  /** Verschiebt den Datumsbereich um `delta` ganze Jahre (−1 = Vorjahr). */
+  stepYear: (delta: number) => void;
 }
 
 export const FilterPrefsContext = createContext<FilterPrefsState | null>(null);
