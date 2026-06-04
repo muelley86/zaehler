@@ -10,6 +10,13 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.54.0](https://github.com/muelley86/zaehler/compare/v2.53.4...v2.54.0) (2026-06-04)
+
+
+### Funktionen
+
+* **dashboard:** Vergleichs-Chart statt Karten je Messstelle ([#235](https://github.com/muelley86/zaehler/issues/235)) ([ebf7b5c](https://github.com/muelley86/zaehler/commit/ebf7b5c147ac50b955ce98256f233f87881ce069))
+
 ## [2.53.4](https://github.com/muelley86/zaehler/compare/v2.53.3...v2.53.4) (2026-06-04)
 
 
