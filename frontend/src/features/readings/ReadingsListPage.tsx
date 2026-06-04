@@ -42,8 +42,27 @@ import type {
 import { cx } from '@/components/ui/cx';
 
 import { TYPE_LABELS } from '@/lib/meterLabels';
+import { useFilterPrefs } from '@/features/prefs/filter-prefs-context';
+import { useSharedDateRange } from '@/features/prefs/useSharedDateRange';
+import { setCodec, stringCodec, useStickyState } from '@/lib/useStickyState';
 
 type ItemKind = 'reading' | 'correction' | 'delivery';
+
+// Session-Memory der Erfassungs-Filter („Filter merken"). Namespace + Codecs als
+// Modul-Consts → stabile Referenzen.
+const FILTER_NS = 'filters.readings.';
+const isIdMember = (x: unknown): x is number | null => x === null || typeof x === 'number';
+const isNumber = (x: unknown): x is number => typeof x === 'number';
+const isString = (x: unknown): x is string => typeof x === 'string';
+const isMeterType = (x: unknown): x is MeterType =>
+  typeof x === 'string' && Object.prototype.hasOwnProperty.call(TYPE_LABELS, x);
+const isItemKind = (x: unknown): x is ItemKind =>
+  x === 'reading' || x === 'correction' || x === 'delivery';
+const ID_CODEC = setCodec<number | null>(isIdMember);
+const TYPE_CODEC = setCodec<MeterType>(isMeterType);
+const MP_CODEC = setCodec<number>(isNumber);
+const OBIS_CODEC = setCodec<string>(isString);
+const KIND_CODEC = setCodec<ItemKind>(isItemKind);
 
 interface RegisterIndex {
   registerId: number;
@@ -144,19 +163,56 @@ export function ReadingsListPage() {
     photos: ReadingPhotoRead[];
   } | null>(null);
 
-  const [locationFilter, setLocationFilter] = useState<Set<number | null>>(new Set());
-  const [typeFilter, setTypeFilter] = useState<Set<MeterType>>(new Set());
-  const [mpFilter, setMpFilter] = useState<Set<number>>(new Set());
-  const [obisFilter, setObisFilter] = useState<Set<string>>(new Set());
-  const [from, setFrom] = useState('');
-  const [to, setTo] = useState('');
-  const [search, setSearch] = useState('');
+  // „Filter merken": wenn aktiv, je Seite in sessionStorage gespiegelt; sonst
+  // verhalten sich diese wie normales useState (unverändertes Verhalten).
+  const { rememberFilters } = useFilterPrefs();
+  const [locationFilter, setLocationFilter] = useStickyState<Set<number | null>>(
+    FILTER_NS + 'location',
+    new Set(),
+    rememberFilters,
+    ID_CODEC,
+  );
+  const [typeFilter, setTypeFilter] = useStickyState<Set<MeterType>>(
+    FILTER_NS + 'type',
+    new Set(),
+    rememberFilters,
+    TYPE_CODEC,
+  );
+  const [mpFilter, setMpFilter] = useStickyState<Set<number>>(
+    FILTER_NS + 'mp',
+    new Set(),
+    rememberFilters,
+    MP_CODEC,
+  );
+  const [obisFilter, setObisFilter] = useStickyState<Set<string>>(
+    FILTER_NS + 'obis',
+    new Set(),
+    rememberFilters,
+    OBIS_CODEC,
+  );
+  // Datumsbereich gilt — bei aktiver Option — seitenübergreifend (Dashboard ⇄
+  // Erfassungen); `from`/`to` bleiben lokale Aliase, damit buildEntriesQuery und
+  // die abhängigen Effekte unverändert weiterlaufen.
+  const dateRange = useSharedDateRange({ from: '', to: '' });
+  const from = dateRange.from;
+  const to = dateRange.to;
+  const [search, setSearch] = useStickyState<string>(
+    FILTER_NS + 'search',
+    '',
+    rememberFilters,
+    stringCodec,
+  );
   // Verzögerter Filterwert — die Filterung läuft 250 ms nach dem letzten
   // Tastendruck statt nach jedem Zeichen. Das Eingabefeld selbst zeigt
   // weiterhin sofort den aktuellen `search`-Wert, nur die teure Filter-
   // Pipeline (über tausende Readings) wird debounced.
   const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [kindFilter, setKindFilter] = useState<Set<ItemKind>>(new Set());
+  const [kindFilter, setKindFilter] = useStickyState<Set<ItemKind>>(
+    FILTER_NS + 'kind',
+    new Set(),
+    rememberFilters,
+    KIND_CODEC,
+  );
 
   // Mehrfach-Auswahl zum Sammel-Löschen. Keys decken sich mit den React-Keys
   // der Liste: "r-<id>" für Readings/Korrekturen, "d-<id>" für Lieferungen.
@@ -549,11 +605,11 @@ export function ReadingsListPage() {
               <div className="flex flex-col gap-2 p-3">
                 <label className="flex flex-col gap-1 text-caption text-tertiary">
                   von
-                  <DateInput value={from} onChange={setFrom} aria-label="von" />
+                  <DateInput value={from} onChange={dateRange.setFrom} aria-label="von" />
                 </label>
                 <label className="flex flex-col gap-1 text-caption text-tertiary">
                   bis
-                  <DateInput value={to} onChange={setTo} aria-label="bis" />
+                  <DateInput value={to} onChange={dateRange.setTo} aria-label="bis" />
                 </label>
               </div>
             </Dropdown>
@@ -585,8 +641,7 @@ export function ReadingsListPage() {
                 setTypeFilter(new Set());
                 setMpFilter(new Set());
                 setObisFilter(new Set());
-                setFrom('');
-                setTo('');
+                dateRange.reset();
                 setKindFilter(new Set());
                 setSearch('');
               }}

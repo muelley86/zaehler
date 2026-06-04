@@ -36,6 +36,9 @@ import type {
   RegisterStateRead,
 } from '@/lib/types';
 import { TYPE_LABELS, TYPE_ORDER, describeMeterType } from '@/lib/meterLabels';
+import { useFilterPrefs } from '@/features/prefs/filter-prefs-context';
+import { useSharedDateRange } from '@/features/prefs/useSharedDateRange';
+import { setCodec, useStickyState } from '@/lib/useStickyState';
 import { MeterChart } from './MeterChart';
 import {
   bucketEndIso,
@@ -78,6 +81,15 @@ const EXPANDED_LOCATIONS_KEY = 'dashboard.expandedLocations';
 const NO_MAIN_LOCATION_KEY = '__no_main_location__';
 const NO_LOCATION_KEY = '__no_location__';
 const FILTERS_EXPANDED_KEY = 'dashboard.filtersExpanded';
+
+// Session-Memory der Dashboard-Filter („Filter merken"). Namespace + Codecs als
+// Modul-Consts → stabile Referenzen. ID-Sets enthalten `null` (= „ohne …").
+const FILTER_NS = 'filters.dashboard.';
+const isIdMember = (x: unknown): x is number | null => x === null || typeof x === 'number';
+const isMeterType = (x: unknown): x is MeterType =>
+  typeof x === 'string' && Object.prototype.hasOwnProperty.call(TYPE_LABELS, x);
+const ID_CODEC = setCodec<number | null>(isIdMember);
+const TYPE_CODEC = setCodec<MeterType>(isMeterType);
 
 function loadExpandedSet(key: string): Set<string> {
   try {
@@ -159,15 +171,45 @@ export function DashboardPage() {
   // Stabile Refresh-Referenz für memoizierte Sub-Komponenten.
   const handleChanged = useCallback(() => setTick((t) => t + 1), []);
 
-  const [locationFilter, setLocationFilter] = useState<Set<number | null>>(new Set());
-  const [mainLocationFilter, setMainLocationFilter] = useState<Set<number | null>>(new Set());
-  const [ownerFilter, setOwnerFilter] = useState<Set<number | null>>(new Set());
-  const [typeFilter, setTypeFilter] = useState<Set<MeterType>>(new Set());
+  // „Filter merken": wenn aktiv, werden die kategorialen Filter je Seite in
+  // sessionStorage gespiegelt; sonst verhalten sie sich wie normales useState.
+  const { rememberFilters } = useFilterPrefs();
+  const [locationFilter, setLocationFilter] = useStickyState<Set<number | null>>(
+    FILTER_NS + 'location',
+    new Set(),
+    rememberFilters,
+    ID_CODEC,
+  );
+  const [mainLocationFilter, setMainLocationFilter] = useStickyState<Set<number | null>>(
+    FILTER_NS + 'mainLocation',
+    new Set(),
+    rememberFilters,
+    ID_CODEC,
+  );
+  const [ownerFilter, setOwnerFilter] = useStickyState<Set<number | null>>(
+    FILTER_NS + 'owner',
+    new Set(),
+    rememberFilters,
+    ID_CODEC,
+  );
+  const [typeFilter, setTypeFilter] = useStickyState<Set<MeterType>>(
+    FILTER_NS + 'type',
+    new Set(),
+    rememberFilters,
+    TYPE_CODEC,
+  );
   // Default: laufendes Kalenderjahr — Uebersicht bleibt fokussiert,
   // User kann das Range manuell aufweiten (z. B. Mehrjahres-Vergleich).
+  // Der Datumsbereich gilt — bei aktiver Option — seitenübergreifend
+  // (Dashboard ⇄ Erfassungen); `from`/`to` bleiben lokale Aliase, damit alle
+  // abhängigen Effekte/Helfer unverändert weiterlaufen.
   const currentYear = new Date().getFullYear();
-  const [from, setFrom] = useState(`${currentYear}-01-01`);
-  const [to, setTo] = useState(`${currentYear}-12-31`);
+  const dateRange = useSharedDateRange({
+    from: `${currentYear}-01-01`,
+    to: `${currentYear}-12-31`,
+  });
+  const from = dateRange.from;
+  const to = dateRange.to;
 
   // Globale View-Controls (gelten für alle Karten + CSV): Diagrammtyp und
   // Aggregations-Granularität, beide in localStorage gemerkt.
@@ -491,6 +533,9 @@ export function DashboardPage() {
 
   const activeFilterCount =
     mainLocationFilter.size + ownerFilter.size + locationFilter.size + typeFilter.size;
+  // Datumsbereich gilt als „nicht-Standard", wenn er vom laufenden Kalenderjahr
+  // abweicht — dann soll „Filter zurücksetzen" ebenfalls erreichbar sein.
+  const rangeIsDefault = from === `${currentYear}-01-01` && to === `${currentYear}-12-31`;
 
   return (
     <PageContainer>
@@ -512,9 +557,9 @@ export function DashboardPage() {
       <Section header="Ansicht">
         <div className="space-y-4 p-5">
           <FilterRow label="Zeitraum">
-            <DateInput value={from} onChange={setFrom} aria-label="von" />
+            <DateInput value={from} onChange={dateRange.setFrom} aria-label="von" />
             <span className="text-tertiary">—</span>
-            <DateInput value={to} onChange={setTo} aria-label="bis" />
+            <DateInput value={to} onChange={dateRange.setTo} aria-label="bis" />
           </FilterRow>
           <FilterRow label="Aggregation">
             {GRANULARITY_OPTIONS.map(([g, label]) => (
@@ -623,7 +668,7 @@ export function DashboardPage() {
                 onChange={setTypeFilter}
               />
             </div>
-            {activeFilterCount > 0 ? (
+            {activeFilterCount > 0 || !rangeIsDefault ? (
               <button
                 type="button"
                 onClick={() => {
@@ -631,6 +676,7 @@ export function DashboardPage() {
                   setOwnerFilter(new Set());
                   setLocationFilter(new Set());
                   setTypeFilter(new Set());
+                  dateRange.reset();
                 }}
                 className="text-caption font-semibold text-primary"
               >

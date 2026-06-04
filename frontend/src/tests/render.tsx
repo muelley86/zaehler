@@ -13,6 +13,8 @@ import { render, type RenderOptions } from '@testing-library/react';
 import type { ReactElement, ReactNode } from 'react';
 import { MemoryRouter } from 'react-router-dom';
 
+import { FilterPrefsProvider } from '@/features/prefs/FilterPrefsProvider';
+
 interface Options extends RenderOptions {
   initialEntries?: string[];
 }
@@ -22,7 +24,11 @@ export function renderWithRouter(
   { initialEntries = ['/'], ...rest }: Options = {},
 ) {
   function Wrapper({ children }: { children: ReactNode }) {
-    return <MemoryRouter initialEntries={initialEntries}>{children}</MemoryRouter>;
+    return (
+      <MemoryRouter initialEntries={initialEntries}>
+        <FilterPrefsProvider>{children}</FilterPrefsProvider>
+      </MemoryRouter>
+    );
   }
   return render(ui, { wrapper: Wrapper, ...rest });
 }
