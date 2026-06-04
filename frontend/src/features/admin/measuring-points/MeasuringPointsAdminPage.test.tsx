@@ -10,8 +10,8 @@
  */
 
 import { http, HttpResponse } from 'msw';
-import { describe, expect, it, vi } from 'vitest';
-import { screen, within } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import { renderWithRouter } from '@/tests/render';
@@ -70,6 +70,11 @@ function _mockList(mps: ReturnType<typeof _mp>[]) {
 }
 
 describe('MeasuringPointsAdminPage Wizard', () => {
+  afterEach(() => {
+    window.localStorage.clear();
+    window.sessionStorage.clear();
+  });
+
   it('zeigt nach Klick auf "Messstelle anlegen" drei Typ-Karten', async () => {
     _mockEmptyData();
     const user = userEvent.setup();
@@ -224,5 +229,40 @@ describe('MeasuringPointsAdminPage Wizard', () => {
     expect(screen.getByText('Hauptzähler Strom')).toBeInTheDocument();
     expect(screen.getByText('Gartenwasser')).toBeInTheDocument();
     expect(screen.getByText('Ölheizung')).toBeInTheDocument();
+  });
+
+  it('merkt den Typ-Filter in sessionStorage, wenn „Filter merken" aktiv ist', async () => {
+    window.localStorage.setItem('filters.remember', '1');
+    _mockList([
+      _mp({ id: 1, name: 'Hauptzähler Strom', type: 'electricity' }),
+      _mp({ id: 2, name: 'Gartenwasser', type: 'water' }),
+    ]);
+    const user = userEvent.setup();
+    renderWithRouter(<MeasuringPointsAdminPage />);
+
+    await screen.findByText('Hauptzähler Strom');
+    await user.click(screen.getByRole('button', { name: 'Typ' }));
+    await user.click(await screen.findByRole('checkbox', { name: 'Wasser' }));
+
+    await waitFor(() =>
+      expect(window.sessionStorage.getItem('filters.adminMeasuringPoints.type')).toContain('water'),
+    );
+  });
+
+  it('persistiert nichts, wenn „Filter merken" aus ist (Default)', async () => {
+    _mockList([
+      _mp({ id: 1, name: 'Hauptzähler Strom', type: 'electricity' }),
+      _mp({ id: 2, name: 'Gartenwasser', type: 'water' }),
+    ]);
+    const user = userEvent.setup();
+    renderWithRouter(<MeasuringPointsAdminPage />);
+
+    await screen.findByText('Hauptzähler Strom');
+    await user.click(screen.getByRole('button', { name: 'Typ' }));
+    await user.click(await screen.findByRole('checkbox', { name: 'Wasser' }));
+
+    // Filter wirkt (Strom-Card fällt raus), aber nichts wird persistiert.
+    expect(screen.queryByText('Hauptzähler Strom')).not.toBeInTheDocument();
+    expect(window.sessionStorage.getItem('filters.adminMeasuringPoints.type')).toBeNull();
   });
 });

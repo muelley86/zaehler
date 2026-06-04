@@ -30,6 +30,8 @@ import {
 import { ApiError, api } from '@/lib/api';
 import { parseDe } from '@/lib/format';
 import { HEATING_SOURCE_LABELS, TYPE_LABELS, describeMeterType } from '@/lib/meterLabels';
+import { useFilterPrefs } from '@/features/prefs/filter-prefs-context';
+import { setCodec, useStickyState } from '@/lib/useStickyState';
 import type {
   HeatingSource,
   HeatingUnit,
@@ -111,13 +113,27 @@ const HEATING_PRESETS: Record<HeatingSource, RegisterDraft[]> = {
   ],
 };
 
+// Session-Memory des Typ-Filters („Filter merken") — Muster wie Dashboard/Readings.
+const FILTER_NS = 'filters.adminMeasuringPoints.';
+const isMeterType = (x: unknown): x is MeterType =>
+  typeof x === 'string' && Object.prototype.hasOwnProperty.call(TYPE_LABELS, x);
+const TYPE_CODEC = setCodec<MeterType>(isMeterType);
+
 export function MeasuringPointsAdminPage() {
   const [points, setPoints] = useState<MeasuringPointRead[] | null>(null);
   const [locations, setLocations] = useState<LocationRead[]>([]);
   const [owners, setOwners] = useState<OwnerRead[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
-  const [typeFilter, setTypeFilter] = useState<Set<MeterType>>(new Set());
+  // „Filter merken": Typ-Filter je Seite in sessionStorage gespiegelt; sonst
+  // normales useState (unverändertes Verhalten).
+  const { rememberFilters } = useFilterPrefs();
+  const [typeFilter, setTypeFilter] = useStickyState<Set<MeterType>>(
+    FILTER_NS + 'type',
+    new Set(),
+    rememberFilters,
+    TYPE_CODEC,
+  );
 
   useEffect(() => {
     Promise.all([
