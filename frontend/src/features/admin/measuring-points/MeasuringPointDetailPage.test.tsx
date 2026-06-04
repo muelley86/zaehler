@@ -22,8 +22,8 @@
  */
 
 import { http, HttpResponse } from 'msw';
-import { describe, expect, it, vi } from 'vitest';
-import { fireEvent, screen } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
 
 import { renderWithRouter } from '@/tests/render';
 import { server } from '@/tests/server';
@@ -184,6 +184,11 @@ const _fernwaerme: MeasuringPointRead = {
 
 // --- Tests ----------------------------------------------------------------
 
+afterEach(() => {
+  window.localStorage.clear();
+  window.sessionStorage.clear();
+});
+
 describe('MeasuringPointDetailPage Stammdaten-Card', () => {
   it('rendert die Stammdaten-Card mit "Bearbeiten"-Knopf', async () => {
     _mockMp(_strom);
@@ -294,5 +299,42 @@ describe('MeasuringPointDetailPage Register-Section', () => {
     // weil Strom feste OBIS-Register hat).
     const editButtons = await screen.findAllByRole('button', { name: /^Bearbeiten$/ });
     expect(editButtons.length).toBe(2);
+  });
+
+  it('verlinkt eine Nicht-Lieferungs-Register-Zeile auf die gefilterten Erfassungen', async () => {
+    _mockMp(_strom);
+    renderWithRouter(<MeasuringPointDetailPage />, {
+      initialEntries: ['/admin/messstellen/1'],
+    });
+    const link = await screen.findByRole('link', { name: 'Messungen zu Register 1.8.0' });
+    expect(link).toHaveAttribute('href', '/erfassungen?mp=1&obis=1.8.0');
+  });
+});
+
+describe('MeasuringPointDetailPage Verbrauchskurve — Datumsfilter', () => {
+  it('sendet den globalen Datumsbereich als from_at/to_at an die Consumption-Query', async () => {
+    window.sessionStorage.setItem(
+      'app.dateRange',
+      JSON.stringify({ from: '2025-01-01', to: '2025-12-31' }),
+    );
+    let consumptionUrl: string | null = null;
+    server.use(
+      http.get('/api/v1/measuring-points/1', () => HttpResponse.json(_strom)),
+      http.get('/api/v1/measuring-points/1/consumption', ({ request }) => {
+        consumptionUrl = request.url;
+        return HttpResponse.json([]);
+      }),
+      http.get('/api/v1/measuring-points/1/state', () => HttpResponse.json([])),
+      http.get('/api/v1/measuring-points/1/users', () => HttpResponse.json([])),
+      http.get('/api/v1/locations', () => HttpResponse.json([])),
+      http.get('/api/v1/qr-tokens', () => HttpResponse.json([])),
+    );
+    renderWithRouter(<MeasuringPointDetailPage />, {
+      initialEntries: ['/admin/messstellen/1'],
+    });
+    await waitFor(() => expect(consumptionUrl).not.toBeNull());
+    const url = new URL(consumptionUrl!);
+    expect(url.searchParams.get('from_at')).toBe('2025-01-01');
+    expect(url.searchParams.get('to_at')).toBe('2025-12-31');
   });
 });

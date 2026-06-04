@@ -1,5 +1,6 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Camera, Download, ImageIcon, ListChecks, Pencil, Search, Trash2, X } from 'lucide-react';
 
 import { useAuth } from '@/features/auth/auth-context';
@@ -188,6 +189,30 @@ export function ReadingsListPage() {
     rememberFilters,
     OBIS_CODEC,
   );
+
+  // Deep-Link aus der MP-Detailansicht (`/erfassungen?mp=<id>&obis=<code>`):
+  // setzt Messstellen-/OBIS-Filter EINMALIG (überschreibt evtl. gemerkte Filter
+  // — gewollt: „zeig genau dieses Register") und räumt die Query danach ab,
+  // damit Refresh/spätere Filteränderungen sie nicht erneut anwenden.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const deepLinkConsumed = useRef(false);
+  useEffect(() => {
+    if (deepLinkConsumed.current) return;
+    const mpParam = searchParams.get('mp');
+    const obisParam = searchParams.get('obis');
+    if (mpParam === null && obisParam === null) return;
+    deepLinkConsumed.current = true;
+    if (mpParam !== null) {
+      const mpId = Number(mpParam);
+      if (Number.isFinite(mpId)) setMpFilter(new Set([mpId]));
+    }
+    if (obisParam !== null && obisParam !== '') setObisFilter(new Set([obisParam]));
+    const next = new URLSearchParams(searchParams);
+    next.delete('mp');
+    next.delete('obis');
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams, setMpFilter, setObisFilter]);
+
   // Datumsbereich kommt global aus dem FilterPrefsContext (Navigation);
   // `from`/`to` bleiben lokale Aliase, damit buildEntriesQuery und die
   // abhängigen Effekte unverändert weiterlaufen.
