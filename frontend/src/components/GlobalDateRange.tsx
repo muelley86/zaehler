@@ -1,7 +1,7 @@
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 import { useFilterPrefs } from '@/features/prefs/filter-prefs-context';
-import { formatRangeDe } from '@/lib/dateRange';
+import { formatRangeShort } from '@/lib/dateRange';
 import { DateInput, Dropdown } from '@/components/ui';
 import { cx } from '@/components/ui/cx';
 
@@ -22,8 +22,9 @@ export function GlobalDateRange({ variant }: { variant: 'sidebar' | 'mobile' }) 
       <YearArrow dir="prev" onClick={() => stepYear(-1)} />
       <div className={variant === 'sidebar' ? 'min-w-0 flex-1' : 'min-w-0'}>
         <Dropdown
-          label={formatRangeDe(dateRange)}
+          label={formatRangeShort(dateRange)}
           variant={variant === 'sidebar' ? 'field' : 'pill'}
+          dense
         >
           <div className="flex flex-col gap-2 p-3">
             <label className="flex flex-col gap-1 text-caption text-tertiary">

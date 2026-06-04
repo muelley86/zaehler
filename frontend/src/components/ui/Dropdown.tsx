@@ -27,6 +27,7 @@ export function Dropdown({
   children,
   align = 'left',
   variant = 'pill',
+  dense = false,
 }: {
   label: ReactNode;
   /** Aktiv-Zähler (nur ``pill``). > 0 → Trigger aktiv gestylt und zeigt das Badge. */
@@ -35,6 +36,8 @@ export function Dropdown({
   align?: 'left' | 'right';
   /** ``pill`` = kompakter Filter-Trigger, ``field`` = volle Breite wie ein Formularfeld. */
   variant?: 'pill' | 'field';
+  /** Kompaktere Schrift/Höhe für enge Container (z. B. Sidebar). */
+  dense?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState<{ top: number; left: number; width: number } | null>(null);
@@ -91,9 +94,13 @@ export function Dropdown({
         aria-expanded={open}
         className={
           isField
-            ? 'flex h-11 w-full items-center justify-between gap-2 rounded-pill border-hairline border-border bg-fill px-3.5 text-body text-label transition-colors hover:bg-fill-strong'
+            ? cx(
+                'flex w-full items-center justify-between gap-2 rounded-pill border-hairline border-border bg-fill text-label transition-colors hover:bg-fill-strong',
+                dense ? 'h-9 px-3 text-body-sm' : 'h-11 px-3.5 text-body',
+              )
             : cx(
-                'flex items-center gap-1.5 rounded-pill border-hairline px-3 py-1.5 text-body-sm font-medium tracking-tight transition-[background,color,border-color]',
+                'flex items-center gap-1.5 rounded-pill border-hairline px-3 font-medium tracking-tight transition-[background,color,border-color]',
+                dense ? 'py-1 text-caption' : 'py-1.5 text-body-sm',
                 active
                   ? 'border-primary bg-primary-soft text-primary-deep'
                   : 'border-border bg-fill text-secondary hover:bg-fill-strong',

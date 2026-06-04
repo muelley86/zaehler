@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { currentYearRange, formatRangeDe, shiftRangeByYears } from './dateRange';
+import { currentYearRange, formatRangeDe, formatRangeShort, shiftRangeByYears } from './dateRange';
 
 describe('dateRange helpers', () => {
   it('currentYearRange liefert 1.1.–31.12. des gegebenen Jahres', () => {
@@ -39,5 +39,21 @@ describe('dateRange helpers', () => {
 
   it('formatRangeDe formatiert deutsch mit Gedankenstrich', () => {
     expect(formatRangeDe({ from: '2026-01-01', to: '2026-12-31' })).toBe('01.01.2026 – 31.12.2026');
+  });
+
+  describe('formatRangeShort', () => {
+    it('volles Kalenderjahr → nur die Jahreszahl', () => {
+      expect(formatRangeShort({ from: '2026-01-01', to: '2026-12-31' })).toBe('2026');
+    });
+    it('gleiches Jahr, Teilbereich → Start ohne Jahr', () => {
+      expect(formatRangeShort({ from: '2026-03-01', to: '2026-12-31' })).toBe('01.03.–31.12.2026');
+    });
+    it('jahresübergreifend → 2-stellige Jahre', () => {
+      expect(formatRangeShort({ from: '2025-03-15', to: '2027-08-20' })).toBe('15.03.25–20.08.27');
+    });
+    it('offener Endpunkt → Fallback auf das volle Format', () => {
+      const r = { from: '', to: '2026-12-31' };
+      expect(formatRangeShort(r)).toBe(formatRangeDe(r));
+    });
   });
 });
