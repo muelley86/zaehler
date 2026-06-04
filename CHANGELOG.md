@@ -10,6 +10,13 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.53.0](https://github.com/muelley86/zaehler/compare/v2.52.0...v2.53.0) (2026-06-04)
+
+
+### Funktionen
+
+* **filters:** globaler Datumsbereich in der Navigation + Jahres-Schnellwechsel ([#225](https://github.com/muelley86/zaehler/issues/225)) ([7c38275](https://github.com/muelley86/zaehler/commit/7c3827563ccad31df6ac1645508635667a06e053))
+
 ## [2.52.0](https://github.com/muelley86/zaehler/compare/v2.51.0...v2.52.0) (2026-06-04)
 
 
