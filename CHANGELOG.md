@@ -10,6 +10,13 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.53.4](https://github.com/muelley86/zaehler/compare/v2.53.3...v2.53.4) (2026-06-04)
+
+
+### Fehlerbehebungen
+
+* Messstellen-Detail - Datumsfilter wirkt auf Verbrauchskurve + Register-Zeile öffnet Messungen ([#233](https://github.com/muelley86/zaehler/issues/233)) ([5b4ab2d](https://github.com/muelley86/zaehler/commit/5b4ab2d1604386bd01c55430463d6c1f0dc60732))
+
 ## [2.53.3](https://github.com/muelley86/zaehler/compare/v2.53.2...v2.53.3) (2026-06-04)
 
 
