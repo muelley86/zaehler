@@ -26,6 +26,8 @@ import { PageGlows } from '@/components/PageGlows';
 import { ApiError, api } from '@/lib/api';
 import { formatDe } from '@/lib/format';
 import { TYPE_LABELS } from '@/lib/meterLabels';
+import { useFilterPrefs } from '@/features/prefs/filter-prefs-context';
+import { enumCodec, setCodec, stringCodec, useStickyState } from '@/lib/useStickyState';
 import type {
   MeasuringPointRead,
   MeterType,
@@ -63,6 +65,25 @@ const PERIOD_KINDS: ReportPeriodKind[] = [
   'all',
   'fixed',
 ];
+
+// Session-Memory der Auswertungs-Filter („Filter merken"). Reports bleibt
+// ausserhalb des geteilten Datumsbereichs — die Periode wird hier per-Seite
+// gemerkt. Codecs als Modul-Consts → stabile Referenzen.
+const FILTER_NS = 'filters.reports.';
+const isNumber = (x: unknown): x is number => typeof x === 'number';
+const isMeterType = (x: unknown): x is MeterType =>
+  typeof x === 'string' && Object.prototype.hasOwnProperty.call(TYPE_LABELS, x);
+const NUM_CODEC = setCodec<number>(isNumber);
+const TYPE_CODEC = setCodec<MeterType>(isMeterType);
+const DIMENSION_CODEC = enumCodec<ReportDimension>((x): x is ReportDimension =>
+  DIMENSIONS.some((d) => d === x),
+);
+const GRANULARITY_CODEC = enumCodec<ReportGranularity>((x): x is ReportGranularity =>
+  GRANULARITIES.some((g) => g === x),
+);
+const PERIOD_KIND_CODEC = enumCodec<ReportPeriodKind>((x): x is ReportPeriodKind =>
+  PERIOD_KINDS.some((p) => p === x),
+);
 
 interface NumOption {
   id: number;
@@ -115,21 +136,75 @@ export function ReportsPage() {
   const [points, setPoints] = useState<MeasuringPointRead[]>([]);
   const [error, setError] = useState<string | null>(null);
 
-  const [dimension, setDimension] = useState<ReportDimension>('measuring_point');
-  const [granularity, setGranularity] = useState<ReportGranularity>('total');
-  const [periodKind, setPeriodKind] = useState<ReportPeriodKind>('current_year');
-  const [customFrom, setCustomFrom] = useState('');
-  const [customTo, setCustomTo] = useState('');
+  // „Filter merken": Reports merkt seine Arbeits-Filter je Seite (sessionStorage)
+  // — das Datum bleibt hier seiteneigen (eigenes periodKind-Modell, kein
+  // geteilter Datumsbereich). Default aus = unverändertes useState-Verhalten.
+  const { rememberFilters } = useFilterPrefs();
+  const [dimension, setDimension] = useStickyState<ReportDimension>(
+    FILTER_NS + 'dimension',
+    'measuring_point',
+    rememberFilters,
+    DIMENSION_CODEC,
+  );
+  const [granularity, setGranularity] = useStickyState<ReportGranularity>(
+    FILTER_NS + 'granularity',
+    'total',
+    rememberFilters,
+    GRANULARITY_CODEC,
+  );
+  const [periodKind, setPeriodKind] = useStickyState<ReportPeriodKind>(
+    FILTER_NS + 'periodKind',
+    'current_year',
+    rememberFilters,
+    PERIOD_KIND_CODEC,
+  );
+  const [customFrom, setCustomFrom] = useStickyState<string>(
+    FILTER_NS + 'customFrom',
+    '',
+    rememberFilters,
+    stringCodec,
+  );
+  const [customTo, setCustomTo] = useStickyState<string>(
+    FILTER_NS + 'customTo',
+    '',
+    rememberFilters,
+    stringCodec,
+  );
 
   const [compare, setCompare] = useState(false);
   const [compareFrom, setCompareFrom] = useState('');
   const [compareTo, setCompareTo] = useState('');
 
-  const [mainLocationFilter, setMainLocationFilter] = useState<Set<number>>(new Set());
-  const [locationFilter, setLocationFilter] = useState<Set<number>>(new Set());
-  const [ownerFilter, setOwnerFilter] = useState<Set<number>>(new Set());
-  const [kostenstelleFilter, setKostenstelleFilter] = useState<Set<number>>(new Set());
-  const [typeFilter, setTypeFilter] = useState<Set<MeterType>>(new Set());
+  const [mainLocationFilter, setMainLocationFilter] = useStickyState<Set<number>>(
+    FILTER_NS + 'mainLocation',
+    new Set(),
+    rememberFilters,
+    NUM_CODEC,
+  );
+  const [locationFilter, setLocationFilter] = useStickyState<Set<number>>(
+    FILTER_NS + 'location',
+    new Set(),
+    rememberFilters,
+    NUM_CODEC,
+  );
+  const [ownerFilter, setOwnerFilter] = useStickyState<Set<number>>(
+    FILTER_NS + 'owner',
+    new Set(),
+    rememberFilters,
+    NUM_CODEC,
+  );
+  const [kostenstelleFilter, setKostenstelleFilter] = useStickyState<Set<number>>(
+    FILTER_NS + 'kostenstelle',
+    new Set(),
+    rememberFilters,
+    NUM_CODEC,
+  );
+  const [typeFilter, setTypeFilter] = useStickyState<Set<MeterType>>(
+    FILTER_NS + 'type',
+    new Set(),
+    rememberFilters,
+    TYPE_CODEC,
+  );
   const [filtersOpen, setFiltersOpen] = useState(false);
 
   const [result, setResult] = useState<ReportAggregateResponse | null>(null);
@@ -263,21 +338,37 @@ export function ReportsPage() {
     return (['electricity', 'water', 'heating'] as MeterType[]).filter((t) => present.has(t));
   }, [points]);
 
-  const loadConfig = useCallback((c: ReportConfigRead) => {
-    setDimension(c.dimension);
-    setGranularity(c.granularity);
-    setPeriodKind(c.period_kind);
-    setCustomFrom(c.from_date ?? '');
-    setCustomTo(c.to_date ?? '');
-    setCompare(false);
-    const nums = (xs: (number | null)[]): Set<number> =>
-      new Set(xs.filter((x): x is number => x != null));
-    setMainLocationFilter(nums(c.filters.main_location_ids));
-    setLocationFilter(nums(c.filters.location_ids));
-    setOwnerFilter(nums(c.filters.owner_ids));
-    setKostenstelleFilter(nums(c.filters.kostenstellen));
-    setTypeFilter(new Set(c.filters.meter_types));
-  }, []);
+  const loadConfig = useCallback(
+    (c: ReportConfigRead) => {
+      setDimension(c.dimension);
+      setGranularity(c.granularity);
+      setPeriodKind(c.period_kind);
+      setCustomFrom(c.from_date ?? '');
+      setCustomTo(c.to_date ?? '');
+      setCompare(false);
+      const nums = (xs: (number | null)[]): Set<number> =>
+        new Set(xs.filter((x): x is number => x != null));
+      setMainLocationFilter(nums(c.filters.main_location_ids));
+      setLocationFilter(nums(c.filters.location_ids));
+      setOwnerFilter(nums(c.filters.owner_ids));
+      setKostenstelleFilter(nums(c.filters.kostenstellen));
+      setTypeFilter(new Set(c.filters.meter_types));
+      // Die useStickyState-Setter sind stabile useState-Dispatcher; eslint kennt
+      // nur die eingebaute useState-Stabilität, daher hier explizit gelistet.
+    },
+    [
+      setDimension,
+      setGranularity,
+      setPeriodKind,
+      setCustomFrom,
+      setCustomTo,
+      setMainLocationFilter,
+      setLocationFilter,
+      setOwnerFilter,
+      setKostenstelleFilter,
+      setTypeFilter,
+    ],
+  );
 
   const saveConfig = useCallback(() => {
     const name = window.prompt('Name der Auswertung');
