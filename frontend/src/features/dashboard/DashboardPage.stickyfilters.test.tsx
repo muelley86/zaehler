@@ -77,6 +77,23 @@ describe('DashboardPage — Filter merken', () => {
     );
   });
 
+  it('spiegelt den Messstellen-Filter (IDs) in sessionStorage, wenn die Option aktiv ist', async () => {
+    window.localStorage.setItem('filters.remember', '1');
+    mockEndpoints();
+
+    renderWithRouter(<DashboardPage />);
+    await screen.findByRole('button', { name: 'Monat' });
+
+    fireEvent.click(screen.getByRole('button', { name: /Filter/ }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Messstellen' }));
+    fireEvent.click(await screen.findByRole('checkbox', { name: 'Wasser Garten' }));
+    expect(await screen.findByText('1 aktiv')).toBeInTheDocument();
+
+    await waitFor(() =>
+      expect(window.sessionStorage.getItem('filters.dashboard.measuringPoint')).toContain('1'),
+    );
+  });
+
   it('stellt einen gemerkten Filter beim Laden wieder her und der Reset räumt ihn', async () => {
     window.localStorage.setItem('filters.remember', '1');
     window.sessionStorage.setItem('filters.dashboard.type', JSON.stringify(['water']));

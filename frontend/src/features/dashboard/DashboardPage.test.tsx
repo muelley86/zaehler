@@ -1,8 +1,10 @@
 /**
- * Smoke-Tests für die globalen Dashboard-View-Controls und den einklappbaren
- * Filter. Recharts-Internals werden bewusst NICHT geprüft (ResponsiveContainer
- * hat in jsdom keine Maße) — Fokus liegt auf Steuer-State, localStorage-
- * Persistenz, dem gebündelten `/dashboard`-Refetch und der Collapse-Mechanik.
+ * Smoke-Tests für das vereinfachte Dashboard: globale View-Controls
+ * (Granularität/Diagrammtyp), der einklappbare Filter inkl. neuem
+ * Messstellen-Filter, und der Vergleichs-Chart pro (Zählerart, Einheit)-Gruppe.
+ * Recharts-Internals werden bewusst NICHT geprüft (ResponsiveContainer hat in
+ * jsdom keine Maße) — Fokus liegt auf Steuer-State, localStorage-Persistenz,
+ * dem gebündelten `/dashboard`-Refetch und der Gruppen-/Leerzustand-Logik.
  *
  * AbortSignal-Strip: Das Dashboard lädt `/dashboard` mit einem AbortSignal; unter
  * jsdom akzeptiert undici-`fetch` (MSW) die jsdom-AbortSignal-Instanz nicht — wir
@@ -16,7 +18,7 @@ import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { renderWithRouter } from '@/tests/render';
 import { server } from '@/tests/server';
 import { api } from '@/lib/api';
-import type { MeasuringPointRead, RegisterStateRead } from '@/lib/types';
+import type { ConsumptionPoint, MeasuringPointRead } from '@/lib/types';
 
 import { DashboardPage } from './DashboardPage';
 
@@ -42,18 +44,36 @@ const MP: MeasuringPointRead = {
   physical_meters: [],
 };
 
+const STROM_MP: MeasuringPointRead = { ...MP, id: 2, name: 'Strom Haus', type: 'electricity' };
+
+function cp(periodEnd: string, consumption: string, unit: string, obis = 'r'): ConsumptionPoint {
+  return {
+    period_start: periodEnd,
+    period_end: periodEnd,
+    register_id: 0,
+    obis_code: obis,
+    consumption,
+    unit,
+  };
+}
+
 /** Registriert die vom Dashboard aufgerufenen Endpoints (MPs, Locations, der
  *  gebündelte /dashboard-Load). Liefert die je /dashboard-Request gesehenen
  *  `granularity`-Werte zurück. */
-function mockEndpoints(): { granularityCalls: string[] } {
+function mockEndpoints(
+  mps: MeasuringPointRead[] = [MP],
+  items: unknown[] = [],
+): {
+  granularityCalls: string[];
+} {
   const granularityCalls: string[] = [];
   server.use(
-    http.get('/api/v1/measuring-points', () => HttpResponse.json([MP])),
+    http.get('/api/v1/measuring-points', () => HttpResponse.json(mps)),
     http.get('/api/v1/locations', () => HttpResponse.json([])),
     http.get('/api/v1/dashboard', ({ request }) => {
       const g = new URL(request.url).searchParams.get('granularity');
       if (g) granularityCalls.push(g);
-      return HttpResponse.json({ items: [] });
+      return HttpResponse.json({ items });
     }),
   );
   return { granularityCalls };
@@ -68,6 +88,7 @@ beforeEach(() => {
 afterEach(() => {
   vi.restoreAllMocks();
   window.localStorage.clear();
+  window.sessionStorage.clear();
 });
 
 describe('DashboardPage — globale View-Controls', () => {
@@ -132,66 +153,6 @@ describe('DashboardPage — globale View-Controls', () => {
   });
 });
 
-const TANK_MP: MeasuringPointRead = {
-  ...MP,
-  name: 'Heizöl Tank',
-  type: 'heating',
-  heating_source: 'oil',
-};
-
-const TANK_STATE: RegisterStateRead = {
-  register_id: 99,
-  physical_meter_id: 9,
-  obis_code: 'heat.1',
-  label: 'Tankstand',
-  unit: 'L',
-  is_active: true,
-  accepts_deliveries: true,
-  last_reading_at: '2026-05-01T08:00:00Z',
-  last_reading_value: '2000',
-  refilled_since: '0',
-  current_value: '1800',
-};
-
-describe('DashboardPage — Bestandskorrektur', () => {
-  it('sendet reading_at als UTC-ISO (…Z), nicht als lokale Wanduhrzeit', async () => {
-    // Akkordeon (Ohne Hauptstandort → Ohne Zählerstandort) vorab aufklappen,
-    // damit die Karte + Tank-Kachel rendern.
-    window.localStorage.setItem(
-      'dashboard.expandedMainLocations',
-      JSON.stringify(['__no_main_location__']),
-    );
-    window.localStorage.setItem(
-      'dashboard.expandedLocations',
-      JSON.stringify(['__no_main_location__::__no_location__']),
-    );
-
-    const readingBodies: Array<{ reading_at?: string }> = [];
-    server.use(
-      http.get('/api/v1/measuring-points', () => HttpResponse.json([TANK_MP])),
-      http.get('/api/v1/locations', () => HttpResponse.json([])),
-      http.get('/api/v1/dashboard', () =>
-        HttpResponse.json({
-          items: [{ measuring_point_id: 1, consumption: [], readings: [], state: [TANK_STATE] }],
-        }),
-      ),
-      http.post('/api/v1/readings', async ({ request }) => {
-        readingBodies.push((await request.json()) as { reading_at?: string });
-        return HttpResponse.json({ id: 1 }, { status: 201 });
-      }),
-    );
-
-    renderWithRouter(<DashboardPage />);
-
-    fireEvent.click(await screen.findByRole('button', { name: 'Bestand korrigieren' }));
-    // Wert ist aus current_value vorbefüllt → direkt speichern.
-    fireEvent.click(await screen.findByRole('button', { name: /Korrektur speichern/ }));
-
-    await waitFor(() => expect(readingBodies.length).toBe(1));
-    expect(readingBodies[0]?.reading_at).toMatch(/Z$/);
-  });
-});
-
 describe('DashboardPage — einklappbarer Filter', () => {
   it('ist per Default eingeklappt; nach Aufklappen filtert das Dropdown, Badge zählt aktive', async () => {
     mockEndpoints();
@@ -208,5 +169,85 @@ describe('DashboardPage — einklappbarer Filter', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Zählerart' }));
     fireEvent.click(await screen.findByRole('checkbox', { name: 'Wasser' }));
     expect(await screen.findByText('1 aktiv')).toBeInTheDocument();
+  });
+
+  it('bietet einen Messstellen-Filter, dessen Optionen mit der Zählerart kaskadieren', async () => {
+    mockEndpoints([MP, STROM_MP]);
+    renderWithRouter(<DashboardPage />);
+    await screen.findByRole('button', { name: 'Monat' });
+
+    fireEvent.click(screen.getByRole('button', { name: /Filter/ }));
+
+    // Messstellen-Dropdown listet zunächst beide Messstellen.
+    // Hinweis: `Dropdown` schließt nur bei `mousedown` außerhalb — unter jsdom
+    // löst `fireEvent.click` das nicht aus, daher jedes Dropdown vor dem
+    // nächsten explizit per erneutem Trigger-Klick wieder zuklappen.
+    fireEvent.click(await screen.findByRole('button', { name: 'Messstellen' }));
+    expect(await screen.findByRole('checkbox', { name: 'Wasser Garten' })).toBeInTheDocument();
+    expect(screen.getByRole('checkbox', { name: 'Strom Haus' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Messstellen' })); // zuklappen
+
+    // Zählerart = Wasser → die Strom-Messstelle verschwindet aus den Optionen.
+    // (Zählerart-Dropdown bleibt offen; die Checkbox-Namen sind eindeutig, daher
+    // unkritisch — das Messstellen-Panel wird separat geöffnet.)
+    fireEvent.click(screen.getByRole('button', { name: 'Zählerart' }));
+    fireEvent.click(await screen.findByRole('checkbox', { name: 'Wasser' }));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Messstellen' }));
+    await waitFor(() => expect(screen.queryByRole('checkbox', { name: 'Strom Haus' })).toBeNull());
+    expect(screen.getByRole('checkbox', { name: 'Wasser Garten' })).toBeInTheDocument();
+  });
+});
+
+describe('DashboardPage — Vergleichs-Charts', () => {
+  it('rendert je (Zählerart, Einheit)-Gruppe eine Section mit Header', async () => {
+    mockEndpoints(
+      [MP, STROM_MP],
+      [
+        {
+          measuring_point_id: 1,
+          consumption: [cp('2024-01-31', '5', 'm³')],
+          readings: [],
+          state: [],
+        },
+        {
+          measuring_point_id: 2,
+          consumption: [cp('2024-01-31', '120', 'kWh', '1.8.0')],
+          readings: [],
+          state: [],
+        },
+      ],
+    );
+    renderWithRouter(<DashboardPage />);
+
+    // Section-Header sind divs (keine heading-Rolle) → per Text prüfen.
+    expect(await screen.findByText('Strom · kWh')).toBeInTheDocument();
+    expect(screen.getByText('Wasser · m³')).toBeInTheDocument();
+  });
+
+  it('zeigt einen Leerzustand, wenn es Messstellen, aber keinen Verbrauch im Zeitraum gibt', async () => {
+    mockEndpoints([MP], [{ measuring_point_id: 1, consumption: [], readings: [], state: [] }]);
+    renderWithRouter(<DashboardPage />);
+
+    expect(await screen.findByText(/Kein Verbrauch im gewählten Zeitraum/)).toBeInTheDocument();
+  });
+
+  it('Diagrammtyp auf Balken umschalten crasht nicht (Chart bleibt gerendert)', async () => {
+    mockEndpoints(
+      [MP],
+      [
+        {
+          measuring_point_id: 1,
+          consumption: [cp('2024-01-31', '5', 'm³')],
+          readings: [],
+          state: [],
+        },
+      ],
+    );
+    renderWithRouter(<DashboardPage />);
+    await screen.findByText('Wasser · m³');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Balken' }));
+    expect(screen.getByText('Wasser · m³')).toBeInTheDocument();
   });
 });

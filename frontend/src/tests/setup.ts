@@ -13,21 +13,37 @@ if (typeof URL.createObjectURL !== 'function') {
 
 // jsdom hat kein window.matchMedia. useChartTheme.ts nutzt es zum
 // Erkennen des System-Themes — wir mocken es als no-op, damit
-// MutationObserver/Eventlistener-Setup nicht crasht.
+// MutationObserver/Eventlistener-Setup nicht crasht. BEWUSST eine reine
+// Funktion (kein vi.fn): Tests, die in ihrem afterEach `vi.restoreAllMocks()`
+// rufen, würden einen vi.fn-Mock aushebeln (Implementierung → undefined),
+// sodass spätere Chart-Mounts in derselben Datei `mq.addEventListener` auf
+// undefined aufriefen.
 if (!window.matchMedia) {
   Object.defineProperty(window, 'matchMedia', {
     writable: true,
-    value: vi.fn().mockImplementation((query: string) => ({
+    configurable: true,
+    value: (query: string) => ({
       matches: false,
       media: query,
       onchange: null,
-      addEventListener: vi.fn(),
-      removeEventListener: vi.fn(),
-      addListener: vi.fn(),
-      removeListener: vi.fn(),
-      dispatchEvent: vi.fn(),
-    })),
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      addListener: () => {},
+      removeListener: () => {},
+      dispatchEvent: () => false,
+    }),
   });
+}
+
+// jsdom hat kein ResizeObserver — Recharts' ResponsiveContainer braucht es beim
+// Mount. Charts werden in jsdom mangels Layout-Maßen ohnehin nicht gemessen;
+// der Stub verhindert nur den ReferenceError.
+if (!('ResizeObserver' in globalThis)) {
+  (globalThis as unknown as { ResizeObserver: unknown }).ResizeObserver = class ResizeObserverStub {
+    observe(): void {}
+    unobserve(): void {}
+    disconnect(): void {}
+  };
 }
 
 // msw als API-Mock-Server (nur in Tests aktiv). Tests, die keine HTTP-Requests
