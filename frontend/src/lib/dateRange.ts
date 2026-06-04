@@ -48,11 +48,10 @@ export function formatRangeDe(range: DateRange): string {
 }
 
 /**
- * Kompakte Darstellung für enge Container (Sidebar): ein volles Kalenderjahr
- * wird zur reinen Jahreszahl („2026"), ein Teilbereich innerhalb eines Jahres
- * lässt das Start-Jahr weg („01.03.–31.12.2026"), jahresübergreifend kommen
- * 2-stellige Jahre zum Einsatz („15.03.25–20.08.27"). Offene Endpunkte fallen
- * auf das volle Format zurück.
+ * Kompakte Darstellung für enge Container (Sidebar): zeigt IMMER beide Daten,
+ * Jahre 2-stellig (YY). Bei gleichem Jahr wird das (redundante) Start-Jahr
+ * weggelassen — „01.01.–31.12.26"; jahresübergreifend beide Jahre —
+ * „15.03.25–20.08.27". Offene Endpunkte fallen aufs volle Format zurück.
  */
 export function formatRangeShort(range: DateRange): string {
   const { from, to } = range;
@@ -65,7 +64,6 @@ export function formatRangeShort(range: DateRange): string {
   const y2 = Number(t[0]);
   const m2 = Number(t[1]);
   const d2 = Number(t[2]);
-  if (y1 === y2 && m1 === 1 && d1 === 1 && m2 === 12 && d2 === 31) return `${y1}`;
-  if (y1 === y2) return `${pad(d1)}.${pad(m1)}.–${pad(d2)}.${pad(m2)}.${y1}`;
+  if (y1 === y2) return `${pad(d1)}.${pad(m1)}.–${pad(d2)}.${pad(m2)}.${pad(y1 % 100)}`;
   return `${pad(d1)}.${pad(m1)}.${pad(y1 % 100)}–${pad(d2)}.${pad(m2)}.${pad(y2 % 100)}`;
 }

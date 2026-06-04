@@ -23,6 +23,8 @@ export interface FilterPrefsState {
   setTo: (v: string) => void;
   /** Verschiebt den Datumsbereich um `delta` ganze Jahre (−1 = Vorjahr). */
   stepYear: (delta: number) => void;
+  /** Setzt den Datumsbereich auf den Standard (laufendes Kalenderjahr). */
+  resetDateRange: () => void;
 }
 
 export const FilterPrefsContext = createContext<FilterPrefsState | null>(null);

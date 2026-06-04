@@ -93,6 +93,7 @@ export function FilterPrefsProvider({ children }: { children: ReactNode }) {
   const setFrom = useCallback((v: string) => setRange((r) => ({ ...r, from: v })), []);
   const setTo = useCallback((v: string) => setRange((r) => ({ ...r, to: v })), []);
   const stepYear = useCallback((delta: number) => setRange((r) => shiftRangeByYears(r, delta)), []);
+  const resetDateRange = useCallback(() => setRange(currentYearRange(new Date())), []);
 
   const value = useMemo<FilterPrefsState>(
     () => ({
@@ -103,8 +104,18 @@ export function FilterPrefsProvider({ children }: { children: ReactNode }) {
       setFrom,
       setTo,
       stepYear,
+      resetDateRange,
     }),
-    [rememberFilters, setRememberFilters, dateRange, setDateRange, setFrom, setTo, stepYear],
+    [
+      rememberFilters,
+      setRememberFilters,
+      dateRange,
+      setDateRange,
+      setFrom,
+      setTo,
+      stepYear,
+      resetDateRange,
+    ],
   );
 
   return <FilterPrefsContext.Provider value={value}>{children}</FilterPrefsContext.Provider>;

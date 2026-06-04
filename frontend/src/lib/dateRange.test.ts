@@ -42,13 +42,11 @@ describe('dateRange helpers', () => {
   });
 
   describe('formatRangeShort', () => {
-    it('volles Kalenderjahr → nur die Jahreszahl', () => {
-      expect(formatRangeShort({ from: '2026-01-01', to: '2026-12-31' })).toBe('2026');
+    it('gleiches Jahr → Start ohne Jahr, Ende als YY (immer beide Daten)', () => {
+      expect(formatRangeShort({ from: '2026-01-01', to: '2026-12-31' })).toBe('01.01.–31.12.26');
+      expect(formatRangeShort({ from: '2026-03-01', to: '2026-12-31' })).toBe('01.03.–31.12.26');
     });
-    it('gleiches Jahr, Teilbereich → Start ohne Jahr', () => {
-      expect(formatRangeShort({ from: '2026-03-01', to: '2026-12-31' })).toBe('01.03.–31.12.2026');
-    });
-    it('jahresübergreifend → 2-stellige Jahre', () => {
+    it('jahresübergreifend → beide Jahre als YY', () => {
       expect(formatRangeShort({ from: '2025-03-15', to: '2027-08-20' })).toBe('15.03.25–20.08.27');
     });
     it('offener Endpunkt → Fallback auf das volle Format', () => {

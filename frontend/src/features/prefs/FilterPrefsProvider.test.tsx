@@ -50,6 +50,16 @@ describe('FilterPrefsProvider', () => {
     expect(result.current.dateRange).toEqual({ from: '2025-01-01', to: '2025-12-31' });
   });
 
+  it('resetDateRange setzt den Bereich auf das laufende Kalenderjahr', () => {
+    window.sessionStorage.setItem(
+      'app.dateRange',
+      JSON.stringify({ from: '2020-01-01', to: '2020-12-31' }),
+    );
+    const { result } = renderHook(() => useFilterPrefs(), { wrapper: FilterPrefsProvider });
+    act(() => result.current.resetDateRange());
+    expect(result.current.dateRange).toEqual(YEAR_RANGE);
+  });
+
   it('Ausschalten von „Filter merken" wischt filters.*-Keys, lässt den Datumsbereich aber unangetastet', () => {
     window.localStorage.setItem('filters.remember', '1');
     window.sessionStorage.setItem('filters.dashboard.type', JSON.stringify(['water']));

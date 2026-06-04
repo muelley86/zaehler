@@ -28,6 +28,7 @@ export function Dropdown({
   align = 'left',
   variant = 'pill',
   dense = false,
+  hideChevron = false,
 }: {
   label: ReactNode;
   /** Aktiv-Zähler (nur ``pill``). > 0 → Trigger aktiv gestylt und zeigt das Badge. */
@@ -36,6 +37,8 @@ export function Dropdown({
   align?: 'left' | 'right';
   /** ``pill`` = kompakter Filter-Trigger, ``field`` = volle Breite wie ein Formularfeld. */
   variant?: 'pill' | 'field';
+  /** Blendet das Chevron aus — schafft Textbreite in sehr engen Triggern. */
+  hideChevron?: boolean;
   /** Kompaktere Schrift/Höhe für enge Container (z. B. Sidebar). */
   dense?: boolean;
 }) {
@@ -113,15 +116,17 @@ export function Dropdown({
             {badge}
           </span>
         ) : null}
-        <ChevronDown
-          size={isField ? 16 : 14}
-          aria-hidden
-          className={cx(
-            'shrink-0 transition-transform',
-            isField && 'text-tertiary',
-            open && 'rotate-180',
-          )}
-        />
+        {hideChevron ? null : (
+          <ChevronDown
+            size={isField ? 16 : 14}
+            aria-hidden
+            className={cx(
+              'shrink-0 transition-transform',
+              isField && 'text-tertiary',
+              open && 'rotate-180',
+            )}
+          />
+        )}
       </button>
       {open && pos
         ? createPortal(
