@@ -10,6 +10,14 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.52.0](https://github.com/muelley86/zaehler/compare/v2.51.0...v2.52.0) (2026-06-04)
+
+
+### Funktionen
+
+* **filters:** Filter-Memory pro Session + Reset-Button ([#221](https://github.com/muelley86/zaehler/issues/221)) ([ac17ec4](https://github.com/muelley86/zaehler/commit/ac17ec4b91cd0a2e4e6d85f45ad23abc6a3ee20f))
+* **reports:** Auswertungs-Filter pro Session merken ([#224](https://github.com/muelley86/zaehler/issues/224)) ([0e60f98](https://github.com/muelley86/zaehler/commit/0e60f98879a158e1f0841d9cf18f34c2fa43edd6))
+
 ## [2.51.0](https://github.com/muelley86/zaehler/compare/v2.50.0...v2.51.0) (2026-06-03)
 
 
