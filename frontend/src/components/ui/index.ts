@@ -1,5 +1,6 @@
 export { Button } from './Button';
 export { Card } from './Card';
+export { DateInput } from './DateInput';
 export { Dropdown } from './Dropdown';
 export { EmptyState } from './EmptyState';
 export { LargeTitle } from './LargeTitle';

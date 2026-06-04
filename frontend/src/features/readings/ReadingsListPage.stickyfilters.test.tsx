@@ -92,10 +92,10 @@ afterEach(() => {
 });
 
 describe('ReadingsListPage — Filter merken', () => {
-  it('konsumiert den geteilten Datumsbereich in der /entries-Query', async () => {
-    window.localStorage.setItem('filters.remember', '1');
+  it('konsumiert den globalen Datumsbereich in der /entries-Query', async () => {
+    // Globaler Datumsbereich ist immer aktiv (unabhängig von „Filter merken").
     window.sessionStorage.setItem(
-      'filters.shared.dateRange',
+      'app.dateRange',
       JSON.stringify({ from: '2025-06-01', to: '2025-06-30' }),
     );
     const { dateParams } = mockEndpoints();

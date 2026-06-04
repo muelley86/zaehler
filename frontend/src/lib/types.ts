@@ -311,7 +311,8 @@ export type ReportPeriodKind =
   | 'last_12_months'
   | 'current_month'
   | 'last_month'
-  | 'all';
+  | 'all'
+  | 'shared_range';
 
 export interface ReportFilter {
   main_location_ids: (number | null)[];

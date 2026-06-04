@@ -1,25 +1,28 @@
 /**
  * FilterPrefsProvider — fuellt den FilterPrefsContext. Mountet an der App-Wurzel
- * (oberhalb des Route-Trees), damit der geteilte Datumsbereich Routenwechsel
- * (Dashboard ⇄ Erfassungen) ueberlebt.
+ * (oberhalb des Route-Trees), damit der globale Datumsbereich Routenwechsel
+ * überlebt.
  *
  * Speicher-Schluessel:
- *  - `filters.remember`        (localStorage)   — dauerhafte Ein/Aus-Praeferenz
- *  - `filters.shared.dateRange`(sessionStorage) — geteilter Datumsbereich
- *  - `filters.*`               (sessionStorage) — alle per-Seite gemerkten Filter
+ *  - `app.dateRange` (sessionStorage)  — globaler Datumsbereich, IMMER persistiert
+ *    (außerhalb des `filters.`-Präfix, s.u.).
+ *  - `filters.remember` (localStorage) — dauerhafte Ein/Aus-Praeferenz „Filter merken".
+ *  - `filters.*` (sessionStorage)      — die per-Seite gemerkten Nicht-Datums-Filter.
  *
- * Ausschalten = Reset: loescht jeden `filters.*`-Session-Key und nullt den
- * geteilten Datumsbereich.
+ * „Filter merken → aus" loescht jeden `filters.*`-Session-Key — der Datumsbereich
+ * (`app.dateRange`) liegt bewusst außerhalb dieses Präfix und bleibt erhalten.
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 
+import { currentYearRange, shiftRangeByYears } from '@/lib/dateRange';
+import type { DateRange } from '@/lib/dateRange';
 import { FilterPrefsContext } from './filter-prefs-context';
-import type { FilterPrefsState, SharedDateRange } from './filter-prefs-context';
+import type { FilterPrefsState } from './filter-prefs-context';
 
 const REMEMBER_KEY = 'filters.remember';
-const SHARED_RANGE_KEY = 'filters.shared.dateRange';
+const DATE_RANGE_KEY = 'app.dateRange';
 const SESSION_PREFIX = 'filters.';
 
 function loadRemember(): boolean {
@@ -34,19 +37,19 @@ function isRecord(x: unknown): x is Record<string, unknown> {
   return typeof x === 'object' && x !== null;
 }
 
-function loadSharedRange(enabled: boolean): SharedDateRange {
-  if (!enabled) return null;
+function loadDateRange(): DateRange {
   try {
-    const raw = window.sessionStorage.getItem(SHARED_RANGE_KEY);
-    if (!raw) return null;
-    const parsed: unknown = JSON.parse(raw);
-    if (isRecord(parsed) && typeof parsed.from === 'string' && typeof parsed.to === 'string') {
-      return { from: parsed.from, to: parsed.to };
+    const raw = window.sessionStorage.getItem(DATE_RANGE_KEY);
+    if (raw) {
+      const parsed: unknown = JSON.parse(raw);
+      if (isRecord(parsed) && typeof parsed.from === 'string' && typeof parsed.to === 'string') {
+        return { from: parsed.from, to: parsed.to };
+      }
     }
-    return null;
   } catch {
-    return null;
+    /* ignore */
   }
+  return currentYearRange(new Date());
 }
 
 function clearAllSessionFilterKeys(): void {
@@ -64,19 +67,16 @@ function clearAllSessionFilterKeys(): void {
 
 export function FilterPrefsProvider({ children }: { children: ReactNode }) {
   const [rememberFilters, setRemember] = useState<boolean>(() => loadRemember());
-  const [sharedRange, setRange] = useState<SharedDateRange>(() => loadSharedRange(loadRemember()));
+  const [dateRange, setRange] = useState<DateRange>(() => loadDateRange());
 
-  // Persistenz des geteilten Datumsbereichs — nur wenn aktiviert. Das Entfernen
-  // beim Ausschalten erledigt `clearAllSessionFilterKeys` (Praefix-Match).
+  // Globaler Datumsbereich — IMMER persistiert (kein „Filter merken"-Gate).
   useEffect(() => {
-    if (!rememberFilters) return;
     try {
-      if (sharedRange === null) window.sessionStorage.removeItem(SHARED_RANGE_KEY);
-      else window.sessionStorage.setItem(SHARED_RANGE_KEY, JSON.stringify(sharedRange));
+      window.sessionStorage.setItem(DATE_RANGE_KEY, JSON.stringify(dateRange));
     } catch {
       /* non-fatal */
     }
-  }, [rememberFilters, sharedRange]);
+  }, [dateRange]);
 
   const setRememberFilters = useCallback((on: boolean) => {
     try {
@@ -84,19 +84,27 @@ export function FilterPrefsProvider({ children }: { children: ReactNode }) {
     } catch {
       /* non-fatal */
     }
-    if (!on) {
-      clearAllSessionFilterKeys();
-      setRange(null);
-    }
+    // Aus = Reset der ÜBRIGEN Filter; der Datumsbereich bleibt unangetastet.
+    if (!on) clearAllSessionFilterKeys();
     setRemember(on);
   }, []);
 
-  const setSharedRange = useCallback((next: SharedDateRange) => setRange(next), []);
-  const clearSharedRange = useCallback(() => setRange(null), []);
+  const setDateRange = useCallback((next: DateRange) => setRange(next), []);
+  const setFrom = useCallback((v: string) => setRange((r) => ({ ...r, from: v })), []);
+  const setTo = useCallback((v: string) => setRange((r) => ({ ...r, to: v })), []);
+  const stepYear = useCallback((delta: number) => setRange((r) => shiftRangeByYears(r, delta)), []);
 
   const value = useMemo<FilterPrefsState>(
-    () => ({ rememberFilters, setRememberFilters, sharedRange, setSharedRange, clearSharedRange }),
-    [rememberFilters, setRememberFilters, sharedRange, setSharedRange, clearSharedRange],
+    () => ({
+      rememberFilters,
+      setRememberFilters,
+      dateRange,
+      setDateRange,
+      setFrom,
+      setTo,
+      stepYear,
+    }),
+    [rememberFilters, setRememberFilters, dateRange, setDateRange, setFrom, setTo, stepYear],
   );
 
   return <FilterPrefsContext.Provider value={value}>{children}</FilterPrefsContext.Provider>;
