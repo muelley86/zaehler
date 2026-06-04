@@ -11,6 +11,12 @@ on:
       - 'backend/**'
       - '.github/workflows/backend.yml'
 
+# Least Privilege: dieser Workflow checkt nur aus + testet, braucht keinen
+# Schreib-Token. Ohne diesen Block erbt der Job den (oft weiteren)
+# Repo-Default-Scope.
+permissions:
+  contents: read
+
 defaults:
   run:
     working-directory: backend
@@ -19,10 +25,14 @@ jobs:
   lint-and-test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          # Kein Schreib-Token nötig; verhindert, dass der GITHUB_TOKEN nach
+          # dem Checkout in .git/config persistiert (zizmor: artipacked).
+          persist-credentials: false
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v3
+        uses: astral-sh/setup-uv@caf0cab7a618c569241d31dcd442f54681755d39 # v3.2.4
         with:
           enable-cache: true
 
@@ -44,11 +54,11 @@ jobs:
       # SPA-Fallback-Tests in test_spa_fallback.py setzen voraus, dass
       # backend/src/meters/static/index.html existiert. Das Verzeichnis ist
       # gitignored — CI muss das Frontend selber bauen, sonst 5 rote Tests.
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
         with:
           version: 9
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 22
           cache: pnpm
