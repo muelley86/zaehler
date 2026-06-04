@@ -16,6 +16,8 @@ import {
 } from '@/components/ui';
 import { ApiError, api } from '@/lib/api';
 import { formatDateTimeDe } from '@/lib/format';
+import { useFilterPrefs } from '@/features/prefs/filter-prefs-context';
+import { enumCodec, useStickyState } from '@/lib/useStickyState';
 import type { Me, UserRead, UserRole } from '@/lib/types';
 import { cx } from '@/components/ui/cx';
 
@@ -24,12 +26,24 @@ import { UserEditSheet } from './UserEditSheet';
 
 type Filter = 'all' | UserRole | 'inactive';
 
+// Session-Memory des Rollen-Filters („Filter merken").
+const FILTER_NS = 'filters.adminUsers.';
+const isUserFilter = (x: string): x is Filter =>
+  x === 'all' || x === 'admin' || x === 'recorder' || x === 'inactive';
+const FILTER_CODEC = enumCodec<Filter>(isUserFilter);
+
 export function UsersAdminPage() {
   const { me } = useAuth();
   const [users, setUsers] = useState<UserRead[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
-  const [filter, setFilter] = useState<Filter>('all');
+  const { rememberFilters } = useFilterPrefs();
+  const [filter, setFilter] = useStickyState<Filter>(
+    FILTER_NS + 'filter',
+    'all',
+    rememberFilters,
+    FILTER_CODEC,
+  );
 
   useEffect(() => {
     api
