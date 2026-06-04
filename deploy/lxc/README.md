@@ -278,6 +278,28 @@ sudo zaehler repair-midnight-readings --apply  # verschiebt sie auf Vortag 23:59
 sudo zaehler repair-legacy-timestamps [--apply]  # naiv-UTC-Altdaten korrigieren
 ```
 
+**Register-Einheit umbenennen** (kein `zaehler`-Subcommand — direkt als App-User
+ausführen). Benennt die Einheit passender Register um, **ohne die gespeicherten Werte zu
+ändern** (reines Label). Typischer Fall: versehentlich mit kWh statt MWh angelegte
+Wärmemengenzähler, bei denen die Stände bereits als MWh-Zahlen erfasst wurden. Default
+Dry-Run; `--apply` schreibt und frischt den Monats-Cache der betroffenen Register auf.
+**Vorher `sudo zaehler backup`** — dieser Direktaufruf sichert (anders als die `repair-*`-
+Kommandos oben) NICHT automatisch.
+
+```bash
+sudo zaehler backup   # Sicherung vorher (kein Auto-Backup bei diesem Direktaufruf)
+
+# Dry-Run — zeigt die betroffenen Register, ändert nichts:
+sudo -u zaehler -H bash -lc 'cd /opt/zaehler/backend && set -a && . /opt/zaehler/data/meters.env && set +a && uv run python -m meters.cli relabel-register-unit --type heating --from kWh --to MWh'
+
+# Schreiben — Einheit kWh → MWh (Werte unverändert, Monats-Cache neu berechnet):
+sudo -u zaehler -H bash -lc 'cd /opt/zaehler/backend && set -a && . /opt/zaehler/data/meters.env && set +a && uv run python -m meters.cli relabel-register-unit --type heating --from kWh --to MWh --apply'
+```
+
+> Die Einheit `MWh` muss eine gültige Heizungs-Einheit sein (ist sie:
+> `ALLOWED_HEATING_UNITS`). `--type`/`--from`/`--to` sind anpassbar, falls mal eine andere
+> Einheit/ein anderer Messstellen-Typ korrigiert werden muss.
+
 > **Hinweis:** `zaehler` ist ein Symlink auf
 > `/opt/zaehler/repo/deploy/lxc/zaehler.sh`, den die Installation
 > automatisch in `/usr/local/bin` ablegt. Du kannst alle Kommandos
