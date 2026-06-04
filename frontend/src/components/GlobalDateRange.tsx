@@ -1,7 +1,7 @@
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 import { useFilterPrefs } from '@/features/prefs/filter-prefs-context';
-import { formatRangeDe } from '@/lib/dateRange';
+import { formatRangeShort } from '@/lib/dateRange';
 import { DateInput, Dropdown } from '@/components/ui';
 import { cx } from '@/components/ui/cx';
 
@@ -12,18 +12,20 @@ import { cx } from '@/components/ui/cx';
  * kompakte, zentrierte Leiste.
  */
 export function GlobalDateRange({ variant }: { variant: 'sidebar' | 'mobile' }) {
-  const { dateRange, setFrom, setTo, stepYear } = useFilterPrefs();
+  const { dateRange, setFrom, setTo, stepYear, resetDateRange } = useFilterPrefs();
 
   return (
     <div
       data-testid={`global-date-range-${variant}`}
-      className={cx('flex items-center gap-1', variant === 'mobile' && 'justify-center')}
+      className={cx('flex items-center gap-0.5', variant === 'mobile' && 'justify-center')}
     >
       <YearArrow dir="prev" onClick={() => stepYear(-1)} />
       <div className={variant === 'sidebar' ? 'min-w-0 flex-1' : 'min-w-0'}>
         <Dropdown
-          label={formatRangeDe(dateRange)}
+          label={formatRangeShort(dateRange)}
           variant={variant === 'sidebar' ? 'field' : 'pill'}
+          dense
+          hideChevron
         >
           <div className="flex flex-col gap-2 p-3">
             <label className="flex flex-col gap-1 text-caption text-tertiary">
@@ -34,6 +36,13 @@ export function GlobalDateRange({ variant }: { variant: 'sidebar' | 'mobile' }) 
               bis
               <DateInput value={dateRange.to} onChange={setTo} aria-label="bis" />
             </label>
+            <button
+              type="button"
+              onClick={resetDateRange}
+              className="mt-1 self-start text-caption font-semibold text-primary"
+            >
+              Datum zurücksetzen
+            </button>
           </div>
         </Dropdown>
       </div>
@@ -49,9 +58,9 @@ function YearArrow({ dir, onClick }: { dir: 'prev' | 'next'; onClick: () => void
       type="button"
       onClick={onClick}
       aria-label={dir === 'prev' ? 'Ein Jahr zurück' : 'Ein Jahr vor'}
-      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-tertiary transition-colors hover:bg-fill hover:text-label"
+      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-tertiary transition-colors hover:bg-fill hover:text-label"
     >
-      <Icon size={18} />
+      <Icon size={16} />
     </button>
   );
 }
