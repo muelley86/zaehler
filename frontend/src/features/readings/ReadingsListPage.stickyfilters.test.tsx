@@ -134,3 +134,25 @@ describe('ReadingsListPage — Filter merken', () => {
     expect(window.sessionStorage.getItem('filters.readings.type')).toBeNull();
   });
 });
+
+describe('ReadingsListPage — Deep-Link aus der MP-Detailansicht', () => {
+  it('konsumiert ?mp=&obis= aus der URL und filtert die /entries-Query danach', async () => {
+    const seen: Array<{ mp: string[]; obis: string[] }> = [];
+    server.use(
+      http.get('/api/v1/measuring-points', () => HttpResponse.json([MP])),
+      http.get('/api/v1/entries', ({ request }) => {
+        const sp = new URL(request.url).searchParams;
+        seen.push({ mp: sp.getAll('measuring_point_id'), obis: sp.getAll('obis') });
+        return HttpResponse.json({ items: [], total: 0 });
+      }),
+    );
+
+    renderWithRouter(<ReadingsListPage />, {
+      initialEntries: ['/erfassungen?mp=1&obis=1.8.0'],
+    });
+
+    await waitFor(() =>
+      expect(seen.some((s) => s.mp.includes('1') && s.obis.includes('1.8.0'))).toBe(true),
+    );
+  });
+});
