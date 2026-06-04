@@ -10,6 +10,13 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.53.3](https://github.com/muelley86/zaehler/compare/v2.53.2...v2.53.3) (2026-06-04)
+
+
+### Fehlerbehebungen
+
+* **filters:** Filter merken auch für Verwaltung ▸ Standorte & Benutzer ([#231](https://github.com/muelley86/zaehler/issues/231)) ([f5c9872](https://github.com/muelley86/zaehler/commit/f5c9872f4c5b5eda26144cffc4e7eae3c7041119))
+
 ## [2.53.2](https://github.com/muelley86/zaehler/compare/v2.53.1...v2.53.2) (2026-06-04)
 
 
