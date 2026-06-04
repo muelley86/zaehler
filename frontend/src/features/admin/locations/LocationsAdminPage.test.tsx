@@ -7,8 +7,8 @@
  */
 
 import { http, HttpResponse } from 'msw';
-import { describe, expect, it, vi } from 'vitest';
-import { screen } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import { renderWithRouter } from '@/tests/render';
@@ -51,6 +51,11 @@ function _mockList(locs: ReturnType<typeof _loc>[]) {
 }
 
 describe('LocationsAdminPage — Hauptstandort-Filter', () => {
+  afterEach(() => {
+    window.localStorage.clear();
+    window.sessionStorage.clear();
+  });
+
   it('filtert das Grid per Hauptstandort-Pill und setzt zurück', async () => {
     _mockList([
       _loc({ id: 1, name: 'Keller', main_location_id: 10, main_location_name: 'Haus West' }),
@@ -83,5 +88,39 @@ describe('LocationsAdminPage — Hauptstandort-Filter', () => {
     expect(screen.getByText('Wiese')).toBeInTheDocument();
     expect(screen.queryByText('Keller')).not.toBeInTheDocument();
     expect(screen.queryByText('Garage')).not.toBeInTheDocument();
+  });
+
+  it('merkt den Hauptstandort-Filter in sessionStorage, wenn „Filter merken" aktiv ist', async () => {
+    window.localStorage.setItem('filters.remember', '1');
+    _mockList([
+      _loc({ id: 1, name: 'Keller', main_location_id: 10, main_location_name: 'Haus West' }),
+      _loc({ id: 2, name: 'Garage', main_location_id: 20, main_location_name: 'Haus Ost' }),
+    ]);
+    const user = userEvent.setup();
+    renderWithRouter(<LocationsAdminPage />);
+
+    await screen.findByText('Keller');
+    await user.click(screen.getByRole('button', { name: 'Hauptstandort' }));
+    await user.click(await screen.findByRole('checkbox', { name: 'Haus West' }));
+
+    await waitFor(() =>
+      expect(window.sessionStorage.getItem('filters.adminLocations.mainLocation')).toContain('10'),
+    );
+  });
+
+  it('persistiert nichts, wenn „Filter merken" aus ist (Default)', async () => {
+    _mockList([
+      _loc({ id: 1, name: 'Keller', main_location_id: 10, main_location_name: 'Haus West' }),
+      _loc({ id: 2, name: 'Garage', main_location_id: 20, main_location_name: 'Haus Ost' }),
+    ]);
+    const user = userEvent.setup();
+    renderWithRouter(<LocationsAdminPage />);
+
+    await screen.findByText('Keller');
+    await user.click(screen.getByRole('button', { name: 'Hauptstandort' }));
+    await user.click(await screen.findByRole('checkbox', { name: 'Haus West' }));
+
+    expect(screen.queryByText('Garage')).not.toBeInTheDocument(); // Filter wirkt
+    expect(window.sessionStorage.getItem('filters.adminLocations.mainLocation')).toBeNull();
   });
 });

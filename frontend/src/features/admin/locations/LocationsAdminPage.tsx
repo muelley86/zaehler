@@ -16,12 +16,19 @@ import type { DropdownOption } from '@/components/ui';
 import { LocationMap } from '@/components/LocationMap';
 import { LocationMapSheet } from '@/components/LocationMapSheet';
 import { ApiError, api } from '@/lib/api';
+import { useFilterPrefs } from '@/features/prefs/filter-prefs-context';
+import { setCodec, useStickyState } from '@/lib/useStickyState';
 import type { LocationRead, MainLocationRead, MeasuringPointRead } from '@/lib/types';
 
 // Default-Karten-Zentrum (Kassel, Mitte Deutschland) wenn der User noch
 // keine Koordinaten hat und auf "Auf Karte wählen" klickt.
 const DEFAULT_LAT = 51.16;
 const DEFAULT_LNG = 10.45;
+
+// Session-Memory des Hauptstandort-Filters („Filter merken").
+const FILTER_NS = 'filters.adminLocations.';
+const isIdMember = (x: unknown): x is number | null => x === null || typeof x === 'number';
+const ID_CODEC = setCodec<number | null>(isIdMember);
 
 export function LocationsAdminPage() {
   const [locations, setLocations] = useState<LocationRead[] | null>(null);
@@ -31,7 +38,13 @@ export function LocationsAdminPage() {
   const [tick, setTick] = useState(0);
   const [editing, setEditing] = useState<LocationRead | null>(null);
   const [mapTarget, setMapTarget] = useState<LocationRead | null>(null);
-  const [mainFilter, setMainFilter] = useState<Set<number | null>>(new Set());
+  const { rememberFilters } = useFilterPrefs();
+  const [mainFilter, setMainFilter] = useStickyState<Set<number | null>>(
+    FILTER_NS + 'mainLocation',
+    new Set(),
+    rememberFilters,
+    ID_CODEC,
+  );
 
   useEffect(() => {
     api
