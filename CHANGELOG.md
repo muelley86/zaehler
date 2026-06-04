@@ -10,6 +10,13 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.54.2](https://github.com/muelley86/zaehler/compare/v2.54.1...v2.54.2) (2026-06-04)
+
+
+### Fehlerbehebungen
+
+* **deps:** pnpm-Overrides entfernen, react-router-dom 6.30.4 (LXC-Deploy reparieren) ([#242](https://github.com/muelley86/zaehler/issues/242)) ([6c91a9a](https://github.com/muelley86/zaehler/commit/6c91a9a65bd9399ee8e7e13777fb77f9fc2e376d))
+
 ## [2.54.1](https://github.com/muelley86/zaehler/compare/v2.54.0...v2.54.1) (2026-06-04)
 
 
