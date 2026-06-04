@@ -15,16 +15,3 @@ packages:
 allowBuilds:
   esbuild: true
   msw: true
-
-# Sicherheits-Overrides (Audit 2026-06-04): heben einzelne verwundbare
-# Transitiv-Versionen auf den gepatchten Stand. Versions-spezifische Keys,
-# damit nur die betroffene Instanz angehoben wird — brace-expansion hat z.B.
-# zusaetzlich unkritische 1.x/2.x-Stränge, die unberührt bleiben müssen.
-# vite/vitest/esbuild fehlen bewusst: deren Fix erfordert einen Major-Sprung
-# (vite 6 / vitest 4) und ist dev/build-only — separate Migration.
-overrides:
-  '@babel/plugin-transform-modules-systemjs@7.29.0': '7.29.4'
-  'fast-uri@3.1.1': '3.1.2'
-  'ws@8.20.0': '8.20.1'
-  'brace-expansion@5.0.5': '5.0.6'
-  'react-router@6.30.3': '6.30.4'
