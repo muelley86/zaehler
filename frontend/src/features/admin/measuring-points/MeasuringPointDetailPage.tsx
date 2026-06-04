@@ -48,6 +48,7 @@ import {
 } from '@/components/ui';
 import { LocationMapSheet } from '@/components/LocationMapSheet';
 import { useAuth } from '@/features/auth/auth-context';
+import { useFilterPrefs } from '@/features/prefs/filter-prefs-context';
 import { ApiError, api } from '@/lib/api';
 import { formatDateDe, formatDateTickDe, formatDateTimeDe, formatDe, parseDe } from '@/lib/format';
 import { useChartTheme } from '@/lib/useChartTheme';
@@ -87,6 +88,12 @@ export function MeasuringPointDetailPage() {
   const [mapOpen, setMapOpen] = useState(false);
   const [tick, setTick] = useState(0);
 
+  // Globaler Datumsbereich aus der Navigation — treibt die Verbrauchskurve
+  // (wie das Dashboard). `from`/`to` als lokale Aliase für die Query.
+  const { dateRange } = useFilterPrefs();
+  const from = dateRange.from;
+  const to = dateRange.to;
+
   const refresh = useCallback(() => setTick((t) => t + 1), []);
 
   useEffect(() => {
@@ -94,8 +101,9 @@ export function MeasuringPointDetailPage() {
       navigate('/admin/messstellen', { replace: true });
       return;
     }
-    // Vier Endpoints parallel - keine Cascade. Location wird in einem
-    // separaten useEffect anhand von mp.location_id nachgeladen.
+    // Stammdaten + Locations + Register-State parallel — keine Cascade. Die
+    // Verbrauchskurve hängt am Datumsbereich und lädt in einem eigenen Effekt;
+    // Location wird anhand von mp.location_id nachgeladen.
     api
       .get<MeasuringPointRead>(`/measuring-points/${mpId}`)
       .then(setMp)
@@ -110,18 +118,36 @@ export function MeasuringPointDetailPage() {
         /* nicht kritisch - der Edit-Modus zeigt dann eine leere Auswahl */
       });
     api
-      .get<ConsumptionPoint[]>(`/measuring-points/${mpId}/consumption`)
-      .then(setConsumption)
-      .catch(() => {
-        /* nicht kritisch */
-      });
-    api
       .get<RegisterStateRead[]>(`/measuring-points/${mpId}/state`)
       .then(setStates)
       .catch(() => {
         /* nicht kritisch */
       });
   }, [mpId, navigate, tick]);
+
+  // Verbrauchskurve: respektiert den globalen Datumsbereich (from_at/to_at) und
+  // lädt bei jeder Datumsänderung neu. Ein `cancelled`-Flag verwirft veraltete
+  // Antworten bei schnellem Umstellen (Jahr-Pfeile), ohne AbortSignal — wie die
+  // übrigen Fetches dieser Seite.
+  useEffect(() => {
+    if (!Number.isFinite(mpId)) return;
+    let cancelled = false;
+    const p = new URLSearchParams();
+    if (from) p.set('from_at', from);
+    if (to) p.set('to_at', to);
+    const qs = p.toString();
+    api
+      .get<ConsumptionPoint[]>(`/measuring-points/${mpId}/consumption${qs ? `?${qs}` : ''}`)
+      .then((data) => {
+        if (!cancelled) setConsumption(data);
+      })
+      .catch(() => {
+        /* nicht kritisch */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [mpId, from, to, tick]);
 
   // Standort-Detail nur laden, wenn die MP einen hat. Optional, daher
   // schluckt der Catch leise.
@@ -1252,14 +1278,9 @@ function RegisterTable({
         <ul className="divide-y divide-separator">
           {allRegisters.map(({ register, meterSerial, meterRemovedAt }) => {
             const state = stateByRegister.get(register.id);
-            return (
-              <li
-                key={register.id}
-                className={cx(
-                  'grid grid-cols-1 gap-2 px-5 py-4',
-                  'md:grid-cols-[110px_1.4fr_1fr_1fr_auto] md:items-center md:gap-4',
-                )}
-              >
+            // Vier Info-Zellen — identisch für klickbare wie Lieferungs-Zeilen.
+            const cells = (
+              <>
                 <div>
                   <code className="num inline-block rounded-badge bg-primary-soft px-2 py-1 text-caption font-semibold text-primary-deep">
                     {register.obis_code}
@@ -1288,7 +1309,18 @@ function RegisterTable({
                 <div className="num text-caption text-tertiary">
                   {state?.last_reading_at ? formatDateTimeDe(state.last_reading_at) : '—'}
                 </div>
-                {register.accepts_deliveries ? (
+              </>
+            );
+            const gridClass = cx(
+              'grid grid-cols-1 gap-2 px-5 py-4',
+              'md:grid-cols-[110px_1.4fr_1fr_1fr_auto] md:items-center md:gap-4',
+            );
+            // Lieferungs-Register (Tank/Vorrat): „Befüllungen"-Knopf, Zeile
+            // selbst nicht verlinkt (keine geschachtelten Interaktiven).
+            if (register.accepts_deliveries) {
+              return (
+                <li key={register.id} className={gridClass}>
+                  {cells}
                   <Button
                     type="button"
                     variant="plain"
@@ -1298,9 +1330,21 @@ function RegisterTable({
                   >
                     Befüllungen
                   </Button>
-                ) : (
+                </li>
+              );
+            }
+            // Normale Register: ganze Zeile verlinkt auf die gefilterten
+            // Erfassungen genau dieses Registers (Messstelle + OBIS-Code).
+            return (
+              <li key={register.id}>
+                <Link
+                  to={`/erfassungen?mp=${mp.id}&obis=${encodeURIComponent(register.obis_code)}`}
+                  aria-label={`Messungen zu Register ${register.obis_code}`}
+                  className={cx(gridClass, 'hover:bg-fill/40 transition-colors')}
+                >
+                  {cells}
                   <ChevronRight size={16} className="hidden text-tertiary md:block" />
-                )}
+                </Link>
               </li>
             );
           })}
