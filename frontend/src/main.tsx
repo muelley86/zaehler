@@ -20,6 +20,7 @@ import 'leaflet/dist/leaflet.css';
 
 import { App } from './App';
 import { AuthProvider } from './features/auth/AuthProvider';
+import { FilterPrefsProvider } from './features/prefs/FilterPrefsProvider';
 import './styles/index.css';
 
 const container = document.getElementById('root');
@@ -31,7 +32,9 @@ createRoot(container).render(
   <StrictMode>
     <BrowserRouter>
       <AuthProvider>
-        <App />
+        <FilterPrefsProvider>
+          <App />
+        </FilterPrefsProvider>
       </AuthProvider>
     </BrowserRouter>
   </StrictMode>,

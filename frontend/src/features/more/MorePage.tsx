@@ -1,10 +1,11 @@
-import { BarChart3, KeyRound, LayoutGrid, LogOut, Moon, Sun } from 'lucide-react';
+import { BarChart3, Filter, KeyRound, LayoutGrid, LogOut, Moon, Sun } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { useAuth } from '@/features/auth/auth-context';
 import { TwoFactorSection } from '@/features/auth/TwoFactorSection';
-import { Card, LargeTitle, Row, RowGroup, Section } from '@/components/ui';
+import { useFilterPrefs } from '@/features/prefs/filter-prefs-context';
+import { Card, LargeTitle, Row, RowGroup, Section, Switch } from '@/components/ui';
 import { PageGlows } from '@/components/PageGlows';
 import { cx } from '@/components/ui/cx';
 
@@ -38,6 +39,7 @@ function applyTheme(choice: ThemeChoice) {
 
 export function MorePage() {
   const { me, logout } = useAuth();
+  const { rememberFilters, setRememberFilters } = useFilterPrefs();
   const navigate = useNavigate();
   const isAdmin = me?.role === 'admin';
 
@@ -102,6 +104,30 @@ export function MorePage() {
                     : 'Dunkel'
               }
               trailing={<ThemeToggle value={themeChoice} onChange={setThemeChoice} />}
+            />
+          </RowGroup>
+        </Section>
+
+        {/* Filter — persönliche Einstellung: gesetzte Filter für die laufende
+            Browser-Session merken. Datum gilt dann seitenübergreifend
+            (Dashboard ⇄ Erfassungen), übrige Filter je Seite. Aus = Reset. */}
+        <Section header="Filter">
+          <RowGroup>
+            <Row
+              icon={<Filter size={20} />}
+              label="Filter merken"
+              sublabel={
+                rememberFilters
+                  ? 'Datum gilt seitenübergreifend, übrige Filter je Seite (diese Sitzung)'
+                  : 'Filter werden nicht gespeichert'
+              }
+              trailing={
+                <Switch
+                  checked={rememberFilters}
+                  onChange={setRememberFilters}
+                  ariaLabel="Filter merken"
+                />
+              }
             />
           </RowGroup>
         </Section>
