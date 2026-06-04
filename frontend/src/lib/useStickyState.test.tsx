@@ -1,7 +1,7 @@
 import { act, renderHook } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { setCodec, stringCodec, useStickyState } from './useStickyState';
+import { enumCodec, setCodec, stringCodec, useStickyState } from './useStickyState';
 
 const KEY = 'filters.test.value';
 
@@ -66,5 +66,26 @@ describe('useStickyState', () => {
 
     const second = renderHook(() => useStickyState<string>(KEY, '', true, stringCodec));
     expect(second.result.current[0]).toBe('hallo');
+  });
+
+  it('enumCodec round-trippt gueltige Werte und faellt bei Fremdwerten auf den Default', () => {
+    type Color = 'red' | 'blue';
+    const codec = enumCodec<Color>((x): x is Color => x === 'red' || x === 'blue');
+
+    const first = renderHook(() => useStickyState<Color>(KEY, 'red', true, codec));
+    act(() => {
+      first.result.current[1]('blue');
+    });
+    expect(window.sessionStorage.getItem(KEY)).toBe('blue');
+    first.unmount();
+
+    const second = renderHook(() => useStickyState<Color>(KEY, 'red', true, codec));
+    expect(second.result.current[0]).toBe('blue');
+    second.unmount();
+
+    // Fremdwert (z. B. veralteter Enum-Wert) -> Default statt kaputtem State.
+    window.sessionStorage.setItem(KEY, 'green');
+    const third = renderHook(() => useStickyState<Color>(KEY, 'red', true, codec));
+    expect(third.result.current[0]).toBe('red');
   });
 });

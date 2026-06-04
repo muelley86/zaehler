@@ -75,3 +75,18 @@ export const stringCodec: StickyCodec<string> = {
   serialize: (s) => s,
   deserialize: (raw) => raw,
 };
+
+/**
+ * Codec fuer String-Union-Enums (z. B. `'day' | 'month'`). Speichert den Wert
+ * roh; beim Lesen verwirft ein Fremd-/Altwert den Eintrag (wirft → Default-
+ * Fallback in `useStickyState`), statt einen ungueltigen Enum-State zu setzen.
+ */
+export function enumCodec<T extends string>(isMember: (x: string) => x is T): StickyCodec<T> {
+  return {
+    serialize: (v) => v,
+    deserialize: (raw) => {
+      if (isMember(raw)) return raw;
+      throw new Error(`invalid enum value: ${raw}`);
+    },
+  };
+}
