@@ -10,6 +10,19 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.54.1](https://github.com/muelley86/zaehler/compare/v2.54.0...v2.54.1) (2026-06-04)
+
+
+### Fehlerbehebungen
+
+* **deps:** patchbare Frontend-CVEs via pnpm-Overrides (5 von 8) ([#241](https://github.com/muelley86/zaehler/issues/241)) ([a0236ee](https://github.com/muelley86/zaehler/commit/a0236eedbb48350e6d5a3c57cbc4f3864887ce94))
+* **deps:** starlette 1.0.1 + idna 3.18 (Backend-CVEs) ([#240](https://github.com/muelley86/zaehler/issues/240)) ([a5d8dca](https://github.com/muelley86/zaehler/commit/a5d8dcaa0159754c5be19a495abccf60e7171881))
+
+
+### Dokumentation
+
+* **deploy:** relabel-register-unit-Aufruf im LXC-Runbook dokumentieren ([#237](https://github.com/muelley86/zaehler/issues/237)) ([6998395](https://github.com/muelley86/zaehler/commit/6998395302f4037656453079812494056f6046a5))
+
 ## [2.54.0](https://github.com/muelley86/zaehler/compare/v2.53.4...v2.54.0) (2026-06-04)
 
 
