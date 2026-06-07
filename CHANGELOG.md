@@ -10,6 +10,18 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.55.0](https://github.com/muelley86/zaehler/compare/v2.54.2...v2.55.0) (2026-06-07)
+
+
+### Funktionen
+
+* **reports:** Messstellen-ID (group_key) in Auswertungen-CSV ([#247](https://github.com/muelley86/zaehler/issues/247)) ([4670554](https://github.com/muelley86/zaehler/commit/4670554e82d5569703fda6272a3021db0d8876b5))
+
+
+### Dokumentation
+
+* Security-Audit 2026-06-04 + Remediation-Nachtrag ([#245](https://github.com/muelley86/zaehler/issues/245)) ([99e070d](https://github.com/muelley86/zaehler/commit/99e070d57b29c145bb1d70dc1367213c40141722))
+
 ## [2.54.2](https://github.com/muelley86/zaehler/compare/v2.54.1...v2.54.2) (2026-06-04)
 
 
