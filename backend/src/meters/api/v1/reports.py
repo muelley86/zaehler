@@ -132,7 +132,16 @@ def aggregate_csv(
     # wird in Excel/LibreOffice (DE-Locale) geöffnet; siehe schemas.common.
     writer = csv.writer(buffer, delimiter=";", lineterminator="\n")
     writer.writerow(
-        ["Dimension", "Gruppe", "Zählerart", "Einheit", "Periode_von", "Periode_bis", "Verbrauch"]
+        [
+            "Dimension",
+            "Gruppe",
+            "Gruppen_ID",
+            "Zählerart",
+            "Einheit",
+            "Periode_von",
+            "Periode_bis",
+            "Verbrauch",
+        ]
     )
     dim_label = _DIMENSION_LABELS[dimension]
     for r in rows:
@@ -140,6 +149,10 @@ def aggregate_csv(
             [
                 dim_label,
                 csv_guard_formula(r.group_label),
+                # group_key traegt die ID der Dimension: bei Messstelle die MP-ID
+                # (stabiler PK, Match-Key fuer externe Import-Blaetter), bei
+                # Zaehlerart leer (dort gibt es keinen Schluessel).
+                str(r.group_key) if r.group_key is not None else "",
                 METER_TYPE_LABELS[r.meter_type],
                 csv_guard_formula(r.unit),
                 r.period_start.strftime("%d.%m.%Y") if r.period_start else "",

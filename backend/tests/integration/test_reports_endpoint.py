@@ -235,9 +235,10 @@ def test_csv_export(admin_client: TestClient) -> None:
     text = resp.text
     # Deutsches Excel-CSV: Semikolon-Delimiter + UTF-8-BOM.
     assert text.startswith("﻿")
-    assert "Dimension;Gruppe;Zählerart;Einheit" in text
-    # Zeile: Kostenstelle;80008;Wasser;m³;;;42  (Gesamt-Modus -> keine Perioden)
-    assert "Kostenstelle;80008;Wasser;m³;;;" in text
+    assert "Dimension;Gruppe;Gruppen_ID;Zählerart;Einheit" in text
+    # Zeile: Kostenstelle;80008;80008;Wasser;m³;;;42 (Gesamt-Modus -> keine
+    # Perioden; group_key der Kostenstelle == die Kostenstellen-Nummer).
+    assert "Kostenstelle;80008;80008;Wasser;m³;;;" in text
     data_line = next(line for line in text.splitlines() if line.startswith("Kostenstelle;80008"))
     assert float(data_line.rsplit(";", 1)[1]) == 42.0
 
@@ -252,7 +253,9 @@ def test_csv_export_dimension_measuring_point(admin_client: TestClient) -> None:
     )
     assert resp.status_code == 200, resp.text
     assert resp.headers["content-type"].startswith("text/csv")
-    assert "Messstelle;Halle Nord;Wasser;m³;;;" in resp.text
+    # Gruppen_ID-Spalte traegt bei Dimension Messstelle die MP-ID (stabiler
+    # Match-Key fuer externe Import-Blaetter), zwischen Name und Zaehlerart.
+    assert f"Messstelle;Halle Nord;{a['id']};Wasser;m³;;;" in resp.text
 
 
 def test_csv_export_german_number_and_date_format(admin_client: TestClient) -> None:
@@ -280,7 +283,8 @@ def test_csv_export_german_number_and_date_format(admin_client: TestClient) -> N
     )
     cols = feb.split(";")
     assert cols[-1] == "2,5"  # Komma-Dezimal, kein Punkt
-    assert cols[5] == "29.02.2024", cols
+    # Spalten: Dimension;Gruppe;Gruppen_ID;Zählerart;Einheit;Periode_von;Periode_bis;Verbrauch
+    assert cols[6] == "29.02.2024", cols  # Periode_bis
 
 
 def test_csv_export_escapes_formula_injection(admin_client: TestClient) -> None:
@@ -293,7 +297,7 @@ def test_csv_export_escapes_formula_injection(admin_client: TestClient) -> None:
         params={"dimension": "measuring_point", "granularity": "total"},
     )
     assert resp.status_code == 200, resp.text
-    assert "Messstelle;'=Tricky;Wasser;m³;;;" in resp.text
+    assert f"Messstelle;'=Tricky;{a['id']};Wasser;m³;;;" in resp.text
 
 
 def test_all_dimensions_have_csv_label() -> None:
