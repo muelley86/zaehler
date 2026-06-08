@@ -44,6 +44,11 @@ _DIMENSION_LABELS: dict[ReportDimension, str] = {
 }
 
 
+def _de_date(d: date | None) -> str:
+    """Datum als TT.MM.JJJJ fuer das deutsche Excel-CSV; ``None`` -> Leerstring."""
+    return d.strftime("%d.%m.%Y") if d else ""
+
+
 def _to_filter(
     main_location_id: list[int],
     location_id: list[int],
@@ -155,8 +160,11 @@ def aggregate_csv(
                 str(r.group_key) if r.group_key is not None else "",
                 METER_TYPE_LABELS[r.meter_type],
                 csv_guard_formula(r.unit),
-                r.period_start.strftime("%d.%m.%Y") if r.period_start else "",
-                r.period_end.strftime("%d.%m.%Y") if r.period_end else "",
+                # Bucket-Modi tragen die Bucket-Grenzen je Zeile; im Gesamt-Modus
+                # (keine Buckets) auf den gewaehlten Zeitraum (from_at/to_at)
+                # zurueckfallen, sonst blieben die Perioden-Spalten leer.
+                _de_date(r.period_start or from_at),
+                _de_date(r.period_end or to_at),
                 format_decimal_de(r.consumption),
             ]
         )

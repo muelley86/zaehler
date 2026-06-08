@@ -258,6 +258,32 @@ def test_csv_export_dimension_measuring_point(admin_client: TestClient) -> None:
     assert f"Messstelle;Halle Nord;{a['id']};Wasser;m³;;;" in resp.text
 
 
+def test_csv_export_total_with_range_fills_period(admin_client: TestClient) -> None:
+    # Gesamt-Modus mit gewähltem Zeitraum (z. B. „letzter Monat"): die Spalten
+    # Periode_von/Periode_bis sollen das gewählte Fenster (from_at/to_at) zeigen,
+    # auch wenn es keine Bucket-Grenzen gibt. Vorher waren sie leer (;;).
+    a = _create_mp(admin_client, name="Halle Nord", serial="W-N")
+    reg = _registers(a)["water"]
+    _add(admin_client, reg, "10", "2024-05-15T12:00:00Z")
+    _add(admin_client, reg, "20", "2024-06-15T12:00:00Z")
+    resp = admin_client.get(
+        "/api/v1/reports/aggregate.csv",
+        params={
+            "dimension": "measuring_point",
+            "granularity": "total",
+            "from_at": "2024-05-01",
+            "to_at": "2024-05-31",
+        },
+    )
+    assert resp.status_code == 200, resp.text
+    prefix = f"Messstelle;Halle Nord;{a['id']}"
+    data_line = next(line for line in resp.text.splitlines() if line.startswith(prefix))
+    cols = data_line.split(";")
+    # Spalten: Dimension;Gruppe;Gruppen_ID;Zählerart;Einheit;Periode_von;Periode_bis;Verbrauch
+    assert cols[5] == "01.05.2024", cols  # Periode_von = from_at
+    assert cols[6] == "31.05.2024", cols  # Periode_bis = to_at
+
+
 def test_csv_export_german_number_and_date_format(admin_client: TestClient) -> None:
     # Deutsches Excel-Format: ; -Trennung, Komma-Dezimal, Perioden als TT.MM.JJJJ.
     a = _create_mp(admin_client, name="A", serial="SN-A", kostenstelle=90009)
