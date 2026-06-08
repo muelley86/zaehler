@@ -10,6 +10,13 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.55.1](https://github.com/muelley86/zaehler/compare/v2.55.0...v2.55.1) (2026-06-08)
+
+
+### Fehlerbehebungen
+
+* **reports:** Periode_von/bis im Gesamt-CSV aus gewähltem Zeitraum füllen ([#248](https://github.com/muelley86/zaehler/issues/248)) ([28f227e](https://github.com/muelley86/zaehler/commit/28f227e3d9605aff4079afb61ff73b08c87038c3))
+
 ## [2.55.0](https://github.com/muelley86/zaehler/compare/v2.54.2...v2.55.0) (2026-06-07)
 
 
