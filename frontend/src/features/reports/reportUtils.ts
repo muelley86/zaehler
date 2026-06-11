@@ -108,6 +108,11 @@ export function directionSuffix(row: DirectionRow, bidiGroups: Set<string>): str
   return bidiGroups.has(directionGroupKey(row)) ? DIRECTION_LABELS.bezug : null;
 }
 
+/** Label-Suffix für verrechnete (virtuelle) Messstellen-Zeilen. */
+export function displayGroupLabel(label: string, isVirtual: boolean | undefined): string {
+  return isVirtual ? `${label} (verrechnet)` : label;
+}
+
 export interface ComparisonRow {
   key: string;
   group_key: number | null;
@@ -116,6 +121,8 @@ export interface ComparisonRow {
   unit: string;
   /** Einspeise-Zeilen (OBIS 2.8.x) getrennt vom Bezug vergleichen. */
   direction: 'bezug' | 'einspeisung';
+  /** Verrechnete (virtuelle) Messstelle — getrennt von echten MPs mit gleicher ID. */
+  is_virtual: boolean;
   a: number;
   b: number;
   delta: number;
@@ -124,7 +131,10 @@ export interface ComparisonRow {
 }
 
 function rowKey(r: ReportRow): string {
-  return `${r.group_key ?? 'null'}|${r.group_label}|${r.meter_type}|${r.unit}|${r.direction}`;
+  // `is_virtual` gehört in den Key: eine virtuelle Messstelle kann dieselbe
+  // group_key-ID tragen wie eine echte.
+  const ns = r.is_virtual ? 'v' : 'r';
+  return `${ns}|${r.group_key ?? 'null'}|${r.group_label}|${r.meter_type}|${r.unit}|${r.direction}`;
 }
 
 /**
@@ -145,6 +155,7 @@ export function diffRows(rowsA: ReportRow[], rowsB: ReportRow[]): ComparisonRow[
         meter_type: r.meter_type,
         unit: r.unit,
         direction: r.direction,
+        is_virtual: r.is_virtual ?? false,
         a: 0,
         b: 0,
         delta: 0,

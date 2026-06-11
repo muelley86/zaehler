@@ -126,3 +126,54 @@ describe('buildComparisonGroups', () => {
     expect(at(groups, 0).seriesKeys).toEqual(['mp-2::draw', 'mp-1::draw']); // Alpha vor Zeta
   });
 });
+
+describe('buildComparisonGroups — verrechnete Messstellen', () => {
+  it('fügt eine Netto-Serie im vmp-Namensraum mit "(verrechnet)"-Label hinzu', () => {
+    const groups = buildComparisonGroups({
+      filteredPoints: [mp(3, 'Strom A', 'electricity')],
+      consumptions: { 3: [cp('1.8.0', '2024-01-31', '100', 'kWh')] },
+      virtualItems: [
+        {
+          id: 3, // gleiche ID wie die echte MP — darf nicht kollidieren
+          name: 'Biogas real',
+          type: 'electricity',
+          consumption: [cp('virtual', '2024-01-31', '380', 'kWh')],
+        },
+      ],
+    });
+
+    expect(groups).toHaveLength(1);
+    const g = at(groups, 0);
+    expect(g.seriesKeys).toContain('vmp-3');
+    expect(g.seriesKeys).toContain('mp-3::draw');
+    expect(g.labelOf['vmp-3']).toBe('Biogas real (verrechnet)');
+    expect(at(g.series, 0)['vmp-3']).toBe(380);
+    expect(at(g.series, 0)['mp-3::draw']).toBe(100);
+  });
+
+  it('behält negative Netto-Buckets bei', () => {
+    const groups = buildComparisonGroups({
+      filteredPoints: [],
+      consumptions: {},
+      virtualItems: [
+        {
+          id: 1,
+          name: 'Netto',
+          type: 'electricity',
+          consumption: [cp('virtual', '2024-01-31', '-200', 'kWh')],
+        },
+      ],
+    });
+
+    expect(groups).toHaveLength(1);
+    expect(at(at(groups, 0).series, 0)['vmp-1']).toBe(-200);
+  });
+
+  it('ohne virtualItems unverändert (Regression)', () => {
+    const groups = buildComparisonGroups({
+      filteredPoints: [mp(1, 'Strom A', 'electricity')],
+      consumptions: { 1: [cp('1.8.0', '2024-01-31', '100', 'kWh')] },
+    });
+    expect(at(groups, 0).seriesKeys).toEqual(['mp-1::draw']);
+  });
+});
