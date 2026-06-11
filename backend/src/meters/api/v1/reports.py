@@ -157,8 +157,12 @@ def aggregate_csv(
                 csv_guard_formula(r.group_label),
                 # group_key traegt die ID der Dimension: bei Messstelle die MP-ID
                 # (stabiler PK, Match-Key fuer externe Import-Blaetter), bei
-                # Zaehlerart leer (dort gibt es keinen Schluessel).
-                str(r.group_key) if r.group_key is not None else "",
+                # Zaehlerart leer (dort gibt es keinen Schluessel). Virtuelle
+                # Messstellen bekommen ein V-Praefix — ihr Key-Namensraum ist
+                # von echten MP-IDs getrennt.
+                (f"V{r.group_key}" if r.is_virtual else str(r.group_key))
+                if r.group_key is not None
+                else "",
                 METER_TYPE_LABELS[r.meter_type],
                 # Einspeisung (2.8.x) ist eine eigene Zeile, nie mit Bezug summiert.
                 "Einspeisung" if r.direction == "einspeisung" else "Bezug",

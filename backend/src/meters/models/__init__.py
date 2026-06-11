@@ -3,6 +3,7 @@ from __future__ import annotations
 from meters.models._enums import (
     AuditAction,
     AuditEntityType,
+    FlowDirection,
     HeatingSource,
     MeterType,
     ReportDimension,
@@ -28,6 +29,7 @@ from meters.models.report_config import ReportConfig
 from meters.models.session import Session
 from meters.models.user import User
 from meters.models.user_measuring_point_access import UserMeasuringPointAccess
+from meters.models.virtual_measuring_point import VirtualMeasuringPoint, VirtualMpComponent
 
 __all__ = [
     "AuditAction",
@@ -35,6 +37,7 @@ __all__ = [
     "AuditLog",
     "BackupCode",
     "Delivery",
+    "FlowDirection",
     "HeatingSource",
     "Location",
     "MainLocation",
@@ -57,4 +60,6 @@ __all__ = [
     "User",
     "UserMeasuringPointAccess",
     "UserRole",
+    "VirtualMeasuringPoint",
+    "VirtualMpComponent",
 ]

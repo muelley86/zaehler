@@ -22,6 +22,16 @@ class UserRole(enum.StrEnum):
     RECORDER = "recorder"
 
 
+class FlowDirection(enum.StrEnum):
+    """Richtung einer Verbrauchsreihe: Bezug/Verbrauch (OBIS 1.8.x, Wasser,
+    Waerme) vs. Einspeisung (OBIS ``2.8.x``, nur Strom). Genutzt von den
+    Komponenten virtueller Messstellen, um gezielt eine der beiden Reihen
+    eines bidirektionalen Zaehlers zu verrechnen."""
+
+    BEZUG = "bezug"
+    EINSPEISUNG = "einspeisung"
+
+
 class AuditAction(enum.StrEnum):
     CREATE = "create"
     UPDATE = "update"
@@ -74,6 +84,7 @@ class AuditEntityType(enum.StrEnum):
     LOCATION = "location"
     MAIN_LOCATION = "main_location"
     OWNER = "owner"
+    VIRTUAL_MEASURING_POINT = "virtual_measuring_point"
     DELIVERY = "delivery"
     SESSION = "session"
     QR_TOKEN = "qr_token"

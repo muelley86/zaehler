@@ -19,6 +19,9 @@ class ReportRow(APIModel):
     meter_type: MeterType
     unit: str
     direction: Literal["bezug", "einspeisung"] = "bezug"
+    # Verrechnete (virtuelle) Messstelle: eigener Key-Namensraum — group_key
+    # kann mit einer echten MP-ID kollidieren, is_virtual disambiguiert.
+    is_virtual: bool = False
     period_start: date | None = None
     period_end: date | None = None
     consumption: DecimalStr

@@ -39,9 +39,14 @@ from meters.services.consumption import (
     aggregate_consumption,
     clip_consumption_to_range,
     consumption_for_measuring_point,
+    direction_of,
 )
 from meters.services.monthly_consumption import monthly_points_for_measuring_point
 from meters.services.owner_assignment import current_assignments_bulk
+from meters.services.virtual_measuring_point import (
+    consumption_for_virtual_mp,
+    visible_virtual_mps,
+)
 
 # Deutsche Labels fuer die Zaehlerart-Dimension (Backend liefert das Label mit,
 # damit das Frontend keine Stammdaten nachladen muss).
@@ -78,13 +83,9 @@ class GroupBucketRow:
     period_start: date | None  # None im Gesamt-Modus
     period_end: date | None
     consumption: Decimal
-
-
-def _direction_of(obis_code: str) -> ReportDirection:
-    """Einspeisung (``2.8.x``, nur Strom) vs. Bezug/Verbrauch (alles andere —
-    inkl. Wasser ``water`` und user-definierter Waerme-Register). Einspeisung
-    bekommt eigene Ergebniszeilen und wird nie mit Bezug summiert."""
-    return "einspeisung" if obis_code.startswith("2.8.") else "bezug"
+    # Verrechnete (virtuelle) Messstelle: group_key kann mit einer echten
+    # MP-ID kollidieren — is_virtual disambiguiert (eigener Key-Namensraum).
+    is_virtual: bool = False
 
 
 def _matches(value: int | None, allowed: set[int | None] | None) -> bool:
@@ -193,7 +194,7 @@ def aggregate_report(
                 group_label,
                 mp.type,
                 p.unit,
-                _direction_of(p.obis_code),
+                direction_of(p.obis_code),
                 bucket[0],
                 bucket[1],
             )
@@ -212,6 +213,17 @@ def aggregate_report(
         )
         for k, v in sums.items()
     ]
+    rows.extend(
+        _virtual_rows(
+            db,
+            user=user,
+            dimension=dimension,
+            granularity=granularity,
+            from_date=from_date,
+            to_date=to_date,
+            filters=filters,
+        )
+    )
     rows.sort(
         key=lambda r: (
             r.period_end or date.max,
@@ -221,4 +233,56 @@ def aggregate_report(
             r.unit,
         )
     )
+    return rows
+
+
+def _virtual_rows(
+    db: DbSession,
+    *,
+    user: User,
+    dimension: ReportDimension,
+    granularity: Granularity | None,
+    from_date: date | None,
+    to_date: date | None,
+    filters: ReportFilter,
+) -> list[GroupBucketRow]:
+    """Zeilen fuer virtuelle (verrechnete) Messstellen.
+
+    Nur in der Dimension MEASURING_POINT und nur ohne aktive kategoriale
+    Filter — virtuelle MPs haben weder Standort noch Eigentuemer noch
+    Kostenstelle, ein gefiltertes Ergebnis waere semantisch falsch. Der
+    ``meter_type``-Filter greift (die vmp hat einen Typ). Richtung ist immer
+    ``bezug``: die Zeile ist ein Netto-Wert, keine Einspeise-Reihe.
+    """
+    if dimension is not ReportDimension.MEASURING_POINT:
+        return []
+    has_categorical = (
+        filters.main_location_ids is not None
+        or filters.location_ids is not None
+        or filters.owner_ids is not None
+        or filters.kostenstellen is not None
+    )
+    if has_categorical:
+        return []
+    rows: list[GroupBucketRow] = []
+    for vmp in visible_virtual_mps(db, user):
+        if filters.meter_types is not None and vmp.type not in filters.meter_types:
+            continue
+        points = consumption_for_virtual_mp(
+            db, vmp, granularity=granularity, from_date=from_date, to_date=to_date
+        )
+        for p in points:
+            rows.append(
+                GroupBucketRow(
+                    group_key=vmp.id,
+                    group_label=vmp.name,
+                    meter_type=vmp.type,
+                    unit=p.unit,
+                    direction="bezug",
+                    period_start=None if granularity is None else p.period_start,
+                    period_end=None if granularity is None else p.period_end,
+                    consumption=p.consumption,
+                    is_virtual=True,
+                )
+            )
     return rows
