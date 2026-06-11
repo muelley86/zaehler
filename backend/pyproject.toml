@@ -20,6 +20,10 @@ dependencies = [
     "pyotp>=2.9",
     "qrcode[pil]>=7.4",
     "openpyxl>=3.1",
+    # Zoneinfo-Datenbank: auf Windows zwingend (kein System-tzdata, sonst faellt
+    # ZoneInfo("Europe/Berlin") und damit der Settings-Validator beim Start um),
+    # auf Linux/macOS harmloser Fallback hinter den Systemdaten.
+    "tzdata>=2024.1",
 ]
 
 [dependency-groups]
