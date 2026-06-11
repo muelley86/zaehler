@@ -155,6 +155,58 @@ describe('ReportsPage', () => {
     expect(screen.getByText(/· Einspeisung/)).toBeInTheDocument();
   });
 
+  it('bidirektionale Messstelle: auch die Bezugs-Zeile trägt ihre Richtung', async () => {
+    const body: ReportAggregateResponse = {
+      ...response(),
+      rows: [
+        {
+          group_key: 1,
+          group_label: 'Solar PV',
+          meter_type: 'electricity',
+          unit: 'kWh',
+          direction: 'bezug',
+          period_start: null,
+          period_end: null,
+          consumption: '1200',
+        },
+        {
+          group_key: 1,
+          group_label: 'Solar PV',
+          meter_type: 'electricity',
+          unit: 'kWh',
+          direction: 'einspeisung',
+          period_start: null,
+          period_end: null,
+          consumption: '280',
+        },
+        {
+          group_key: 2,
+          group_label: 'Strom Halle',
+          meter_type: 'electricity',
+          unit: 'kWh',
+          direction: 'bezug',
+          period_start: null,
+          period_end: null,
+          consumption: '500',
+        },
+      ],
+    };
+    server.use(
+      http.get('/api/v1/measuring-points', () => HttpResponse.json([MP])),
+      http.get('/api/v1/report-configs', () => HttpResponse.json([])),
+      http.get('/api/v1/reports/aggregate', () => HttpResponse.json(body)),
+    );
+    renderWithRouter(<ReportsPage />);
+    await screen.findByText('Strom Halle');
+    // Beide Zeilen der bidirektionalen Messstelle sind beschriftet …
+    expect(screen.getByText(/· Bezug/)).toBeInTheDocument();
+    expect(screen.getByText(/· Einspeisung/)).toBeInTheDocument();
+    // … die unidirektionale Zeile bleibt ohne Zusatz.
+    const halleCell = screen.getByText('Strom Halle').closest('td');
+    if (!halleCell) throw new Error('Tabellenzelle für „Strom Halle" nicht gefunden');
+    expect(within(halleCell).queryByText(/· Bezug/)).not.toBeInTheDocument();
+  });
+
   it('Filter-Dropdown sendet den gewählten Filter als Query-Param', async () => {
     const urls: string[] = [];
     server.use(

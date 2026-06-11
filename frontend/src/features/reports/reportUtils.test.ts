@@ -2,7 +2,14 @@ import { describe, expect, it } from 'vitest';
 
 import type { ReportRow } from '@/lib/types';
 
-import { PERIOD_KIND_LABELS, buildAggregateQuery, diffRows, resolvePeriod } from './reportUtils';
+import {
+  PERIOD_KIND_LABELS,
+  buildAggregateQuery,
+  diffRows,
+  directionSuffix,
+  groupsWithEinspeisung,
+  resolvePeriod,
+} from './reportUtils';
 
 describe('resolvePeriod', () => {
   const today = new Date(2024, 5, 15); // 15. Juni 2024 (lokal)
@@ -98,6 +105,31 @@ describe('diffRows', () => {
     expect(bezug?.b).toBe(80);
     expect(einspeisung?.a).toBe(30);
     expect(einspeisung?.b).toBe(0);
+  });
+});
+
+describe('directionSuffix', () => {
+  const pvBezug = row(4, 'PV', 'kWh', '100', 'bezug');
+  const pvEinspeisung = row(4, 'PV', 'kWh', '30', 'einspeisung');
+  const halleBezug = row(5, 'Halle', 'kWh', '50', 'bezug');
+  const rows = [pvBezug, pvEinspeisung, halleBezug];
+
+  it('bidirektionale Gruppe: beide Richtungen werden beschriftet', () => {
+    const bidiGroups = groupsWithEinspeisung(rows);
+    expect(directionSuffix(pvBezug, bidiGroups)).toBe('Bezug');
+    expect(directionSuffix(pvEinspeisung, bidiGroups)).toBe('Einspeisung');
+  });
+
+  it('Bezugs-Zeile ohne Einspeisungs-Pendant bleibt ohne Zusatz', () => {
+    const bidiGroups = groupsWithEinspeisung(rows);
+    expect(directionSuffix(halleBezug, bidiGroups)).toBeNull();
+  });
+
+  it('andere Zählerart derselben Gruppe bekommt kein „Bezug"', () => {
+    // Dimension Standort: bidirektionaler Stromzähler + Wasserzähler am selben Ort.
+    const wasser: ReportRow = { ...row(4, 'PV', 'm³', '10', 'bezug'), meter_type: 'water' };
+    const bidiGroups = groupsWithEinspeisung([...rows, wasser]);
+    expect(directionSuffix(wasser, bidiGroups)).toBeNull();
   });
 });
 

@@ -44,6 +44,8 @@ import {
   PERIOD_KIND_LABELS,
   buildAggregateQuery,
   diffRows,
+  directionSuffix,
+  groupsWithEinspeisung,
   resolvePeriod,
 } from './reportUtils';
 import type { ComparisonRow } from './reportUtils';
@@ -732,6 +734,7 @@ function ResultTable({
       />
     );
   }
+  const bidiGroups = groupsWithEinspeisung(rows);
   return (
     <Section>
       <table className="w-full text-body-sm">
@@ -744,24 +747,25 @@ function ResultTable({
           </tr>
         </thead>
         <tbody>
-          {rows.map((r) => (
-            <tr
-              key={`${r.group_key}-${r.meter_type}-${r.unit}-${r.direction}-${r.period_end ?? ''}`}
-              className="border-border/50 border-b"
-            >
-              <td className="p-2 text-label">
-                {r.group_label}
-                {r.direction === 'einspeisung' ? (
-                  <span className="text-secondary"> · Einspeisung</span>
-                ) : null}
-              </td>
-              <td className="p-2 text-secondary">{TYPE_LABELS[r.meter_type]}</td>
-              {showPeriod ? <td className="p-2 text-secondary">{r.period_end ?? ''}</td> : null}
-              <td className="p-2 text-right tabular-nums text-label">
-                {formatDe(r.consumption)} {r.unit}
-              </td>
-            </tr>
-          ))}
+          {rows.map((r) => {
+            const suffix = directionSuffix(r, bidiGroups);
+            return (
+              <tr
+                key={`${r.group_key}-${r.meter_type}-${r.unit}-${r.direction}-${r.period_end ?? ''}`}
+                className="border-border/50 border-b"
+              >
+                <td className="p-2 text-label">
+                  {r.group_label}
+                  {suffix ? <span className="text-secondary"> · {suffix}</span> : null}
+                </td>
+                <td className="p-2 text-secondary">{TYPE_LABELS[r.meter_type]}</td>
+                {showPeriod ? <td className="p-2 text-secondary">{r.period_end ?? ''}</td> : null}
+                <td className="p-2 text-right tabular-nums text-label">
+                  {formatDe(r.consumption)} {r.unit}
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </Section>
@@ -778,6 +782,7 @@ function ComparisonTable({ rows, groupHeader }: { rows: ComparisonRow[]; groupHe
       />
     );
   }
+  const bidiGroups = groupsWithEinspeisung(rows);
   return (
     <Section>
       <table className="w-full text-body-sm">
@@ -792,25 +797,26 @@ function ComparisonTable({ rows, groupHeader }: { rows: ComparisonRow[]; groupHe
           </tr>
         </thead>
         <tbody>
-          {rows.map((r) => (
-            <tr key={r.key} className="border-border/50 border-b">
-              <td className="p-2 text-label">
-                {r.group_label}
-                {r.direction === 'einspeisung' ? (
-                  <span className="text-secondary"> · Einspeisung</span>
-                ) : null}
-              </td>
-              <td className="p-2 text-secondary">
-                {TYPE_LABELS[r.meter_type]} ({r.unit})
-              </td>
-              <td className="p-2 text-right tabular-nums">{formatDe(r.a)}</td>
-              <td className="p-2 text-right tabular-nums">{formatDe(r.b)}</td>
-              <td className="p-2 text-right tabular-nums">{formatDe(r.delta)}</td>
-              <td className="p-2 text-right tabular-nums text-secondary">
-                {r.pct === null ? '—' : `${formatDe(r.pct, { maximumFractionDigits: 1 })} %`}
-              </td>
-            </tr>
-          ))}
+          {rows.map((r) => {
+            const suffix = directionSuffix(r, bidiGroups);
+            return (
+              <tr key={r.key} className="border-border/50 border-b">
+                <td className="p-2 text-label">
+                  {r.group_label}
+                  {suffix ? <span className="text-secondary"> · {suffix}</span> : null}
+                </td>
+                <td className="p-2 text-secondary">
+                  {TYPE_LABELS[r.meter_type]} ({r.unit})
+                </td>
+                <td className="p-2 text-right tabular-nums">{formatDe(r.a)}</td>
+                <td className="p-2 text-right tabular-nums">{formatDe(r.b)}</td>
+                <td className="p-2 text-right tabular-nums">{formatDe(r.delta)}</td>
+                <td className="p-2 text-right tabular-nums text-secondary">
+                  {r.pct === null ? '—' : `${formatDe(r.pct, { maximumFractionDigits: 1 })} %`}
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </Section>
