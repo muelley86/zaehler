@@ -78,6 +78,13 @@ from meters.schemas.user import (
     UserRead,
     UserUpdate,
 )
+from meters.schemas.virtual_measuring_point import (
+    VirtualMeasuringPointCreate,
+    VirtualMeasuringPointRead,
+    VirtualMeasuringPointUpdate,
+    VirtualMpComponentIn,
+    VirtualMpComponentRead,
+)
 
 __all__ = [
     "APIModel",
@@ -148,4 +155,9 @@ __all__ = [
     "UserCreate",
     "UserRead",
     "UserUpdate",
+    "VirtualMeasuringPointCreate",
+    "VirtualMeasuringPointRead",
+    "VirtualMeasuringPointUpdate",
+    "VirtualMpComponentIn",
+    "VirtualMpComponentRead",
 ]

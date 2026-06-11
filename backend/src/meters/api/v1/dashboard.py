@@ -26,11 +26,19 @@ from meters.api.deps import CurrentUser, DbDep
 from meters.api.v1.readings import _to_read
 from meters.models import MeasuringPoint, PhysicalMeter, Reading, Register
 from meters.schemas import ConsumptionPoint, ReadingRead, RegisterStateRead
-from meters.schemas.dashboard import DashboardMeasuringPoint, DashboardResponse
+from meters.schemas.dashboard import (
+    DashboardMeasuringPoint,
+    DashboardResponse,
+    DashboardVirtualMeasuringPoint,
+)
 from meters.services.access import accessible_mp_ids, restrict_mp_query
 from meters.services.consumption import aggregate_consumption, consumption_for_measuring_point
 from meters.services.monthly_consumption import monthly_points_for_measuring_point
 from meters.services.state import state_for_measuring_point
+from meters.services.virtual_measuring_point import (
+    consumption_for_virtual_mp,
+    visible_virtual_mps,
+)
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
@@ -119,4 +127,29 @@ def dashboard(
                 state=state,
             )
         )
-    return DashboardResponse(items=items)
+
+    # Virtuelle (verrechnete) Messstellen: Netto-Reihen mit derselben
+    # Granularität wie die echten Items. Ohne granularity Fallback auf "day" —
+    # die Verrechnung braucht eine gemeinsame Zeitbasis (Buckets).
+    virtual_items = [
+        DashboardVirtualMeasuringPoint(
+            id=vmp.id,
+            name=vmp.name,
+            type=vmp.type,
+            consumption=[
+                ConsumptionPoint(
+                    period_start=p.period_start,
+                    period_end=p.period_end,
+                    register_id=p.register_id,
+                    obis_code=p.obis_code,
+                    consumption=p.consumption,
+                    unit=p.unit,
+                )
+                for p in consumption_for_virtual_mp(
+                    db, vmp, granularity=granularity or "day", from_date=from_at, to_date=to_at
+                )
+            ],
+        )
+        for vmp in visible_virtual_mps(db, user)
+    ]
+    return DashboardResponse(items=items, virtual_items=virtual_items)

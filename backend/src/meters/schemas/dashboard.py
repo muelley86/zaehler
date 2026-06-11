@@ -7,6 +7,9 @@ muss (Fan-out). Wiederverwendet die bestehenden Teil-DTOs.
 
 from __future__ import annotations
 
+from pydantic import Field
+
+from meters.models import MeterType
 from meters.schemas.common import APIModel
 from meters.schemas.reading import ConsumptionPoint, ReadingRead
 from meters.schemas.state import RegisterStateRead
@@ -19,5 +22,17 @@ class DashboardMeasuringPoint(APIModel):
     state: list[RegisterStateRead]
 
 
+class DashboardVirtualMeasuringPoint(APIModel):
+    """Verrechnete Messstelle im Dashboard: Netto-Verbrauchsreihe (kann
+    negative Buckets enthalten), keine Readings/State (abgeleitete Werte)."""
+
+    id: int
+    name: str
+    type: MeterType
+    consumption: list[ConsumptionPoint]
+
+
 class DashboardResponse(APIModel):
     items: list[DashboardMeasuringPoint]
+    # Additiv mit Default — aeltere Frontend-Stände ignorieren das Feld einfach.
+    virtual_items: list[DashboardVirtualMeasuringPoint] = Field(default_factory=list)

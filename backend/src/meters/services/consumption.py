@@ -131,6 +131,15 @@ def consumption_for_measuring_point(
 
 Granularity = Literal["day", "week", "month", "year"]
 
+FlowDirectionStr = Literal["bezug", "einspeisung"]
+
+
+def direction_of(obis_code: str) -> FlowDirectionStr:
+    """Einspeisung (``2.8.x``, nur Strom) vs. Bezug/Verbrauch (alles andere —
+    inkl. Wasser ``water`` und user-definierter Waerme-Register). Einspeisung
+    bekommt eigene Ergebniszeilen und wird nie mit Bezug summiert."""
+    return "einspeisung" if obis_code.startswith("2.8.") else "bezug"
+
 
 def clip_consumption_to_range(
     points: list[ConsumptionPoint],
