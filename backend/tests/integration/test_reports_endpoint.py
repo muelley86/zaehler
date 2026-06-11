@@ -2,7 +2,7 @@
 
 Testet ``GET /reports/aggregate`` (+ ``/aggregate.csv``) end-to-end über die
 HTTP-API: Gruppierung je Dimension, Einheiten-/Typ-Trennung, NULL-Buckets,
-Einspeise-Ausschluss, Gesamt vs. Monat, Recorder-Filter/partial und CSV.
+Einspeisung als eigene Zeilen, Gesamt vs. Monat, Recorder-Filter/partial und CSV.
 """
 
 from __future__ import annotations
@@ -125,7 +125,7 @@ def test_total_equals_month_sum(admin_client: TestClient) -> None:
     assert float(total_val) == month_sum == 60.0
 
 
-def test_feed_in_is_excluded(admin_client: TestClient) -> None:
+def test_feed_in_is_separate_row(admin_client: TestClient) -> None:
     mp = _create_mp(
         admin_client,
         name="PV",
@@ -141,9 +141,10 @@ def test_feed_in_is_excluded(admin_client: TestClient) -> None:
 
     body = _agg(admin_client, dimension="kostenstelle", granularity="total")
     rows = [r for r in body["rows"] if r["group_label"] == "50005"]
-    # Nur Bezug zählt; Einspeisung (2.8.0) ist nicht enthalten -> genau eine Zeile, 100.
-    assert len(rows) == 1
-    assert float(rows[0]["consumption"]) == 100.0
+    # Einspeisung (2.8.0) erscheint als eigene Zeile und wird NIE mit dem
+    # Bezug summiert (100 + 30 wäre fachlich sinnlos, 30 verschweigen auch).
+    by_direction = {r["direction"]: float(r["consumption"]) for r in rows}
+    assert by_direction == {"bezug": 100.0, "einspeisung": 30.0}
 
 
 def test_dimension_meter_type(admin_client: TestClient) -> None:
@@ -235,10 +236,10 @@ def test_csv_export(admin_client: TestClient) -> None:
     text = resp.text
     # Deutsches Excel-CSV: Semikolon-Delimiter + UTF-8-BOM.
     assert text.startswith("﻿")
-    assert "Dimension;Gruppe;Gruppen_ID;Zählerart;Einheit" in text
-    # Zeile: Kostenstelle;80008;80008;Wasser;m³;;;42 (Gesamt-Modus -> keine
+    assert "Dimension;Gruppe;Gruppen_ID;Zählerart;Richtung;Einheit" in text
+    # Zeile: Kostenstelle;80008;80008;Wasser;Bezug;m³;;;42 (Gesamt-Modus -> keine
     # Perioden; group_key der Kostenstelle == die Kostenstellen-Nummer).
-    assert "Kostenstelle;80008;80008;Wasser;m³;;;" in text
+    assert "Kostenstelle;80008;80008;Wasser;Bezug;m³;;;" in text
     data_line = next(line for line in text.splitlines() if line.startswith("Kostenstelle;80008"))
     assert float(data_line.rsplit(";", 1)[1]) == 42.0
 
@@ -255,7 +256,7 @@ def test_csv_export_dimension_measuring_point(admin_client: TestClient) -> None:
     assert resp.headers["content-type"].startswith("text/csv")
     # Gruppen_ID-Spalte traegt bei Dimension Messstelle die MP-ID (stabiler
     # Match-Key fuer externe Import-Blaetter), zwischen Name und Zaehlerart.
-    assert f"Messstelle;Halle Nord;{a['id']};Wasser;m³;;;" in resp.text
+    assert f"Messstelle;Halle Nord;{a['id']};Wasser;Bezug;m³;;;" in resp.text
 
 
 def test_csv_export_total_with_range_fills_period(admin_client: TestClient) -> None:
@@ -279,9 +280,10 @@ def test_csv_export_total_with_range_fills_period(admin_client: TestClient) -> N
     prefix = f"Messstelle;Halle Nord;{a['id']}"
     data_line = next(line for line in resp.text.splitlines() if line.startswith(prefix))
     cols = data_line.split(";")
-    # Spalten: Dimension;Gruppe;Gruppen_ID;Zählerart;Einheit;Periode_von;Periode_bis;Verbrauch
-    assert cols[5] == "01.05.2024", cols  # Periode_von = from_at
-    assert cols[6] == "31.05.2024", cols  # Periode_bis = to_at
+    # Spalten: Dimension;Gruppe;Gruppen_ID;Zählerart;Richtung;Einheit;
+    #          Periode_von;Periode_bis;Verbrauch
+    assert cols[6] == "01.05.2024", cols  # Periode_von = from_at
+    assert cols[7] == "31.05.2024", cols  # Periode_bis = to_at
 
 
 def test_csv_export_german_number_and_date_format(admin_client: TestClient) -> None:
@@ -309,8 +311,9 @@ def test_csv_export_german_number_and_date_format(admin_client: TestClient) -> N
     )
     cols = feb.split(";")
     assert cols[-1] == "2,5"  # Komma-Dezimal, kein Punkt
-    # Spalten: Dimension;Gruppe;Gruppen_ID;Zählerart;Einheit;Periode_von;Periode_bis;Verbrauch
-    assert cols[6] == "29.02.2024", cols  # Periode_bis
+    # Spalten: Dimension;Gruppe;Gruppen_ID;Zählerart;Richtung;Einheit;
+    #          Periode_von;Periode_bis;Verbrauch
+    assert cols[7] == "29.02.2024", cols  # Periode_bis
 
 
 def test_csv_export_escapes_formula_injection(admin_client: TestClient) -> None:
@@ -323,7 +326,7 @@ def test_csv_export_escapes_formula_injection(admin_client: TestClient) -> None:
         params={"dimension": "measuring_point", "granularity": "total"},
     )
     assert resp.status_code == 200, resp.text
-    assert f"Messstelle;'=Tricky;{a['id']};Wasser;m³;;;" in resp.text
+    assert f"Messstelle;'=Tricky;{a['id']};Wasser;Bezug;m³;;;" in resp.text
 
 
 def test_all_dimensions_have_csv_label() -> None:
@@ -332,3 +335,47 @@ def test_all_dimensions_have_csv_label() -> None:
     from meters.models import ReportDimension
 
     assert set(_DIMENSION_LABELS) == set(ReportDimension)
+
+
+def test_historical_values_before_installed_at_appear(admin_client: TestClient) -> None:
+    # Regression: rückdatiert erfasste/importierte Historien (reading_at VOR dem
+    # bei der Anlage gesetzten installed_at) müssen in der Auswertung erscheinen.
+    a = _create_mp(admin_client, name="Nachtrag", serial="W-H", initial={})
+    reg = _registers(a)["water"]  # installed_at = 2024-01-01 (siehe _create_mp)
+    _add(admin_client, reg, "100", "2023-01-15T12:00:00Z")
+    _add(admin_client, reg, "160", "2023-07-15T12:00:00Z")
+    _add(admin_client, reg, "200", "2024-01-15T12:00:00Z")
+
+    body = _agg(admin_client, dimension="measuring_point", granularity="total")
+    row = next(r for r in body["rows"] if r["group_label"] == "Nachtrag")
+    assert float(row["consumption"]) == 100.0  # 200 - 100, inkl. 2023er-Historie
+
+    year = _agg(admin_client, dimension="measuring_point", granularity="year")
+    by_year = {
+        r["period_end"]: float(r["consumption"])
+        for r in year["rows"]
+        if r["group_label"] == "Nachtrag"
+    }
+    assert "2023-12-31" in by_year  # Historie vor installed_at sichtbar
+
+
+def test_total_clips_partial_range_to_month_sum(admin_client: TestClient) -> None:
+    # Regression: der Gesamt-Modus zählte ein Intervall bisher ganz oder gar
+    # nicht (period_end-Filter). Jetzt wird taggenau geclippt -> Gesamt ==
+    # Summe der Monats-Buckets desselben Zeitraums.
+    a = _create_mp(admin_client, name="Clip", serial="W-C", initial={})
+    reg = _registers(a)["water"]
+    _add(admin_client, reg, "10", "2024-01-15T12:00:00Z")
+    _add(admin_client, reg, "31", "2024-02-15T12:00:00Z")
+    _add(admin_client, reg, "60", "2024-04-10T12:00:00Z")
+
+    params = {"from_at": "2024-02-01", "to_at": "2024-02-29"}
+    total = _agg(admin_client, dimension="measuring_point", granularity="total", **params)
+    total_val = float(next(r for r in total["rows"] if r["group_label"] == "Clip")["consumption"])
+
+    month = _agg(admin_client, dimension="measuring_point", granularity="month", **params)
+    month_sum = sum(float(r["consumption"]) for r in month["rows"] if r["group_label"] == "Clip")
+    assert abs(total_val - month_sum) < 1e-9
+    # Plausibilität: Februar-Anteil = 15 Tage des 31-Tage-Intervalls (01-15..02-15)
+    # + 14 Tage des 55-Tage-Intervalls (02-15..04-10) — deutlich unter 50.
+    assert 0 < total_val < 50

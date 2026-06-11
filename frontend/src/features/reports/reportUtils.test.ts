@@ -44,12 +44,19 @@ function first<T>(arr: T[]): T {
   return x;
 }
 
-function row(group_key: number | null, label: string, unit: string, value: string): ReportRow {
+function row(
+  group_key: number | null,
+  label: string,
+  unit: string,
+  value: string,
+  direction: 'bezug' | 'einspeisung' = 'bezug',
+): ReportRow {
   return {
     group_key,
     group_label: label,
     meter_type: 'electricity',
     unit,
+    direction,
     period_start: null,
     period_end: null,
     consumption: value,
@@ -78,6 +85,19 @@ describe('diffRows', () => {
   it('beide 0 → pct 0', () => {
     const d = first(diffRows([row(3, 'X', 'kWh', '0')], [row(3, 'X', 'kWh', '0')]));
     expect(d.pct).toBe(0);
+  });
+
+  it('Bezug und Einspeisung werden nicht vermischt', () => {
+    const a = [row(4, 'PV', 'kWh', '100', 'bezug'), row(4, 'PV', 'kWh', '30', 'einspeisung')];
+    const b = [row(4, 'PV', 'kWh', '80', 'bezug')];
+    const rows = diffRows(a, b);
+    expect(rows).toHaveLength(2);
+    const bezug = rows.find((r) => r.direction === 'bezug');
+    const einspeisung = rows.find((r) => r.direction === 'einspeisung');
+    expect(bezug?.a).toBe(100);
+    expect(bezug?.b).toBe(80);
+    expect(einspeisung?.a).toBe(30);
+    expect(einspeisung?.b).toBe(0);
   });
 });
 

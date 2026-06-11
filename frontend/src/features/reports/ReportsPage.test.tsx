@@ -55,6 +55,7 @@ function response(partial = false): ReportAggregateResponse {
         group_label: '10001',
         meter_type: 'electricity',
         unit: 'kWh',
+        direction: 'bezug',
         period_start: null,
         period_end: null,
         consumption: '1234',
@@ -126,6 +127,32 @@ describe('ReportsPage', () => {
     renderWithRouter(<ReportsPage />);
     await screen.findByText('10001');
     expect(screen.queryByRole('button', { name: /Speichern/ })).not.toBeInTheDocument();
+  });
+
+  it('Einspeise-Zeilen tragen den Zusatz „· Einspeisung"', async () => {
+    const body: ReportAggregateResponse = {
+      ...response(),
+      rows: [
+        {
+          group_key: 1,
+          group_label: 'Solar PV',
+          meter_type: 'electricity',
+          unit: 'kWh',
+          direction: 'einspeisung',
+          period_start: null,
+          period_end: null,
+          consumption: '280',
+        },
+      ],
+    };
+    server.use(
+      http.get('/api/v1/measuring-points', () => HttpResponse.json([MP])),
+      http.get('/api/v1/report-configs', () => HttpResponse.json([])),
+      http.get('/api/v1/reports/aggregate', () => HttpResponse.json(body)),
+    );
+    renderWithRouter(<ReportsPage />);
+    expect(await screen.findByText('Solar PV')).toBeInTheDocument();
+    expect(screen.getByText(/· Einspeisung/)).toBeInTheDocument();
   });
 
   it('Filter-Dropdown sendet den gewählten Filter als Query-Param', async () => {

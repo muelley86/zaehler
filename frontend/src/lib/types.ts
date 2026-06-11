@@ -327,6 +327,8 @@ export interface ReportRow {
   group_label: string;
   meter_type: MeterType;
   unit: string;
+  /** Einspeise-Register (OBIS 2.8.x) bilden eigene Zeilen — nie mit Bezug summiert. */
+  direction: 'bezug' | 'einspeisung';
   period_start: string | null;
   period_end: string | null;
   consumption: string;

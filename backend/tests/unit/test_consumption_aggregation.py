@@ -12,6 +12,7 @@ from decimal import Decimal
 from meters.services.consumption import (
     ConsumptionPoint,
     aggregate_consumption,
+    clip_consumption_to_range,
     split_across_buckets,
 )
 
@@ -173,3 +174,76 @@ def test_aggregate_interpolates_real_intervals() -> None:
     by_end = {p.period_end: p.consumption for p in out}
     assert by_end[date(2024, 5, 31)] == Decimal("16")
     assert by_end[date(2024, 6, 30)] == Decimal("5")
+
+
+# --- Taggenaues Clipping für den Gesamt-Modus (clip_consumption_to_range) ----
+
+
+def test_clip_without_range_keeps_all_points() -> None:
+    points = [_interval("2024-01-15", "2024-02-15", "10"), _p("2024-03-10", "5")]
+    out = clip_consumption_to_range(points, from_date=None, to_date=None)
+    assert sum((p.consumption for p in out), Decimal("0")) == Decimal("15")
+
+
+def test_clip_interval_fully_inside_is_unchanged() -> None:
+    out = clip_consumption_to_range(
+        [_interval("2024-02-05", "2024-02-20", "8")],
+        from_date=date(2024, 2, 1),
+        to_date=date(2024, 2, 28),
+    )
+    assert len(out) == 1
+    assert out[0].consumption == Decimal("8")
+    assert out[0].period_start == date(2024, 2, 5)
+    assert out[0].period_end == date(2024, 2, 20)
+
+
+def test_clip_interval_fully_outside_is_dropped() -> None:
+    out = clip_consumption_to_range(
+        [_interval("2024-01-05", "2024-01-20", "8")],
+        from_date=date(2024, 6, 1),
+        to_date=date(2024, 6, 30),
+    )
+    assert out == []
+
+
+def test_clip_interval_across_boundary_is_prorated() -> None:
+    # 15.05 -> 05.06 (21 Tage), Zeitraum nur Mai: 16 der 21 Tage liegen im Mai.
+    out = clip_consumption_to_range(
+        [_interval("2024-05-15", "2024-06-05", "21")],
+        from_date=date(2024, 5, 1),
+        to_date=date(2024, 5, 31),
+    )
+    assert len(out) == 1
+    assert out[0].consumption == Decimal("16")
+    assert out[0].period_end == date(2024, 5, 31)
+
+
+def test_clip_zero_span_counts_when_end_in_range() -> None:
+    inside = _p("2024-02-10", "7")
+    outside = _p("2024-03-10", "9")
+    out = clip_consumption_to_range(
+        [inside, outside], from_date=date(2024, 2, 1), to_date=date(2024, 2, 28)
+    )
+    assert [p.consumption for p in out] == [Decimal("7")]
+
+
+def test_clip_total_equals_sum_of_month_buckets() -> None:
+    # Invariante des Gesamt-Modus: Clipping auf einen Zeitraum == Summe der
+    # Monats-Buckets desselben Zeitraums (gleiche Tages-Interpolation).
+    points = [
+        _interval("2024-01-15", "2024-02-15", "10"),
+        _interval("2024-02-15", "2024-04-10", "30"),
+    ]
+    frm, to = date(2024, 2, 1), date(2024, 2, 29)
+    clipped = sum(
+        (p.consumption for p in clip_consumption_to_range(points, from_date=frm, to_date=to)),
+        Decimal("0"),
+    )
+    months = sum(
+        (
+            p.consumption
+            for p in aggregate_consumption(points, granularity="month", from_date=frm, to_date=to)
+        ),
+        Decimal("0"),
+    )
+    assert clipped == months

@@ -137,9 +137,11 @@ export function ReportsPage() {
   const [points, setPoints] = useState<MeasuringPointRead[]>([]);
   const [error, setError] = useState<string | null>(null);
 
-  // „Filter merken": Reports merkt seine Arbeits-Filter je Seite (sessionStorage)
-  // — das Datum bleibt hier seiteneigen (eigenes periodKind-Modell, kein
-  // geteilter Datumsbereich). Default aus = unverändertes useState-Verhalten.
+  // „Filter merken": Reports merkt seine Arbeits-Filter je Seite (sessionStorage).
+  // Der Zeitraum folgt per Default dem globalen Datumsbereich aus der Navigation
+  // („Aktueller Zeitraum") — konsistent mit dem Dashboard, damit importierte
+  // Historien nicht stumm aus einem abweichenden Seiten-Default fallen. Andere
+  // periodKinds bleiben als bewusste Abwahl wählbar (seiteneigen gemerkt).
   const { rememberFilters, dateRange } = useFilterPrefs();
   const [dimension, setDimension] = useStickyState<ReportDimension>(
     FILTER_NS + 'dimension',
@@ -155,7 +157,7 @@ export function ReportsPage() {
   );
   const [periodKind, setPeriodKind] = useStickyState<ReportPeriodKind>(
     FILTER_NS + 'periodKind',
-    'current_year',
+    'shared_range',
     rememberFilters,
     PERIOD_KIND_CODEC,
   );
@@ -436,12 +438,13 @@ export function ReportsPage() {
   const exportComparisonCsv = useCallback(() => {
     if (!comparison) return;
     const rows: string[][] = [
-      ['Gruppe', 'Zählerart', 'Einheit', 'Aktuell', 'Vergleich', 'Differenz'],
+      ['Gruppe', 'Zählerart', 'Richtung', 'Einheit', 'Aktuell', 'Vergleich', 'Differenz'],
     ];
     for (const r of comparison) {
       rows.push([
         r.group_label,
         TYPE_LABELS[r.meter_type],
+        r.direction === 'einspeisung' ? 'Einspeisung' : 'Bezug',
         r.unit,
         // Komma-Dezimal für deutsches Excel.
         String(r.a).replace('.', ','),
@@ -743,10 +746,15 @@ function ResultTable({
         <tbody>
           {rows.map((r) => (
             <tr
-              key={`${r.group_key}-${r.meter_type}-${r.unit}-${r.period_end ?? ''}`}
+              key={`${r.group_key}-${r.meter_type}-${r.unit}-${r.direction}-${r.period_end ?? ''}`}
               className="border-border/50 border-b"
             >
-              <td className="p-2 text-label">{r.group_label}</td>
+              <td className="p-2 text-label">
+                {r.group_label}
+                {r.direction === 'einspeisung' ? (
+                  <span className="text-secondary"> · Einspeisung</span>
+                ) : null}
+              </td>
               <td className="p-2 text-secondary">{TYPE_LABELS[r.meter_type]}</td>
               {showPeriod ? <td className="p-2 text-secondary">{r.period_end ?? ''}</td> : null}
               <td className="p-2 text-right tabular-nums text-label">
@@ -786,7 +794,12 @@ function ComparisonTable({ rows, groupHeader }: { rows: ComparisonRow[]; groupHe
         <tbody>
           {rows.map((r) => (
             <tr key={r.key} className="border-border/50 border-b">
-              <td className="p-2 text-label">{r.group_label}</td>
+              <td className="p-2 text-label">
+                {r.group_label}
+                {r.direction === 'einspeisung' ? (
+                  <span className="text-secondary"> · Einspeisung</span>
+                ) : null}
+              </td>
               <td className="p-2 text-secondary">
                 {TYPE_LABELS[r.meter_type]} ({r.unit})
               </td>

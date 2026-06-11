@@ -142,6 +142,7 @@ def aggregate_csv(
             "Gruppe",
             "Gruppen_ID",
             "Zählerart",
+            "Richtung",
             "Einheit",
             "Periode_von",
             "Periode_bis",
@@ -159,6 +160,8 @@ def aggregate_csv(
                 # Zaehlerart leer (dort gibt es keinen Schluessel).
                 str(r.group_key) if r.group_key is not None else "",
                 METER_TYPE_LABELS[r.meter_type],
+                # Einspeisung (2.8.x) ist eine eigene Zeile, nie mit Bezug summiert.
+                "Einspeisung" if r.direction == "einspeisung" else "Bezug",
                 csv_guard_formula(r.unit),
                 # Bucket-Modi tragen die Bucket-Grenzen je Zeile; im Gesamt-Modus
                 # (keine Buckets) auf den gewaehlten Zeitraum (from_at/to_at)

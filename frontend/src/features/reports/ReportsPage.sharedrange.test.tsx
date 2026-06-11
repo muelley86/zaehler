@@ -1,7 +1,8 @@
 /**
- * „Aktueller Zeitraum" (shared_range) in den Auswertungen: bei Auswahl folgt der
+ * „Aktueller Zeitraum" (shared_range) in den Auswertungen: per DEFAULT folgt der
  * Report dem globalen Datumsbereich (sessionStorage `app.dateRange`) und sendet
- * dessen from_at/to_at an /reports/aggregate.
+ * dessen from_at/to_at an /reports/aggregate — konsistent mit dem Dashboard.
+ * Andere Zeiträume (z. B. „Laufendes Jahr") bleiben als bewusste Abwahl wählbar.
  */
 
 import { http, HttpResponse } from 'msw';
@@ -67,7 +68,7 @@ afterEach(() => {
 });
 
 describe('ReportsPage — Aktueller Zeitraum (shared_range)', () => {
-  it('übernimmt den globalen Datumsbereich in die /reports/aggregate-Query', async () => {
+  it('folgt per Default dem globalen Datumsbereich (ohne manuelle Auswahl)', async () => {
     window.sessionStorage.setItem(
       'app.dateRange',
       JSON.stringify({ from: '2023-01-01', to: '2023-12-31' }),
@@ -75,13 +76,24 @@ describe('ReportsPage — Aktueller Zeitraum (shared_range)', () => {
     const { dateParams } = mockEndpoints();
 
     renderWithRouter(<ReportsPage />);
-    // Erst-Load (Default „Laufendes Jahr") abwarten.
+
+    // Bereits der Erst-Load nutzt den globalen Bereich — importierte Historien
+    // fallen nicht mehr stumm aus einem abweichenden Seiten-Default.
+    await waitFor(() => expect(dateParams.length).toBeGreaterThan(0));
+    expect(dateParams[0]).toEqual({ from: '2023-01-01', to: '2023-12-31' });
+  });
+
+  it('„Laufendes Jahr" bleibt als bewusste Abwahl wählbar', async () => {
+    const { dateParams } = mockEndpoints();
+
+    renderWithRouter(<ReportsPage />);
     await waitFor(() => expect(dateParams.length).toBeGreaterThan(0));
 
-    fireEvent.change(screen.getByLabelText('Zeitraum'), { target: { value: 'shared_range' } });
+    fireEvent.change(screen.getByLabelText('Zeitraum'), { target: { value: 'current_year' } });
 
+    const y = new Date().getFullYear();
     await waitFor(() =>
-      expect(dateParams.some((p) => p.from === '2023-01-01' && p.to === '2023-12-31')).toBe(true),
+      expect(dateParams.some((p) => p.from === `${y}-01-01` && p.to === `${y}-12-31`)).toBe(true),
     );
   });
 });
