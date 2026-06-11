@@ -42,7 +42,9 @@ from meters.schemas import (
     MeasuringPointRead,
     MeasuringPointUpdate,
     MpAccessUserRead,
+    OwnerAssignmentCreate,
     OwnerAssignmentRead,
+    OwnerAssignmentUpdate,
     RegisterStateRead,
     ReplaceMeterRequest,
 )
@@ -51,9 +53,12 @@ from meters.services.audit import record
 from meters.services.meter_replacement import install_first_meter, replace_meter
 from meters.services.owner_assignment import (
     assign_owner,
+    create_assignment,
     current_assignment,
     current_assignments_bulk,
+    delete_assignment,
     list_history,
+    update_assignment,
 )
 from meters.services.state import state_for_measuring_point
 
@@ -582,6 +587,79 @@ def change_owner_endpoint(
     refreshed = _load_with_meters(db, mp_id)
     assert refreshed is not None
     return _to_read(refreshed, db)
+
+
+# Historien-Editor (admin-only): Perioden der Eigentuemer-Historie anlegen,
+# korrigieren und loeschen — inkl. Rueckdatierung und Luecken (Leerstand).
+# Validierung (keine Ueberlappung, max. eine offene Periode) liegt im Service.
+
+
+@router.post(
+    "/{mp_id}/owners",
+    response_model=OwnerAssignmentRead,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_owner_period(
+    mp_id: int,
+    payload: OwnerAssignmentCreate,
+    request: Request,
+    db: DbDep,
+    admin: AdminUser,
+) -> OwnerAssignmentRead:
+    assignment = create_assignment(
+        db,
+        mp_id=mp_id,
+        owner_id=payload.owner_id,
+        valid_from=payload.valid_from,
+        valid_to=payload.valid_to,
+        user_id=admin.id,
+        ip_address=client_ip(request),
+    )
+    db.commit()
+    db.refresh(assignment)
+    return _assignment_to_read(assignment)
+
+
+@router.patch("/{mp_id}/owners/{assignment_id}", response_model=OwnerAssignmentRead)
+def update_owner_period(
+    mp_id: int,
+    assignment_id: int,
+    payload: OwnerAssignmentUpdate,
+    request: Request,
+    db: DbDep,
+    admin: AdminUser,
+) -> OwnerAssignmentRead:
+    assignment = update_assignment(
+        db,
+        mp_id=mp_id,
+        assignment_id=assignment_id,
+        owner_id=payload.owner_id,
+        valid_from=payload.valid_from,
+        valid_to=payload.valid_to,
+        user_id=admin.id,
+        ip_address=client_ip(request),
+    )
+    db.commit()
+    db.refresh(assignment)
+    return _assignment_to_read(assignment)
+
+
+@router.delete("/{mp_id}/owners/{assignment_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_owner_period(
+    mp_id: int,
+    assignment_id: int,
+    request: Request,
+    db: DbDep,
+    admin: AdminUser,
+) -> None:
+    delete_assignment(
+        db,
+        mp_id=mp_id,
+        assignment_id=assignment_id,
+        user_id=admin.id,
+        ip_address=client_ip(request),
+    )
+    db.commit()
 
 
 # Der frühere GET /measuring-points/{id}/qr-Endpoint wurde mit Feature A

@@ -188,6 +188,259 @@ def test_list_measuring_points_no_n_plus_one_for_owners(admin_client: TestClient
     )
 
 
+# ---------------------------------------------------------------------------
+# Historien-Editor: POST/PATCH/DELETE /measuring-points/{id}/owners[/{aid}]
+# ---------------------------------------------------------------------------
+
+
+def _history(client: TestClient, mp_id: int) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = client.get(f"/api/v1/measuring-points/{mp_id}/owners").json()
+    return out
+
+
+def test_create_historical_period_with_gap(admin_client: TestClient) -> None:
+    a = _create_owner(admin_client, "Hist-A")
+    b = _create_owner(admin_client, "Hist-B")
+    mp = _create_mp(admin_client, "Strom-Hist", "SN-H-1", owner_id=a, installed_at="2024-01-01")
+    # Historische Periode VOR der offenen, mit Luecke (2023-06-01 bis 2024-01-01).
+    resp = admin_client.post(
+        f"/api/v1/measuring-points/{mp['id']}/owners",
+        json={"owner_id": b, "valid_from": "2022-01-01", "valid_to": "2023-06-01"},
+    )
+    assert resp.status_code == 201, resp.text
+    created = resp.json()
+    assert created["owner_id"] == b
+    assert created["owner_name"] == "Hist-B"
+    assert created["valid_from"] == "2022-01-01"
+    assert created["valid_to"] == "2023-06-01"
+    history = _history(admin_client, mp["id"])
+    assert len(history) == 2
+    assert history[0]["owner_id"] == a  # offene Periode zuerst (desc)
+    assert history[1]["owner_id"] == b
+
+
+def test_create_second_open_period_rejected(admin_client: TestClient) -> None:
+    a = _create_owner(admin_client, "Open-A")
+    b = _create_owner(admin_client, "Open-B")
+    mp = _create_mp(admin_client, "Strom-Open", "SN-O-1", owner_id=a, installed_at="2024-01-01")
+    resp = admin_client.post(
+        f"/api/v1/measuring-points/{mp['id']}/owners",
+        json={"owner_id": b, "valid_from": "2026-01-01", "valid_to": None},
+    )
+    assert resp.status_code == 422
+
+
+def test_create_overlapping_period_rejected(admin_client: TestClient) -> None:
+    a = _create_owner(admin_client, "Ovl-A")
+    b = _create_owner(admin_client, "Ovl-B")
+    mp = _create_mp(admin_client, "Strom-Ovl", "SN-OV-1", owner_id=a, installed_at="2024-01-01")
+    # Ueberlappt die offene Periode [2024-01-01, inf).
+    resp = admin_client.post(
+        f"/api/v1/measuring-points/{mp['id']}/owners",
+        json={"owner_id": b, "valid_from": "2024-06-01", "valid_to": "2024-07-01"},
+    )
+    assert resp.status_code == 422
+    # Angrenzend (halboffen) ist erlaubt: [2023-01-01, 2024-01-01).
+    resp = admin_client.post(
+        f"/api/v1/measuring-points/{mp['id']}/owners",
+        json={"owner_id": b, "valid_from": "2023-01-01", "valid_to": "2024-01-01"},
+    )
+    assert resp.status_code == 201, resp.text
+    # Ueberlappt die neue geschlossene Periode.
+    resp = admin_client.post(
+        f"/api/v1/measuring-points/{mp['id']}/owners",
+        json={"owner_id": a, "valid_from": "2023-06-01", "valid_to": "2023-12-01"},
+    )
+    assert resp.status_code == 422
+
+
+def test_create_valid_to_not_after_valid_from_rejected(admin_client: TestClient) -> None:
+    a = _create_owner(admin_client, "Rng-A")
+    mp = _create_mp(admin_client, "Strom-Rng", "SN-RG-1")
+    resp = admin_client.post(
+        f"/api/v1/measuring-points/{mp['id']}/owners",
+        json={"owner_id": a, "valid_from": "2024-01-01", "valid_to": "2024-01-01"},
+    )
+    assert resp.status_code == 422
+
+
+def test_create_unknown_owner_or_mp_404(admin_client: TestClient) -> None:
+    a = _create_owner(admin_client, "Unk-A")
+    mp = _create_mp(admin_client, "Strom-Unk", "SN-UK-1")
+    resp = admin_client.post(
+        f"/api/v1/measuring-points/{mp['id']}/owners",
+        json={"owner_id": 999999, "valid_from": "2024-01-01", "valid_to": None},
+    )
+    assert resp.status_code == 404
+    resp = admin_client.post(
+        "/api/v1/measuring-points/999999/owners",
+        json={"owner_id": a, "valid_from": "2024-01-01", "valid_to": None},
+    )
+    assert resp.status_code == 404
+
+
+def test_update_period_dates_and_owner(admin_client: TestClient) -> None:
+    a = _create_owner(admin_client, "Upd-A")
+    b = _create_owner(admin_client, "Upd-B")
+    mp = _create_mp(admin_client, "Strom-Upd", "SN-UP-1", owner_id=a, installed_at="2024-03-01")
+    aid = _history(admin_client, mp["id"])[0]["id"]
+    # Rueckdatieren + Eigentuemer tauschen — vorher append-only unmoeglich.
+    resp = admin_client.patch(
+        f"/api/v1/measuring-points/{mp['id']}/owners/{aid}",
+        json={"owner_id": b, "valid_from": "2024-01-01", "valid_to": None},
+    )
+    assert resp.status_code == 200, resp.text
+    updated = resp.json()
+    assert updated["owner_id"] == b
+    assert updated["valid_from"] == "2024-01-01"
+    assert updated["valid_to"] is None
+    mp_after = admin_client.get(f"/api/v1/measuring-points/{mp['id']}").json()
+    assert mp_after["current_owner_name"] == "Upd-B"
+
+
+def test_update_to_overlap_rejected(admin_client: TestClient) -> None:
+    a = _create_owner(admin_client, "UpdOvl-A")
+    b = _create_owner(admin_client, "UpdOvl-B")
+    mp = _create_mp(admin_client, "Strom-UpdOvl", "SN-UO-1", owner_id=a, installed_at="2024-01-01")
+    resp = admin_client.post(
+        f"/api/v1/measuring-points/{mp['id']}/owners",
+        json={"owner_id": b, "valid_from": "2022-01-01", "valid_to": "2023-01-01"},
+    )
+    aid = resp.json()["id"]
+    # Geschlossene Periode in die offene hineinschieben.
+    resp = admin_client.patch(
+        f"/api/v1/measuring-points/{mp['id']}/owners/{aid}",
+        json={"owner_id": b, "valid_from": "2023-06-01", "valid_to": "2024-06-01"},
+    )
+    assert resp.status_code == 422
+    # Selbe Periode unveraendert speichern darf NICHT an sich selbst scheitern.
+    resp = admin_client.patch(
+        f"/api/v1/measuring-points/{mp['id']}/owners/{aid}",
+        json={"owner_id": b, "valid_from": "2022-01-01", "valid_to": "2023-01-01"},
+    )
+    assert resp.status_code == 200, resp.text
+
+
+def test_update_open_while_other_open_rejected(admin_client: TestClient) -> None:
+    a = _create_owner(admin_client, "Dual-A")
+    b = _create_owner(admin_client, "Dual-B")
+    mp = _create_mp(admin_client, "Strom-Dual", "SN-DU-1", owner_id=a, installed_at="2024-01-01")
+    resp = admin_client.post(
+        f"/api/v1/measuring-points/{mp['id']}/owners",
+        json={"owner_id": b, "valid_from": "2022-01-01", "valid_to": "2023-01-01"},
+    )
+    aid = resp.json()["id"]
+    resp = admin_client.patch(
+        f"/api/v1/measuring-points/{mp['id']}/owners/{aid}",
+        json={"owner_id": b, "valid_from": "2022-01-01", "valid_to": None},
+    )
+    assert resp.status_code == 422
+
+
+def test_update_assignment_of_other_mp_404(admin_client: TestClient) -> None:
+    a = _create_owner(admin_client, "X-A")
+    mp1 = _create_mp(admin_client, "Strom-X1", "SN-X-1", owner_id=a)
+    mp2 = _create_mp(admin_client, "Strom-X2", "SN-X-2")
+    aid = _history(admin_client, mp1["id"])[0]["id"]
+    resp = admin_client.patch(
+        f"/api/v1/measuring-points/{mp2['id']}/owners/{aid}",
+        json={"owner_id": a, "valid_from": "2024-01-01", "valid_to": None},
+    )
+    assert resp.status_code == 404
+    resp = admin_client.delete(f"/api/v1/measuring-points/{mp2['id']}/owners/{aid}")
+    assert resp.status_code == 404
+
+
+def test_delete_closed_period(admin_client: TestClient) -> None:
+    a = _create_owner(admin_client, "Del-A")
+    b = _create_owner(admin_client, "Del-B")
+    mp = _create_mp(admin_client, "Strom-Del", "SN-DL-1", owner_id=a, installed_at="2024-01-01")
+    resp = admin_client.post(
+        f"/api/v1/measuring-points/{mp['id']}/owners",
+        json={"owner_id": b, "valid_from": "2022-01-01", "valid_to": "2023-01-01"},
+    )
+    aid = resp.json()["id"]
+    resp = admin_client.delete(f"/api/v1/measuring-points/{mp['id']}/owners/{aid}")
+    assert resp.status_code == 204
+    history = _history(admin_client, mp["id"])
+    assert aid not in [h["id"] for h in history]
+    assert len(history) == 1
+
+
+def test_delete_open_period_clears_current_owner(admin_client: TestClient) -> None:
+    a = _create_owner(admin_client, "DelOpen-A")
+    mp = _create_mp(admin_client, "Strom-DelOpen", "SN-DO-1", owner_id=a)
+    aid = _history(admin_client, mp["id"])[0]["id"]
+    resp = admin_client.delete(f"/api/v1/measuring-points/{mp['id']}/owners/{aid}")
+    assert resp.status_code == 204
+    mp_after = admin_client.get(f"/api/v1/measuring-points/{mp['id']}").json()
+    assert mp_after["current_owner_id"] is None
+    assert mp_after["current_owner_name"] is None
+
+
+def test_audit_entries_for_history_editor(admin_client: TestClient) -> None:
+    a = _create_owner(admin_client, "AudEd-A")
+    b = _create_owner(admin_client, "AudEd-B")
+    mp = _create_mp(admin_client, "Strom-AudEd", "SN-AE-1", owner_id=a, installed_at="2024-01-01")
+    resp = admin_client.post(
+        f"/api/v1/measuring-points/{mp['id']}/owners",
+        json={"owner_id": b, "valid_from": "2022-01-01", "valid_to": "2023-01-01"},
+    )
+    aid = resp.json()["id"]
+    admin_client.patch(
+        f"/api/v1/measuring-points/{mp['id']}/owners/{aid}",
+        json={"owner_id": b, "valid_from": "2022-02-01", "valid_to": "2023-01-01"},
+    )
+    admin_client.delete(f"/api/v1/measuring-points/{mp['id']}/owners/{aid}")
+    with SessionLocal() as db:
+
+        def latest(action: AuditAction) -> AuditLog:
+            log = (
+                db.query(AuditLog)
+                .filter(AuditLog.action == action)
+                .order_by(AuditLog.id.desc())
+                .first()
+            )
+            assert log is not None, f"Kein AuditLog fuer {action}"
+            return log
+
+        created = latest(AuditAction.OWNER_ASSIGNMENT_CREATED)
+        assert created.entity_id == mp["id"]
+        assert created.diff is not None
+        assert created.diff["owner_id"] == b
+        assert created.diff["valid_from"] == "2022-01-01"
+
+        updated = latest(AuditAction.OWNER_ASSIGNMENT_UPDATED)
+        assert updated.diff is not None
+        assert updated.diff["before"]["valid_from"] == "2022-01-01"
+        assert updated.diff["after"]["valid_from"] == "2022-02-01"
+
+        deleted = latest(AuditAction.OWNER_ASSIGNMENT_DELETED)
+        assert deleted.diff is not None
+        assert deleted.diff["before"]["owner_id"] == b
+
+
+def test_history_editor_admin_only(admin_client: TestClient, recorder_client: TestClient) -> None:
+    a = _create_owner(admin_client, "Perm-A")
+    mp = _create_mp(admin_client, "Strom-Perm", "SN-PM-1", owner_id=a)
+    aid = _history(admin_client, mp["id"])[0]["id"]
+    body = {"owner_id": a, "valid_from": "2024-01-01", "valid_to": None}
+    assert (
+        recorder_client.post(f"/api/v1/measuring-points/{mp['id']}/owners", json=body).status_code
+        == 403
+    )
+    assert (
+        recorder_client.patch(
+            f"/api/v1/measuring-points/{mp['id']}/owners/{aid}", json=body
+        ).status_code
+        == 403
+    )
+    assert (
+        recorder_client.delete(f"/api/v1/measuring-points/{mp['id']}/owners/{aid}").status_code
+        == 403
+    )
+
+
 def test_mp_delete_cascades_assignments(admin_client: TestClient) -> None:
     # MP-Delete via Endpoint ist durch das Readings-Existenz-Lock geschuetzt
     # (install_first_meter legt initial readings an). Wir testen die DB-Cascade

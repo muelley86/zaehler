@@ -21,3 +21,22 @@ class ChangeOwnerRequest(BaseModel):
 
     owner_id: int
     valid_from: date
+
+
+class OwnerAssignmentCreate(BaseModel):
+    """Historien-Editor: neue Periode anlegen. ``valid_to = None`` heisst
+    offene (aktive) Periode — davon darf es je MP nur eine geben."""
+
+    owner_id: int
+    valid_from: date
+    valid_to: date | None = None
+
+
+class OwnerAssignmentUpdate(BaseModel):
+    """Historien-Editor: Periode korrigieren. Bewusst Vollkoerper statt
+    partieller PATCH-Semantik, damit ``valid_to = null`` (Periode oeffnen)
+    nicht mit „Feld nicht gesendet" verwechselt werden kann."""
+
+    owner_id: int
+    valid_from: date
+    valid_to: date | None
