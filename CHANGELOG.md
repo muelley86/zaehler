@@ -10,6 +10,13 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.55.2](https://github.com/muelley86/zaehler/compare/v2.55.1...v2.55.2) (2026-06-11)
+
+
+### Fehlerbehebungen
+
+* **reports:** importierte Historien in den Auswertungen sichtbar machen ([#250](https://github.com/muelley86/zaehler/issues/250)) ([f1c8d6d](https://github.com/muelley86/zaehler/commit/f1c8d6dc81f0233072a8125969a47021fce6512c))
+
 ## [2.55.1](https://github.com/muelley86/zaehler/compare/v2.55.0...v2.55.1) (2026-06-08)
 
 
