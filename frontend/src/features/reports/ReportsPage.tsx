@@ -45,6 +45,7 @@ import {
   buildAggregateQuery,
   diffRows,
   directionSuffix,
+  displayGroupLabel,
   groupsWithEinspeisung,
   resolvePeriod,
 } from './reportUtils';
@@ -751,11 +752,11 @@ function ResultTable({
             const suffix = directionSuffix(r, bidiGroups);
             return (
               <tr
-                key={`${r.group_key}-${r.meter_type}-${r.unit}-${r.direction}-${r.period_end ?? ''}`}
+                key={`${r.is_virtual ? 'v' : 'r'}-${r.group_key}-${r.meter_type}-${r.unit}-${r.direction}-${r.period_end ?? ''}`}
                 className="border-border/50 border-b"
               >
                 <td className="p-2 text-label">
-                  {r.group_label}
+                  {displayGroupLabel(r.group_label, r.is_virtual)}
                   {suffix ? <span className="text-secondary"> · {suffix}</span> : null}
                 </td>
                 <td className="p-2 text-secondary">{TYPE_LABELS[r.meter_type]}</td>
@@ -802,7 +803,7 @@ function ComparisonTable({ rows, groupHeader }: { rows: ComparisonRow[]; groupHe
             return (
               <tr key={r.key} className="border-border/50 border-b">
                 <td className="p-2 text-label">
-                  {r.group_label}
+                  {displayGroupLabel(r.group_label, r.is_virtual)}
                   {suffix ? <span className="text-secondary"> · {suffix}</span> : null}
                 </td>
                 <td className="p-2 text-secondary">

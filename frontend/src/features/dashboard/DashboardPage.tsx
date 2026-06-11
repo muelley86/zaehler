@@ -18,6 +18,7 @@ import { formatDateDe, formatDe } from '@/lib/format';
 import type {
   ConsumptionPoint,
   DashboardResponse,
+  DashboardVirtualMeasuringPoint,
   LocationRead,
   MeasuringPointRead,
   MeterType,
@@ -90,6 +91,9 @@ export function DashboardPage() {
   const [points, setPoints] = useState<MeasuringPointRead[] | null>(null);
   const [, setLocations] = useState<LocationRead[]>([]);
   const [consumptions, setConsumptions] = useState<ConsumptionsByMP>({});
+  // Verrechnete Messstellen aus dem gebündelten Dashboard-Load (optional —
+  // ältere Backend-Stände liefern das Feld nicht).
+  const [virtualItems, setVirtualItems] = useState<DashboardVirtualMeasuringPoint[]>([]);
   const [error, setError] = useState<string | null>(null);
   // Wird `true`, sobald der gebündelte Dashboard-Load fertig ist. Bis dahin
   // zeigen wir Skeletons, damit beim Cutover möglichst wenig wandert (CLS).
@@ -130,6 +134,14 @@ export function DashboardPage() {
   // Kaskadiert zu den anderen vier Filtern (die Optionen unten respektieren sie).
   const [measuringPointFilter, setMeasuringPointFilter] = useStickyState<Set<number | null>>(
     FILTER_NS + 'measuringPoint',
+    new Set(),
+    rememberFilters,
+    ID_CODEC,
+  );
+  // Eigener Filter für verrechnete Messstellen — getrennter ID-Namensraum,
+  // darf nicht mit dem Messstellen-Set kollidieren. Leer = alle anzeigen.
+  const [virtualFilter, setVirtualFilter] = useStickyState<Set<number | null>>(
+    FILTER_NS + 'virtual',
     new Set(),
     rememberFilters,
     ID_CODEC,
@@ -211,6 +223,7 @@ export function DashboardPage() {
           cById[item.measuring_point_id] = item.consumption;
         }
         setConsumptions(cById);
+        setVirtualItems(data.virtual_items ?? []);
         setMpDataReady(true);
         setRefreshing(false);
       })
@@ -253,11 +266,25 @@ export function DashboardPage() {
     return out;
   }, [filteredPoints, consumptions]);
 
+  // Verrechnete Messstellen: respektieren Zählerart- und eigenen vmp-Filter.
+  // Die übrigen kategorialen Filter (Standort/Eigentümer) greifen nicht —
+  // virtuelle Messstellen haben diese Attribute nicht.
+  const filteredVirtual = useMemo(
+    () =>
+      virtualItems.filter(
+        (v) =>
+          (typeFilter.size === 0 || typeFilter.has(v.type)) &&
+          (virtualFilter.size === 0 || virtualFilter.has(v.id)),
+      ),
+    [virtualItems, typeFilter, virtualFilter],
+  );
+
   // Vergleichs-Serien: eine Serie je Messstelle (bidirektionaler Strom getrennt
-  // nach Bezug/Einspeisung), gruppiert nach (Zählerart, Einheit).
+  // nach Bezug/Einspeisung), gruppiert nach (Zählerart, Einheit). Verrechnete
+  // Messstellen erscheinen als zusätzliche Netto-Serien.
   const comparisonGroups = useMemo(
-    () => buildComparisonGroups({ filteredPoints, consumptions }),
-    [filteredPoints, consumptions],
+    () => buildComparisonGroups({ filteredPoints, consumptions, virtualItems: filteredVirtual }),
+    [filteredPoints, consumptions, filteredVirtual],
   );
   const totalSeries = useMemo(
     () => comparisonGroups.reduce((n, g) => n + g.seriesKeys.length, 0),
@@ -395,7 +422,8 @@ export function DashboardPage() {
     ownerFilter.size +
     locationFilter.size +
     typeFilter.size +
-    measuringPointFilter.size;
+    measuringPointFilter.size +
+    virtualFilter.size;
 
   return (
     <PageContainer>
@@ -528,6 +556,16 @@ export function DashboardPage() {
                 selected={measuringPointFilter}
                 onChange={setMeasuringPointFilter}
               />
+              {virtualItems.length > 0 ? (
+                <MultiSelectDropdown
+                  label="Verrechnete Messstellen"
+                  options={virtualItems.map(
+                    (v): DropdownOption<number | null> => ({ value: v.id, label: v.name }),
+                  )}
+                  selected={virtualFilter}
+                  onChange={setVirtualFilter}
+                />
+              ) : null}
             </div>
             {activeFilterCount > 0 ? (
               <button
@@ -538,6 +576,7 @@ export function DashboardPage() {
                   setLocationFilter(new Set());
                   setTypeFilter(new Set());
                   setMeasuringPointFilter(new Set());
+                  setVirtualFilter(new Set());
                 }}
                 className="text-caption font-semibold text-primary"
               >

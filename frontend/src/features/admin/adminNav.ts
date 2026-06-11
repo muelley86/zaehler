@@ -21,6 +21,7 @@ import {
   QrCode,
   ScrollText,
   Shield,
+  Sigma,
   Upload,
   User,
   Users,
@@ -75,6 +76,14 @@ export const ADMIN_SECTIONS: AdminNavItem[] = [
     icon: createElement(User, { size: 18 }),
     description: 'Eigentuemer-Stammdaten und MP-Zuordnung',
     color: 'primary',
+  },
+  {
+    to: '/admin/verrechnung',
+    label: 'Verrechnete Messstellen',
+    short: 'Verrechn.',
+    icon: createElement(Sigma, { size: 18 }),
+    description: 'Virtuelle Messstellen aus +/− Komponenten',
+    color: 'electricity',
   },
   {
     to: '/admin/benutzer',

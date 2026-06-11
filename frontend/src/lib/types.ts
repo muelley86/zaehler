@@ -237,8 +237,37 @@ export interface DashboardMeasuringPoint {
   state: RegisterStateRead[];
 }
 
+/** Verrechnete Messstelle im Dashboard: Netto-Reihe, kann negative Buckets enthalten. */
+export interface DashboardVirtualMeasuringPoint {
+  id: number;
+  name: string;
+  type: MeterType;
+  consumption: ConsumptionPoint[];
+}
+
 export interface DashboardResponse {
   items: DashboardMeasuringPoint[];
+  /** Optional — ältere Backend-Stände liefern das Feld nicht. */
+  virtual_items?: DashboardVirtualMeasuringPoint[];
+}
+
+// Virtuelle (verrechnete) Messstellen: +/− Kombination echter Messstellen.
+export type FlowDirection = 'bezug' | 'einspeisung';
+
+export interface VirtualMpComponentRead {
+  id: number;
+  measuring_point_id: number;
+  measuring_point_name: string;
+  direction: FlowDirection;
+  sign: number; // +1 | -1
+}
+
+export interface VirtualMeasuringPointRead {
+  id: number;
+  name: string;
+  note: string | null;
+  type: MeterType;
+  components: VirtualMpComponentRead[];
 }
 
 export interface AuditLogRead {
@@ -329,6 +358,8 @@ export interface ReportRow {
   unit: string;
   /** Einspeise-Register (OBIS 2.8.x) bilden eigene Zeilen — nie mit Bezug summiert. */
   direction: 'bezug' | 'einspeisung';
+  /** Verrechnete (virtuelle) Messstelle — eigener Key-Namensraum für group_key. */
+  is_virtual?: boolean;
   period_start: string | null;
   period_end: string | null;
   consumption: string;

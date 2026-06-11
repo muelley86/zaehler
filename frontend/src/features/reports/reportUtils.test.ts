@@ -7,6 +7,7 @@ import {
   buildAggregateQuery,
   diffRows,
   directionSuffix,
+  displayGroupLabel,
   groupsWithEinspeisung,
   resolvePeriod,
 } from './reportUtils';
@@ -170,5 +171,23 @@ describe('buildAggregateQuery', () => {
     expect(p.getAll('owner_id')).toEqual(['7', '8']);
     expect(p.getAll('kostenstelle')).toEqual(['10001']);
     expect(p.getAll('meter_type')).toEqual(['electricity', 'water']);
+  });
+});
+
+describe('verrechnete Messstellen (is_virtual)', () => {
+  it('displayGroupLabel hängt "(verrechnet)" nur an virtuelle Zeilen', () => {
+    expect(displayGroupLabel('Biogas', true)).toBe('Biogas (verrechnet)');
+    expect(displayGroupLabel('Biogas', false)).toBe('Biogas');
+    expect(displayGroupLabel('Biogas', undefined)).toBe('Biogas');
+  });
+
+  it('diffRows trennt virtuelle und echte Zeile mit gleicher group_key', () => {
+    const real = row(5, 'Halle', 'kWh', '100');
+    const virt: ReportRow = { ...row(5, 'Halle', 'kWh', '40'), is_virtual: true };
+    const rows = diffRows([real, virt], []);
+    expect(rows).toHaveLength(2);
+    const v = rows.find((r) => r.is_virtual);
+    expect(v?.a).toBe(40);
+    expect(rows.find((r) => !r.is_virtual)?.a).toBe(100);
   });
 });

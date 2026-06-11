@@ -13,7 +13,12 @@
  * Bewusst frei von React/Recharts, damit isoliert unit-testbar.
  */
 
-import type { ConsumptionPoint, MeasuringPointRead, MeterType } from '@/lib/types';
+import type {
+  ConsumptionPoint,
+  DashboardVirtualMeasuringPoint,
+  MeasuringPointRead,
+  MeterType,
+} from '@/lib/types';
 import { TYPE_ORDER } from '@/lib/meterLabels';
 
 /** Eine Chart-Zeile: ein Datum plus je Serie ein Wert. */
@@ -48,12 +53,15 @@ interface GroupAcc {
 export function buildComparisonGroups(input: {
   filteredPoints: MpLike[];
   consumptions: Record<number, ConsumptionPoint[]>;
+  /** Verrechnete Messstellen: Netto-Serien (Key `vmp-<id>`, kein draw/feed-Split). */
+  virtualItems?: DashboardVirtualMeasuringPoint[];
 }): ComparisonGroup[] {
-  const { filteredPoints, consumptions } = input;
+  const { filteredPoints, consumptions, virtualItems = [] } = input;
 
   const groups = new Map<string, GroupAcc>();
   const flowsByMp = new Map<number, Set<Flow>>();
   const nameById = new Map<number, string>();
+  const virtualNameByKey = new Map<string, string>();
 
   for (const point of filteredPoints) {
     nameById.set(point.id, point.name);
@@ -83,7 +91,32 @@ export function buildComparisonGroups(input: {
     }
   }
 
+  // Verrechnete Messstellen: eine Netto-Serie je vmp (eigener `vmp-`-Namensraum,
+  // keine Kollision mit echten MP-IDs). Negative Bucket-Werte laufen unverändert
+  // durch — der Chart stellt sie unterhalb der Nulllinie dar.
+  for (const vmp of virtualItems) {
+    const seriesKey = `vmp-${vmp.id}`;
+    virtualNameByKey.set(seriesKey, `${vmp.name} (verrechnet)`);
+    for (const p of vmp.consumption) {
+      const groupKey = `${vmp.type}::${p.unit}`;
+      let acc = groups.get(groupKey);
+      if (!acc) {
+        acc = { type: vmp.type, unit: p.unit, rows: new Map(), seriesKeys: new Set() };
+        groups.set(groupKey, acc);
+      }
+      acc.seriesKeys.add(seriesKey);
+      let row = acc.rows.get(p.period_end);
+      if (!row) {
+        row = {};
+        acc.rows.set(p.period_end, row);
+      }
+      row[seriesKey] = (row[seriesKey] ?? 0) + Number(p.consumption);
+    }
+  }
+
   const labelFor = (seriesKey: string): string => {
+    const virtualName = virtualNameByKey.get(seriesKey);
+    if (virtualName !== undefined) return virtualName;
     const sep = seriesKey.indexOf('::');
     const id = Number(seriesKey.slice(3, sep));
     const flow = seriesKey.slice(sep + 2) as Flow;

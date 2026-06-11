@@ -60,6 +60,11 @@ const OwnersAdminPage = lazy(() =>
     default: m.OwnersAdminPage,
   })),
 );
+const VirtualPointsAdminPage = lazy(() =>
+  import('@/features/admin/virtual-points/VirtualPointsAdminPage').then((m) => ({
+    default: m.VirtualPointsAdminPage,
+  })),
+);
 const AuditLogPage = lazy(() =>
   import('@/features/admin/audit/AuditLogPage').then((m) => ({ default: m.AuditLogPage })),
 );
@@ -195,6 +200,7 @@ export function App() {
             <Route path="standorte" element={<LocationsAdminPage />} />
             <Route path="hauptstandorte" element={<MainLocationsAdminPage />} />
             <Route path="eigentuemer" element={<OwnersAdminPage />} />
+            <Route path="verrechnung" element={<VirtualPointsAdminPage />} />
             <Route path="benutzer" element={<UsersAdminPage />} />
             <Route path="qr-codes" element={<QrCodesAdminPage />} />
             <Route path="import" element={<ImportReadingsPage />} />
