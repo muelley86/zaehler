@@ -8,26 +8,26 @@ Backup-Artefakt (siehe ``deploy/lxc/backup.sh``).
 from __future__ import annotations
 
 import csv
-import gzip
 import io
 import json
 import shutil
-import sqlite3
 import tempfile
 from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 from fastapi.responses import FileResponse, Response, StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 from starlette.background import BackgroundTask
 
-from meters.api.deps import AdminUser, CurrentUser, DbDep
+from meters.api.deps import AdminUser, CurrentUser, DbDep, client_ip
 from meters.core.problem import ProblemError
 from meters.db import engine
 from meters.models import (
+    AuditAction,
+    AuditEntityType,
     MeasuringPoint,
     PhysicalMeter,
     Reading,
@@ -35,6 +35,8 @@ from meters.models import (
     UserRole,
 )
 from meters.schemas.common import csv_guard_formula, format_decimal_de, to_utc_iso
+from meters.services import audit
+from meters.services import backup as backup_service
 from meters.services.access import restrict_mp_query
 
 router = APIRouter(prefix="/export", tags=["export"])
@@ -198,18 +200,21 @@ def full_dump(db: DbDep, _admin: AdminUser) -> Response:
     )
 
 
-@router.get("/backup.db.gz")
-def full_backup(_admin: AdminUser) -> FileResponse:
-    """Konsistenter, gzip-komprimierter Snapshot der SQLite-Datenbank (admin-only).
+@router.get("/backup.zip")
+def full_backup_zip(request: Request, db: DbDep, admin: AdminUser) -> FileResponse:
+    """Voll-Backup als ZIP: SQLite-Snapshot + alle Ablese-Fotos + Manifest (admin-only).
 
     Im Gegensatz zu :func:`full_dump` (menschenlesbarer Teil-Export als JSON) ist
-    dies das echte, **verlustfreie** Voll-Backup — exakt die SQLite-Datei inkl.
-    User/Sessions/Audit/Eigentümer/Standorte/Lieferungen/Monats-Cache. Erzeugt
-    über SQLites Online-Backup-API (wie ``deploy/lxc/backup.sh``): WAL-sicher,
+    dies das echte, **verlustfreie** Voll-Backup — die SQLite-Datei inkl.
+    User/Sessions/Audit/Eigentümer/Standorte/Lieferungen/Monats-Cache, dazu
+    sämtliche Foto-Dateien aus ``media_dir`` und eine ``manifest.json``
+    (App-Version, Alembic-Revision, Prüfsumme). Der Snapshot entsteht über
+    SQLites Online-Backup-API (wie ``deploy/lxc/backup.sh``): WAL-sicher,
     blockiert keine laufenden Schreibvorgänge.
 
     Enthält bcrypt-Hashes und TOTP-Secrets → niemals an Nicht-Admins,
-    ``Cache-Control: no-store``. Restore-Anleitung: ``deploy/lxc/README.md``.
+    ``Cache-Control: no-store``. Wiederherstellen: Admin ▸ System ▸
+    Wiederherstellung (``POST /api/v1/restore/...``).
     """
     db_path = engine.url.database
     if engine.dialect.name != "sqlite" or not db_path:
@@ -222,35 +227,32 @@ def full_backup(_admin: AdminUser) -> FileResponse:
         raise ProblemError(status_code=404, title="Datenbankdatei nicht gefunden")
 
     tmp_dir = Path(tempfile.mkdtemp(prefix="meters-backup-"))
-    snapshot = tmp_dir / "snapshot.db"
-    gz_path = tmp_dir / "backup.db.gz"
-
-    # Konsistenter Hot-Snapshot über eine eigene Connection — die parallelen
-    # Schreiber der App (WAL-Modus) bleiben unberührt.
-    source = sqlite3.connect(str(src_path))
     try:
-        dest = sqlite3.connect(str(snapshot))
-        try:
-            source.backup(dest)
-        finally:
-            dest.close()
-    finally:
-        source.close()
+        zip_path = backup_service.build_backup_zip(src_path, tmp_dir)
+    except Exception:
+        shutil.rmtree(tmp_dir, ignore_errors=True)
+        raise
 
-    with open(snapshot, "rb") as f_in, gzip.open(gz_path, "wb") as f_out:
-        shutil.copyfileobj(f_in, f_out)
-    snapshot.unlink(missing_ok=True)
+    audit.record(
+        db,
+        user_id=admin.id,
+        action=AuditAction.BACKUP_DOWNLOADED,
+        entity_type=AuditEntityType.SYSTEM,
+        entity_id=None,
+        ip_address=client_ip(request),
+    )
+    db.commit()
 
     stamp = datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
 
     def _cleanup() -> None:
-        # Temp-Verzeichnis samt gzip nach dem Senden wegräumen.
+        # Temp-Verzeichnis samt ZIP nach dem Senden wegräumen.
         shutil.rmtree(tmp_dir, ignore_errors=True)
 
     return FileResponse(
-        gz_path,
-        media_type="application/gzip",
-        filename=f"meters-{stamp}.db.gz",
+        zip_path,
+        media_type="application/zip",
+        filename=f"meters-backup-{stamp}.zip",
         headers={"Cache-Control": "private, no-store"},
         background=BackgroundTask(_cleanup),
     )

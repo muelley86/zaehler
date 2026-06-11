@@ -200,7 +200,11 @@ versehentlich im Klartext über die Leitung. `proxy-external` setzt zusätzlich
    erzwingen (Default aus — im reinen LAN-Betrieb kein Zwang).
 3. **Limits am Proxy** gegen Überlast/Missbrauch, z. B. bei Caddy/nginx:
    `client_max_body_size 25m;` und ein `limit_req`/Rate-Limit. Greift, bevor
-   ein Request die App erreicht.
+   ein Request die App erreicht. Ausnahme: soll der **Backup-Restore über die
+   App-UI** durch den Proxy laufen, braucht es ein größeres Body-Limit
+   (Backup-ZIPs können hunderte MB erreichen) — dann z. B.
+   `client_max_body_size 1g;` setzen oder den Restore nur im LAN direkt gegen
+   die App ausführen.
 
 **Optionale Härtungs-Settings** in `/opt/zaehler/data/meters.env` (alle leer =
 unverändertes Verhalten):
@@ -232,7 +236,8 @@ Nach Änderungen an `meters.env`: `systemctl restart zaehler.service`.
 
 Am Proxy (NPM/nginx/Caddy): `X-Forwarded-For` = echte Client-IP **ersetzen**
 (nicht anhängen), `X-Forwarded-Proto=https`, `client_max_body_size 25m` und ein
-Rate-Limit. Wenn der Proxy auf demselben Host möglich ist, ist `proxy-same`
+Rate-Limit (für den Backup-Restore über die App-UI ggf. `1g`, siehe
+Checkliste oben). Wenn der Proxy auf demselben Host möglich ist, ist `proxy-same`
 (App nur auf `127.0.0.1`) ohne Firewall-Aufwand die sicherere Wahl.
 
 ---
@@ -422,15 +427,39 @@ Ausgabe nennt den Pfad: `Backup erstellt: /opt/zaehler/backups/meters-….db.gz`
 
 ### Backup über die App-UI laden (ohne SSH)
 
-Als Admin in der App unter **System & Backup → „Backup laden"**. Das zieht
-denselben konsistenten Online-Snapshot wie `zaehler backup` und lädt ihn als
-`meters-<datum>.db.gz` direkt im Browser herunter — praktisch, wenn du keinen
-Shell-Zugriff hast oder den Bestand schnell auf einen Arbeitsrechner holen
-willst. Das Ergebnis ist 1:1 das Format, das `zaehler restore` und das lokale
-Einspielen (siehe unten) erwarten.
+Als Admin in der App unter **System & Backup → „Backup laden"**. Das lädt ein
+**ZIP-Voll-Backup** (`meters-backup-<datum>.zip`) herunter, das mehr enthält
+als der reine DB-Snapshot von `zaehler backup`:
+
+- `meters.db` — derselbe konsistente Online-Snapshot (WAL-sicher),
+- `photos/` — **alle Ablese-Fotos** aus `data/media/photos/`,
+- `manifest.json` — App-Version, Schema-Revision, Foto-Anzahl, Prüfsumme.
+
+Das ZIP ist das Format, das die **Wiederherstellung über die App-UI** (siehe
+unten) erwartet. Für `zaehler restore` (CLI, nur DB) lässt sich die
+`meters.db` aus dem ZIP entpacken und mit `gzip` komprimieren.
 
 > Das Backup enthält Passwort-Hashes und TOTP-Secrets. Der Download ist
 > admin-only und `no-store`; behandle die Datei entsprechend vertraulich.
+
+### Wiederherstellen über die App-UI (ohne SSH)
+
+Als Admin unter **System & Backup → „Wiederherstellung"**: Backup-ZIP
+hochladen → die App prüft das Archiv vollständig (ZIP-Struktur, SQLite-
+Integritätscheck, Schema-Revision) und zeigt eine **Vorschau** (Erstellt-am,
+Version, Anzahl Messstellen/Ablesungen/Fotos/Benutzer, Warnungen) → nach
+expliziter Bestätigung werden Datenbank **und** Fotos vollständig durch den
+Backup-Stand ersetzt (Full-Replace).
+
+Sicherheitsnetz: Vor dem Tausch entsteht eine Sicherheitskopie der laufenden
+DB; schlägt irgendein Schritt fehl (auch eine automatische Migration eines
+älteren Backups), wird der vorherige Stand komplett zurückgerollt. Backups
+**neuerer** App-Versionen werden abgelehnt (erst App aktualisieren). Stammt
+das Backup von einer älteren Version, migriert die App es nach dem Einspielen
+automatisch auf den aktuellen Stand und berechnet den Monats-Cache neu.
+Während der (kurzen) Wiederherstellung antworten alle anderen Requests mit
+503. Existiert der ausführende Admin-Account im Backup nicht, ist danach eine
+Neuanmeldung mit den Zugangsdaten aus dem Backup-Stand nötig.
 
 ### Inhalt eines Backups inspizieren (ohne zu ersetzen)
 
@@ -490,8 +519,10 @@ sudo systemctl start zaehler.service
 
 ### Lokal einspielen (Entwicklung / Test)
 
-Ein heruntergeladenes Backup (`meters-<datum>.db.gz`, z. B. über die App-UI
-geladen) in die lokale Dev-Umgebung übernehmen, um mit echten Daten zu testen:
+Ein heruntergeladenes Backup (`meters-<datum>.db.gz` von `zaehler backup`,
+oder die `meters.db` aus einem App-UI-ZIP — dann entfällt Schritt 3 und die
+Datei wird direkt kopiert) in die lokale Dev-Umgebung übernehmen, um mit
+echten Daten zu testen:
 
 ```bash
 # 1. Dev-Server stoppen (sonst lockt er die DB / WAL).

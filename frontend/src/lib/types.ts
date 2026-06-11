@@ -388,3 +388,43 @@ export interface ImportCommitResponse {
   skipped_existing: number;
   failed: ImportCommitFailure[];
 }
+
+// --- Voll-Backup (ZIP) & Restore -------------------------------------------
+
+export interface BackupManifest {
+  format: number;
+  app_version: string | null;
+  alembic_revision: string | null;
+  created_at: string;
+  photo_count: number;
+  db_sha256: string | null;
+}
+
+export interface RestoreCounts {
+  users: number;
+  measuring_points: number;
+  readings: number;
+  photos_in_db: number;
+  photos_in_zip: number;
+}
+
+export type RestoreCompatibility = 'ok' | 'migration_needed' | 'unknown_revision';
+
+export interface RestorePreviewResponse {
+  token: string;
+  expires_at: string;
+  manifest: BackupManifest | null;
+  db_alembic_revision: string | null;
+  counts: RestoreCounts;
+  compatibility: RestoreCompatibility;
+  backup_age_days: number | null;
+  warnings: string[];
+}
+
+export interface RestoreCommitResponse {
+  migrations_applied: boolean;
+  monthly_cache_recomputed: boolean;
+  relogin_required: boolean;
+  restored: RestoreCounts;
+  message: string;
+}

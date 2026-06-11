@@ -124,6 +124,13 @@ class Settings(BaseSettings):
     # 413 ab, bevor Pillow den Decode startet.
     photo_max_upload_bytes: int = 20 * 1024 * 1024
 
+    # Max Upload-Größe für ein Restore-Backup (ZIP mit DB-Snapshot + Fotos).
+    # DB plus Fotos können bei jahrelanger Nutzung mehrere hundert MB
+    # erreichen; 1 GiB lässt Luft. Override via METERS_BACKUP_MAX_UPLOAD_BYTES.
+    # Achtung: ein Reverse-Proxy davor braucht ein passendes Body-Limit
+    # (nginx ``client_max_body_size``), siehe deploy/lxc/README.md.
+    backup_max_upload_bytes: int = 1024 * 1024 * 1024
+
     # Wenn True, MUESSEN Admins 2FA/TOTP aktiviert haben: ein Admin ohne
     # aktives TOTP wird nach dem Login zur Einrichtung gezwungen und kann bis
     # dahin keine anderen Endpoints nutzen. Default False = kein Zwang (reiner

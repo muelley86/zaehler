@@ -25,6 +25,8 @@ from sqlalchemy.orm import (
 )
 
 from meters.core.config import settings
+from meters.core.maintenance import restore_in_progress
+from meters.core.problem import ProblemError
 
 # Schwellwert in Sekunden, ab dem eine Query als "langsam" geloggt wird.
 # 100 ms ist für ein lokales SQLite ein guter Indikator für problematische
@@ -147,6 +149,15 @@ def _log_slow_query(
 
 
 def get_session() -> Iterator[Session]:
+    # Während eines laufenden Backup-Restores darf kein Request mehr an die
+    # DB — die Datei wird gerade ersetzt. 503 statt hängender Connections;
+    # der Restore-Endpoint selbst nutzt eigene Connections am Gate vorbei.
+    if restore_in_progress.is_set():
+        raise ProblemError(
+            status_code=503,
+            title="Wartung",
+            detail="Eine Wiederherstellung läuft gerade. Bitte kurz warten.",
+        )
     db = SessionLocal()
     try:
         yield db
