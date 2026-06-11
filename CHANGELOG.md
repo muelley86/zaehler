@@ -10,6 +10,14 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.58.0](https://github.com/muelley86/zaehler/compare/v2.57.0...v2.58.0) (2026-06-11)
+
+
+### Funktionen
+
+* **virtual-mps:** Admin-UI, Dashboard-Kurve und Auswertungs-Zeilen für verrechnete Messstellen ([#259](https://github.com/muelley86/zaehler/issues/259)) ([5e2db79](https://github.com/muelley86/zaehler/commit/5e2db794ade35e83e710200d68cfd665b60cc9c5))
+* **virtual-mps:** Backend für verrechnete Messstellen (+/− Komponenten) ([#258](https://github.com/muelley86/zaehler/issues/258)) ([8f97850](https://github.com/muelley86/zaehler/commit/8f9785067ef8eab97923218e9a0fd933bb182674))
+
 ## [2.57.0](https://github.com/muelley86/zaehler/compare/v2.56.1...v2.57.0) (2026-06-11)
 
 
