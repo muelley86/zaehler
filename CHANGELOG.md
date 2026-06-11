@@ -10,6 +10,13 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.56.0](https://github.com/muelley86/zaehler/compare/v2.55.2...v2.56.0) (2026-06-11)
+
+
+### Funktionen
+
+* **backup:** Voll-Backup als ZIP inkl. Fotos + GUI-Restore mit Rollback ([#252](https://github.com/muelley86/zaehler/issues/252)) ([66dcbd8](https://github.com/muelley86/zaehler/commit/66dcbd8bdb597c1e3f2e5e21ca0c5b9813994996))
+
 ## [2.55.2](https://github.com/muelley86/zaehler/compare/v2.55.1...v2.55.2) (2026-06-11)
 
 
