@@ -10,6 +10,13 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.57.0](https://github.com/muelley86/zaehler/compare/v2.56.1...v2.57.0) (2026-06-11)
+
+
+### Funktionen
+
+* **owners:** Eigentümer-Historie für Admins editierbar (Perioden anlegen/bearbeiten/löschen) ([#256](https://github.com/muelley86/zaehler/issues/256)) ([062aeb5](https://github.com/muelley86/zaehler/commit/062aeb53a0a5ed0f458e2c2cfb274c86ef14e725))
+
 ## [2.56.1](https://github.com/muelley86/zaehler/compare/v2.56.0...v2.56.1) (2026-06-11)
 
 
