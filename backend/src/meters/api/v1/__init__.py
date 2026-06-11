@@ -19,6 +19,7 @@ from meters.api.v1 import (
     readings,
     report_configs,
     reports,
+    restore,
     search,
     users,
 )
@@ -37,6 +38,7 @@ router.include_router(deliveries.router)
 router.include_router(entries.router)
 router.include_router(exports.router)
 router.include_router(imports.router)
+router.include_router(restore.router)
 router.include_router(audit.router)
 router.include_router(qr_tokens.router)
 router.include_router(reports.router)

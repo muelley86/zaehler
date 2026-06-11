@@ -53,6 +53,11 @@ class AuditAction(enum.StrEnum):
     # Eigentuemer-Wechsel mit Stichtag — entity_type=MEASURING_POINT,
     # diff = {"from": old_owner_id, "to": new_owner_id, "valid_from": "..."}.
     OWNER_CHANGED = "owner_changed"
+    # Voll-Backup (ZIP mit DB-Snapshot + Fotos) heruntergeladen bzw. per
+    # GUI-Restore eingespielt — entity_type=SYSTEM, entity_id=None. Der
+    # Restore-Eintrag wird NACH dem Swap in die restaurierte DB geschrieben.
+    BACKUP_DOWNLOADED = "backup_downloaded"
+    RESTORE_PERFORMED = "restore_performed"
 
 
 class AuditEntityType(enum.StrEnum):
@@ -68,6 +73,8 @@ class AuditEntityType(enum.StrEnum):
     SESSION = "session"
     QR_TOKEN = "qr_token"
     REPORT_CONFIG = "report_config"
+    # Systemweite Vorgänge ohne konkrete Entität (Backup-Download, Restore).
+    SYSTEM = "system"
 
 
 class ReportDimension(enum.StrEnum):

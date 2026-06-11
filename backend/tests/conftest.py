@@ -80,6 +80,11 @@ def admin_user(db: Session) -> User:
     db.add(user)
     db.commit()
     db.refresh(user)
+    # Transaktion des refresh() beenden, damit die Fixture nicht für die
+    # gesamte Test-Dauer eine Pool-Connection hält (stört z. B. den
+    # Pool-Drain des Restore-Tests; Objekt bleibt dank expire_on_commit=False
+    # voll geladen).
+    db.rollback()
     return user
 
 
@@ -96,6 +101,7 @@ def recorder_user(db: Session) -> User:
     db.add(user)
     db.commit()
     db.refresh(user)
+    db.rollback()  # Pool-Connection freigeben, s. admin_user
     return user
 
 
