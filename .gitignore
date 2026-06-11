@@ -38,6 +38,10 @@ data/*.db.*
 data/*.db-journal
 data/*.db-wal
 data/*.db-shm
+# DB-Dateien/-Backups generell (z. B. Produktions-Backups im Repo-Root) —
+# echte Daten duerfen nie zu GitHub.
+*.db
+*.db.gz
 
 # --- Sekrete & lokale Configs ---
 .env

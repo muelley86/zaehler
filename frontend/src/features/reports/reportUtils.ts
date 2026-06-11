@@ -85,6 +85,8 @@ export interface ComparisonRow {
   group_label: string;
   meter_type: MeterType;
   unit: string;
+  /** Einspeise-Zeilen (OBIS 2.8.x) getrennt vom Bezug vergleichen. */
+  direction: 'bezug' | 'einspeisung';
   a: number;
   b: number;
   delta: number;
@@ -93,13 +95,13 @@ export interface ComparisonRow {
 }
 
 function rowKey(r: ReportRow): string {
-  return `${r.group_key ?? 'null'}|${r.group_label}|${r.meter_type}|${r.unit}`;
+  return `${r.group_key ?? 'null'}|${r.group_label}|${r.meter_type}|${r.unit}|${r.direction}`;
 }
 
 /**
- * Stellt zwei Perioden je `(Gruppe, Zählerart, Einheit)` gegenüber. A = aktuelle
- * Periode, B = Vergleichsperiode. Zeilen, die nur in einer Periode vorkommen,
- * erscheinen mit 0 auf der fehlenden Seite.
+ * Stellt zwei Perioden je `(Gruppe, Zählerart, Einheit, Richtung)` gegenüber.
+ * A = aktuelle Periode, B = Vergleichsperiode. Zeilen, die nur in einer Periode
+ * vorkommen, erscheinen mit 0 auf der fehlenden Seite.
  */
 export function diffRows(rowsA: ReportRow[], rowsB: ReportRow[]): ComparisonRow[] {
   const map = new Map<string, ComparisonRow>();
@@ -112,6 +114,7 @@ export function diffRows(rowsA: ReportRow[], rowsB: ReportRow[]): ComparisonRow[
         group_label: r.group_label,
         meter_type: r.meter_type,
         unit: r.unit,
+        direction: r.direction,
         a: 0,
         b: 0,
         delta: 0,

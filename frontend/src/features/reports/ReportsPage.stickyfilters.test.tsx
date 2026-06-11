@@ -1,7 +1,7 @@
 /**
- * Integrationstests fuer „Filter merken" auf der Auswertungen-Seite. Reports
- * bleibt bewusst AUSSERHALB des geteilten Datumsbereichs (eigenes periodKind-
- * Modell), bekommt aber per-Seite-Session-Memory fuer seine Arbeits-Filter
+ * Integrationstests fuer „Filter merken" auf der Auswertungen-Seite. Der
+ * Zeitraum folgt per Default dem geteilten Datumsbereich (shared_range);
+ * die Seite hat per-Seite-Session-Memory fuer ihre Arbeits-Filter
  * (Dimension, Granularitaet, Periode, kategoriale Filter).
  *
  * Die Seite laedt den Report automatisch beim Mount → die wiederhergestellte

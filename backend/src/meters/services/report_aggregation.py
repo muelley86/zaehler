@@ -7,11 +7,13 @@ Summe. Baut auf der bestehenden Single-MP-Pipeline auf
 (:func:`consumption_for_measuring_point` + :func:`aggregate_consumption`).
 
 Invarianten:
-- Einheiten werden NIE gemischt: Ergebniszeile = ``(group_key, meter_type, unit
-  [, bucket])``. Eine Gruppe (z. B. eine Kostenstelle) kann mehrere Zeilen haben
-  (Strom kWh, Wasser m3, ...).
-- Es wird nur BEZUG summiert. Einspeise-Register (OBIS ``2.8.x``) werden
-  ausgeschlossen (Summe ueber Bezug + Einspeisung waere fachlich sinnlos).
+- Einheiten werden NIE gemischt: Ergebniszeile = ``(group_key, meter_type, unit,
+  direction[, bucket])``. Eine Gruppe (z. B. eine Kostenstelle) kann mehrere
+  Zeilen haben (Strom kWh, Wasser m3, ...).
+- Bezug und Einspeisung werden NIE verrechnet: Einspeise-Register (OBIS
+  ``2.8.x``) bilden eigene Zeilen (``direction="einspeisung"``) — eine Summe
+  ueber Bezug + Einspeisung waere fachlich sinnlos, ein Verschweigen der
+  Einspeisung aber auch (importierte PV-Historien waeren sonst unsichtbar).
 - Eigentuemer-Dimension nutzt den AKTUELL gueltigen Eigentuemer (nicht
   zeitraum-genau) — konsistent mit Dashboard-Filter und ``current_owner``.
 - Recorder sehen nur ihre zugaenglichen MPs (``restrict_mp_query``); ihre Summen
@@ -24,6 +26,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
+from typing import Literal
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session as DbSession
@@ -34,6 +37,7 @@ from meters.services.access import restrict_mp_query
 from meters.services.consumption import (
     Granularity,
     aggregate_consumption,
+    clip_consumption_to_range,
     consumption_for_measuring_point,
 )
 from meters.services.monthly_consumption import monthly_points_for_measuring_point
@@ -61,22 +65,26 @@ class ReportFilter:
     meter_types: set[MeterType] | None = None
 
 
+ReportDirection = Literal["bezug", "einspeisung"]
+
+
 @dataclass(slots=True)
 class GroupBucketRow:
     group_key: int | None
     group_label: str
     meter_type: MeterType
     unit: str
+    direction: ReportDirection
     period_start: date | None  # None im Gesamt-Modus
     period_end: date | None
     consumption: Decimal
 
 
-def _is_consumption_register(obis_code: str) -> bool:
-    """True fuer Bezugs-/Verbrauchs-Register. Schliesst Einspeisung (``2.8.x``)
-    aus — der einzige OBIS-Praefix, der fachlich nicht in eine Verbrauchs-Summe
-    gehoert. Wasser (``water``) und user-definierte Waerme-Register bleiben drin."""
-    return not obis_code.startswith("2.8.")
+def _direction_of(obis_code: str) -> ReportDirection:
+    """Einspeisung (``2.8.x``, nur Strom) vs. Bezug/Verbrauch (alles andere —
+    inkl. Wasser ``water`` und user-definierter Waerme-Register). Einspeisung
+    bekommt eigene Ergebniszeilen und wird nie mit Bezug summiert."""
+    return "einspeisung" if obis_code.startswith("2.8.") else "bezug"
 
 
 def _matches(value: int | None, allowed: set[int | None] | None) -> bool:
@@ -137,10 +145,11 @@ def aggregate_report(
 
     owners = current_assignments_bulk(db, [mp.id for mp in mps])
 
-    # (group_key, group_label, meter_type, unit, period_start, period_end) -> Decimal
-    sums: dict[tuple[int | None, str, MeterType, str, date | None, date | None], Decimal] = (
-        defaultdict(lambda: Decimal("0"))
-    )
+    # (group_key, group_label, meter_type, unit, direction, period_start, period_end) -> Decimal
+    sums: dict[
+        tuple[int | None, str, MeterType, str, ReportDirection, date | None, date | None],
+        Decimal,
+    ] = defaultdict(lambda: Decimal("0"))
 
     for mp in mps:
         assignment = owners.get(mp.id)
@@ -168,13 +177,26 @@ def aggregate_report(
             points = monthly_points_for_measuring_point(db, mp.id)
         else:
             points = consumption_for_measuring_point(db, measuring_point_id=mp.id)
-        points = [p for p in points if _is_consumption_register(p.obis_code)]
-        points = aggregate_consumption(
-            points, granularity=granularity, from_date=from_date, to_date=to_date
-        )
+        if granularity is None:
+            # Gesamt-Modus: Intervalle taggenau auf den Zeitraum clippen (anteiliger
+            # Verbrauch) statt sie ueber period_end ganz/gar-nicht zu zaehlen —
+            # sonst weicht "Gesamt" von der Summe der Monats-Buckets ab.
+            points = clip_consumption_to_range(points, from_date=from_date, to_date=to_date)
+        else:
+            points = aggregate_consumption(
+                points, granularity=granularity, from_date=from_date, to_date=to_date
+            )
         for p in points:
             bucket = (None, None) if granularity is None else (p.period_start, p.period_end)
-            key = (group_key, group_label, mp.type, p.unit, bucket[0], bucket[1])
+            key = (
+                group_key,
+                group_label,
+                mp.type,
+                p.unit,
+                _direction_of(p.obis_code),
+                bucket[0],
+                bucket[1],
+            )
             sums[key] += p.consumption
 
     rows = [
@@ -183,8 +205,9 @@ def aggregate_report(
             group_label=k[1],
             meter_type=k[2],
             unit=k[3],
-            period_start=k[4],
-            period_end=k[5],
+            direction=k[4],
+            period_start=k[5],
+            period_end=k[6],
             consumption=v,
         )
         for k, v in sums.items()
@@ -194,6 +217,7 @@ def aggregate_report(
             r.period_end or date.max,
             r.group_label,
             r.meter_type.value,
+            r.direction,  # "bezug" vor "einspeisung"
             r.unit,
         )
     )

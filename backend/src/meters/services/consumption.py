@@ -132,6 +132,60 @@ def consumption_for_measuring_point(
 Granularity = Literal["day", "week", "month", "year"]
 
 
+def clip_consumption_to_range(
+    points: list[ConsumptionPoint],
+    *,
+    from_date: date | None,
+    to_date: date | None,
+) -> list[ConsumptionPoint]:
+    """Schneidet Verbrauchs-Intervalle **taggenau** auf ``[from_date, to_date]`` zu.
+
+    Anders als die ``period_end``-Filterung in :func:`aggregate_consumption`
+    (Gesamt-Modus-Altverhalten: ein Intervall zählt ganz oder gar nicht) wird hier
+    pro Intervall der anteilige Verbrauch der Tage im Bereich berechnet — lineare
+    Interpolation mit derselben Tag-Zuordnung wie :func:`split_across_buckets`
+    (Tag ``d`` gehört zum Intervall, wenn ``period_start < d <= period_end``).
+    Damit gilt: Gesamt-Summe über einen Zeitraum == Summe der Tages-/Monats-Buckets
+    desselben Zeitraums. Null-Spannen (``period_end <= period_start``) bleiben
+    ungeteilt und zählen, wenn ``period_end`` im Bereich liegt.
+    """
+
+    def in_range(d: date) -> bool:
+        return (from_date is None or d >= from_date) and (to_date is None or d <= to_date)
+
+    out: list[ConsumptionPoint] = []
+    for p in points:
+        total_days = (p.period_end - p.period_start).days
+        if total_days <= 0:
+            if in_range(p.period_end):
+                out.append(p)
+            continue
+        # Tage des Intervalls: period_start+1 .. period_end (jeweils inklusive).
+        first_day = p.period_start + timedelta(days=1)
+        lo = first_day if from_date is None else max(first_day, from_date)
+        hi = p.period_end if to_date is None else min(p.period_end, to_date)
+        overlap = (hi - lo).days + 1 if lo <= hi else 0
+        if overlap <= 0:
+            continue
+        if overlap == total_days:
+            out.append(p)
+            continue
+        out.append(
+            ConsumptionPoint(
+                # period_start bleibt exklusiv (Tag VOR dem ersten gezählten Tag),
+                # konsistent zur (start, end]-Konvention der Intervalle.
+                period_start=lo - timedelta(days=1),
+                period_end=hi,
+                register_id=p.register_id,
+                obis_code=p.obis_code,
+                consumption=p.consumption * overlap / total_days,
+                unit=p.unit,
+            )
+        )
+    out.sort(key=lambda p: (p.period_end, p.obis_code))
+    return out
+
+
 def _bucket_bounds(d: date, granularity: Granularity) -> tuple[date, date]:
     """Start-/Enddatum des Buckets, in den ``d`` fällt.
 
