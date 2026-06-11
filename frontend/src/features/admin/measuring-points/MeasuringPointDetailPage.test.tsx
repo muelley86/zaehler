@@ -311,6 +311,155 @@ describe('MeasuringPointDetailPage Register-Section', () => {
   });
 });
 
+describe('MeasuringPointDetailPage Eigentümer-Historie', () => {
+  const _owners = [
+    { id: 5, name: 'Alice GmbH' },
+    { id: 6, name: 'Bob AG' },
+  ];
+  const _ownerHistory = [
+    { id: 31, owner_id: 5, owner_name: 'Alice GmbH', valid_from: '2024-01-01', valid_to: null },
+    { id: 30, owner_id: 6, owner_name: 'Bob AG', valid_from: '2022-01-01', valid_to: '2023-06-01' },
+  ];
+
+  function _mockOwners() {
+    server.use(
+      http.get('/api/v1/measuring-points/1/owners', () => HttpResponse.json(_ownerHistory)),
+      http.get('/api/v1/owners', () => HttpResponse.json(_owners)),
+    );
+  }
+
+  it('zeigt pro Periode Bearbeiten/Löschen-Buttons und einen "Periode hinzufügen"-Knopf', async () => {
+    _mockMp(_strom);
+    _mockOwners();
+    renderWithRouter(<MeasuringPointDetailPage />, {
+      initialEntries: ['/admin/messstellen/1'],
+    });
+    expect(await screen.findByText('Alice GmbH')).toBeInTheDocument();
+    expect(screen.getByText('Bob AG')).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Periode bearbeiten' })).toHaveLength(2);
+    expect(screen.getAllByRole('button', { name: 'Periode löschen' })).toHaveLength(2);
+    expect(screen.getByRole('button', { name: /Periode hinzufügen/i })).toBeInTheDocument();
+  });
+
+  it('legt eine neue historische Periode per POST an', async () => {
+    _mockMp(_strom);
+    _mockOwners();
+    let postBody: unknown = null;
+    server.use(
+      http.post('/api/v1/measuring-points/1/owners', async ({ request }) => {
+        postBody = await request.json();
+        return HttpResponse.json(
+          {
+            id: 32,
+            owner_id: 6,
+            owner_name: 'Bob AG',
+            valid_from: '2020-01-01',
+            valid_to: '2021-01-01',
+          },
+          { status: 201 },
+        );
+      }),
+    );
+    renderWithRouter(<MeasuringPointDetailPage />, {
+      initialEntries: ['/admin/messstellen/1'],
+    });
+    fireEvent.click(await screen.findByRole('button', { name: /Periode hinzufügen/i }));
+    fireEvent.change(await screen.findByLabelText(/^Eigentümer$/), { target: { value: '6' } });
+    fireEvent.change(screen.getByLabelText(/Gültig ab/i), { target: { value: '2020-01-01' } });
+    fireEvent.change(screen.getByLabelText(/Gültig bis/i), { target: { value: '2021-01-01' } });
+    fireEvent.click(screen.getByRole('button', { name: /Speichern/i }));
+    await waitFor(() => expect(postBody).not.toBeNull());
+    expect(postBody).toEqual({
+      owner_id: 6,
+      valid_from: '2020-01-01',
+      valid_to: '2021-01-01',
+    });
+  });
+
+  it('bearbeitet eine bestehende Periode per PATCH (Formular vorbefüllt)', async () => {
+    _mockMp(_strom);
+    _mockOwners();
+    let patchBody: unknown = null;
+    server.use(
+      http.patch('/api/v1/measuring-points/1/owners/30', async ({ request }) => {
+        patchBody = await request.json();
+        return HttpResponse.json({
+          id: 30,
+          owner_id: 6,
+          owner_name: 'Bob AG',
+          valid_from: '2022-01-01',
+          valid_to: '2023-12-31',
+        });
+      }),
+    );
+    renderWithRouter(<MeasuringPointDetailPage />, {
+      initialEntries: ['/admin/messstellen/1'],
+    });
+    // Zweite Zeile = geschlossene Periode von Bob AG (id 30).
+    const editButtons = await screen.findAllByRole('button', { name: 'Periode bearbeiten' });
+    fireEvent.click(editButtons[1]!);
+    const ownerSelect = await screen.findByLabelText(/^Eigentümer$/);
+    expect(ownerSelect).toHaveValue('6');
+    expect(screen.getByLabelText(/Gültig ab/i)).toHaveValue('2022-01-01');
+    fireEvent.change(screen.getByLabelText(/Gültig bis/i), { target: { value: '2023-12-31' } });
+    fireEvent.click(screen.getByRole('button', { name: /Speichern/i }));
+    await waitFor(() => expect(patchBody).not.toBeNull());
+    expect(patchBody).toEqual({
+      owner_id: 6,
+      valid_from: '2022-01-01',
+      valid_to: '2023-12-31',
+    });
+  });
+
+  it('löscht eine Periode nach Bestätigung per DELETE', async () => {
+    _mockMp(_strom);
+    _mockOwners();
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    let deleted = false;
+    server.use(
+      http.delete('/api/v1/measuring-points/1/owners/30', () => {
+        deleted = true;
+        return new HttpResponse(null, { status: 204 });
+      }),
+    );
+    renderWithRouter(<MeasuringPointDetailPage />, {
+      initialEntries: ['/admin/messstellen/1'],
+    });
+    const deleteButtons = await screen.findAllByRole('button', { name: 'Periode löschen' });
+    fireEvent.click(deleteButtons[1]!);
+    await waitFor(() => expect(deleted).toBe(true));
+    expect(confirmSpy).toHaveBeenCalled();
+    confirmSpy.mockRestore();
+  });
+
+  it('zeigt einen 422-Validierungsfehler des Backends im Formular an', async () => {
+    _mockMp(_strom);
+    _mockOwners();
+    server.use(
+      http.post('/api/v1/measuring-points/1/owners', () =>
+        HttpResponse.json(
+          {
+            title: 'Period overlaps existing assignment',
+            detail: 'Die Periode ueberschneidet sich mit einer bestehenden Eigentuemer-Periode.',
+            status: 422,
+          },
+          { status: 422, headers: { 'Content-Type': 'application/problem+json' } },
+        ),
+      ),
+    );
+    renderWithRouter(<MeasuringPointDetailPage />, {
+      initialEntries: ['/admin/messstellen/1'],
+    });
+    fireEvent.click(await screen.findByRole('button', { name: /Periode hinzufügen/i }));
+    fireEvent.change(await screen.findByLabelText(/^Eigentümer$/), { target: { value: '5' } });
+    fireEvent.change(screen.getByLabelText(/Gültig ab/i), { target: { value: '2024-06-01' } });
+    fireEvent.click(screen.getByRole('button', { name: /Speichern/i }));
+    expect(
+      await screen.findByText(/ueberschneidet sich mit einer bestehenden/i),
+    ).toBeInTheDocument();
+  });
+});
+
 describe('MeasuringPointDetailPage Verbrauchskurve — Datumsfilter', () => {
   it('sendet den globalen Datumsbereich als from_at/to_at an die Consumption-Query', async () => {
     window.sessionStorage.setItem(

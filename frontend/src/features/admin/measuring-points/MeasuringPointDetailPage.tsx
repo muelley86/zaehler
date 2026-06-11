@@ -1546,11 +1546,17 @@ function HeatingRegisterEditor({
 // ---------------------------------------------------------------------------
 
 /** Listet alle ``OwnerAssignment``-Perioden absteigend. Aktive Periode oben
- *  mit ``aktiv``-Badge. Button „Eigentümer wechseln" oeffnet ChangeOwnerSheet. */
+ *  mit ``aktiv``-Badge. „Eigentümer wechseln" haengt eine neue offene Periode
+ *  an; der Historien-Editor (hinzufügen/bearbeiten/löschen pro Zeile) erlaubt
+ *  Korrekturen inkl. Rückdatierung und Lücken (Leerstand). */
 function OwnerHistoryCard({ mp, onChanged }: { mp: MeasuringPointRead; onChanged: () => void }) {
   const [history, setHistory] = useState<OwnerAssignmentRead[]>([]);
   const [owners, setOwners] = useState<OwnerRead[]>([]);
   const [open, setOpen] = useState(false);
+  // null = Sheet zu; { period: null } = neue Periode; { period: a } = bearbeiten.
+  const [periodSheet, setPeriodSheet] = useState<{ period: OwnerAssignmentRead | null } | null>(
+    null,
+  );
   const [error, setError] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
 
@@ -1569,19 +1575,45 @@ function OwnerHistoryCard({ mp, onChanged }: { mp: MeasuringPointRead; onChanged
       });
   }, [mp.id, tick]);
 
+  function refresh() {
+    setTick((t) => t + 1);
+    onChanged();
+  }
+
+  async function removePeriod(a: OwnerAssignmentRead) {
+    const label = a.owner_name ?? 'unbekannt';
+    if (!window.confirm(`Eigentümer-Periode "${label}" wirklich löschen?`)) return;
+    try {
+      await api.delete(`/measuring-points/${mp.id}/owners/${a.id}`);
+      refresh();
+    } catch (err) {
+      if (err instanceof ApiError) window.alert(err.problem.detail ?? err.problem.title);
+    }
+  }
+
   return (
     <Section
       header={
-        <div className="flex items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <span>Eigentümer-Historie</span>
-          <Button
-            variant="bordered"
-            size="sm"
-            onClick={() => setOpen(true)}
-            disabled={owners.length === 0}
-          >
-            Eigentümer wechseln
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              variant="bordered"
+              size="sm"
+              onClick={() => setPeriodSheet({ period: null })}
+              disabled={owners.length === 0}
+            >
+              Periode hinzufügen
+            </Button>
+            <Button
+              variant="bordered"
+              size="sm"
+              onClick={() => setOpen(true)}
+              disabled={owners.length === 0}
+            >
+              Eigentümer wechseln
+            </Button>
+          </div>
         </div>
       }
     >
@@ -1596,7 +1628,7 @@ function OwnerHistoryCard({ mp, onChanged }: { mp: MeasuringPointRead; onChanged
             return (
               <div
                 key={a.id}
-                className="bg-fill/40 flex items-center justify-between rounded-pill border-hairline border-border px-3 py-2"
+                className="bg-fill/40 flex items-center justify-between gap-2 rounded-pill border-hairline border-border px-3 py-2"
               >
                 <div className="min-w-0">
                   <div className="truncate text-body-sm font-semibold text-label">
@@ -1607,11 +1639,29 @@ function OwnerHistoryCard({ mp, onChanged }: { mp: MeasuringPointRead; onChanged
                     {a.valid_to ? ` bis ${formatDateDe(a.valid_to)}` : ''}
                   </div>
                 </div>
-                {active ? (
-                  <span className="rounded-full bg-primary-soft px-2 py-0.5 text-caption font-semibold text-primary-deep">
-                    aktiv
-                  </span>
-                ) : null}
+                <div className="flex shrink-0 items-center gap-1">
+                  {active ? (
+                    <span className="rounded-full bg-primary-soft px-2 py-0.5 text-caption font-semibold text-primary-deep">
+                      aktiv
+                    </span>
+                  ) : null}
+                  <button
+                    type="button"
+                    onClick={() => setPeriodSheet({ period: a })}
+                    aria-label="Periode bearbeiten"
+                    className="flex h-7 w-7 items-center justify-center rounded-full text-secondary transition-colors hover:bg-fill"
+                  >
+                    <Pencil size={13} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void removePeriod(a)}
+                    aria-label="Periode löschen"
+                    className="hover:bg-danger/10 flex h-7 w-7 items-center justify-center rounded-full text-danger transition-colors"
+                  >
+                    <Trash2 size={13} />
+                  </button>
+                </div>
               </div>
             );
           })
@@ -1623,13 +1673,125 @@ function OwnerHistoryCard({ mp, onChanged }: { mp: MeasuringPointRead; onChanged
           owners={owners}
           onSaved={() => {
             setOpen(false);
-            setTick((t) => t + 1);
-            onChanged();
+            refresh();
           }}
           onCancel={() => setOpen(false)}
         />
       </Sheet>
+      <Sheet
+        open={periodSheet !== null}
+        onClose={() => setPeriodSheet(null)}
+        title={periodSheet?.period ? 'Periode bearbeiten' : 'Periode hinzufügen'}
+      >
+        {periodSheet ? (
+          <OwnerPeriodForm
+            mpId={mp.id}
+            owners={owners}
+            period={periodSheet.period}
+            onSaved={() => {
+              setPeriodSheet(null);
+              refresh();
+            }}
+            onCancel={() => setPeriodSheet(null)}
+          />
+        ) : null}
+      </Sheet>
     </Section>
+  );
+}
+
+/** Historien-Editor-Formular: legt eine Periode an (period=null) oder
+ *  korrigiert eine bestehende. Leeres „Gültig bis" = offene (aktive) Periode.
+ *  Überlappungs-/Konsistenz-Validierung macht das Backend (422). */
+function OwnerPeriodForm({
+  mpId,
+  owners,
+  period,
+  onSaved,
+  onCancel,
+}: {
+  mpId: number;
+  owners: OwnerRead[];
+  period: OwnerAssignmentRead | null;
+  onSaved: () => void;
+  onCancel: () => void;
+}) {
+  const [ownerId, setOwnerId] = useState<number | ''>(period?.owner_id ?? '');
+  const [validFrom, setValidFrom] = useState(period?.valid_from ?? '');
+  const [validTo, setValidTo] = useState(period?.valid_to ?? '');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function save(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (ownerId === '') {
+      setError('Bitte einen Eigentümer wählen.');
+      return;
+    }
+    if (!validFrom) {
+      setError('Bitte ein Beginn-Datum wählen.');
+      return;
+    }
+    setError(null);
+    setBusy(true);
+    const body = {
+      owner_id: ownerId,
+      valid_from: validFrom,
+      valid_to: validTo === '' ? null : validTo,
+    };
+    try {
+      if (period) {
+        await api.patch(`/measuring-points/${mpId}/owners/${period.id}`, body);
+      } else {
+        await api.post(`/measuring-points/${mpId}/owners`, body);
+      }
+      onSaved();
+    } catch (err) {
+      if (err instanceof ApiError) setError(err.problem.detail ?? err.problem.title);
+      else setError('Speichern fehlgeschlagen.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <form onSubmit={(e) => void save(e)} className="space-y-3">
+      <Select
+        label="Eigentümer"
+        value={ownerId}
+        onChange={(e) => setOwnerId(e.target.value ? Number(e.target.value) : '')}
+        required
+      >
+        <option value="">— bitte wählen —</option>
+        {owners.map((o) => (
+          <option key={o.id} value={o.id}>
+            {o.name}
+          </option>
+        ))}
+      </Select>
+      <TextField
+        label="Gültig ab"
+        type="date"
+        value={validFrom}
+        onChange={(e) => setValidFrom(e.target.value)}
+        required
+      />
+      <TextField
+        label="Gültig bis (leer = aktive Periode)"
+        type="date"
+        value={validTo}
+        onChange={(e) => setValidTo(e.target.value)}
+      />
+      {error ? <div className="text-caption text-danger">{error}</div> : null}
+      <div className="flex gap-2">
+        <Button type="submit" variant="filled" disabled={busy} fullWidth>
+          {busy ? 'Speichere…' : 'Speichern'}
+        </Button>
+        <Button type="button" variant="bordered" onClick={onCancel}>
+          Abbrechen
+        </Button>
+      </div>
+    </form>
   );
 }
 
