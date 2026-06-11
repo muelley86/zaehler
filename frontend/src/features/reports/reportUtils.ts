@@ -80,8 +80,37 @@ export function resolvePeriod(kind: ReportPeriodKind, today: Date): Period {
   }
 }
 
+const DIRECTION_LABELS = { bezug: 'Bezug', einspeisung: 'Einspeisung' } as const;
+
+interface DirectionRow {
+  group_key: number | null;
+  group_label: string;
+  meter_type: MeterType;
+  direction: 'bezug' | 'einspeisung';
+}
+
+/** Gruppen-Identität für die Richtungs-Kennzeichnung: Gruppe + Zählerart. */
+function directionGroupKey(r: DirectionRow): string {
+  return `${r.group_key ?? 'null'}|${r.group_label}|${r.meter_type}`;
+}
+
+/** Gruppen, die mindestens eine Einspeisungs-Zeile haben (= bidirektional). */
+export function groupsWithEinspeisung(rows: readonly DirectionRow[]): Set<string> {
+  return new Set(rows.filter((r) => r.direction === 'einspeisung').map(directionGroupKey));
+}
+
+/**
+ * Richtungs-Label für eine Tabellenzeile: Einspeisung immer, Bezug nur bei
+ * bidirektionalen Gruppen (sonst wäre „Bezug" an Gas/Wasser-Zeilen Rauschen).
+ */
+export function directionSuffix(row: DirectionRow, bidiGroups: Set<string>): string | null {
+  if (row.direction === 'einspeisung') return DIRECTION_LABELS.einspeisung;
+  return bidiGroups.has(directionGroupKey(row)) ? DIRECTION_LABELS.bezug : null;
+}
+
 export interface ComparisonRow {
   key: string;
+  group_key: number | null;
   group_label: string;
   meter_type: MeterType;
   unit: string;
@@ -111,6 +140,7 @@ export function diffRows(rowsA: ReportRow[], rowsB: ReportRow[]): ComparisonRow[
     if (!row) {
       row = {
         key,
+        group_key: r.group_key,
         group_label: r.group_label,
         meter_type: r.meter_type,
         unit: r.unit,
