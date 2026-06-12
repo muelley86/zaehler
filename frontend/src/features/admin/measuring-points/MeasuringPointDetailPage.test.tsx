@@ -109,6 +109,8 @@ const _strom: MeasuringPointRead = {
   installation_location: null,
   current_owner_id: null,
   current_owner_name: null,
+  current_supplier_id: null,
+  current_supplier_name: null,
   kostenstelle: null,
   is_bidirectional: false,
   has_dual_tariff: false,
@@ -139,6 +141,8 @@ const _heizung: MeasuringPointRead = {
   installation_location: null,
   current_owner_id: null,
   current_owner_name: null,
+  current_supplier_id: null,
+  current_supplier_name: null,
   kostenstelle: null,
   is_bidirectional: false,
   has_dual_tariff: false,
@@ -338,7 +342,7 @@ describe('MeasuringPointDetailPage Eigentümer-Historie', () => {
     expect(screen.getByText('Bob AG')).toBeInTheDocument();
     expect(screen.getAllByRole('button', { name: 'Periode bearbeiten' })).toHaveLength(2);
     expect(screen.getAllByRole('button', { name: 'Periode löschen' })).toHaveLength(2);
-    expect(screen.getByRole('button', { name: /Periode hinzufügen/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Periode hinzufügen$/ })).toBeInTheDocument();
   });
 
   it('legt eine neue historische Periode per POST an', async () => {
@@ -363,7 +367,7 @@ describe('MeasuringPointDetailPage Eigentümer-Historie', () => {
     renderWithRouter(<MeasuringPointDetailPage />, {
       initialEntries: ['/admin/messstellen/1'],
     });
-    fireEvent.click(await screen.findByRole('button', { name: /Periode hinzufügen/i }));
+    fireEvent.click(await screen.findByRole('button', { name: /^Periode hinzufügen$/ }));
     fireEvent.change(await screen.findByLabelText(/^Eigentümer$/), { target: { value: '6' } });
     fireEvent.change(screen.getByLabelText(/Gültig ab/i), { target: { value: '2020-01-01' } });
     fireEvent.change(screen.getByLabelText(/Gültig bis/i), { target: { value: '2021-01-01' } });
@@ -450,13 +454,119 @@ describe('MeasuringPointDetailPage Eigentümer-Historie', () => {
     renderWithRouter(<MeasuringPointDetailPage />, {
       initialEntries: ['/admin/messstellen/1'],
     });
-    fireEvent.click(await screen.findByRole('button', { name: /Periode hinzufügen/i }));
+    fireEvent.click(await screen.findByRole('button', { name: /^Periode hinzufügen$/ }));
     fireEvent.change(await screen.findByLabelText(/^Eigentümer$/), { target: { value: '5' } });
     fireEvent.change(screen.getByLabelText(/Gültig ab/i), { target: { value: '2024-06-01' } });
     fireEvent.click(screen.getByRole('button', { name: /Speichern/i }));
     expect(
       await screen.findByText(/ueberschneidet sich mit einer bestehenden/i),
     ).toBeInTheDocument();
+  });
+});
+
+describe('MeasuringPointDetailPage Lieferanten-Historie', () => {
+  const _suppliers = [
+    { id: 7, name: 'Stadtwerke' },
+    { id: 8, name: 'Regionalwerk' },
+  ];
+  const _supplierHistory = [
+    {
+      id: 41,
+      supplier_id: 7,
+      supplier_name: 'Stadtwerke',
+      valid_from: '2024-01-01',
+      valid_to: null,
+    },
+    {
+      id: 40,
+      supplier_id: 8,
+      supplier_name: 'Regionalwerk',
+      valid_from: '2022-01-01',
+      valid_to: '2023-06-01',
+    },
+  ];
+
+  function _mockSuppliers() {
+    server.use(
+      http.get('/api/v1/measuring-points/1/suppliers', () => HttpResponse.json(_supplierHistory)),
+      http.get('/api/v1/suppliers', () => HttpResponse.json(_suppliers)),
+    );
+  }
+
+  it('zeigt die Lieferanten-Perioden mit Editor-Buttons und Wechsel-Knopf', async () => {
+    _mockMp(_strom);
+    _mockSuppliers();
+    renderWithRouter(<MeasuringPointDetailPage />, {
+      initialEntries: ['/admin/messstellen/1'],
+    });
+    expect(await screen.findByText('Stadtwerke')).toBeInTheDocument();
+    expect(screen.getByText('Regionalwerk')).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Lieferanten-Periode bearbeiten' })).toHaveLength(
+      2,
+    );
+    expect(screen.getAllByRole('button', { name: 'Lieferanten-Periode löschen' })).toHaveLength(2);
+    expect(
+      screen.getByRole('button', { name: 'Lieferanten-Periode hinzufügen' }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Lieferant wechseln/i })).toBeInTheDocument();
+  });
+
+  it('führt einen Lieferantenwechsel per POST /change-supplier durch', async () => {
+    _mockMp(_strom);
+    _mockSuppliers();
+    let postBody: unknown = null;
+    server.use(
+      http.post('/api/v1/measuring-points/1/change-supplier', async ({ request }) => {
+        postBody = await request.json();
+        return HttpResponse.json(_strom);
+      }),
+    );
+    renderWithRouter(<MeasuringPointDetailPage />, {
+      initialEntries: ['/admin/messstellen/1'],
+    });
+    fireEvent.click(await screen.findByRole('button', { name: /Lieferant wechseln/i }));
+    fireEvent.change(await screen.findByLabelText(/^Neuer Lieferant$/), {
+      target: { value: '8' },
+    });
+    fireEvent.change(screen.getByLabelText(/Wechsel zum/i), { target: { value: '2025-06-01' } });
+    fireEvent.click(screen.getByRole('button', { name: /^Wechseln$/ }));
+    await waitFor(() => expect(postBody).not.toBeNull());
+    expect(postBody).toEqual({ supplier_id: 8, valid_from: '2025-06-01' });
+  });
+
+  it('legt eine neue historische Lieferanten-Periode per POST an', async () => {
+    _mockMp(_strom);
+    _mockSuppliers();
+    let postBody: unknown = null;
+    server.use(
+      http.post('/api/v1/measuring-points/1/suppliers', async ({ request }) => {
+        postBody = await request.json();
+        return HttpResponse.json(
+          {
+            id: 42,
+            supplier_id: 8,
+            supplier_name: 'Regionalwerk',
+            valid_from: '2020-01-01',
+            valid_to: '2021-01-01',
+          },
+          { status: 201 },
+        );
+      }),
+    );
+    renderWithRouter(<MeasuringPointDetailPage />, {
+      initialEntries: ['/admin/messstellen/1'],
+    });
+    fireEvent.click(await screen.findByRole('button', { name: 'Lieferanten-Periode hinzufügen' }));
+    fireEvent.change(await screen.findByLabelText(/^Lieferant$/), { target: { value: '8' } });
+    fireEvent.change(screen.getByLabelText(/Gültig ab/i), { target: { value: '2020-01-01' } });
+    fireEvent.change(screen.getByLabelText(/Gültig bis/i), { target: { value: '2021-01-01' } });
+    fireEvent.click(screen.getByRole('button', { name: /Speichern/i }));
+    await waitFor(() => expect(postBody).not.toBeNull());
+    expect(postBody).toEqual({
+      supplier_id: 8,
+      valid_from: '2020-01-01',
+      valid_to: '2021-01-01',
+    });
   });
 });
 

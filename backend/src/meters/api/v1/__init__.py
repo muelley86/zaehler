@@ -21,6 +21,7 @@ from meters.api.v1 import (
     reports,
     restore,
     search,
+    suppliers,
     users,
     virtual_measuring_points,
 )
@@ -31,6 +32,7 @@ router.include_router(users.router)
 router.include_router(locations.router)
 router.include_router(main_locations.router)
 router.include_router(owners.router)
+router.include_router(suppliers.router)
 router.include_router(measuring_points.router)
 router.include_router(virtual_measuring_points.router)
 router.include_router(physical_meters.router)

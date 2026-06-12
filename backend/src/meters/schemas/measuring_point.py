@@ -103,6 +103,9 @@ class MeasuringPointCreate(MeasuringPointBase):
     # Bleibt ``owner_id=None``, wird kein Assignment angelegt.
     owner_id: int | None = None
     owner_valid_from: date | None = None
+    # Optionaler erster Lieferant — gleiche Semantik wie owner_id.
+    supplier_id: int | None = None
+    supplier_valid_from: date | None = None
 
     @model_validator(mode="after")
     def _registers_match_type(self) -> Self:
@@ -159,6 +162,9 @@ class MeasuringPointRead(APIModel):
     # ``valid_to IS NULL`` befuellt). ``None``, wenn aktuell keiner.
     current_owner_id: int | None = None
     current_owner_name: str | None = None
+    # Aktueller Lieferant — gleiches Muster wie current_owner_*.
+    current_supplier_id: int | None = None
+    current_supplier_name: str | None = None
     physical_meters: list[PhysicalMeterRead]
 
 

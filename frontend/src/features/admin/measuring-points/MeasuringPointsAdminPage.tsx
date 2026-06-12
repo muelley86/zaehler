@@ -27,6 +27,7 @@ import {
   TextField,
   TypeBadge,
 } from '@/components/ui';
+import type { DropdownOption } from '@/components/ui';
 import { ApiError, api } from '@/lib/api';
 import { parseDe } from '@/lib/format';
 import { HEATING_SOURCE_LABELS, TYPE_LABELS, describeMeterType } from '@/lib/meterLabels';
@@ -39,6 +40,7 @@ import type {
   MeasuringPointRead,
   MeterType,
   OwnerRead,
+  SupplierRead,
 } from '@/lib/types';
 import { HEATING_UNITS } from '@/lib/types';
 import { cx } from '@/components/ui/cx';
@@ -113,19 +115,23 @@ const HEATING_PRESETS: Record<HeatingSource, RegisterDraft[]> = {
   ],
 };
 
-// Session-Memory des Typ-Filters („Filter merken") — Muster wie Dashboard/Readings.
+// Session-Memory der Filter („Filter merken") — Muster wie Dashboard/Readings.
 const FILTER_NS = 'filters.adminMeasuringPoints.';
 const isMeterType = (x: unknown): x is MeterType =>
   typeof x === 'string' && Object.prototype.hasOwnProperty.call(TYPE_LABELS, x);
 const TYPE_CODEC = setCodec<MeterType>(isMeterType);
+// Id-Filter mit „ohne …"-Option: null = Messstellen ohne Zuordnung.
+const isIdMember = (x: unknown): x is number | null => x === null || typeof x === 'number';
+const ID_CODEC = setCodec<number | null>(isIdMember);
 
 export function MeasuringPointsAdminPage() {
   const [points, setPoints] = useState<MeasuringPointRead[] | null>(null);
   const [locations, setLocations] = useState<LocationRead[]>([]);
   const [owners, setOwners] = useState<OwnerRead[]>([]);
+  const [suppliers, setSuppliers] = useState<SupplierRead[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
-  // „Filter merken": Typ-Filter je Seite in sessionStorage gespiegelt; sonst
+  // „Filter merken": Filter je Seite in sessionStorage gespiegelt; sonst
   // normales useState (unverändertes Verhalten).
   const { rememberFilters } = useFilterPrefs();
   const [typeFilter, setTypeFilter] = useStickyState<Set<MeterType>>(
@@ -134,17 +140,37 @@ export function MeasuringPointsAdminPage() {
     rememberFilters,
     TYPE_CODEC,
   );
+  const [ownerFilter, setOwnerFilter] = useStickyState<Set<number | null>>(
+    FILTER_NS + 'owner',
+    new Set(),
+    rememberFilters,
+    ID_CODEC,
+  );
+  const [supplierFilter, setSupplierFilter] = useStickyState<Set<number | null>>(
+    FILTER_NS + 'supplier',
+    new Set(),
+    rememberFilters,
+    ID_CODEC,
+  );
+  const [mainLocationFilter, setMainLocationFilter] = useStickyState<Set<number | null>>(
+    FILTER_NS + 'mainLocation',
+    new Set(),
+    rememberFilters,
+    ID_CODEC,
+  );
 
   useEffect(() => {
     Promise.all([
       api.get<MeasuringPointRead[]>('/measuring-points'),
       api.get<LocationRead[]>('/locations'),
       api.get<OwnerRead[]>('/owners'),
+      api.get<SupplierRead[]>('/suppliers'),
     ])
-      .then(([mps, locs, owns]) => {
+      .then(([mps, locs, owns, supps]) => {
         setPoints(mps);
         setLocations(locs);
         setOwners(owns);
+        setSuppliers(supps);
       })
       .catch((err: unknown) => {
         if (err instanceof ApiError) setError(err.problem.detail ?? err.problem.title);
@@ -153,10 +179,62 @@ export function MeasuringPointsAdminPage() {
 
   const refresh = () => setTick((t) => t + 1);
 
+  // Filter-Optionen aus der MP-Liste selbst ableiten (Dashboard-Muster):
+  // nur tatsächlich verwendete Werte anbieten, jeweils + „ohne …"-Option.
+  const ownerOptions = useMemo(() => {
+    const map = new Map<number, string>();
+    points?.forEach((mp) => {
+      if (mp.current_owner_id !== null && !map.has(mp.current_owner_id)) {
+        map.set(mp.current_owner_id, mp.current_owner_name ?? `#${mp.current_owner_id}`);
+      }
+    });
+    return Array.from(map.entries());
+  }, [points]);
+
+  const supplierOptions = useMemo(() => {
+    const map = new Map<number, string>();
+    points?.forEach((mp) => {
+      if (mp.current_supplier_id !== null && !map.has(mp.current_supplier_id)) {
+        map.set(mp.current_supplier_id, mp.current_supplier_name ?? `#${mp.current_supplier_id}`);
+      }
+    });
+    return Array.from(map.entries());
+  }, [points]);
+
+  const mainLocationOptions = useMemo(() => {
+    const map = new Map<number, string>();
+    points?.forEach((mp) => {
+      if (mp.main_location_id !== null && !map.has(mp.main_location_id)) {
+        map.set(mp.main_location_id, mp.main_location_name ?? `#${mp.main_location_id}`);
+      }
+    });
+    return Array.from(map.entries());
+  }, [points]);
+
   const filtered = useMemo(
-    () => (points ?? []).filter((mp) => typeFilter.size === 0 || typeFilter.has(mp.type)),
-    [points, typeFilter],
+    () =>
+      (points ?? []).filter(
+        (mp) =>
+          (typeFilter.size === 0 || typeFilter.has(mp.type)) &&
+          (ownerFilter.size === 0 || ownerFilter.has(mp.current_owner_id)) &&
+          (supplierFilter.size === 0 || supplierFilter.has(mp.current_supplier_id)) &&
+          (mainLocationFilter.size === 0 || mainLocationFilter.has(mp.main_location_id)),
+      ),
+    [points, typeFilter, ownerFilter, supplierFilter, mainLocationFilter],
   );
+
+  const hasActiveFilters =
+    typeFilter.size > 0 ||
+    ownerFilter.size > 0 ||
+    supplierFilter.size > 0 ||
+    mainLocationFilter.size > 0;
+
+  function resetFilters() {
+    setTypeFilter(new Set());
+    setOwnerFilter(new Set());
+    setSupplierFilter(new Set());
+    setMainLocationFilter(new Set());
+  }
 
   return (
     <>
@@ -167,18 +245,67 @@ export function MeasuringPointsAdminPage() {
         </div>
       ) : null}
 
-      <CreateForm locations={locations} owners={owners} onCreated={refresh} />
+      <CreateForm locations={locations} owners={owners} suppliers={suppliers} onCreated={refresh} />
 
       {points && points.length > 0 ? (
-        <MultiSelectDropdown
-          label="Typ"
-          options={(Object.keys(TYPE_LABELS) as MeterType[]).map((t) => ({
-            value: t,
-            label: TYPE_LABELS[t],
-          }))}
-          selected={typeFilter}
-          onChange={setTypeFilter}
-        />
+        <div className="flex flex-wrap items-center gap-2">
+          <MultiSelectDropdown
+            label="Typ"
+            options={(Object.keys(TYPE_LABELS) as MeterType[]).map((t) => ({
+              value: t,
+              label: TYPE_LABELS[t],
+            }))}
+            selected={typeFilter}
+            onChange={setTypeFilter}
+          />
+          {ownerOptions.length > 0 ? (
+            <MultiSelectDropdown
+              label="Eigentümer"
+              options={[
+                ...ownerOptions.map(
+                  ([id, name]): DropdownOption<number | null> => ({ value: id, label: name }),
+                ),
+                { value: null, label: 'ohne Eigentümer' } satisfies DropdownOption<number | null>,
+              ]}
+              selected={ownerFilter}
+              onChange={setOwnerFilter}
+            />
+          ) : null}
+          {supplierOptions.length > 0 ? (
+            <MultiSelectDropdown
+              label="Lieferant"
+              options={[
+                ...supplierOptions.map(
+                  ([id, name]): DropdownOption<number | null> => ({ value: id, label: name }),
+                ),
+                { value: null, label: 'ohne Lieferant' } satisfies DropdownOption<number | null>,
+              ]}
+              selected={supplierFilter}
+              onChange={setSupplierFilter}
+            />
+          ) : null}
+          {mainLocationOptions.length > 0 ? (
+            <MultiSelectDropdown
+              label="Hauptstandort"
+              options={[
+                ...mainLocationOptions.map(
+                  ([id, name]): DropdownOption<number | null> => ({ value: id, label: name }),
+                ),
+                {
+                  value: null,
+                  label: 'ohne Hauptstandort',
+                } satisfies DropdownOption<number | null>,
+              ]}
+              selected={mainLocationFilter}
+              onChange={setMainLocationFilter}
+            />
+          ) : null}
+          {hasActiveFilters ? (
+            <Button variant="plain" size="sm" onClick={resetFilters}>
+              Filter zurücksetzen
+            </Button>
+          ) : null}
+        </div>
       ) : null}
 
       <div className="space-y-3">
@@ -186,7 +313,7 @@ export function MeasuringPointsAdminPage() {
           <MPCard key={mp.id} mp={mp} onChanged={refresh} />
         ))}
         {points && points.length > 0 && filtered.length === 0 ? (
-          <div className="text-tertiary">Keine Messstellen dieses Typs.</div>
+          <div className="text-tertiary">Keine Messstellen für diese Filter.</div>
         ) : null}
       </div>
     </>
@@ -261,10 +388,12 @@ function MPCard({ mp, onChanged }: { mp: MeasuringPointRead; onChanged: () => vo
 function CreateForm({
   locations,
   owners,
+  suppliers,
   onCreated,
 }: {
   locations: LocationRead[];
   owners: OwnerRead[];
+  suppliers: SupplierRead[];
   onCreated: () => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -315,6 +444,7 @@ function CreateForm({
           type={type}
           locations={locations}
           owners={owners}
+          suppliers={suppliers}
           onBack={() => setType(null)}
           onCreated={() => {
             close();
@@ -330,18 +460,21 @@ function CreateFormFields({
   type,
   locations,
   owners,
+  suppliers,
   onBack,
   onCreated,
 }: {
   type: MeterType;
   locations: LocationRead[];
   owners: OwnerRead[];
+  suppliers: SupplierRead[];
   onBack: () => void;
   onCreated: () => void;
 }) {
   const [name, setName] = useState('');
   const [locationId, setLocationId] = useState<number | null>(null);
   const [ownerId, setOwnerId] = useState<number | null>(null);
+  const [supplierId, setSupplierId] = useState<number | null>(null);
   const [serial, setSerial] = useState('');
   const [installedAt, setInstalledAt] = useState(new Date().toISOString().slice(0, 10));
 
@@ -406,6 +539,10 @@ function CreateFormFields({
         body['owner_id'] = ownerId;
         // valid_from = installed_at (= Default beim Erstanlegen).
         body['owner_valid_from'] = installedAt;
+      }
+      if (supplierId !== null) {
+        body['supplier_id'] = supplierId;
+        body['supplier_valid_from'] = installedAt;
       }
       if (installationLocation.trim()) {
         body['installation_location'] = installationLocation.trim();
@@ -478,6 +615,18 @@ function CreateFormFields({
         {owners.map((o) => (
           <option key={o.id} value={o.id}>
             {o.name}
+          </option>
+        ))}
+      </Select>
+      <Select
+        label="Lieferant (optional)"
+        value={supplierId ?? ''}
+        onChange={(e) => setSupplierId(e.target.value ? Number(e.target.value) : null)}
+      >
+        <option value="">— kein Lieferant —</option>
+        {suppliers.map((s) => (
+          <option key={s.id} value={s.id}>
+            {s.name}
           </option>
         ))}
       </Select>

@@ -23,6 +23,7 @@ if TYPE_CHECKING:
     from meters.models.location import Location
     from meters.models.owner_assignment import OwnerAssignment
     from meters.models.physical_meter import PhysicalMeter
+    from meters.models.supplier_assignment import SupplierAssignment
 
 
 class MeasuringPoint(Base, TimestampMixin):
@@ -73,4 +74,12 @@ class MeasuringPoint(Base, TimestampMixin):
         back_populates="measuring_point",
         cascade="all, delete-orphan",
         order_by="OwnerAssignment.valid_from",
+    )
+    # Periodisierte Lieferanten-Historie — gleiches Modell wie die
+    # Owner-Historie (aktuelles Assignment = ``valid_to IS NULL``).
+    supplier_assignments: Mapped[list[SupplierAssignment]] = relationship(
+        "SupplierAssignment",
+        back_populates="measuring_point",
+        cascade="all, delete-orphan",
+        order_by="SupplierAssignment.valid_from",
     )

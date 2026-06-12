@@ -34,6 +34,7 @@ function _mockEmptyData() {
     http.get('/api/v1/measuring-points', () => HttpResponse.json([])),
     http.get('/api/v1/locations', () => HttpResponse.json([])),
     http.get('/api/v1/owners', () => HttpResponse.json([])),
+    http.get('/api/v1/suppliers', () => HttpResponse.json([])),
   );
 }
 
@@ -52,6 +53,8 @@ function _mp(overrides: Record<string, unknown>) {
     installation_location: null,
     current_owner_id: null,
     current_owner_name: null,
+    current_supplier_id: null,
+    current_supplier_name: null,
     is_bidirectional: false,
     has_dual_tariff: false,
     transformer_factor: null,
@@ -66,6 +69,7 @@ function _mockList(mps: ReturnType<typeof _mp>[]) {
     http.get('/api/v1/measuring-points', () => HttpResponse.json(mps)),
     http.get('/api/v1/locations', () => HttpResponse.json([])),
     http.get('/api/v1/owners', () => HttpResponse.json([])),
+    http.get('/api/v1/suppliers', () => HttpResponse.json([])),
   );
 }
 
@@ -169,6 +173,8 @@ describe('MeasuringPointsAdminPage Wizard', () => {
             installation_location: null,
             current_owner_id: null,
             current_owner_name: null,
+            current_supplier_id: null,
+            current_supplier_name: null,
             is_bidirectional: false,
             has_dual_tariff: false,
             transformer_factor: null,
@@ -179,6 +185,7 @@ describe('MeasuringPointsAdminPage Wizard', () => {
       ),
       http.get('/api/v1/locations', () => HttpResponse.json([])),
       http.get('/api/v1/owners', () => HttpResponse.json([])),
+      http.get('/api/v1/suppliers', () => HttpResponse.json([])),
     );
     renderWithRouter(<MeasuringPointsAdminPage />);
     const link = await screen.findByRole('link', {
@@ -264,5 +271,125 @@ describe('MeasuringPointsAdminPage Wizard', () => {
     // Filter wirkt (Strom-Card fällt raus), aber nichts wird persistiert.
     expect(screen.queryByText('Hauptzähler Strom')).not.toBeInTheDocument();
     expect(window.sessionStorage.getItem('filters.adminMeasuringPoints.type')).toBeNull();
+  });
+
+  it('filtert die Liste nach Eigentümer inkl. „ohne Eigentümer"-Option', async () => {
+    _mockList([
+      _mp({ id: 1, name: 'MP-Mueller', current_owner_id: 3, current_owner_name: 'Müller' }),
+      _mp({ id: 2, name: 'MP-Schmidt', current_owner_id: 4, current_owner_name: 'Schmidt' }),
+      _mp({ id: 3, name: 'MP-Ohne' }),
+    ]);
+    const user = userEvent.setup();
+    renderWithRouter(<MeasuringPointsAdminPage />);
+
+    expect(await screen.findByText('MP-Mueller')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Eigentümer' }));
+    await user.click(await screen.findByRole('checkbox', { name: 'Müller' }));
+    expect(screen.getByText('MP-Mueller')).toBeInTheDocument();
+    expect(screen.queryByText('MP-Schmidt')).not.toBeInTheDocument();
+    expect(screen.queryByText('MP-Ohne')).not.toBeInTheDocument();
+
+    // „ohne Eigentümer" zusätzlich ankreuzen → MP ohne Zuordnung kommt dazu.
+    await user.click(screen.getByRole('checkbox', { name: 'ohne Eigentümer' }));
+    expect(screen.getByText('MP-Mueller')).toBeInTheDocument();
+    expect(screen.getByText('MP-Ohne')).toBeInTheDocument();
+    expect(screen.queryByText('MP-Schmidt')).not.toBeInTheDocument();
+  });
+
+  it('filtert die Liste nach Lieferant inkl. „ohne Lieferant"-Option', async () => {
+    _mockList([
+      _mp({
+        id: 1,
+        name: 'MP-Stadtwerke',
+        current_supplier_id: 7,
+        current_supplier_name: 'Stadtwerke',
+      }),
+      _mp({
+        id: 2,
+        name: 'MP-Regional',
+        current_supplier_id: 8,
+        current_supplier_name: 'Regionalwerk',
+      }),
+      _mp({ id: 3, name: 'MP-Ohne' }),
+    ]);
+    const user = userEvent.setup();
+    renderWithRouter(<MeasuringPointsAdminPage />);
+
+    expect(await screen.findByText('MP-Stadtwerke')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Lieferant' }));
+    await user.click(await screen.findByRole('checkbox', { name: 'Stadtwerke' }));
+    expect(screen.getByText('MP-Stadtwerke')).toBeInTheDocument();
+    expect(screen.queryByText('MP-Regional')).not.toBeInTheDocument();
+    expect(screen.queryByText('MP-Ohne')).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('checkbox', { name: 'ohne Lieferant' }));
+    expect(screen.getByText('MP-Ohne')).toBeInTheDocument();
+    expect(screen.queryByText('MP-Regional')).not.toBeInTheDocument();
+  });
+
+  it('filtert die Liste nach Hauptstandort und setzt alle Filter zurück', async () => {
+    _mockList([
+      _mp({ id: 1, name: 'MP-Hof', main_location_id: 11, main_location_name: 'Hof' }),
+      _mp({ id: 2, name: 'MP-Halle', main_location_id: 12, main_location_name: 'Halle' }),
+      _mp({ id: 3, name: 'MP-Ohne' }),
+    ]);
+    const user = userEvent.setup();
+    renderWithRouter(<MeasuringPointsAdminPage />);
+
+    expect(await screen.findByText('MP-Hof')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Hauptstandort' }));
+    await user.click(await screen.findByRole('checkbox', { name: 'Hof' }));
+    expect(screen.getByText('MP-Hof')).toBeInTheDocument();
+    expect(screen.queryByText('MP-Halle')).not.toBeInTheDocument();
+    expect(screen.queryByText('MP-Ohne')).not.toBeInTheDocument();
+
+    // „Filter zurücksetzen" bringt alle Cards zurück.
+    await user.click(screen.getByRole('button', { name: 'Filter zurücksetzen' }));
+    expect(screen.getByText('MP-Hof')).toBeInTheDocument();
+    expect(screen.getByText('MP-Halle')).toBeInTheDocument();
+    expect(screen.getByText('MP-Ohne')).toBeInTheDocument();
+  });
+
+  it('sendet supplier_id + supplier_valid_from, wenn ein Lieferant gewählt ist', async () => {
+    let createBody: Record<string, unknown> | null = null;
+    server.use(
+      http.get('/api/v1/measuring-points', () => HttpResponse.json([])),
+      http.get('/api/v1/locations', () => HttpResponse.json([])),
+      http.get('/api/v1/owners', () => HttpResponse.json([])),
+      http.get('/api/v1/suppliers', () =>
+        HttpResponse.json([
+          {
+            id: 9,
+            name: 'Stadtwerke',
+            address_street: null,
+            address_postcode: null,
+            address_city: null,
+            email: null,
+            phone: null,
+            vat_id: null,
+            tax_id: null,
+            note: null,
+          },
+        ]),
+      ),
+      http.post('/api/v1/measuring-points', async ({ request }) => {
+        createBody = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json({ id: 99 }, { status: 201 });
+      }),
+    );
+    const user = userEvent.setup();
+    renderWithRouter(<MeasuringPointsAdminPage />);
+
+    await user.click(await screen.findByRole('button', { name: /Messstelle anlegen/i }));
+    await user.click(await screen.findByRole('button', { name: /Strom/i }));
+    await user.type(screen.getByLabelText('Name'), 'Neuer Zähler');
+    await user.selectOptions(screen.getByLabelText('Lieferant (optional)'), '9');
+    await user.type(screen.getByLabelText('Seriennummer'), 'SN-1');
+    await user.click(screen.getByRole('button', { name: 'Anlegen' }));
+
+    await waitFor(() => expect(createBody).not.toBeNull());
+    expect(createBody!['supplier_id']).toBe(9);
+    // valid_from = installed_at (Default heute, vorbefüllt im Formular).
+    expect(createBody!['supplier_valid_from']).toBe(createBody!['installed_at']);
   });
 });

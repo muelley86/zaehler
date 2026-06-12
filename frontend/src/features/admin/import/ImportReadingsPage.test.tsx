@@ -37,6 +37,8 @@ const _waterMp: MeasuringPointRead = {
   installation_location: null,
   current_owner_id: null,
   current_owner_name: null,
+  current_supplier_id: null,
+  current_supplier_name: null,
   kostenstelle: null,
   physical_meters: [
     {

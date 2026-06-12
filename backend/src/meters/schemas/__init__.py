@@ -71,6 +71,13 @@ from meters.schemas.report_config import (
 )
 from meters.schemas.search import SearchHit, SearchMatchKind
 from meters.schemas.state import RegisterStateRead
+from meters.schemas.supplier import SupplierCreate, SupplierRead, SupplierUpdate
+from meters.schemas.supplier_assignment import (
+    ChangeSupplierRequest,
+    SupplierAssignmentCreate,
+    SupplierAssignmentRead,
+    SupplierAssignmentUpdate,
+)
 from meters.schemas.user import (
     PasswordResetRequest,
     PasswordResetResponse,
@@ -98,6 +105,7 @@ __all__ = [
     "BulkDeleteSkipped",
     "ChangeOwnerRequest",
     "ChangePasswordRequest",
+    "ChangeSupplierRequest",
     "ConsumptionPoint",
     "DecimalStr",
     "DeliveryCreate",
@@ -147,6 +155,12 @@ __all__ = [
     "ReportRow",
     "SearchHit",
     "SearchMatchKind",
+    "SupplierAssignmentCreate",
+    "SupplierAssignmentRead",
+    "SupplierAssignmentUpdate",
+    "SupplierCreate",
+    "SupplierRead",
+    "SupplierUpdate",
     "TotpActivateRequest",
     "TotpActivateResponse",
     "TotpDisableRequest",

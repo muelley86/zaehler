@@ -34,6 +34,8 @@ const MP = {
   installation_location: null,
   current_owner_id: 3,
   current_owner_name: 'Müller',
+  current_supplier_id: null,
+  current_supplier_name: null,
   kostenstelle: 100,
   is_bidirectional: false,
   has_dual_tariff: false,
