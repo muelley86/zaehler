@@ -183,8 +183,10 @@ function VmpCard({
               {c.sign < 0 ? '−' : '+'}
             </span>
             <span className="min-w-0 flex-1 truncate text-label">{c.measuring_point_name}</span>
-            {c.direction === 'einspeisung' ? (
-              <span className="shrink-0 text-caption text-tertiary">Einspeisung</span>
+            {vmp.type === 'electricity' ? (
+              <span className="shrink-0 text-caption text-tertiary">
+                {c.direction === 'einspeisung' ? 'Einspeisung' : 'Bezug'}
+              </span>
             ) : null}
           </li>
         ))}

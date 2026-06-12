@@ -6,7 +6,7 @@
 
 import { http, HttpResponse } from 'msw';
 import { describe, expect, it, vi } from 'vitest';
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 
 import { renderWithRouter } from '@/tests/render';
 import { server } from '@/tests/server';
@@ -60,6 +60,15 @@ describe('VirtualPointsAdminPage', () => {
     expect(screen.getAllByText('Solar-Trafo').length).toBeGreaterThanOrEqual(2);
     expect(screen.getAllByText('Einspeisung').length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText('−').length).toBeGreaterThanOrEqual(1);
+    // Richtungs-Label gezielt in den Komponenten-Zeilen der Karte prüfen —
+    // getAllByText allein würde auch die <option>-Texte des Formulars treffen.
+    const rows = screen.getAllByRole('listitem');
+    const bezugRow = rows.find((li) => li.textContent?.includes('Biogas-Trafo'));
+    expect(bezugRow).toBeDefined();
+    expect(within(bezugRow!).getByText('Bezug')).toBeInTheDocument();
+    const einspeisungRow = rows.find((li) => li.textContent?.includes('Solar-Trafo'));
+    expect(einspeisungRow).toBeDefined();
+    expect(within(einspeisungRow!).getByText('Einspeisung')).toBeInTheDocument();
   });
 
   it('legt eine verrechnete Messstelle per POST an (Komponenten-Payload)', async () => {
