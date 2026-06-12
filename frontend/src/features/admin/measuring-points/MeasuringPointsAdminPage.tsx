@@ -191,15 +191,13 @@ export function MeasuringPointsAdminPage() {
     return Array.from(map.entries());
   }, [points]);
 
-  const supplierOptions = useMemo(() => {
-    const map = new Map<number, string>();
-    points?.forEach((mp) => {
-      if (mp.current_supplier_id !== null && !map.has(mp.current_supplier_id)) {
-        map.set(mp.current_supplier_id, mp.current_supplier_name ?? `#${mp.current_supplier_id}`);
-      }
-    });
-    return Array.from(map.entries());
-  }, [points]);
+  // Lieferant abweichend aus der Stammliste (bereits fuers Create-Formular
+  // gefetcht): das Dropdown soll sichtbar sein, sobald Lieferanten existieren —
+  // auch wenn noch keine Messstelle einen zugeordnet hat.
+  const supplierOptions = useMemo(
+    () => suppliers.map((s): [number, string] => [s.id, s.name]),
+    [suppliers],
+  );
 
   const mainLocationOptions = useMemo(() => {
     const map = new Map<number, string>();
