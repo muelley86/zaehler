@@ -13,7 +13,7 @@ from meters.schemas._master_data import (
 from meters.schemas.common import APIModel
 
 
-class OwnerCreate(BaseModel):
+class SupplierCreate(BaseModel):
     name: str = Field(min_length=1, max_length=120)
     address_street: str | None = Field(default=None, max_length=200)
     address_postcode: str | None = Field(default=None, max_length=5, pattern=POSTCODE_RE)
@@ -48,13 +48,11 @@ class OwnerCreate(BaseModel):
         return strip_or_none(value)
 
 
-class OwnerUpdate(BaseModel):
+class SupplierUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=120)
     address_street: str | None = Field(default=None, max_length=200)
     # PATCH erlaubt leeren String zum Loeschen; deshalb keine pattern-Regex
-    # auf Schema-Ebene — die Pruefung verlagern wir in den API-Layer
-    # (Strip + Regex pruefen, NULL fuer leeren String). Sonst koennten wir
-    # nicht mit "" zurueck auf NULL setzen, ohne 422 zu kassieren.
+    # auf Schema-Ebene — wie beim Owner-Update (siehe schemas/owner.py).
     address_postcode: str | None = Field(default=None, max_length=20)
     address_city: str | None = Field(default=None, max_length=120)
     email: str | None = Field(default=None, max_length=200)
@@ -71,7 +69,7 @@ class OwnerUpdate(BaseModel):
         return strip_name(value)
 
 
-class OwnerRead(APIModel):
+class SupplierRead(APIModel):
     id: int
     name: str
     address_street: str | None

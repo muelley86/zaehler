@@ -32,12 +32,14 @@ from meters.models import (
     PhysicalMeter,
     Reading,
     Register,
+    SupplierAssignment,
     User,
     UserMeasuringPointAccess,
     UserRole,
 )
 from meters.schemas import (
     ChangeOwnerRequest,
+    ChangeSupplierRequest,
     MeasuringPointCreate,
     MeasuringPointRead,
     MeasuringPointUpdate,
@@ -47,6 +49,9 @@ from meters.schemas import (
     OwnerAssignmentUpdate,
     RegisterStateRead,
     ReplaceMeterRequest,
+    SupplierAssignmentCreate,
+    SupplierAssignmentRead,
+    SupplierAssignmentUpdate,
 )
 from meters.services.access import assert_can_access_mp, restrict_mp_query
 from meters.services.audit import record
@@ -61,6 +66,30 @@ from meters.services.owner_assignment import (
     update_assignment,
 )
 from meters.services.state import state_for_measuring_point
+
+# Supplier-Service mit Aliassen — die Funktionsnamen kollidieren sonst mit
+# dem strukturgleichen Owner-Service.
+from meters.services.supplier_assignment import (
+    assign_supplier,
+)
+from meters.services.supplier_assignment import (
+    create_assignment as create_supplier_assignment,
+)
+from meters.services.supplier_assignment import (
+    current_assignment as current_supplier_assignment,
+)
+from meters.services.supplier_assignment import (
+    current_assignments_bulk as current_supplier_assignments_bulk,
+)
+from meters.services.supplier_assignment import (
+    delete_assignment as delete_supplier_assignment,
+)
+from meters.services.supplier_assignment import (
+    list_history as list_supplier_history_service,
+)
+from meters.services.supplier_assignment import (
+    update_assignment as update_supplier_assignment,
+)
 
 router = APIRouter(prefix="/measuring-points", tags=["measuring-points"])
 
@@ -81,6 +110,7 @@ def _to_read(
     db: DbSession | None = None,
     *,
     current_owner: OwnerAssignment | None = None,
+    current_supplier: SupplierAssignment | None = None,
 ) -> MeasuringPointRead:
     data = MeasuringPointRead.model_validate(mp)
     location = mp.location
@@ -98,6 +128,13 @@ def _to_read(
     if assignment is not None and assignment.owner is not None:
         data.current_owner_id = assignment.owner.id
         data.current_owner_name = assignment.owner.name
+    # Lieferant: identischer Mechanismus wie der Owner-Lookup darueber.
+    supplier_assignment = current_supplier
+    if supplier_assignment is None and db is not None:
+        supplier_assignment = current_supplier_assignment(db, mp.id)
+    if supplier_assignment is not None and supplier_assignment.supplier is not None:
+        data.current_supplier_id = supplier_assignment.supplier.id
+        data.current_supplier_name = supplier_assignment.supplier.name
     return data
 
 
@@ -120,11 +157,21 @@ def list_measuring_points(db: DbDep, user: CurrentUser) -> list[MeasuringPointRe
     )
     stmt = restrict_mp_query(stmt, user, mp_id_column=MeasuringPoint.id)
     items = list(db.scalars(stmt))
-    # Owner-Assignments fuer alle MPs in einer Query vorladen. Kein db
-    # an _to_read durchreichen, damit der Single-Query-Fallback fuer
-    # MPs ohne Owner nicht greift.
-    owners_by_mp = current_assignments_bulk(db, (m.id for m in items))
-    return [_to_read(m, current_owner=owners_by_mp.get(m.id)) for m in items]
+    # Owner-/Supplier-Assignments fuer alle MPs in je einer Query vorladen.
+    # Kein db an _to_read durchreichen, damit der Single-Query-Fallback fuer
+    # MPs ohne Owner/Supplier nicht greift. ids als Liste materialisieren —
+    # ein Generator waere nach dem ersten Bulk-Call konsumiert.
+    ids = [m.id for m in items]
+    owners_by_mp = current_assignments_bulk(db, ids)
+    suppliers_by_mp = current_supplier_assignments_bulk(db, ids)
+    return [
+        _to_read(
+            m,
+            current_owner=owners_by_mp.get(m.id),
+            current_supplier=suppliers_by_mp.get(m.id),
+        )
+        for m in items
+    ]
 
 
 @router.get("/{mp_id}", response_model=MeasuringPointRead)
@@ -224,6 +271,16 @@ def create_measuring_point(
             mp_id=mp.id,
             owner_id=payload.owner_id,
             valid_from=payload.owner_valid_from or payload.installed_at,
+            user_id=admin.id,
+            ip_address=client_ip(request),
+        )
+    # Initiales Supplier-Assignment — gleiche Semantik wie der Owner-Block.
+    if payload.supplier_id is not None:
+        assign_supplier(
+            db,
+            mp_id=mp.id,
+            supplier_id=payload.supplier_id,
+            valid_from=payload.supplier_valid_from or payload.installed_at,
             user_id=admin.id,
             ip_address=client_ip(request),
         )
@@ -653,6 +710,122 @@ def delete_owner_period(
     admin: AdminUser,
 ) -> None:
     delete_assignment(
+        db,
+        mp_id=mp_id,
+        assignment_id=assignment_id,
+        user_id=admin.id,
+        ip_address=client_ip(request),
+    )
+    db.commit()
+
+
+# ---------------------------------------------------------------------------
+# Lieferanten-Historie + Wechsel-Endpoint — 1:1-Spiegel der Owner-Endpoints.
+# ---------------------------------------------------------------------------
+
+
+def _supplier_assignment_to_read(a: SupplierAssignment) -> SupplierAssignmentRead:
+    data = SupplierAssignmentRead.model_validate(a)
+    data.supplier_name = a.supplier.name if a.supplier is not None else None
+    return data
+
+
+@router.get("/{mp_id}/suppliers", response_model=list[SupplierAssignmentRead])
+def list_supplier_history(
+    mp_id: int,
+    db: DbDep,
+    user: CurrentUser,
+) -> list[SupplierAssignmentRead]:
+    assert_can_access_mp(db, user, mp_id)
+    return [_supplier_assignment_to_read(a) for a in list_supplier_history_service(db, mp_id)]
+
+
+@router.post("/{mp_id}/change-supplier", response_model=MeasuringPointRead)
+def change_supplier_endpoint(
+    mp_id: int,
+    payload: ChangeSupplierRequest,
+    request: Request,
+    db: DbDep,
+    admin: AdminUser,
+) -> MeasuringPointRead:
+    assign_supplier(
+        db,
+        mp_id=mp_id,
+        supplier_id=payload.supplier_id,
+        valid_from=payload.valid_from,
+        user_id=admin.id,
+        ip_address=client_ip(request),
+    )
+    db.commit()
+    refreshed = _load_with_meters(db, mp_id)
+    assert refreshed is not None
+    return _to_read(refreshed, db)
+
+
+# Historien-Editor (admin-only): Perioden der Lieferanten-Historie anlegen,
+# korrigieren und loeschen — inkl. Rueckdatierung und Luecken. Validierung
+# (keine Ueberlappung, max. eine offene Periode) liegt im Service.
+
+
+@router.post(
+    "/{mp_id}/suppliers",
+    response_model=SupplierAssignmentRead,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_supplier_period(
+    mp_id: int,
+    payload: SupplierAssignmentCreate,
+    request: Request,
+    db: DbDep,
+    admin: AdminUser,
+) -> SupplierAssignmentRead:
+    assignment = create_supplier_assignment(
+        db,
+        mp_id=mp_id,
+        supplier_id=payload.supplier_id,
+        valid_from=payload.valid_from,
+        valid_to=payload.valid_to,
+        user_id=admin.id,
+        ip_address=client_ip(request),
+    )
+    db.commit()
+    db.refresh(assignment)
+    return _supplier_assignment_to_read(assignment)
+
+
+@router.patch("/{mp_id}/suppliers/{assignment_id}", response_model=SupplierAssignmentRead)
+def update_supplier_period(
+    mp_id: int,
+    assignment_id: int,
+    payload: SupplierAssignmentUpdate,
+    request: Request,
+    db: DbDep,
+    admin: AdminUser,
+) -> SupplierAssignmentRead:
+    assignment = update_supplier_assignment(
+        db,
+        mp_id=mp_id,
+        assignment_id=assignment_id,
+        supplier_id=payload.supplier_id,
+        valid_from=payload.valid_from,
+        valid_to=payload.valid_to,
+        user_id=admin.id,
+        ip_address=client_ip(request),
+    )
+    db.commit()
+    db.refresh(assignment)
+    return _supplier_assignment_to_read(assignment)
+
+
+@router.delete("/{mp_id}/suppliers/{assignment_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_supplier_period(
+    mp_id: int,
+    assignment_id: int,
+    request: Request,
+    db: DbDep,
+    admin: AdminUser,
+) -> None:
+    delete_supplier_assignment(
         db,
         mp_id=mp_id,
         assignment_id=assignment_id,

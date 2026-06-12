@@ -68,6 +68,12 @@ class AuditAction(enum.StrEnum):
     OWNER_ASSIGNMENT_CREATED = "owner_assignment_created"
     OWNER_ASSIGNMENT_UPDATED = "owner_assignment_updated"
     OWNER_ASSIGNMENT_DELETED = "owner_assignment_deleted"
+    # Lieferanten-Wechsel + Historien-Editor — exakt das Eigentuemer-Modell:
+    # entity_type=MEASURING_POINT, diff analog zu OWNER_*.
+    SUPPLIER_CHANGED = "supplier_changed"
+    SUPPLIER_ASSIGNMENT_CREATED = "supplier_assignment_created"
+    SUPPLIER_ASSIGNMENT_UPDATED = "supplier_assignment_updated"
+    SUPPLIER_ASSIGNMENT_DELETED = "supplier_assignment_deleted"
     # Voll-Backup (ZIP mit DB-Snapshot + Fotos) heruntergeladen bzw. per
     # GUI-Restore eingespielt — entity_type=SYSTEM, entity_id=None. Der
     # Restore-Eintrag wird NACH dem Swap in die restaurierte DB geschrieben.
@@ -84,6 +90,7 @@ class AuditEntityType(enum.StrEnum):
     LOCATION = "location"
     MAIN_LOCATION = "main_location"
     OWNER = "owner"
+    SUPPLIER = "supplier"
     VIRTUAL_MEASURING_POINT = "virtual_measuring_point"
     DELIVERY = "delivery"
     SESSION = "session"

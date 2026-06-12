@@ -142,6 +142,29 @@ export interface OwnerAssignmentRead {
   valid_to: string | null;
 }
 
+/** Lieferant — identischer Feldsatz wie OwnerRead (gespiegeltes Backend-Schema). */
+export interface SupplierRead {
+  id: number;
+  name: string;
+  address_street: string | null;
+  address_postcode: string | null;
+  address_city: string | null;
+  email: string | null;
+  phone: string | null;
+  vat_id: string | null;
+  tax_id: string | null;
+  note: string | null;
+}
+
+export interface SupplierAssignmentRead {
+  id: number;
+  /** null, wenn der Lieferant nach Anlage der Periode gelöscht wurde (SET NULL). */
+  supplier_id: number | null;
+  supplier_name: string | null;
+  valid_from: string;
+  valid_to: string | null;
+}
+
 export interface MainLocationRead {
   id: number;
   name: string;
@@ -179,6 +202,8 @@ export interface MeasuringPointRead {
   installation_location: string | null;
   current_owner_id: number | null;
   current_owner_name: string | null;
+  current_supplier_id: number | null;
+  current_supplier_name: string | null;
   kostenstelle: number | null;
   physical_meters: PhysicalMeterRead[];
 }

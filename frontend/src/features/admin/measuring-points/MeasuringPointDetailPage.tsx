@@ -62,6 +62,8 @@ import type {
   PhysicalMeterRead,
   RegisterRead,
   RegisterStateRead,
+  SupplierAssignmentRead,
+  SupplierRead,
 } from '@/lib/types';
 import { HEATING_UNITS } from '@/lib/types';
 import { describeMeterType } from '@/lib/meterLabels';
@@ -199,6 +201,8 @@ export function MeasuringPointDetailPage() {
       <PhysicalMetersCard mp={mp} onChanged={refresh} />
 
       <OwnerHistoryCard mp={mp} onChanged={refresh} />
+
+      <SupplierHistoryCard mp={mp} onChanged={refresh} />
 
       <ConsumptionChart consumption={consumption} mp={mp} />
 
@@ -437,6 +441,7 @@ function StammdatenReadView({
       ) : null}
       {mp.installation_location ? <FieldRow k="Einbauort" v={mp.installation_location} /> : null}
       <FieldRow k="Aktueller Eigentümer" v={mp.current_owner_name ?? '—'} />
+      <FieldRow k="Aktueller Lieferant" v={mp.current_supplier_name ?? '—'} />
       {mp.kostenstelle !== null ? <FieldRow k="Kostenstelle" v={String(mp.kostenstelle)} /> : null}
       {location &&
       (location.address_street || location.address_postcode || location.address_city) ? (
@@ -1561,18 +1566,28 @@ function OwnerHistoryCard({ mp, onChanged }: { mp: MeasuringPointRead; onChanged
   const [tick, setTick] = useState(0);
 
   useEffect(() => {
+    // cancelled-Flag verwirft Antworten nach Unmount/MP-Wechsel.
+    let cancelled = false;
     api
       .get<OwnerAssignmentRead[]>(`/measuring-points/${mp.id}/owners`)
-      .then(setHistory)
+      .then((d) => {
+        if (!cancelled) setHistory(d);
+      })
       .catch((err: unknown) => {
-        if (err instanceof ApiError) setError(err.problem.detail ?? err.problem.title);
+        if (!cancelled && err instanceof ApiError)
+          setError(err.problem.detail ?? err.problem.title);
       });
     api
       .get<OwnerRead[]>('/owners')
-      .then(setOwners)
+      .then((d) => {
+        if (!cancelled) setOwners(d);
+      })
       .catch(() => {
         /* Dropdown bleibt leer */
       });
+    return () => {
+      cancelled = true;
+    };
   }, [mp.id, tick]);
 
   function refresh() {
@@ -1845,6 +1860,346 @@ function ChangeOwnerForm({
         {owners.map((o) => (
           <option key={o.id} value={o.id}>
             {o.name}
+          </option>
+        ))}
+      </Select>
+      <TextField
+        label="Wechsel zum"
+        type="date"
+        value={validFrom}
+        onChange={(e) => setValidFrom(e.target.value)}
+        required
+      />
+      {error ? <div className="text-caption text-danger">{error}</div> : null}
+      <div className="flex gap-2">
+        <Button type="submit" variant="filled" disabled={busy} fullWidth>
+          {busy ? 'Speichere…' : 'Wechseln'}
+        </Button>
+        <Button type="button" variant="bordered" onClick={onCancel}>
+          Abbrechen
+        </Button>
+      </div>
+    </form>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Lieferanten-Historie + Wechsel — 1:1-Spiegel der Eigentuemer-Karten oben.
+// ---------------------------------------------------------------------------
+
+/** Listet alle ``SupplierAssignment``-Perioden absteigend. Aktive Periode oben
+ *  mit ``aktiv``-Badge. „Lieferant wechseln" haengt eine neue offene Periode
+ *  an; der Historien-Editor (hinzufügen/bearbeiten/löschen pro Zeile) erlaubt
+ *  Korrekturen inkl. Rückdatierung und Lücken (kein Liefervertrag). */
+function SupplierHistoryCard({ mp, onChanged }: { mp: MeasuringPointRead; onChanged: () => void }) {
+  const [history, setHistory] = useState<SupplierAssignmentRead[]>([]);
+  const [suppliers, setSuppliers] = useState<SupplierRead[]>([]);
+  const [open, setOpen] = useState(false);
+  // null = Sheet zu; { period: null } = neue Periode; { period: a } = bearbeiten.
+  const [periodSheet, setPeriodSheet] = useState<{
+    period: SupplierAssignmentRead | null;
+  } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [tick, setTick] = useState(0);
+
+  useEffect(() => {
+    // cancelled-Flag verwirft Antworten nach Unmount/MP-Wechsel.
+    let cancelled = false;
+    api
+      .get<SupplierAssignmentRead[]>(`/measuring-points/${mp.id}/suppliers`)
+      .then((d) => {
+        if (!cancelled) setHistory(d);
+      })
+      .catch((err: unknown) => {
+        if (!cancelled && err instanceof ApiError)
+          setError(err.problem.detail ?? err.problem.title);
+      });
+    api
+      .get<SupplierRead[]>('/suppliers')
+      .then((d) => {
+        if (!cancelled) setSuppliers(d);
+      })
+      .catch(() => {
+        /* Dropdown bleibt leer */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [mp.id, tick]);
+
+  function refresh() {
+    setTick((t) => t + 1);
+    onChanged();
+  }
+
+  async function removePeriod(a: SupplierAssignmentRead) {
+    const label = a.supplier_name ?? 'unbekannt';
+    if (!window.confirm(`Lieferanten-Periode "${label}" wirklich löschen?`)) return;
+    try {
+      await api.delete(`/measuring-points/${mp.id}/suppliers/${a.id}`);
+      refresh();
+    } catch (err) {
+      if (err instanceof ApiError) window.alert(err.problem.detail ?? err.problem.title);
+    }
+  }
+
+  return (
+    <Section
+      header={
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <span>Lieferanten-Historie</span>
+          <div className="flex gap-2">
+            {/* aria-label haelt den Accessible Name eindeutig gegenueber dem
+                gleichnamigen Button der Eigentuemer-Karte. */}
+            <Button
+              variant="bordered"
+              size="sm"
+              onClick={() => setPeriodSheet({ period: null })}
+              disabled={suppliers.length === 0}
+              aria-label="Lieferanten-Periode hinzufügen"
+            >
+              Periode hinzufügen
+            </Button>
+            <Button
+              variant="bordered"
+              size="sm"
+              onClick={() => setOpen(true)}
+              disabled={suppliers.length === 0}
+            >
+              Lieferant wechseln
+            </Button>
+          </div>
+        </div>
+      }
+    >
+      <div className="space-y-2 p-5">
+        {error ? (
+          <div className="text-caption text-danger">{error}</div>
+        ) : history.length === 0 ? (
+          <div className="text-caption text-tertiary">Noch keine Lieferanten-Zuordnung.</div>
+        ) : (
+          history.map((a) => {
+            const active = a.valid_to === null;
+            return (
+              <div
+                key={a.id}
+                className="bg-fill/40 flex items-center justify-between gap-2 rounded-pill border-hairline border-border px-3 py-2"
+              >
+                <div className="min-w-0">
+                  <div className="truncate text-body-sm font-semibold text-label">
+                    {a.supplier_name ?? <em className="text-tertiary">unbekannt</em>}
+                  </div>
+                  <div className="text-caption text-tertiary">
+                    ab {formatDateDe(a.valid_from)}
+                    {a.valid_to ? ` bis ${formatDateDe(a.valid_to)}` : ''}
+                  </div>
+                </div>
+                <div className="flex shrink-0 items-center gap-1">
+                  {active ? (
+                    <span className="rounded-full bg-primary-soft px-2 py-0.5 text-caption font-semibold text-primary-deep">
+                      aktiv
+                    </span>
+                  ) : null}
+                  <button
+                    type="button"
+                    onClick={() => setPeriodSheet({ period: a })}
+                    aria-label="Lieferanten-Periode bearbeiten"
+                    className="flex h-7 w-7 items-center justify-center rounded-full text-secondary transition-colors hover:bg-fill"
+                  >
+                    <Pencil size={13} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void removePeriod(a)}
+                    aria-label="Lieferanten-Periode löschen"
+                    className="hover:bg-danger/10 flex h-7 w-7 items-center justify-center rounded-full text-danger transition-colors"
+                  >
+                    <Trash2 size={13} />
+                  </button>
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+      <Sheet open={open} onClose={() => setOpen(false)} title="Lieferant wechseln">
+        <ChangeSupplierForm
+          mpId={mp.id}
+          suppliers={suppliers}
+          onSaved={() => {
+            setOpen(false);
+            refresh();
+          }}
+          onCancel={() => setOpen(false)}
+        />
+      </Sheet>
+      <Sheet
+        open={periodSheet !== null}
+        onClose={() => setPeriodSheet(null)}
+        title={periodSheet?.period ? 'Periode bearbeiten' : 'Periode hinzufügen'}
+      >
+        {periodSheet ? (
+          <SupplierPeriodForm
+            mpId={mp.id}
+            suppliers={suppliers}
+            period={periodSheet.period}
+            onSaved={() => {
+              setPeriodSheet(null);
+              refresh();
+            }}
+            onCancel={() => setPeriodSheet(null)}
+          />
+        ) : null}
+      </Sheet>
+    </Section>
+  );
+}
+
+/** Historien-Editor-Formular: legt eine Periode an (period=null) oder
+ *  korrigiert eine bestehende. Leeres „Gültig bis" = offene (aktive) Periode.
+ *  Überlappungs-/Konsistenz-Validierung macht das Backend (422). */
+function SupplierPeriodForm({
+  mpId,
+  suppliers,
+  period,
+  onSaved,
+  onCancel,
+}: {
+  mpId: number;
+  suppliers: SupplierRead[];
+  period: SupplierAssignmentRead | null;
+  onSaved: () => void;
+  onCancel: () => void;
+}) {
+  const [supplierId, setSupplierId] = useState<number | ''>(period?.supplier_id ?? '');
+  const [validFrom, setValidFrom] = useState(period?.valid_from ?? '');
+  const [validTo, setValidTo] = useState(period?.valid_to ?? '');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function save(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (supplierId === '') {
+      setError('Bitte einen Lieferanten wählen.');
+      return;
+    }
+    if (!validFrom) {
+      setError('Bitte ein Beginn-Datum wählen.');
+      return;
+    }
+    setError(null);
+    setBusy(true);
+    const body = {
+      supplier_id: supplierId,
+      valid_from: validFrom,
+      valid_to: validTo === '' ? null : validTo,
+    };
+    try {
+      if (period) {
+        await api.patch(`/measuring-points/${mpId}/suppliers/${period.id}`, body);
+      } else {
+        await api.post(`/measuring-points/${mpId}/suppliers`, body);
+      }
+      onSaved();
+    } catch (err) {
+      if (err instanceof ApiError) setError(err.problem.detail ?? err.problem.title);
+      else setError('Speichern fehlgeschlagen.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <form onSubmit={(e) => void save(e)} className="space-y-3">
+      <Select
+        label="Lieferant"
+        value={supplierId}
+        onChange={(e) => setSupplierId(e.target.value ? Number(e.target.value) : '')}
+        required
+      >
+        <option value="">— bitte wählen —</option>
+        {suppliers.map((s) => (
+          <option key={s.id} value={s.id}>
+            {s.name}
+          </option>
+        ))}
+      </Select>
+      <TextField
+        label="Gültig ab"
+        type="date"
+        value={validFrom}
+        onChange={(e) => setValidFrom(e.target.value)}
+        required
+      />
+      <TextField
+        label="Gültig bis (leer = aktive Periode)"
+        type="date"
+        value={validTo}
+        onChange={(e) => setValidTo(e.target.value)}
+      />
+      {error ? <div className="text-caption text-danger">{error}</div> : null}
+      <div className="flex gap-2">
+        <Button type="submit" variant="filled" disabled={busy} fullWidth>
+          {busy ? 'Speichere…' : 'Speichern'}
+        </Button>
+        <Button type="button" variant="bordered" onClick={onCancel}>
+          Abbrechen
+        </Button>
+      </div>
+    </form>
+  );
+}
+
+function ChangeSupplierForm({
+  mpId,
+  suppliers,
+  onSaved,
+  onCancel,
+}: {
+  mpId: number;
+  suppliers: SupplierRead[];
+  onSaved: () => void;
+  onCancel: () => void;
+}) {
+  const [supplierId, setSupplierId] = useState<number | ''>('');
+  const [validFrom, setValidFrom] = useState(new Date().toISOString().slice(0, 10));
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function save(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (supplierId === '') {
+      setError('Bitte einen Lieferanten wählen.');
+      return;
+    }
+    setError(null);
+    setBusy(true);
+    try {
+      await api.post(`/measuring-points/${mpId}/change-supplier`, {
+        supplier_id: supplierId,
+        valid_from: validFrom,
+      });
+      onSaved();
+    } catch (err) {
+      if (err instanceof ApiError) setError(err.problem.detail ?? err.problem.title);
+      else setError('Wechsel fehlgeschlagen.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <form onSubmit={(e) => void save(e)} className="space-y-3">
+      <Select
+        label="Neuer Lieferant"
+        value={supplierId}
+        onChange={(e) => setSupplierId(e.target.value ? Number(e.target.value) : '')}
+        required
+      >
+        <option value="">— bitte wählen —</option>
+        {suppliers.map((s) => (
+          <option key={s.id} value={s.id}>
+            {s.name}
           </option>
         ))}
       </Select>

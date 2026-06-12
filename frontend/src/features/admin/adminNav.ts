@@ -22,6 +22,7 @@ import {
   ScrollText,
   Shield,
   Sigma,
+  Truck,
   Upload,
   User,
   Users,
@@ -75,6 +76,14 @@ export const ADMIN_SECTIONS: AdminNavItem[] = [
     short: 'Eigt.',
     icon: createElement(User, { size: 18 }),
     description: 'Eigentuemer-Stammdaten und MP-Zuordnung',
+    color: 'primary',
+  },
+  {
+    to: '/admin/lieferanten',
+    label: 'Lieferanten',
+    short: 'Lief.',
+    icon: createElement(Truck, { size: 18 }),
+    description: 'Lieferanten-Stammdaten und MP-Zuordnung',
     color: 'primary',
   },
   {

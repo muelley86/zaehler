@@ -27,6 +27,8 @@ from meters.models.reading_photo import ReadingPhoto
 from meters.models.register import Register
 from meters.models.report_config import ReportConfig
 from meters.models.session import Session
+from meters.models.supplier import Supplier
+from meters.models.supplier_assignment import SupplierAssignment
 from meters.models.user import User
 from meters.models.user_measuring_point_access import UserMeasuringPointAccess
 from meters.models.virtual_measuring_point import VirtualMeasuringPoint, VirtualMpComponent
@@ -57,6 +59,8 @@ __all__ = [
     "ReportGranularity",
     "ReportPeriodKind",
     "Session",
+    "Supplier",
+    "SupplierAssignment",
     "User",
     "UserMeasuringPointAccess",
     "UserRole",
