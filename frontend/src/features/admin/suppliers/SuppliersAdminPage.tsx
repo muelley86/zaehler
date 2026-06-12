@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
-import { Pencil, Trash2, Truck } from 'lucide-react';
+import { Handshake, Pencil, Trash2 } from 'lucide-react';
 
 import { Button, Card, EmptyState, LargeTitle, Section, Sheet, TextField } from '@/components/ui';
 import { ApiError, api } from '@/lib/api';
@@ -53,7 +53,7 @@ export function SuppliersAdminPage() {
 
       {suppliers && suppliers.length === 0 ? (
         <EmptyState
-          icon={<Truck size={32} />}
+          icon={<Handshake size={32} />}
           title="Noch keine Lieferanten"
           description="Lieferanten können Messstellen zugeordnet werden und tauchen in den Filtern der Messstellen-Übersicht auf."
         />
@@ -130,7 +130,7 @@ function SupplierCard({
       <div className="flex items-start justify-between gap-3">
         <div className="flex min-w-0 items-start gap-3">
           <div className="bg-gradient-primary shadow-glow-primary flex h-11 w-11 shrink-0 items-center justify-center rounded-card text-white">
-            <Truck size={20} strokeWidth={2} />
+            <Handshake size={20} strokeWidth={2} />
           </div>
           <div className="min-w-0">
             <div className="truncate text-headline tracking-tight text-label">{supplier.name}</div>

@@ -64,12 +64,12 @@ function _mp(overrides: Record<string, unknown>) {
   };
 }
 
-function _mockList(mps: ReturnType<typeof _mp>[]) {
+function _mockList(mps: ReturnType<typeof _mp>[], suppliers: { id: number; name: string }[] = []) {
   server.use(
     http.get('/api/v1/measuring-points', () => HttpResponse.json(mps)),
     http.get('/api/v1/locations', () => HttpResponse.json([])),
     http.get('/api/v1/owners', () => HttpResponse.json([])),
-    http.get('/api/v1/suppliers', () => HttpResponse.json([])),
+    http.get('/api/v1/suppliers', () => HttpResponse.json(suppliers)),
   );
 }
 
@@ -297,21 +297,27 @@ describe('MeasuringPointsAdminPage Wizard', () => {
   });
 
   it('filtert die Liste nach Lieferant inkl. „ohne Lieferant"-Option', async () => {
-    _mockList([
-      _mp({
-        id: 1,
-        name: 'MP-Stadtwerke',
-        current_supplier_id: 7,
-        current_supplier_name: 'Stadtwerke',
-      }),
-      _mp({
-        id: 2,
-        name: 'MP-Regional',
-        current_supplier_id: 8,
-        current_supplier_name: 'Regionalwerk',
-      }),
-      _mp({ id: 3, name: 'MP-Ohne' }),
-    ]);
+    _mockList(
+      [
+        _mp({
+          id: 1,
+          name: 'MP-Stadtwerke',
+          current_supplier_id: 7,
+          current_supplier_name: 'Stadtwerke',
+        }),
+        _mp({
+          id: 2,
+          name: 'MP-Regional',
+          current_supplier_id: 8,
+          current_supplier_name: 'Regionalwerk',
+        }),
+        _mp({ id: 3, name: 'MP-Ohne' }),
+      ],
+      [
+        { id: 7, name: 'Stadtwerke' },
+        { id: 8, name: 'Regionalwerk' },
+      ],
+    );
     const user = userEvent.setup();
     renderWithRouter(<MeasuringPointsAdminPage />);
 
@@ -325,6 +331,19 @@ describe('MeasuringPointsAdminPage Wizard', () => {
     await user.click(screen.getByRole('checkbox', { name: 'ohne Lieferant' }));
     expect(screen.getByText('MP-Ohne')).toBeInTheDocument();
     expect(screen.queryByText('MP-Regional')).not.toBeInTheDocument();
+  });
+
+  it('zeigt den Lieferant-Filter auch ohne zugeordnete Messstellen (Stammliste)', async () => {
+    // Kein MP hat einen Lieferanten — das Dropdown muss trotzdem erscheinen,
+    // weil die Optionen aus der Lieferanten-Stammliste kommen.
+    _mockList([_mp({ id: 1, name: 'MP-Ohne' })], [{ id: 9, name: 'Neuer Versorger' }]);
+    const user = userEvent.setup();
+    renderWithRouter(<MeasuringPointsAdminPage />);
+
+    expect(await screen.findByText('MP-Ohne')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Lieferant' }));
+    expect(await screen.findByRole('checkbox', { name: 'Neuer Versorger' })).toBeInTheDocument();
+    expect(screen.getByRole('checkbox', { name: 'ohne Lieferant' })).toBeInTheDocument();
   });
 
   it('filtert die Liste nach Hauptstandort und setzt alle Filter zurück', async () => {
