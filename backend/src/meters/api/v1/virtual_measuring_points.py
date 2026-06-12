@@ -30,12 +30,17 @@ from meters.schemas import (
     VirtualMeasuringPointCreate,
     VirtualMeasuringPointRead,
     VirtualMeasuringPointUpdate,
+    VirtualMpBreakdownComponent,
+    VirtualMpBreakdownResponse,
+    VirtualMpBreakdownTotal,
     VirtualMpComponentIn,
     VirtualMpComponentRead,
 )
 from meters.services.audit import record
 from meters.services.virtual_measuring_point import (
     assert_can_access_virtual_mp,
+    breakdown_for_virtual_mp,
+    breakdown_totals,
     consumption_for_virtual_mp,
     visible_virtual_mps,
 )
@@ -319,3 +324,39 @@ def virtual_consumption(
         )
         for p in points
     ]
+
+
+@router.get("/{vmp_id}/breakdown", response_model=VirtualMpBreakdownResponse)
+def virtual_breakdown(
+    vmp_id: int,
+    db: DbDep,
+    user: CurrentUser,
+    from_at: date | None = Query(None),
+    to_at: date | None = Query(None),
+) -> VirtualMpBreakdownResponse:
+    """Audit-Aufschluesselung der Verrechnung: je Komponente die Gesamt-Summe
+    im Zeitraum (Rohwert + vorzeichenbehafteter Beitrag) plus Netto je
+    Einheit. Gleiche Sichtbarkeitsregel wie ``/consumption`` — Recorder
+    sehen die vmp nur bei Zugriff auf ALLE Komponenten-MPs (sonst 404)."""
+    vmp = assert_can_access_virtual_mp(db, user, vmp_id)
+    rows = breakdown_for_virtual_mp(db, vmp, from_date=from_at, to_date=to_at)
+    nets = breakdown_totals(rows)
+    return VirtualMpBreakdownResponse(
+        virtual_measuring_point_id=vmp.id,
+        from_date=from_at,
+        to_date=to_at,
+        components=[
+            VirtualMpBreakdownComponent(
+                component_id=r.component_id,
+                measuring_point_id=r.measuring_point_id,
+                measuring_point_name=r.measuring_point_name,
+                direction=r.direction,
+                sign=r.sign,
+                consumption=r.consumption,
+                contribution=r.sign * r.consumption,
+                unit=r.unit,
+            )
+            for r in rows
+        ],
+        totals=[VirtualMpBreakdownTotal(unit=unit, net=nets[unit]) for unit in sorted(nets)],
+    )

@@ -270,6 +270,35 @@ export interface VirtualMeasuringPointRead {
   components: VirtualMpComponentRead[];
 }
 
+/**
+ * Breakdown (Audit-Aufschlüsselung) einer verrechneten Messstelle:
+ * `consumption` ist der Rohwert (>= 0), `contribution` = sign * consumption —
+ * was tatsächlich in die Netto-Summe einging.
+ */
+export interface VirtualMpBreakdownComponent {
+  component_id: number;
+  measuring_point_id: number;
+  measuring_point_name: string;
+  direction: FlowDirection;
+  sign: number; // +1 | -1
+  consumption: string;
+  contribution: string;
+  unit: string;
+}
+
+export interface VirtualMpBreakdownTotal {
+  unit: string;
+  net: string; // kann negativ sein
+}
+
+export interface VirtualMpBreakdownResponse {
+  virtual_measuring_point_id: number;
+  from_date: string | null;
+  to_date: string | null;
+  components: VirtualMpBreakdownComponent[];
+  totals: VirtualMpBreakdownTotal[];
+}
+
 export interface AuditLogRead {
   id: number;
   user_id: number | null;

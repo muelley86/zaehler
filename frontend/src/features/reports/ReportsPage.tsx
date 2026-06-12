@@ -10,6 +10,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { BarChart3, Download, Save, Trash2 } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 import { useAuth } from '@/features/auth/auth-context';
 import {
@@ -470,6 +471,15 @@ export function ReportsPage() {
     a.click();
   }, [compare, exportComparisonCsv, csvHref]);
 
+  // Badge am zugeklappten Filter-Panel: zeigt, wie viele Filter aktiv sind
+  // (gleiche Pille wie im Dashboard).
+  const activeFilterCount =
+    mainLocationFilter.size +
+    locationFilter.size +
+    ownerFilter.size +
+    kostenstelleFilter.size +
+    typeFilter.size;
+
   return (
     <div className="relative min-h-full overflow-hidden bg-bg">
       <PageGlows accent="electricity" />
@@ -576,13 +586,22 @@ export function ReportsPage() {
           <button
             type="button"
             onClick={() => setFiltersOpen((v) => !v)}
+            aria-expanded={filtersOpen}
+            aria-controls="reports-filter-panel"
             className="flex w-full items-center justify-between p-3 text-body-sm text-secondary"
           >
-            <span>Messstellen eingrenzen</span>
+            <span className="flex items-center gap-2">
+              <span>Messstellen eingrenzen</span>
+              {activeFilterCount > 0 ? (
+                <span className="rounded-full bg-primary-soft px-2 py-0.5 text-caption font-semibold text-primary-deep">
+                  {activeFilterCount} aktiv
+                </span>
+              ) : null}
+            </span>
             <span className="text-tertiary">{filtersOpen ? '▲' : '▼'}</span>
           </button>
           {filtersOpen ? (
-            <div className="space-y-3 border-t border-border p-3">
+            <div id="reports-filter-panel" className="space-y-3 border-t border-border p-3">
               <div className="flex flex-wrap items-center gap-2">
                 {typeOptions.length > 0 ? (
                   <MultiSelectDropdown
@@ -717,6 +736,30 @@ export function ReportsPage() {
   );
 }
 
+/**
+ * Gruppen-Label einer Ergebnis-Zeile. Verrechnete Messstellen verlinken auf
+ * ihre Detail-Seite (Komponenten-Aufschlüsselung) — echte Zeilen bleiben Text.
+ */
+function GroupLabelCell({
+  label,
+  isVirtual,
+  groupKey,
+}: {
+  label: string;
+  isVirtual: boolean | undefined;
+  groupKey: number | null;
+}) {
+  const text = displayGroupLabel(label, isVirtual);
+  if (isVirtual && groupKey != null) {
+    return (
+      <Link to={`/verrechnung/${groupKey}`} className="underline-offset-2 hover:underline">
+        {text}
+      </Link>
+    );
+  }
+  return <>{text}</>;
+}
+
 function ResultTable({
   rows,
   showPeriod,
@@ -756,7 +799,11 @@ function ResultTable({
                 className="border-border/50 border-b"
               >
                 <td className="p-2 text-label">
-                  {displayGroupLabel(r.group_label, r.is_virtual)}
+                  <GroupLabelCell
+                    label={r.group_label}
+                    isVirtual={r.is_virtual}
+                    groupKey={r.group_key}
+                  />
                   {suffix ? <span className="text-secondary"> · {suffix}</span> : null}
                 </td>
                 <td className="p-2 text-secondary">{TYPE_LABELS[r.meter_type]}</td>
@@ -803,7 +850,11 @@ function ComparisonTable({ rows, groupHeader }: { rows: ComparisonRow[]; groupHe
             return (
               <tr key={r.key} className="border-border/50 border-b">
                 <td className="p-2 text-label">
-                  {displayGroupLabel(r.group_label, r.is_virtual)}
+                  <GroupLabelCell
+                    label={r.group_label}
+                    isVirtual={r.is_virtual}
+                    groupKey={r.group_key}
+                  />
                   {suffix ? <span className="text-secondary"> · {suffix}</span> : null}
                 </td>
                 <td className="p-2 text-secondary">

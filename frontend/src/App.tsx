@@ -97,6 +97,11 @@ const MorePage = lazy(() =>
 const ReportsPage = lazy(() =>
   import('@/features/reports/ReportsPage').then((m) => ({ default: m.ReportsPage })),
 );
+const VirtualPointDetailPage = lazy(() =>
+  import('@/features/virtual-points/VirtualPointDetailPage').then((m) => ({
+    default: m.VirtualPointDetailPage,
+  })),
+);
 
 function RouteFallback(): JSX.Element {
   return <div className="flex h-full items-center justify-center text-tertiary">Lade…</div>;
@@ -181,6 +186,9 @@ export function App() {
           <Route path="/q/:token" element={<QrShortRedirect />} />
           <Route path="/erfassungen" element={<ReadingsListPage />} />
           <Route path="/auswertungen" element={<ReportsPage />} />
+          {/* Detail einer verrechneten Messstelle — kein AdminOnly: das
+              Backend liefert 404, wenn der Recorder keinen Vollzugriff hat. */}
+          <Route path="/verrechnung/:id" element={<VirtualPointDetailPage />} />
           <Route path="/mehr" element={<MorePage />} />
           <Route path="/passwort-aendern" element={<ChangePasswordPage />} />
           <Route path="/2fa-einrichten" element={<TwoFactorSetupPage />} />
