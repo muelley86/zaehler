@@ -10,6 +10,13 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.58.1](https://github.com/muelley86/zaehler/compare/v2.58.0...v2.58.1) (2026-06-12)
+
+
+### Fehlerbehebungen
+
+* **virtual-mps:** Bezug-Label in der Komponenten-Liste und exklusiver Dashboard-Filter ([#261](https://github.com/muelley86/zaehler/issues/261)) ([8a2abc8](https://github.com/muelley86/zaehler/commit/8a2abc820b87124d24b683e3ccae12f69d77f785))
+
 ## [2.58.0](https://github.com/muelley86/zaehler/compare/v2.57.0...v2.58.0) (2026-06-11)
 
 
