@@ -680,7 +680,14 @@ function ConsumptionSummary({
   virtualItems: DashboardVirtualMeasuringPoint[];
 }) {
   const buckets = useMemo(() => {
-    type Bucket = { label: string; sum: number; unit: string; type: MeterType };
+    type Bucket = {
+      label: string;
+      sum: number;
+      unit: string;
+      type: MeterType;
+      /** Gesetzt bei verrechneten Messstellen — Zeile verlinkt auf die Detail-Seite. */
+      vmpId?: number;
+    };
     const map = new Map<string, Bucket>();
     for (const p of consumption) {
       const key = `${p.mp.type}::${p.obis_code}::${p.unit}`;
@@ -710,6 +717,7 @@ function ConsumptionSummary({
         sum: v.consumption.reduce((acc, p) => acc + Number(p.consumption), 0),
         unit: first.unit,
         type: v.type,
+        vmpId: v.id,
       });
     }
     return Array.from(map.entries(), ([key, b]) => ({ key, ...b })).sort(
@@ -731,7 +739,18 @@ function ConsumptionSummary({
         <ul className="divide-y divide-separator">
           {buckets.map((b) => (
             <li key={b.key} className="flex items-baseline justify-between gap-3 px-5 py-3">
-              <div className="min-w-0 flex-1 truncate text-body text-label">{b.label}</div>
+              <div className="min-w-0 flex-1 truncate text-body text-label">
+                {b.vmpId != null ? (
+                  <Link
+                    to={`/verrechnung/${b.vmpId}`}
+                    className="underline-offset-2 hover:underline"
+                  >
+                    {b.label}
+                  </Link>
+                ) : (
+                  b.label
+                )}
+              </div>
               <div className="num text-headline text-label">
                 {formatDe(b.sum)} <span className="text-caption text-tertiary">{b.unit}</span>
               </div>

@@ -306,6 +306,11 @@ describe('DashboardPage — Vergleichs-Charts', () => {
     expect(await screen.findByText('Strom · PV-Saldo (verrechnet)')).toBeInTheDocument();
     // Netto-Summe: 120 − 20 = 100.
     expect(screen.getByText('100')).toBeInTheDocument();
+    // Die Zeile verlinkt auf die Detail-Seite (Komponenten-Aufschlüsselung).
+    expect(screen.getByRole('link', { name: 'Strom · PV-Saldo (verrechnet)' })).toHaveAttribute(
+      'href',
+      '/verrechnung/9',
+    );
   });
 
   it('Diagrammtyp auf Balken umschalten crasht nicht (Chart bleibt gerendert)', async () => {

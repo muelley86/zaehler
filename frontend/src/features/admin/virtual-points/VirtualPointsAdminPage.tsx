@@ -12,6 +12,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
 import { Pencil, Plus, Sigma, Trash2 } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 import {
   Button,
@@ -145,7 +146,11 @@ function VmpCard({
             <Sigma size={20} strokeWidth={2} />
           </div>
           <div className="min-w-0">
-            <div className="truncate text-headline tracking-tight text-label">{vmp.name}</div>
+            <div className="truncate text-headline tracking-tight text-label">
+              <Link to={`/verrechnung/${vmp.id}`} className="underline-offset-2 hover:underline">
+                {vmp.name}
+              </Link>
+            </div>
             <div className="text-caption text-tertiary">{TYPE_LABELS[vmp.type]}</div>
             {vmp.note ? (
               <div className="mt-0.5 truncate text-caption text-tertiary">{vmp.note}</div>

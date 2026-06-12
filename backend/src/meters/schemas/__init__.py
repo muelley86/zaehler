@@ -82,6 +82,9 @@ from meters.schemas.virtual_measuring_point import (
     VirtualMeasuringPointCreate,
     VirtualMeasuringPointRead,
     VirtualMeasuringPointUpdate,
+    VirtualMpBreakdownComponent,
+    VirtualMpBreakdownResponse,
+    VirtualMpBreakdownTotal,
     VirtualMpComponentIn,
     VirtualMpComponentRead,
 )
@@ -158,6 +161,9 @@ __all__ = [
     "VirtualMeasuringPointCreate",
     "VirtualMeasuringPointRead",
     "VirtualMeasuringPointUpdate",
+    "VirtualMpBreakdownComponent",
+    "VirtualMpBreakdownResponse",
+    "VirtualMpBreakdownTotal",
     "VirtualMpComponentIn",
     "VirtualMpComponentRead",
 ]

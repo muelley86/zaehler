@@ -80,6 +80,8 @@ function mockEndpoints(opts: { partial?: boolean } = {}): { dimensionCalls: stri
 
 afterEach(() => {
   auth.role = 'admin';
+  // Sticky-Filter (sessionStorage) zwischen Tests isolieren.
+  window.sessionStorage.clear();
 });
 
 describe('ReportsPage', () => {
@@ -205,6 +207,56 @@ describe('ReportsPage', () => {
     const halleCell = screen.getByText('Strom Halle').closest('td');
     if (!halleCell) throw new Error('Tabellenzelle für „Strom Halle" nicht gefunden');
     expect(within(halleCell).queryByText(/· Bezug/)).not.toBeInTheDocument();
+  });
+
+  it('verrechnete Zeile verlinkt auf die Detail-Seite /verrechnung/{id}', async () => {
+    const body: ReportAggregateResponse = {
+      ...response(),
+      rows: [
+        ...response().rows,
+        {
+          group_key: 9,
+          group_label: 'PV-Saldo',
+          meter_type: 'electricity',
+          unit: 'kWh',
+          direction: 'bezug',
+          is_virtual: true,
+          period_start: null,
+          period_end: null,
+          consumption: '380',
+        },
+      ],
+    };
+    server.use(
+      http.get('/api/v1/measuring-points', () => HttpResponse.json([MP])),
+      http.get('/api/v1/report-configs', () => HttpResponse.json([])),
+      http.get('/api/v1/reports/aggregate', () => HttpResponse.json(body)),
+    );
+    renderWithRouter(<ReportsPage />);
+    const link = await screen.findByRole('link', { name: 'PV-Saldo (verrechnet)' });
+    expect(link).toHaveAttribute('href', '/verrechnung/9');
+    // Echte Zeilen bleiben unverlinkt.
+    expect(screen.getByText('10001').closest('a')).toBeNull();
+  });
+
+  it('zugeklapptes Filter-Panel zeigt die Anzahl aktiver Filter als Badge', async () => {
+    mockEndpoints();
+    const user = userEvent.setup();
+    renderWithRouter(<ReportsPage />);
+    await screen.findByText('10001');
+
+    // Ohne aktive Filter: kein Badge.
+    expect(screen.queryByText(/aktiv/)).not.toBeInTheDocument();
+
+    // Filter aufklappen, Kostenstelle wählen, wieder zuklappen → Badge bleibt.
+    await user.click(screen.getByRole('button', { name: /Messstellen eingrenzen/ }));
+    const filterSection = screen.getByText('Messstellen eingrenzen').closest('section')!;
+    await user.click(within(filterSection).getByRole('button', { name: 'Kostenstelle' }));
+    await user.click(await screen.findByRole('checkbox', { name: '10001' }));
+    expect(await screen.findByText('1 aktiv')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /Messstellen eingrenzen/ }));
+    expect(screen.getByText('1 aktiv')).toBeInTheDocument();
   });
 
   it('Filter-Dropdown sendet den gewählten Filter als Query-Param', async () => {

@@ -380,6 +380,109 @@ def test_consumption_month_matches_day_sum_with_offset_readings(
 
 
 # ---------------------------------------------------------------------------
+# Breakdown (Audit-Aufschluesselung je Komponente)
+# ---------------------------------------------------------------------------
+
+
+def test_breakdown_listet_komponenten_mit_vorzeichen_und_netto(admin_client: TestClient) -> None:
+    """Je Komponente Rohwert + Beitrag, Netto je Einheit: 300+500-420 = 380."""
+    mps = _setup_biogas_scenario(admin_client)
+    vmp = _create_vmp(admin_client, "Breakdown-vmp", _biogas_components(mps))
+    data = admin_client.get(f"/api/v1/virtual-measuring-points/{vmp['id']}/breakdown").json()
+    assert data["virtual_measuring_point_id"] == vmp["id"]
+    assert data["from_date"] is None
+    assert data["to_date"] is None
+    comps = data["components"]
+    assert [(c["measuring_point_name"], c["direction"], c["sign"]) for c in comps] == [
+        ("Biogas-Trafo", "bezug", 1),
+        ("Solar-Erzeugung", "bezug", 1),
+        ("Solar-Trafo", "einspeisung", -1),
+    ]
+    assert [Decimal(c["consumption"]) for c in comps] == [
+        Decimal("300"),
+        Decimal("500"),
+        Decimal("420"),
+    ]
+    # contribution = sign * consumption — was tatsaechlich addiert wurde.
+    assert Decimal(comps[2]["contribution"]) == Decimal("-420")
+    assert all(c["unit"] == "kWh" for c in comps)
+    assert len(data["totals"]) == 1
+    assert data["totals"][0]["unit"] == "kWh"
+    assert Decimal(data["totals"][0]["net"]) == Decimal("380")
+    # Der irrelevante Bezug (10 kWh) des Solar-Trafos bleibt aussen vor
+    # (Richtungsfilter) — sonst stuende dort 430 statt 420.
+
+
+def test_breakdown_clippt_zeitraum(admin_client: TestClient) -> None:
+    """from_at/to_at clippen taggenau — Werte entsprechen dem Datumsbereich."""
+    a = _create_mp(admin_client, "Clip-A", "SN-CA-1")
+    b = _create_mp(admin_client, "Clip-B", "SN-CB-1")
+    # Januar 2025: A 310 kWh (10/Tag), B 62 kWh (2/Tag).
+    _add_reading(admin_client, _register_id(a, "1.8.0"), "310", "2025-01-31T12:00:00")
+    _add_reading(admin_client, _register_id(b, "1.8.0"), "62", "2025-01-31T12:00:00")
+    vmp = _create_vmp(
+        admin_client,
+        "Clip-vmp",
+        [
+            {"measuring_point_id": a["id"], "direction": "bezug", "sign": 1},
+            {"measuring_point_id": b["id"], "direction": "bezug", "sign": -1},
+        ],
+    )
+    data = admin_client.get(
+        f"/api/v1/virtual-measuring-points/{vmp['id']}/breakdown"
+        "?from_at=2025-01-01&to_at=2025-01-10"
+    ).json()
+    assert data["from_date"] == "2025-01-01"
+    assert data["to_date"] == "2025-01-10"
+    by_name = {c["measuring_point_name"]: c for c in data["components"]}
+    assert Decimal(by_name["Clip-A"]["consumption"]) == Decimal("100")
+    assert Decimal(by_name["Clip-B"]["consumption"]) == Decimal("20")
+    assert Decimal(by_name["Clip-B"]["contribution"]) == Decimal("-20")
+    assert Decimal(data["totals"][0]["net"]) == Decimal("80")
+
+
+def test_breakdown_komponente_ohne_daten_erscheint_mit_null(admin_client: TestClient) -> None:
+    """Zeitraum vor allen Ablesungen: alle Komponenten als 0-Zeile sichtbar."""
+    mps = _setup_biogas_scenario(admin_client)
+    vmp = _create_vmp(admin_client, "Null-vmp", _biogas_components(mps))
+    data = admin_client.get(
+        f"/api/v1/virtual-measuring-points/{vmp['id']}/breakdown"
+        "?from_at=2024-01-01&to_at=2024-06-30"
+    ).json()
+    assert len(data["components"]) == 3
+    assert all(Decimal(c["consumption"]) == Decimal("0") for c in data["components"])
+    assert all(c["unit"] == "kWh" for c in data["components"])
+    assert Decimal(data["totals"][0]["net"]) == Decimal("0")
+
+
+def test_breakdown_recorder_braucht_vollzugriff(
+    admin_client: TestClient,
+    recorder_client: TestClient,
+    recorder_user: User,
+    admin_user: User,
+) -> None:
+    mps = _setup_biogas_scenario(admin_client)
+    vmp = _create_vmp(admin_client, "Breakdown-Sicht", _biogas_components(mps))
+    url = f"/api/v1/virtual-measuring-points/{vmp['id']}/breakdown"
+    # Ohne bzw. mit Teilzugriff: 404 (kein Existenz-Leak).
+    assert recorder_client.get(url).status_code == 404
+    with SessionLocal() as db:
+        _grant_access(db, recorder=recorder_user, granted_by=admin_user, mp_id=mps["biogas"]["id"])
+        _grant_access(
+            db, recorder=recorder_user, granted_by=admin_user, mp_id=mps["solar_prod"]["id"]
+        )
+    assert recorder_client.get(url).status_code == 404
+    # Vollzugriff: 200 inkl. Werte.
+    with SessionLocal() as db:
+        _grant_access(
+            db, recorder=recorder_user, granted_by=admin_user, mp_id=mps["solar_trafo"]["id"]
+        )
+    resp = recorder_client.get(url)
+    assert resp.status_code == 200
+    assert Decimal(resp.json()["totals"][0]["net"]) == Decimal("380")
+
+
+# ---------------------------------------------------------------------------
 # Audit
 # ---------------------------------------------------------------------------
 
