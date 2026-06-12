@@ -10,6 +10,13 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.60.0](https://github.com/muelley86/zaehler/compare/v2.59.1...v2.60.0) (2026-06-12)
+
+
+### Funktionen
+
+* **suppliers:** Lieferanten-Stammdaten, periodisierte MP-Zuordnung und neue Messstellen-Filter ([#267](https://github.com/muelley86/zaehler/issues/267)) ([5c709b5](https://github.com/muelley86/zaehler/commit/5c709b5d4e11e04650bd1dc23b876b2c76135585))
+
 ## [2.59.1](https://github.com/muelley86/zaehler/compare/v2.59.0...v2.59.1) (2026-06-12)
 
 
