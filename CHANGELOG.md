@@ -10,6 +10,13 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.59.1](https://github.com/muelley86/zaehler/compare/v2.59.0...v2.59.1) (2026-06-12)
+
+
+### Fehlerbehebungen
+
+* **virtual-mps:** Zurueck-Link der Detail-Seite fuehrt zur Verrechnungs-Uebersicht ([#265](https://github.com/muelley86/zaehler/issues/265)) ([3bb35cf](https://github.com/muelley86/zaehler/commit/3bb35cffb60d5cb9c670ba4ac2e4c21a7608ab21))
+
 ## [2.59.0](https://github.com/muelley86/zaehler/compare/v2.58.1...v2.59.0) (2026-06-12)
 
 
