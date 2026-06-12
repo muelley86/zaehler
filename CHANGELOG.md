@@ -10,6 +10,13 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.59.0](https://github.com/muelley86/zaehler/compare/v2.58.1...v2.59.0) (2026-06-12)
+
+
+### Funktionen
+
+* **virtual-mps:** Detail-Seite mit Komponenten-Werten und Filter-Badge in den Auswertungen ([#263](https://github.com/muelley86/zaehler/issues/263)) ([04652ff](https://github.com/muelley86/zaehler/commit/04652ff1f3e2e63a4ceeca3a0ef049846363ae56))
+
 ## [2.58.1](https://github.com/muelley86/zaehler/compare/v2.58.0...v2.58.1) (2026-06-12)
 
 
