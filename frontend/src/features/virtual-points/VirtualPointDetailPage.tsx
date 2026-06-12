@@ -14,6 +14,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 
 import { EmptyState, LargeTitle, Section } from '@/components/ui';
 import { PageGlows } from '@/components/PageGlows';
+import { useAuth } from '@/features/auth/auth-context';
 import { ApiError, api } from '@/lib/api';
 import { formatDe } from '@/lib/format';
 import { TYPE_LABELS } from '@/lib/meterLabels';
@@ -219,14 +220,21 @@ export function VirtualPointDetailPage() {
   );
 }
 
+/**
+ * Zurück zur Übersicht der verrechneten Messstellen — die liegt im
+ * Admin-Bereich. Recorder (sehen die Detail-Seite bei Vollzugriff ebenfalls)
+ * landen stattdessen auf den Auswertungen, sonst wäre der Link eine Sackgasse.
+ */
 function BackLink() {
+  const { me } = useAuth();
+  const isAdmin = me?.role === 'admin';
   return (
     <Link
-      to="/auswertungen"
+      to={isAdmin ? '/admin/verrechnung' : '/auswertungen'}
       className="inline-flex items-center gap-1 text-caption font-semibold text-primary-deep transition-colors hover:text-primary"
     >
       <ArrowLeft size={14} />
-      Auswertungen
+      {isAdmin ? 'Verrechnete Messstellen' : 'Auswertungen'}
     </Link>
   );
 }
