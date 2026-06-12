@@ -10,6 +10,13 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.60.1](https://github.com/muelley86/zaehler/compare/v2.60.0...v2.60.1) (2026-06-12)
+
+
+### Fehlerbehebungen
+
+* **suppliers:** Handshake-Icon statt Lieferwagen und Lieferant-Filter immer sichtbar ([#269](https://github.com/muelley86/zaehler/issues/269)) ([af728b3](https://github.com/muelley86/zaehler/commit/af728b32184672f79f3a51cc974b64ca49956464))
+
 ## [2.60.0](https://github.com/muelley86/zaehler/compare/v2.59.1...v2.60.0) (2026-06-12)
 
 
