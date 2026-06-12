@@ -5,7 +5,7 @@
  */
 
 import { http, HttpResponse } from 'msw';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { Route, Routes } from 'react-router-dom';
 
@@ -13,6 +13,11 @@ import { renderWithRouter } from '@/tests/render';
 import { server } from '@/tests/server';
 import { formatDe } from '@/lib/format';
 import type { VirtualMeasuringPointRead, VirtualMpBreakdownResponse } from '@/lib/types';
+
+const auth = vi.hoisted((): { role: 'admin' | 'recorder' } => ({ role: 'admin' }));
+vi.mock('@/features/auth/auth-context', () => ({
+  useAuth: () => ({ me: { role: auth.role } }),
+}));
 
 import { VirtualPointDetailPage } from './VirtualPointDetailPage';
 
@@ -86,6 +91,7 @@ function renderPage() {
 }
 
 afterEach(() => {
+  auth.role = 'admin';
   window.localStorage.clear();
   window.sessionStorage.clear();
 });
@@ -109,6 +115,21 @@ describe('VirtualPointDetailPage', () => {
     // Netto-Zeile.
     expect(screen.getByText('Netto')).toBeInTheDocument();
     expect(screen.getByText(`${formatDe('380')} kWh`)).toBeInTheDocument();
+  });
+
+  it('Zurück-Link führt Admins zur Übersicht der verrechneten Messstellen', async () => {
+    mockEndpoints();
+    renderPage();
+    const link = await screen.findByRole('link', { name: /Verrechnete Messstellen/ });
+    expect(link).toHaveAttribute('href', '/admin/verrechnung');
+  });
+
+  it('Zurück-Link führt Recorder zu den Auswertungen (Admin-Bereich gesperrt)', async () => {
+    auth.role = 'recorder';
+    mockEndpoints();
+    renderPage();
+    const link = await screen.findByRole('link', { name: /Auswertungen/ });
+    expect(link).toHaveAttribute('href', '/auswertungen');
   });
 
   it('lädt den Breakdown bei Datums-Änderung mit from_at/to_at neu', async () => {
