@@ -18,7 +18,11 @@ import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { renderWithRouter } from '@/tests/render';
 import { server } from '@/tests/server';
 import { api } from '@/lib/api';
-import type { ConsumptionPoint, MeasuringPointRead } from '@/lib/types';
+import type {
+  ConsumptionPoint,
+  DashboardVirtualMeasuringPoint,
+  MeasuringPointRead,
+} from '@/lib/types';
 
 import { DashboardPage } from './DashboardPage';
 
@@ -46,6 +50,17 @@ const MP: MeasuringPointRead = {
 
 const STROM_MP: MeasuringPointRead = { ...MP, id: 2, name: 'Strom Haus', type: 'electricity' };
 
+/** Verrechnete Messstelle: Netto-Reihe 120 − 20 = 100 kWh. */
+const VMP: DashboardVirtualMeasuringPoint = {
+  id: 9,
+  name: 'PV-Saldo',
+  type: 'electricity',
+  consumption: [
+    cp('2024-01-31', '120', 'kWh', 'virtual'),
+    cp('2024-02-29', '-20', 'kWh', 'virtual'),
+  ],
+};
+
 function cp(periodEnd: string, consumption: string, unit: string, obis = 'r'): ConsumptionPoint {
   return {
     period_start: periodEnd,
@@ -63,6 +78,7 @@ function cp(periodEnd: string, consumption: string, unit: string, obis = 'r'): C
 function mockEndpoints(
   mps: MeasuringPointRead[] = [MP],
   items: unknown[] = [],
+  virtualItems: DashboardVirtualMeasuringPoint[] = [],
 ): {
   granularityCalls: string[];
 } {
@@ -73,7 +89,7 @@ function mockEndpoints(
     http.get('/api/v1/dashboard', ({ request }) => {
       const g = new URL(request.url).searchParams.get('granularity');
       if (g) granularityCalls.push(g);
-      return HttpResponse.json({ items });
+      return HttpResponse.json({ items, virtual_items: virtualItems });
     }),
   );
   return { granularityCalls };
@@ -230,6 +246,66 @@ describe('DashboardPage — Vergleichs-Charts', () => {
     renderWithRouter(<DashboardPage />);
 
     expect(await screen.findByText(/Kein Verbrauch im gewählten Zeitraum/)).toBeInTheDocument();
+  });
+
+  it('Filter ausschließlich auf eine verrechnete Messstelle blendet echte Messstellen aus', async () => {
+    mockEndpoints(
+      [MP],
+      [
+        {
+          measuring_point_id: 1,
+          consumption: [cp('2024-01-31', '5', 'm³')],
+          readings: [],
+          state: [],
+        },
+      ],
+      [VMP],
+    );
+    renderWithRouter(<DashboardPage />);
+
+    // Ungefiltert: beide Gruppen sichtbar (echte Wasser-MP + verrechnete Strom-vmp).
+    expect(await screen.findByText('Wasser · m³')).toBeInTheDocument();
+    expect(screen.getByText('Strom · kWh')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /Filter/ }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Verrechnete Messstellen' }));
+    fireEvent.click(await screen.findByRole('checkbox', { name: 'PV-Saldo' }));
+
+    await waitFor(() => expect(screen.queryByText('Wasser · m³')).toBeNull());
+    expect(screen.getByText('Strom · kWh')).toBeInTheDocument();
+  });
+
+  it('Filter auf eine echte Messstelle blendet verrechnete Messstellen aus', async () => {
+    mockEndpoints(
+      [MP],
+      [
+        {
+          measuring_point_id: 1,
+          consumption: [cp('2024-01-31', '5', 'm³')],
+          readings: [],
+          state: [],
+        },
+      ],
+      [VMP],
+    );
+    renderWithRouter(<DashboardPage />);
+    expect(await screen.findByText('Strom · kWh')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /Filter/ }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Messstellen' }));
+    fireEvent.click(await screen.findByRole('checkbox', { name: 'Wasser Garten' }));
+
+    await waitFor(() => expect(screen.queryByText('Strom · kWh')).toBeNull());
+    expect(screen.getByText('Wasser · m³')).toBeInTheDocument();
+  });
+
+  it('Summen-Kacheln zeigen eine Netto-Zeile je verrechneter Messstelle', async () => {
+    mockEndpoints([MP], [], [VMP]);
+    renderWithRouter(<DashboardPage />);
+
+    expect(await screen.findByText('Strom · PV-Saldo (verrechnet)')).toBeInTheDocument();
+    // Netto-Summe: 120 − 20 = 100.
+    expect(screen.getByText('100')).toBeInTheDocument();
   });
 
   it('Diagrammtyp auf Balken umschalten crasht nicht (Chart bleibt gerendert)', async () => {

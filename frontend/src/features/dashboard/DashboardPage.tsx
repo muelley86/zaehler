@@ -139,7 +139,8 @@ export function DashboardPage() {
     ID_CODEC,
   );
   // Eigener Filter für verrechnete Messstellen — getrennter ID-Namensraum,
-  // darf nicht mit dem Messstellen-Set kollidieren. Leer = alle anzeigen.
+  // darf nicht mit dem Messstellen-Set kollidieren. Bildet zusammen mit dem
+  // Messstellen-Filter EINE Auswahl (siehe `mpSelectionActive`).
   const [virtualFilter, setVirtualFilter] = useStickyState<Set<number | null>>(
     FILTER_NS + 'virtual',
     new Set(),
@@ -247,14 +248,17 @@ export function DashboardPage() {
     [mainLocationFilter, ownerFilter, locationFilter, typeFilter],
   );
 
+  // Messstellen- und vmp-Filter bilden EINE gemeinsame Auswahl: sobald in
+  // mindestens einem der beiden etwas gewählt ist, erscheinen nur noch explizit
+  // gewählte Einträge — echte und verrechnete blenden sich also gegenseitig aus.
+  const mpSelectionActive = measuringPointFilter.size > 0 || virtualFilter.size > 0;
+
   const filteredPoints = useMemo(() => {
     if (!points) return [];
     return points.filter(
-      (mp) =>
-        matchesBaseFilters(mp) &&
-        (measuringPointFilter.size === 0 || measuringPointFilter.has(mp.id)),
+      (mp) => matchesBaseFilters(mp) && (!mpSelectionActive || measuringPointFilter.has(mp.id)),
     );
-  }, [points, matchesBaseFilters, measuringPointFilter]);
+  }, [points, matchesBaseFilters, mpSelectionActive, measuringPointFilter]);
 
   // Verbrauch ist bereits Backend-seitig auf den Zeitraum gefiltert; hier nur
   // noch nach den kategorialen MP-Filtern einschränken (für CSV + Summen-Tiles).
@@ -266,17 +270,18 @@ export function DashboardPage() {
     return out;
   }, [filteredPoints, consumptions]);
 
-  // Verrechnete Messstellen: respektieren Zählerart- und eigenen vmp-Filter.
-  // Die übrigen kategorialen Filter (Standort/Eigentümer) greifen nicht —
-  // virtuelle Messstellen haben diese Attribute nicht.
+  // Verrechnete Messstellen: respektieren Zählerart-Filter und die gemeinsame
+  // Messstellen-/vmp-Auswahl (siehe `mpSelectionActive`). Die übrigen
+  // kategorialen Filter (Standort/Eigentümer) greifen nicht — virtuelle
+  // Messstellen haben diese Attribute nicht.
   const filteredVirtual = useMemo(
     () =>
       virtualItems.filter(
         (v) =>
           (typeFilter.size === 0 || typeFilter.has(v.type)) &&
-          (virtualFilter.size === 0 || virtualFilter.has(v.id)),
+          (!mpSelectionActive || virtualFilter.has(v.id)),
       ),
-    [virtualItems, typeFilter, virtualFilter],
+    [virtualItems, typeFilter, mpSelectionActive, virtualFilter],
   );
 
   // Vergleichs-Serien: eine Serie je Messstelle (bidirektionaler Strom getrennt
@@ -596,14 +601,20 @@ export function DashboardPage() {
       ) : null}
 
       {mpDataReady ? (
-        <ConsumptionSummary points={filteredPoints} consumption={filteredConsumption} />
+        <ConsumptionSummary
+          points={filteredPoints}
+          consumption={filteredConsumption}
+          virtualItems={filteredVirtual}
+        />
       ) : null}
 
-      {mpDataReady && filteredPoints.length === 0 ? (
+      {mpDataReady && filteredPoints.length === 0 && filteredVirtual.length === 0 ? (
         <EmptyState icon={<Filter size={32} />} title="Keine Messstellen entsprechen dem Filter" />
       ) : null}
 
-      {mpDataReady && filteredPoints.length > 0 && comparisonGroups.length === 0 ? (
+      {mpDataReady &&
+      (filteredPoints.length > 0 || filteredVirtual.length > 0) &&
+      comparisonGroups.length === 0 ? (
         <EmptyState
           icon={<Filter size={32} />}
           title="Kein Verbrauch im gewählten Zeitraum"
@@ -662,9 +673,11 @@ function FilterRow({ label, children }: { label: string; children: React.ReactNo
 function ConsumptionSummary({
   points,
   consumption,
+  virtualItems,
 }: {
   points: MeasuringPointRead[];
   consumption: Array<ConsumptionPoint & { mp: MeasuringPointRead }>;
+  virtualItems: DashboardVirtualMeasuringPoint[];
 }) {
   const buckets = useMemo(() => {
     type Bucket = { label: string; sum: number; unit: string; type: MeterType };
@@ -687,13 +700,25 @@ function ConsumptionSummary({
         });
       }
     }
-    return Array.from(map.values()).sort(
+    // Verrechnete Messstellen: eine Netto-Zeile je vmp (Summe kann negativ
+    // sein, wenn die Minus-Komponenten überwiegen).
+    for (const v of virtualItems) {
+      const first = v.consumption[0];
+      if (!first) continue;
+      map.set(`vmp::${v.id}`, {
+        label: `${TYPE_LABELS[v.type]} · ${v.name} (verrechnet)`,
+        sum: v.consumption.reduce((acc, p) => acc + Number(p.consumption), 0),
+        unit: first.unit,
+        type: v.type,
+      });
+    }
+    return Array.from(map.entries(), ([key, b]) => ({ key, ...b })).sort(
       (a, b) =>
         TYPE_ORDER.indexOf(a.type) - TYPE_ORDER.indexOf(b.type) || a.label.localeCompare(b.label),
     );
-  }, [consumption]);
+  }, [consumption, virtualItems]);
 
-  if (points.length === 0) return null;
+  if (points.length === 0 && virtualItems.length === 0) return null;
 
   return (
     <Section header="Verbrauch im gewählten Zeitraum">
@@ -705,7 +730,7 @@ function ConsumptionSummary({
       ) : (
         <ul className="divide-y divide-separator">
           {buckets.map((b) => (
-            <li key={b.label} className="flex items-baseline justify-between gap-3 px-5 py-3">
+            <li key={b.key} className="flex items-baseline justify-between gap-3 px-5 py-3">
               <div className="min-w-0 flex-1 truncate text-body text-label">{b.label}</div>
               <div className="num text-headline text-label">
                 {formatDe(b.sum)} <span className="text-caption text-tertiary">{b.unit}</span>
