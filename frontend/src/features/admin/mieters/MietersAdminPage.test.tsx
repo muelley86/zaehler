@@ -53,7 +53,7 @@ afterEach(() => {
 });
 
 describe('MietersAdminPage', () => {
-  it('listet Mieter mit Anzeigename, Adresse und Kontakt', async () => {
+  it('listet Mieter kompakt mit Anzeigename und Messstellen-Anzahl', async () => {
     _mock([
       _mieter({
         id: 1,
@@ -70,8 +70,24 @@ describe('MietersAdminPage', () => {
     renderWithRouter(<MietersAdminPage />);
     expect(await screen.findByText('Mustermann, Erika')).toBeInTheDocument();
     expect(screen.getByText('Beispiel')).toBeInTheDocument();
-    expect(screen.getByText(/Mietweg 2, 12345, Beispielstadt/)).toBeInTheDocument();
-    expect(screen.getByText(/erika@example\.com/)).toBeInTheDocument();
+    // Kompakt: Anzahl-Sublabel ist sichtbar, Adresse/Kontakt nur noch im Bearbeiten-Dialog.
+    expect(screen.getAllByText('Keine Messstellen')).toHaveLength(2);
+    expect(screen.queryByText(/Mietweg 2/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/erika@example\.com/)).not.toBeInTheDocument();
+  });
+
+  it('filtert die Liste über das Suchfeld', async () => {
+    _mock([
+      _mieter({ id: 1, last_name: 'Mustermann', display_name: 'Mustermann, Erika' }),
+      _mieter({ id: 2, last_name: 'Beispiel', display_name: 'Beispiel' }),
+    ]);
+    const user = userEvent.setup();
+    renderWithRouter(<MietersAdminPage />);
+
+    await screen.findByText('Mustermann, Erika');
+    await user.type(screen.getByLabelText('Suchen'), 'beispiel');
+    expect(screen.getByText('Beispiel')).toBeInTheDocument();
+    expect(screen.queryByText('Mustermann, Erika')).not.toBeInTheDocument();
   });
 
   it('zeigt den Empty-State, wenn keine Mieter existieren', async () => {
@@ -121,7 +137,7 @@ describe('MietersAdminPage', () => {
     renderWithRouter(<MietersAdminPage />);
 
     await screen.findByText('Alt-Mieter');
-    await user.click(screen.getByRole('button', { name: 'Löschen' }));
+    await user.click(screen.getByRole('button', { name: /löschen/i }));
     await waitFor(() => expect(deleted).toBe(true));
     expect(confirmSpy).toHaveBeenCalled();
     confirmSpy.mockRestore();

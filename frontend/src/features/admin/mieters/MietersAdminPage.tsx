@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
-import { KeyRound, Pencil, Trash2 } from 'lucide-react';
+import { KeyRound } from 'lucide-react';
 
-import { Button, Card, EmptyState, LargeTitle, Section, Sheet, TextField } from '@/components/ui';
+import { Button, EmptyState, LargeTitle, Section, Sheet, TextField } from '@/components/ui';
 import { ApiError, api } from '@/lib/api';
 import type { MeasuringPointRead, MieterRead } from '@/lib/types';
+
+import { MasterDataList } from '../_shared/MasterDataList';
 
 export function MietersAdminPage() {
   const [mieters, setMieters] = useState<MieterRead[] | null>(null);
@@ -30,6 +32,23 @@ export function MietersAdminPage() {
 
   const refresh = () => setTick((t) => t + 1);
 
+  async function handleDelete(mieter: MieterRead) {
+    if (
+      !window.confirm(
+        `Mieter "${mieter.display_name}" löschen?\n\nMessstellen behalten ihre Daten, die historische Zuordnung wird auf „unbekannt" gesetzt.`,
+      )
+    )
+      return;
+    setError(null);
+    try {
+      await api.delete(`/mieters/${mieter.id}`);
+      refresh();
+    } catch (err) {
+      if (err instanceof ApiError) setError(err.problem.detail ?? err.problem.title);
+      else setError('Löschen fehlgeschlagen.');
+    }
+  }
+
   const mpCountByMieter = useMemo(() => {
     const map = new Map<number, number>();
     points?.forEach((mp) => {
@@ -51,25 +70,26 @@ export function MietersAdminPage() {
 
       <CreateForm onCreated={refresh} />
 
-      {mieters && mieters.length === 0 ? (
-        <EmptyState
-          icon={<KeyRound size={32} />}
-          title="Noch keine Mieter"
-          description="Mieter können optional einer Messstelle zugeordnet werden und tauchen in Suche, Export und Filter auf."
-        />
-      ) : (
-        <div className="grid gap-4 sm:grid-cols-2">
-          {(mieters ?? []).map((m) => (
-            <MieterCard
-              key={m.id}
-              mieter={m}
-              mpCount={mpCountByMieter.get(m.id) ?? 0}
-              onEdit={() => setEditing(m)}
-              onChanged={refresh}
-            />
-          ))}
-        </div>
-      )}
+      <MasterDataList
+        items={mieters}
+        icon={<KeyRound size={18} />}
+        getId={(m) => m.id}
+        getName={(m) => m.display_name}
+        getSearchText={(m) =>
+          [m.display_name, m.address_city, m.email, m.phone].filter(Boolean).join(' ').toLowerCase()
+        }
+        mpCount={(id) => mpCountByMieter.get(id) ?? 0}
+        searchPlaceholder="Mieter suchen (Name oder Ort)…"
+        emptyState={
+          <EmptyState
+            icon={<KeyRound size={32} />}
+            title="Noch keine Mieter"
+            description="Mieter können optional einer Messstelle zugeordnet werden und tauchen in Suche, Export und Filter auf."
+          />
+        }
+        onEdit={(m) => setEditing(m)}
+        onDelete={handleDelete}
+      />
 
       <Sheet open={editing !== null} onClose={() => setEditing(null)} title="Mieter bearbeiten">
         {editing ? (
@@ -84,101 +104,6 @@ export function MietersAdminPage() {
         ) : null}
       </Sheet>
     </>
-  );
-}
-
-function MieterCard({
-  mieter,
-  mpCount,
-  onEdit,
-  onChanged,
-}: {
-  mieter: MieterRead;
-  mpCount: number;
-  onEdit: () => void;
-  onChanged: () => void;
-}) {
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  async function remove() {
-    if (
-      !window.confirm(
-        `Mieter "${mieter.display_name}" löschen?\n\nMessstellen behalten ihre Daten, die historische Zuordnung wird auf „unbekannt" gesetzt.`,
-      )
-    )
-      return;
-    setBusy(true);
-    setError(null);
-    try {
-      await api.delete(`/mieters/${mieter.id}`);
-      onChanged();
-    } catch (err) {
-      if (err instanceof ApiError) setError(err.problem.detail ?? err.problem.title);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  const addressLine = [mieter.address_street, mieter.address_postcode, mieter.address_city]
-    .filter(Boolean)
-    .join(', ');
-  const contactLine = [mieter.email, mieter.phone].filter(Boolean).join(' · ');
-
-  return (
-    <Card>
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex min-w-0 items-start gap-3">
-          <div className="bg-gradient-primary shadow-glow-primary flex h-11 w-11 shrink-0 items-center justify-center rounded-card text-white">
-            <KeyRound size={20} strokeWidth={2} />
-          </div>
-          <div className="min-w-0">
-            <div className="truncate text-headline tracking-tight text-label">
-              {mieter.display_name}
-            </div>
-            <div className="text-caption text-tertiary">
-              {mpCount === 0
-                ? 'Keine Messstellen'
-                : `${mpCount} ${mpCount === 1 ? 'Messstelle' : 'Messstellen'}`}
-            </div>
-            {addressLine ? (
-              <div className="mt-0.5 truncate text-caption text-tertiary">{addressLine}</div>
-            ) : null}
-            {contactLine ? (
-              <div className="mt-0.5 truncate text-caption text-tertiary">{contactLine}</div>
-            ) : null}
-          </div>
-        </div>
-        <div className="flex gap-1">
-          <Button variant="plain" size="sm" leftIcon={<Pencil size={14} />} onClick={onEdit}>
-            Bearbeiten
-          </Button>
-          <Button
-            variant="plain"
-            size="sm"
-            leftIcon={<Trash2 size={14} />}
-            onClick={() => void remove()}
-            disabled={busy}
-            className="hover:bg-danger/10 text-danger"
-          >
-            Löschen
-          </Button>
-        </div>
-      </div>
-
-      <div
-        className="mt-4 rounded-pill border-l-2 border-primary bg-fill p-3 text-body-sm text-secondary"
-        style={{ borderLeftWidth: '3px' }}
-      >
-        {mieter.note ? mieter.note : <em className="text-tertiary">Keine Notiz</em>}
-      </div>
-
-      {error ? (
-        <div className="border-danger/40 bg-danger/10 mt-3 rounded-pill border-hairline p-2 text-caption text-danger">
-          {error}
-        </div>
-      ) : null}
-    </Card>
   );
 }
 
