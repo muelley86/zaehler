@@ -79,6 +79,7 @@ export function SuppliersAdminPage() {
           [s.name, s.address_city, s.email, s.phone].filter(Boolean).join(' ').toLowerCase()
         }
         mpCount={(id) => mpCountBySupplier.get(id) ?? 0}
+        getDetailHref={(s) => `/admin/lieferanten/${s.id}`}
         searchPlaceholder="Lieferant suchen (Name oder Ort)…"
         emptyState={
           <EmptyState

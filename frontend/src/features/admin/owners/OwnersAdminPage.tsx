@@ -79,6 +79,7 @@ export function OwnersAdminPage() {
           [o.name, o.address_city, o.email, o.phone].filter(Boolean).join(' ').toLowerCase()
         }
         mpCount={(id) => mpCountByOwner.get(id) ?? 0}
+        getDetailHref={(o) => `/admin/eigentuemer/${o.id}`}
         searchPlaceholder="Eigentümer suchen (Name oder Ort)…"
         emptyState={
           <EmptyState

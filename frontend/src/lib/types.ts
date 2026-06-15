@@ -233,6 +233,13 @@ export interface MeasuringPointRead {
   physical_meters: PhysicalMeterRead[];
 }
 
+// Eine Messstelle gebündelt mit ihrem aktuellen Register-Stand — Datenquelle
+// der Stammdaten-Detailseiten (Eigentümer/Lieferant/Mieter).
+export interface MeasuringPointWithStateRead {
+  measuring_point: MeasuringPointRead;
+  registers: RegisterStateRead[];
+}
+
 export interface ReadingRead {
   id: number;
   register_id: number;

@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field, model_validator
 from meters.models import HeatingSource, MeterType
 from meters.schemas.common import APIModel, DecimalStr
 from meters.schemas.physical_meter import PhysicalMeterRead
+from meters.schemas.state import RegisterStateRead
 
 # Erlaubte Einheiten für vom User definierte Wärme-Register.
 # Die alten Wärme-Einheiten (h, L) bleiben für migrierte Heizöl-Bestände
@@ -181,3 +182,16 @@ class ReplaceMeterRequest(BaseModel):
     new_serial_number: str = Field(min_length=1, max_length=64)
     installed_at: date
     initial_readings: dict[str, DecimalStr] = Field(default_factory=dict)
+
+
+class MeasuringPointWithStateRead(APIModel):
+    """Eine Messstelle gebuendelt mit ihrem aktuellen Register-Stand.
+
+    Datenquelle der Stammdaten-Detailseiten (Eigentuemer/Lieferant/Mieter):
+    pro aktuell zugeordneter MP einmal die Stammdaten (``measuring_point``) plus
+    den aktuellen Bestand je aktivem Register (``registers``) — serverseitig
+    gebuendelt, damit das Frontend nur einen Request je Detailseite braucht.
+    """
+
+    measuring_point: MeasuringPointRead
+    registers: list[RegisterStateRead]

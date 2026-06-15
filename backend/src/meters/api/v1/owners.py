@@ -13,10 +13,17 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
 from meters.api.deps import AdminUser, CurrentUser, DbDep, client_ip
+from meters.api.v1.measuring_points import measuring_points_with_state
 from meters.core.problem import ProblemError
 from meters.models import AuditAction, AuditEntityType, Owner
-from meters.schemas import OwnerCreate, OwnerRead, OwnerUpdate
+from meters.schemas import (
+    MeasuringPointWithStateRead,
+    OwnerCreate,
+    OwnerRead,
+    OwnerUpdate,
+)
 from meters.services.audit import record
+from meters.services.owner_assignment import select_measuring_points_for_owner
 
 router = APIRouter(prefix="/owners", tags=["owners"])
 
@@ -33,6 +40,20 @@ def get_owner(owner_id: int, db: DbDep, _user: CurrentUser) -> OwnerRead:
     if obj is None:
         raise ProblemError(status_code=404, title="Owner not found")
     return OwnerRead.model_validate(obj)
+
+
+@router.get("/{owner_id}/measuring-points", response_model=list[MeasuringPointWithStateRead])
+def list_owner_measuring_points(
+    owner_id: int, db: DbDep, user: CurrentUser
+) -> list[MeasuringPointWithStateRead]:
+    """Aktuell diesem Eigentuemer zugeordnete Messstellen, mit aktuellem Stand.
+
+    Quelle der Eigentuemer-Detailseite. Nur offene Zuordnungen; Recorder sehen
+    via ``restrict_mp_query`` nur ihre zugaenglichen MPs.
+    """
+    if db.get(Owner, owner_id) is None:
+        raise ProblemError(status_code=404, title="Owner not found")
+    return measuring_points_with_state(db, select_measuring_points_for_owner(owner_id), user)
 
 
 @router.post("", response_model=OwnerRead, status_code=status.HTTP_201_CREATED)

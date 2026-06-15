@@ -60,14 +60,29 @@ const OwnersAdminPage = lazy(() =>
     default: m.OwnersAdminPage,
   })),
 );
+const OwnerDetailPage = lazy(() =>
+  import('@/features/admin/owners/OwnerDetailPage').then((m) => ({
+    default: m.OwnerDetailPage,
+  })),
+);
 const SuppliersAdminPage = lazy(() =>
   import('@/features/admin/suppliers/SuppliersAdminPage').then((m) => ({
     default: m.SuppliersAdminPage,
   })),
 );
+const SupplierDetailPage = lazy(() =>
+  import('@/features/admin/suppliers/SupplierDetailPage').then((m) => ({
+    default: m.SupplierDetailPage,
+  })),
+);
 const MietersAdminPage = lazy(() =>
   import('@/features/admin/mieters/MietersAdminPage').then((m) => ({
     default: m.MietersAdminPage,
+  })),
+);
+const MieterDetailPage = lazy(() =>
+  import('@/features/admin/mieters/MieterDetailPage').then((m) => ({
+    default: m.MieterDetailPage,
   })),
 );
 const VirtualPointsAdminPage = lazy(() =>
@@ -218,8 +233,11 @@ export function App() {
             <Route path="standorte" element={<LocationsAdminPage />} />
             <Route path="hauptstandorte" element={<MainLocationsAdminPage />} />
             <Route path="eigentuemer" element={<OwnersAdminPage />} />
+            <Route path="eigentuemer/:id" element={<OwnerDetailPage />} />
             <Route path="lieferanten" element={<SuppliersAdminPage />} />
+            <Route path="lieferanten/:id" element={<SupplierDetailPage />} />
             <Route path="mieter" element={<MietersAdminPage />} />
+            <Route path="mieter/:id" element={<MieterDetailPage />} />
             <Route path="verrechnung" element={<VirtualPointsAdminPage />} />
             <Route path="benutzer" element={<UsersAdminPage />} />
             <Route path="qr-codes" element={<QrCodesAdminPage />} />
