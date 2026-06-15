@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
-import { Handshake, Pencil, Trash2 } from 'lucide-react';
+import { Handshake } from 'lucide-react';
 
-import { Button, Card, EmptyState, LargeTitle, Section, Sheet, TextField } from '@/components/ui';
+import { Button, EmptyState, LargeTitle, Section, Sheet, TextField } from '@/components/ui';
 import { ApiError, api } from '@/lib/api';
 import type { MeasuringPointRead, SupplierRead } from '@/lib/types';
+
+import { MasterDataList } from '../_shared/MasterDataList';
 
 export function SuppliersAdminPage() {
   const [suppliers, setSuppliers] = useState<SupplierRead[] | null>(null);
@@ -30,6 +32,23 @@ export function SuppliersAdminPage() {
 
   const refresh = () => setTick((t) => t + 1);
 
+  async function handleDelete(supplier: SupplierRead) {
+    if (
+      !window.confirm(
+        `Lieferant "${supplier.name}" löschen?\n\nMessstellen behalten ihre Daten, die historische Zuordnung wird auf „unbekannt" gesetzt.`,
+      )
+    )
+      return;
+    setError(null);
+    try {
+      await api.delete(`/suppliers/${supplier.id}`);
+      refresh();
+    } catch (err) {
+      if (err instanceof ApiError) setError(err.problem.detail ?? err.problem.title);
+      else setError('Löschen fehlgeschlagen.');
+    }
+  }
+
   const mpCountBySupplier = useMemo(() => {
     const map = new Map<number, number>();
     points?.forEach((mp) => {
@@ -51,25 +70,26 @@ export function SuppliersAdminPage() {
 
       <CreateForm onCreated={refresh} />
 
-      {suppliers && suppliers.length === 0 ? (
-        <EmptyState
-          icon={<Handshake size={32} />}
-          title="Noch keine Lieferanten"
-          description="Lieferanten können Messstellen zugeordnet werden und tauchen in den Filtern der Messstellen-Übersicht auf."
-        />
-      ) : (
-        <div className="grid gap-4 sm:grid-cols-2">
-          {(suppliers ?? []).map((s) => (
-            <SupplierCard
-              key={s.id}
-              supplier={s}
-              mpCount={mpCountBySupplier.get(s.id) ?? 0}
-              onEdit={() => setEditing(s)}
-              onChanged={refresh}
-            />
-          ))}
-        </div>
-      )}
+      <MasterDataList
+        items={suppliers}
+        icon={<Handshake size={18} />}
+        getId={(s) => s.id}
+        getName={(s) => s.name}
+        getSearchText={(s) =>
+          [s.name, s.address_city, s.email, s.phone].filter(Boolean).join(' ').toLowerCase()
+        }
+        mpCount={(id) => mpCountBySupplier.get(id) ?? 0}
+        searchPlaceholder="Lieferant suchen (Name oder Ort)…"
+        emptyState={
+          <EmptyState
+            icon={<Handshake size={32} />}
+            title="Noch keine Lieferanten"
+            description="Lieferanten können Messstellen zugeordnet werden und tauchen in den Filtern der Messstellen-Übersicht auf."
+          />
+        }
+        onEdit={(s) => setEditing(s)}
+        onDelete={handleDelete}
+      />
 
       <Sheet open={editing !== null} onClose={() => setEditing(null)} title="Lieferant bearbeiten">
         {editing ? (
@@ -84,116 +104,6 @@ export function SuppliersAdminPage() {
         ) : null}
       </Sheet>
     </>
-  );
-}
-
-function SupplierCard({
-  supplier,
-  mpCount,
-  onEdit,
-  onChanged,
-}: {
-  supplier: SupplierRead;
-  mpCount: number;
-  onEdit: () => void;
-  onChanged: () => void;
-}) {
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  async function remove() {
-    if (
-      !window.confirm(
-        `Lieferant "${supplier.name}" löschen?\n\nMessstellen behalten ihre Daten, die historische Zuordnung wird auf „unbekannt" gesetzt.`,
-      )
-    )
-      return;
-    setBusy(true);
-    setError(null);
-    try {
-      await api.delete(`/suppliers/${supplier.id}`);
-      onChanged();
-    } catch (err) {
-      if (err instanceof ApiError) setError(err.problem.detail ?? err.problem.title);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  const addressLine = [supplier.address_street, supplier.address_postcode, supplier.address_city]
-    .filter(Boolean)
-    .join(', ');
-  const contactLine = [supplier.email, supplier.phone].filter(Boolean).join(' · ');
-
-  return (
-    <Card>
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex min-w-0 items-start gap-3">
-          <div className="bg-gradient-primary shadow-glow-primary flex h-11 w-11 shrink-0 items-center justify-center rounded-card text-white">
-            <Handshake size={20} strokeWidth={2} />
-          </div>
-          <div className="min-w-0">
-            <div className="truncate text-headline tracking-tight text-label">{supplier.name}</div>
-            <div className="text-caption text-tertiary">
-              {mpCount === 0
-                ? 'Keine Messstellen'
-                : `${mpCount} ${mpCount === 1 ? 'Messstelle' : 'Messstellen'}`}
-            </div>
-            {addressLine ? (
-              <div className="mt-0.5 truncate text-caption text-tertiary">{addressLine}</div>
-            ) : null}
-            {contactLine ? (
-              <div className="mt-0.5 truncate text-caption text-tertiary">{contactLine}</div>
-            ) : null}
-          </div>
-        </div>
-        <div className="flex gap-1">
-          <Button variant="plain" size="sm" leftIcon={<Pencil size={14} />} onClick={onEdit}>
-            Bearbeiten
-          </Button>
-          <Button
-            variant="plain"
-            size="sm"
-            leftIcon={<Trash2 size={14} />}
-            onClick={() => void remove()}
-            disabled={busy}
-            className="hover:bg-danger/10 text-danger"
-          >
-            Löschen
-          </Button>
-        </div>
-      </div>
-
-      <div
-        className="mt-4 rounded-pill border-l-2 border-primary bg-fill p-3 text-body-sm text-secondary"
-        style={{ borderLeftWidth: '3px' }}
-      >
-        {supplier.note ? supplier.note : <em className="text-tertiary">Keine Notiz</em>}
-      </div>
-
-      {supplier.vat_id || supplier.tax_id ? (
-        <div className="mt-2 grid grid-cols-2 gap-2 text-caption text-tertiary">
-          {supplier.vat_id ? (
-            <div>
-              <div className="text-caption-bold uppercase">USt-IdNr.</div>
-              <div className="text-secondary">{supplier.vat_id}</div>
-            </div>
-          ) : null}
-          {supplier.tax_id ? (
-            <div>
-              <div className="text-caption-bold uppercase">Steuer-Nr.</div>
-              <div className="text-secondary">{supplier.tax_id}</div>
-            </div>
-          ) : null}
-        </div>
-      ) : null}
-
-      {error ? (
-        <div className="border-danger/40 bg-danger/10 mt-3 rounded-pill border-hairline p-2 text-caption text-danger">
-          {error}
-        </div>
-      ) : null}
-    </Card>
   );
 }
 

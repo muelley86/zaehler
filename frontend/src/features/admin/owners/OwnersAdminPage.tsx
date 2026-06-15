@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
-import { Pencil, Trash2, User } from 'lucide-react';
+import { User } from 'lucide-react';
 
-import { Button, Card, EmptyState, LargeTitle, Section, Sheet, TextField } from '@/components/ui';
+import { Button, EmptyState, LargeTitle, Section, Sheet, TextField } from '@/components/ui';
 import { ApiError, api } from '@/lib/api';
 import type { MeasuringPointRead, OwnerRead } from '@/lib/types';
+
+import { MasterDataList } from '../_shared/MasterDataList';
 
 export function OwnersAdminPage() {
   const [owners, setOwners] = useState<OwnerRead[] | null>(null);
@@ -30,6 +32,23 @@ export function OwnersAdminPage() {
 
   const refresh = () => setTick((t) => t + 1);
 
+  async function handleDelete(owner: OwnerRead) {
+    if (
+      !window.confirm(
+        `Eigentümer "${owner.name}" löschen?\n\nMessstellen behalten ihre Daten, die historische Zuordnung wird auf „unbekannt" gesetzt.`,
+      )
+    )
+      return;
+    setError(null);
+    try {
+      await api.delete(`/owners/${owner.id}`);
+      refresh();
+    } catch (err) {
+      if (err instanceof ApiError) setError(err.problem.detail ?? err.problem.title);
+      else setError('Löschen fehlgeschlagen.');
+    }
+  }
+
   const mpCountByOwner = useMemo(() => {
     const map = new Map<number, number>();
     points?.forEach((mp) => {
@@ -51,25 +70,26 @@ export function OwnersAdminPage() {
 
       <CreateForm onCreated={refresh} />
 
-      {owners && owners.length === 0 ? (
-        <EmptyState
-          icon={<User size={32} />}
-          title="Noch keine Eigentümer"
-          description="Eigentümer können Messstellen zugeordnet werden und tauchen in Suche, Export und Filter auf."
-        />
-      ) : (
-        <div className="grid gap-4 sm:grid-cols-2">
-          {(owners ?? []).map((o) => (
-            <OwnerCard
-              key={o.id}
-              owner={o}
-              mpCount={mpCountByOwner.get(o.id) ?? 0}
-              onEdit={() => setEditing(o)}
-              onChanged={refresh}
-            />
-          ))}
-        </div>
-      )}
+      <MasterDataList
+        items={owners}
+        icon={<User size={18} />}
+        getId={(o) => o.id}
+        getName={(o) => o.name}
+        getSearchText={(o) =>
+          [o.name, o.address_city, o.email, o.phone].filter(Boolean).join(' ').toLowerCase()
+        }
+        mpCount={(id) => mpCountByOwner.get(id) ?? 0}
+        searchPlaceholder="Eigentümer suchen (Name oder Ort)…"
+        emptyState={
+          <EmptyState
+            icon={<User size={32} />}
+            title="Noch keine Eigentümer"
+            description="Eigentümer können Messstellen zugeordnet werden und tauchen in Suche, Export und Filter auf."
+          />
+        }
+        onEdit={(o) => setEditing(o)}
+        onDelete={handleDelete}
+      />
 
       <Sheet open={editing !== null} onClose={() => setEditing(null)} title="Eigentümer bearbeiten">
         {editing ? (
@@ -84,116 +104,6 @@ export function OwnersAdminPage() {
         ) : null}
       </Sheet>
     </>
-  );
-}
-
-function OwnerCard({
-  owner,
-  mpCount,
-  onEdit,
-  onChanged,
-}: {
-  owner: OwnerRead;
-  mpCount: number;
-  onEdit: () => void;
-  onChanged: () => void;
-}) {
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  async function remove() {
-    if (
-      !window.confirm(
-        `Eigentümer "${owner.name}" löschen?\n\nMessstellen behalten ihre Daten, die historische Zuordnung wird auf „unbekannt" gesetzt.`,
-      )
-    )
-      return;
-    setBusy(true);
-    setError(null);
-    try {
-      await api.delete(`/owners/${owner.id}`);
-      onChanged();
-    } catch (err) {
-      if (err instanceof ApiError) setError(err.problem.detail ?? err.problem.title);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  const addressLine = [owner.address_street, owner.address_postcode, owner.address_city]
-    .filter(Boolean)
-    .join(', ');
-  const contactLine = [owner.email, owner.phone].filter(Boolean).join(' · ');
-
-  return (
-    <Card>
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex min-w-0 items-start gap-3">
-          <div className="bg-gradient-primary shadow-glow-primary flex h-11 w-11 shrink-0 items-center justify-center rounded-card text-white">
-            <User size={20} strokeWidth={2} />
-          </div>
-          <div className="min-w-0">
-            <div className="truncate text-headline tracking-tight text-label">{owner.name}</div>
-            <div className="text-caption text-tertiary">
-              {mpCount === 0
-                ? 'Keine Messstellen'
-                : `${mpCount} ${mpCount === 1 ? 'Messstelle' : 'Messstellen'}`}
-            </div>
-            {addressLine ? (
-              <div className="mt-0.5 truncate text-caption text-tertiary">{addressLine}</div>
-            ) : null}
-            {contactLine ? (
-              <div className="mt-0.5 truncate text-caption text-tertiary">{contactLine}</div>
-            ) : null}
-          </div>
-        </div>
-        <div className="flex gap-1">
-          <Button variant="plain" size="sm" leftIcon={<Pencil size={14} />} onClick={onEdit}>
-            Bearbeiten
-          </Button>
-          <Button
-            variant="plain"
-            size="sm"
-            leftIcon={<Trash2 size={14} />}
-            onClick={() => void remove()}
-            disabled={busy}
-            className="hover:bg-danger/10 text-danger"
-          >
-            Löschen
-          </Button>
-        </div>
-      </div>
-
-      <div
-        className="mt-4 rounded-pill border-l-2 border-primary bg-fill p-3 text-body-sm text-secondary"
-        style={{ borderLeftWidth: '3px' }}
-      >
-        {owner.note ? owner.note : <em className="text-tertiary">Keine Notiz</em>}
-      </div>
-
-      {owner.vat_id || owner.tax_id ? (
-        <div className="mt-2 grid grid-cols-2 gap-2 text-caption text-tertiary">
-          {owner.vat_id ? (
-            <div>
-              <div className="text-caption-bold uppercase">USt-IdNr.</div>
-              <div className="text-secondary">{owner.vat_id}</div>
-            </div>
-          ) : null}
-          {owner.tax_id ? (
-            <div>
-              <div className="text-caption-bold uppercase">Steuer-Nr.</div>
-              <div className="text-secondary">{owner.tax_id}</div>
-            </div>
-          ) : null}
-        </div>
-      ) : null}
-
-      {error ? (
-        <div className="border-danger/40 bg-danger/10 mt-3 rounded-pill border-hairline p-2 text-caption text-danger">
-          {error}
-        </div>
-      ) : null}
-    </Card>
   );
 }
 

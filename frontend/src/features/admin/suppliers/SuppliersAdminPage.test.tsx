@@ -53,7 +53,7 @@ afterEach(() => {
 });
 
 describe('SuppliersAdminPage', () => {
-  it('listet Lieferanten mit Adresse und Kontakt', async () => {
+  it('listet Lieferanten kompakt mit Name und Messstellen-Anzahl', async () => {
     _mock([
       _supplier({
         id: 1,
@@ -68,8 +68,10 @@ describe('SuppliersAdminPage', () => {
     renderWithRouter(<SuppliersAdminPage />);
     expect(await screen.findByText('Stadtwerke Beispielstadt')).toBeInTheDocument();
     expect(screen.getByText('Regionalwerk')).toBeInTheDocument();
-    expect(screen.getByText(/Werkstr\. 1, 12345, Beispielstadt/)).toBeInTheDocument();
-    expect(screen.getByText(/service@example\.com/)).toBeInTheDocument();
+    // Kompakt: Anzahl-Sublabel sichtbar, Adresse/Kontakt nur noch im Bearbeiten-Dialog.
+    expect(screen.getAllByText('Keine Messstellen')).toHaveLength(2);
+    expect(screen.queryByText(/Werkstr\. 1/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/service@example\.com/)).not.toBeInTheDocument();
   });
 
   it('zeigt den Empty-State, wenn keine Lieferanten existieren', async () => {
@@ -115,7 +117,7 @@ describe('SuppliersAdminPage', () => {
     renderWithRouter(<SuppliersAdminPage />);
 
     await screen.findByText('Alt-Versorger');
-    await user.click(screen.getByRole('button', { name: 'Löschen' }));
+    await user.click(screen.getByRole('button', { name: /löschen/i }));
     await waitFor(() => expect(deleted).toBe(true));
     expect(confirmSpy).toHaveBeenCalled();
     confirmSpy.mockRestore();
