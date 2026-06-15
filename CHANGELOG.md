@@ -10,6 +10,13 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.64.0](https://github.com/muelley86/zaehler/compare/v2.63.1...v2.64.0) (2026-06-15)
+
+
+### Funktionen
+
+* **stammdaten:** Detailseite mit zugeordneten Messstellen je Eigentuemer/Lieferant/Mieter ([#282](https://github.com/muelley86/zaehler/issues/282)) ([a90f9a9](https://github.com/muelley86/zaehler/commit/a90f9a94352d6570e902d37469fd9bbb5adbf98d))
+
 ## [2.63.1](https://github.com/muelley86/zaehler/compare/v2.63.0...v2.63.1) (2026-06-15)
 
 
