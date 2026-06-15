@@ -39,6 +39,7 @@ import type {
   LocationRead,
   MeasuringPointRead,
   MeterType,
+  MieterRead,
   OwnerRead,
   SupplierRead,
 } from '@/lib/types';
@@ -129,6 +130,7 @@ export function MeasuringPointsAdminPage() {
   const [locations, setLocations] = useState<LocationRead[]>([]);
   const [owners, setOwners] = useState<OwnerRead[]>([]);
   const [suppliers, setSuppliers] = useState<SupplierRead[]>([]);
+  const [mieters, setMieters] = useState<MieterRead[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
   // „Filter merken": Filter je Seite in sessionStorage gespiegelt; sonst
@@ -171,12 +173,14 @@ export function MeasuringPointsAdminPage() {
       api.get<LocationRead[]>('/locations'),
       api.get<OwnerRead[]>('/owners'),
       api.get<SupplierRead[]>('/suppliers'),
+      api.get<MieterRead[]>('/mieters'),
     ])
-      .then(([mps, locs, owns, supps]) => {
+      .then(([mps, locs, owns, supps, mits]) => {
         setPoints(mps);
         setLocations(locs);
         setOwners(owns);
         setSuppliers(supps);
+        setMieters(mits);
       })
       .catch((err: unknown) => {
         if (err instanceof ApiError) setError(err.problem.detail ?? err.problem.title);
@@ -197,15 +201,13 @@ export function MeasuringPointsAdminPage() {
     return Array.from(map.entries());
   }, [points]);
 
-  const mieterOptions = useMemo(() => {
-    const map = new Map<number, string>();
-    points?.forEach((mp) => {
-      if (mp.current_mieter_id !== null && !map.has(mp.current_mieter_id)) {
-        map.set(mp.current_mieter_id, mp.current_mieter_name ?? `#${mp.current_mieter_id}`);
-      }
-    });
-    return Array.from(map.entries());
-  }, [points]);
+  // Mieter abweichend aus der Stammliste (wie Lieferant): das Dropdown soll
+  // sichtbar sein, sobald Mieter existieren — auch wenn noch keine Messstelle
+  // einen zugeordnet hat (Zuordnung passiert auf der Detailseite).
+  const mieterOptions = useMemo(
+    () => mieters.map((m): [number, string] => [m.id, m.display_name]),
+    [mieters],
+  );
 
   // Lieferant abweichend aus der Stammliste (bereits fuers Create-Formular
   // gefetcht): das Dropdown soll sichtbar sein, sobald Lieferanten existieren —
