@@ -10,6 +10,13 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.62.1](https://github.com/muelley86/zaehler/compare/v2.62.0...v2.62.1) (2026-06-15)
+
+
+### Refactoring
+
+* **admin:** kompakte Stammdaten-Listen + Suche ([#276](https://github.com/muelley86/zaehler/issues/276)) ([4295312](https://github.com/muelley86/zaehler/commit/42953121eae60911309d9d11e01cdbbb397005e7))
+
 ## [2.62.0](https://github.com/muelley86/zaehler/compare/v2.61.0...v2.62.0) (2026-06-15)
 
 
