@@ -96,6 +96,11 @@ describe('LocationDetailPage', () => {
     expect(screen.getByText('Hauptgebäude')).toBeInTheDocument();
     expect(screen.getByText('Hauptstr. 5, 12345 Beispielstadt')).toBeInTheDocument();
     expect(screen.getByText('48.137154, 11.575492')).toBeInTheDocument();
+    // Google-Maps-Link mit korrekter Deeplink-URL.
+    expect(screen.getByRole('link', { name: /In Google Maps öffnen/ })).toHaveAttribute(
+      'href',
+      'https://www.google.com/maps?q=48.137154,11.575492',
+    );
     // Zugeordnete Messstelle + Register-Label.
     expect(await screen.findByText('Wasser-Keller')).toBeInTheDocument();
     expect(screen.getByText('Wasser')).toBeInTheDocument();
