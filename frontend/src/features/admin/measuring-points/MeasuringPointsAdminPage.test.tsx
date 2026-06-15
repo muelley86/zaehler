@@ -35,6 +35,7 @@ function _mockEmptyData() {
     http.get('/api/v1/locations', () => HttpResponse.json([])),
     http.get('/api/v1/owners', () => HttpResponse.json([])),
     http.get('/api/v1/suppliers', () => HttpResponse.json([])),
+    http.get('/api/v1/mieters', () => HttpResponse.json([])),
   );
 }
 
@@ -66,12 +67,17 @@ function _mp(overrides: Record<string, unknown>) {
   };
 }
 
-function _mockList(mps: ReturnType<typeof _mp>[], suppliers: { id: number; name: string }[] = []) {
+function _mockList(
+  mps: ReturnType<typeof _mp>[],
+  suppliers: { id: number; name: string }[] = [],
+  mieters: { id: number; display_name: string }[] = [],
+) {
   server.use(
     http.get('/api/v1/measuring-points', () => HttpResponse.json(mps)),
     http.get('/api/v1/locations', () => HttpResponse.json([])),
     http.get('/api/v1/owners', () => HttpResponse.json([])),
     http.get('/api/v1/suppliers', () => HttpResponse.json(suppliers)),
+    http.get('/api/v1/mieters', () => HttpResponse.json(mieters)),
   );
 }
 
@@ -188,6 +194,7 @@ describe('MeasuringPointsAdminPage Wizard', () => {
       http.get('/api/v1/locations', () => HttpResponse.json([])),
       http.get('/api/v1/owners', () => HttpResponse.json([])),
       http.get('/api/v1/suppliers', () => HttpResponse.json([])),
+      http.get('/api/v1/mieters', () => HttpResponse.json([])),
     );
     renderWithRouter(<MeasuringPointsAdminPage />);
     const link = await screen.findByRole('link', {
@@ -299,21 +306,28 @@ describe('MeasuringPointsAdminPage Wizard', () => {
   });
 
   it('filtert die Liste nach Mieter inkl. „ohne Mieter"-Option', async () => {
-    _mockList([
-      _mp({
-        id: 1,
-        name: 'MP-Erika',
-        current_mieter_id: 5,
-        current_mieter_name: 'Mustermann, Erika',
-      }),
-      _mp({
-        id: 2,
-        name: 'MP-Thomas',
-        current_mieter_id: 6,
-        current_mieter_name: 'Müller, Thomas',
-      }),
-      _mp({ id: 3, name: 'MP-Ohne' }),
-    ]);
+    _mockList(
+      [
+        _mp({
+          id: 1,
+          name: 'MP-Erika',
+          current_mieter_id: 5,
+          current_mieter_name: 'Mustermann, Erika',
+        }),
+        _mp({
+          id: 2,
+          name: 'MP-Thomas',
+          current_mieter_id: 6,
+          current_mieter_name: 'Müller, Thomas',
+        }),
+        _mp({ id: 3, name: 'MP-Ohne' }),
+      ],
+      [],
+      [
+        { id: 5, display_name: 'Mustermann, Erika' },
+        { id: 6, display_name: 'Müller, Thomas' },
+      ],
+    );
     const user = userEvent.setup();
     renderWithRouter(<MeasuringPointsAdminPage />);
 
@@ -329,6 +343,19 @@ describe('MeasuringPointsAdminPage Wizard', () => {
     expect(screen.getByText('MP-Erika')).toBeInTheDocument();
     expect(screen.getByText('MP-Ohne')).toBeInTheDocument();
     expect(screen.queryByText('MP-Thomas')).not.toBeInTheDocument();
+  });
+
+  it('zeigt den Mieter-Filter auch ohne zugeordnete Messstellen (Stammliste)', async () => {
+    // Kein MP hat einen Mieter — das Dropdown muss trotzdem erscheinen,
+    // weil die Optionen aus der Mieter-Stammliste kommen.
+    _mockList([_mp({ id: 1, name: 'MP-Ohne' })], [], [{ id: 9, display_name: 'Neuer, Mieter' }]);
+    const user = userEvent.setup();
+    renderWithRouter(<MeasuringPointsAdminPage />);
+
+    expect(await screen.findByText('MP-Ohne')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Mieter' }));
+    expect(await screen.findByRole('checkbox', { name: 'Neuer, Mieter' })).toBeInTheDocument();
+    expect(screen.getByRole('checkbox', { name: 'ohne Mieter' })).toBeInTheDocument();
   });
 
   it('filtert die Liste nach Lieferant inkl. „ohne Lieferant"-Option', async () => {
@@ -426,6 +453,7 @@ describe('MeasuringPointsAdminPage Wizard', () => {
           },
         ]),
       ),
+      http.get('/api/v1/mieters', () => HttpResponse.json([])),
       http.post('/api/v1/measuring-points', async ({ request }) => {
         createBody = (await request.json()) as Record<string, unknown>;
         return HttpResponse.json({ id: 99 }, { status: 201 });
