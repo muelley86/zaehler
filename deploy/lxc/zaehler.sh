@@ -160,11 +160,11 @@ ensure_env_file() {
 
 # Stellt sicher, dass Node.js >= NODE_MAJOR_REQUIRED installiert ist. Auf
 # Debian 12 liefert apt nur Node 18, das frontend/package.json setzt aber
-# `engines.node >=20` voraus (Vite 5 + neueres Toolchain). Ohne diesen
+# `engines.node >=24` voraus (Vite + neueres Toolchain). Ohne diesen
 # Helper warnt pnpm bei jedem install, neuere Pakete brechen ggf. ganz
-# ab. Wir ziehen Node 20 aus dem offiziellen NodeSource-Repo nach —
-# idempotent: läuft nur, wenn die installierte Version zu alt ist.
-NODE_MAJOR_REQUIRED="${NODE_MAJOR_REQUIRED:-20}"
+# ab. Wir ziehen Node 24 (Active LTS) aus dem offiziellen NodeSource-Repo
+# nach — idempotent: läuft nur, wenn die installierte Version zu alt ist.
+NODE_MAJOR_REQUIRED="${NODE_MAJOR_REQUIRED:-24}"
 
 ensure_node_lts() {
     local current_major=0
@@ -702,9 +702,9 @@ cmd_upgrade_app() {
     ensure_sudo_rule
     ensure_env_file
 
-    # Frühe Vorbedingung: pnpm und vite verlangen Node >= 20. Wenn das
-    # System noch auf einer älteren Version steht, würde der Build mit
-    # Engine-Warning durchrasseln und teils kryptisch fehlschlagen.
+    # Frühe Vorbedingung: pnpm und vite verlangen Node >= NODE_MAJOR_REQUIRED
+    # (aktuell 24). Wenn das System noch auf einer älteren Version steht, würde
+    # der Build mit Engine-Warning durchrasseln und teils kryptisch fehlschlagen.
     local node_major=0
     if command -v node >/dev/null 2>&1; then
         node_major=$(node -v 2>/dev/null | sed -E 's/^v([0-9]+).*/\1/')

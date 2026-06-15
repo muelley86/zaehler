@@ -37,8 +37,8 @@ jobs:
 
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
-          # Node 22 (LTS bis 2027) — Node 20 läuft auf GitHub-Runnern aus.
-          node-version: 22
+          # Node 24 (Active LTS seit 10/2025) — passt zu engines.node >=24.
+          node-version: 24
           cache: pnpm
           cache-dependency-path: frontend/pnpm-lock.yaml
 
