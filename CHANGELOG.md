@@ -10,6 +10,13 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.63.0](https://github.com/muelley86/zaehler/compare/v2.62.1...v2.63.0) (2026-06-15)
+
+
+### Funktionen
+
+* **messstellen:** Mieter-Filter in der Uebersicht ([#278](https://github.com/muelley86/zaehler/issues/278)) ([faaff73](https://github.com/muelley86/zaehler/commit/faaff7345ccb6f2cf0833cd3bdbfd4f2fc857d83))
+
 ## [2.62.1](https://github.com/muelley86/zaehler/compare/v2.62.0...v2.62.1) (2026-06-15)
 
 
