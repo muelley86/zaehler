@@ -22,6 +22,7 @@ import type {
   LocationRead,
   MainLocationRead,
   MeasuringPointRead,
+  MieterRead,
   OwnerRead,
   QrTokenRead,
   SupplierRead,
@@ -37,6 +38,7 @@ interface Counts {
   '/admin/hauptstandorte'?: number;
   '/admin/eigentuemer'?: number;
   '/admin/lieferanten'?: number;
+  '/admin/mieter'?: number;
   '/admin/benutzer'?: number;
   '/admin/qr-codes'?: number;
 }
@@ -60,8 +62,9 @@ export function AdminHubPage() {
       api.get<MainLocationRead[]>('/main-locations'),
       api.get<OwnerRead[]>('/owners'),
       api.get<SupplierRead[]>('/suppliers'),
+      api.get<MieterRead[]>('/mieters'),
       api.get<QrTokenRead[]>('/qr-tokens'),
-    ]).then(([users, mps, locs, mains, owners, suppliers, tokens]) => {
+    ]).then(([users, mps, locs, mains, owners, suppliers, mieters, tokens]) => {
       if (cancelled) return;
       const next: Counts = {};
       if (users.status === 'fulfilled') next['/admin/benutzer'] = users.value.length;
@@ -70,6 +73,7 @@ export function AdminHubPage() {
       if (mains.status === 'fulfilled') next['/admin/hauptstandorte'] = mains.value.length;
       if (owners.status === 'fulfilled') next['/admin/eigentuemer'] = owners.value.length;
       if (suppliers.status === 'fulfilled') next['/admin/lieferanten'] = suppliers.value.length;
+      if (mieters.status === 'fulfilled') next['/admin/mieter'] = mieters.value.length;
       if (tokens.status === 'fulfilled') next['/admin/qr-codes'] = tokens.value.length;
       setCounts(next);
     });

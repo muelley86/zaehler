@@ -37,6 +37,13 @@ from meters.schemas.measuring_point import (
     MeasuringPointUpdate,
     ReplaceMeterRequest,
 )
+from meters.schemas.mieter import MieterCreate, MieterRead, MieterUpdate
+from meters.schemas.mieter_assignment import (
+    ChangeMieterRequest,
+    MieterAssignmentCreate,
+    MieterAssignmentRead,
+    MieterAssignmentUpdate,
+)
 from meters.schemas.owner import OwnerCreate, OwnerRead, OwnerUpdate
 from meters.schemas.owner_assignment import (
     ChangeOwnerRequest,
@@ -103,6 +110,7 @@ __all__ = [
     "BulkDeleteRequest",
     "BulkDeleteResult",
     "BulkDeleteSkipped",
+    "ChangeMieterRequest",
     "ChangeOwnerRequest",
     "ChangePasswordRequest",
     "ChangeSupplierRequest",
@@ -124,6 +132,12 @@ __all__ = [
     "MeasuringPointCreate",
     "MeasuringPointRead",
     "MeasuringPointUpdate",
+    "MieterAssignmentCreate",
+    "MieterAssignmentRead",
+    "MieterAssignmentUpdate",
+    "MieterCreate",
+    "MieterRead",
+    "MieterUpdate",
     "MpAccessUserRead",
     "OwnerAssignmentCreate",
     "OwnerAssignmentRead",

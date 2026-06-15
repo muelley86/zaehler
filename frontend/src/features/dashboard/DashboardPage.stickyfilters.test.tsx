@@ -38,6 +38,8 @@ const MP: MeasuringPointRead = {
   current_owner_name: null,
   current_supplier_id: null,
   current_supplier_name: null,
+  current_mieter_id: null,
+  current_mieter_name: null,
   kostenstelle: null,
   physical_meters: [],
 };
