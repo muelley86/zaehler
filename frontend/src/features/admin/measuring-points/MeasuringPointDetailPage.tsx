@@ -57,6 +57,8 @@ import type {
   HeatingUnit,
   LocationRead,
   MeasuringPointRead,
+  MieterAssignmentRead,
+  MieterRead,
   OwnerAssignmentRead,
   OwnerRead,
   PhysicalMeterRead,
@@ -203,6 +205,8 @@ export function MeasuringPointDetailPage() {
       <OwnerHistoryCard mp={mp} onChanged={refresh} />
 
       <SupplierHistoryCard mp={mp} onChanged={refresh} />
+
+      <MieterHistoryCard mp={mp} onChanged={refresh} />
 
       <ConsumptionChart consumption={consumption} mp={mp} />
 
@@ -1860,6 +1864,338 @@ function ChangeOwnerForm({
         {owners.map((o) => (
           <option key={o.id} value={o.id}>
             {o.name}
+          </option>
+        ))}
+      </Select>
+      <TextField
+        label="Wechsel zum"
+        type="date"
+        value={validFrom}
+        onChange={(e) => setValidFrom(e.target.value)}
+        required
+      />
+      {error ? <div className="text-caption text-danger">{error}</div> : null}
+      <div className="flex gap-2">
+        <Button type="submit" variant="filled" disabled={busy} fullWidth>
+          {busy ? 'Speichere…' : 'Wechseln'}
+        </Button>
+        <Button type="button" variant="bordered" onClick={onCancel}>
+          Abbrechen
+        </Button>
+      </div>
+    </form>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Mieter-Historie + Wechsel — 1:1-Spiegel der Eigentuemer-Karten oben.
+// Zuordnung ist optional; eine MP muss keinen Mieter haben.
+// ---------------------------------------------------------------------------
+
+function MieterHistoryCard({ mp, onChanged }: { mp: MeasuringPointRead; onChanged: () => void }) {
+  const [history, setHistory] = useState<MieterAssignmentRead[]>([]);
+  const [mieters, setMieters] = useState<MieterRead[]>([]);
+  const [open, setOpen] = useState(false);
+  const [periodSheet, setPeriodSheet] = useState<{ period: MieterAssignmentRead | null } | null>(
+    null,
+  );
+  const [error, setError] = useState<string | null>(null);
+  const [tick, setTick] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    api
+      .get<MieterAssignmentRead[]>(`/measuring-points/${mp.id}/mieters`)
+      .then((d) => {
+        if (!cancelled) setHistory(d);
+      })
+      .catch((err: unknown) => {
+        if (!cancelled && err instanceof ApiError)
+          setError(err.problem.detail ?? err.problem.title);
+      });
+    api
+      .get<MieterRead[]>('/mieters')
+      .then((d) => {
+        if (!cancelled) setMieters(d);
+      })
+      .catch(() => {
+        /* Dropdown bleibt leer */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [mp.id, tick]);
+
+  function refresh() {
+    setTick((t) => t + 1);
+    onChanged();
+  }
+
+  async function removePeriod(a: MieterAssignmentRead) {
+    const label = a.mieter_name ?? 'unbekannt';
+    if (!window.confirm(`Mieter-Periode "${label}" wirklich löschen?`)) return;
+    try {
+      await api.delete(`/measuring-points/${mp.id}/mieters/${a.id}`);
+      refresh();
+    } catch (err) {
+      if (err instanceof ApiError) window.alert(err.problem.detail ?? err.problem.title);
+    }
+  }
+
+  return (
+    <Section
+      header={
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <span>Mieter-Historie</span>
+          <div className="flex gap-2">
+            <Button
+              variant="bordered"
+              size="sm"
+              onClick={() => setPeriodSheet({ period: null })}
+              disabled={mieters.length === 0}
+            >
+              Mieter-Periode hinzufügen
+            </Button>
+            <Button
+              variant="bordered"
+              size="sm"
+              onClick={() => setOpen(true)}
+              disabled={mieters.length === 0}
+            >
+              Mieter wechseln
+            </Button>
+          </div>
+        </div>
+      }
+    >
+      <div className="space-y-2 p-5">
+        {error ? (
+          <div className="text-caption text-danger">{error}</div>
+        ) : history.length === 0 ? (
+          <div className="text-caption text-tertiary">Noch keine Mieter-Zuordnung.</div>
+        ) : (
+          history.map((a) => {
+            const active = a.valid_to === null;
+            return (
+              <div
+                key={a.id}
+                className="bg-fill/40 flex items-center justify-between gap-2 rounded-pill border-hairline border-border px-3 py-2"
+              >
+                <div className="min-w-0">
+                  <div className="truncate text-body-sm font-semibold text-label">
+                    {a.mieter_name ?? <em className="text-tertiary">unbekannt</em>}
+                  </div>
+                  <div className="text-caption text-tertiary">
+                    ab {formatDateDe(a.valid_from)}
+                    {a.valid_to ? ` bis ${formatDateDe(a.valid_to)}` : ''}
+                  </div>
+                </div>
+                <div className="flex shrink-0 items-center gap-1">
+                  {active ? (
+                    <span className="rounded-full bg-primary-soft px-2 py-0.5 text-caption font-semibold text-primary-deep">
+                      aktiv
+                    </span>
+                  ) : null}
+                  <button
+                    type="button"
+                    onClick={() => setPeriodSheet({ period: a })}
+                    aria-label="Mieter-Periode bearbeiten"
+                    className="flex h-7 w-7 items-center justify-center rounded-full text-secondary transition-colors hover:bg-fill"
+                  >
+                    <Pencil size={13} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void removePeriod(a)}
+                    aria-label="Mieter-Periode löschen"
+                    className="hover:bg-danger/10 flex h-7 w-7 items-center justify-center rounded-full text-danger transition-colors"
+                  >
+                    <Trash2 size={13} />
+                  </button>
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+      <Sheet open={open} onClose={() => setOpen(false)} title="Mieter wechseln">
+        <ChangeMieterForm
+          mpId={mp.id}
+          mieters={mieters}
+          onSaved={() => {
+            setOpen(false);
+            refresh();
+          }}
+          onCancel={() => setOpen(false)}
+        />
+      </Sheet>
+      <Sheet
+        open={periodSheet !== null}
+        onClose={() => setPeriodSheet(null)}
+        title={periodSheet?.period ? 'Periode bearbeiten' : 'Periode hinzufügen'}
+      >
+        {periodSheet ? (
+          <MieterPeriodForm
+            mpId={mp.id}
+            mieters={mieters}
+            period={periodSheet.period}
+            onSaved={() => {
+              setPeriodSheet(null);
+              refresh();
+            }}
+            onCancel={() => setPeriodSheet(null)}
+          />
+        ) : null}
+      </Sheet>
+    </Section>
+  );
+}
+
+/** Historien-Editor-Formular: legt eine Periode an (period=null) oder
+ *  korrigiert eine bestehende. Leeres „Gültig bis" = offene (aktive) Periode.
+ *  Überlappungs-/Konsistenz-Validierung macht das Backend (422). */
+function MieterPeriodForm({
+  mpId,
+  mieters,
+  period,
+  onSaved,
+  onCancel,
+}: {
+  mpId: number;
+  mieters: MieterRead[];
+  period: MieterAssignmentRead | null;
+  onSaved: () => void;
+  onCancel: () => void;
+}) {
+  const [mieterId, setMieterId] = useState<number | ''>(period?.mieter_id ?? '');
+  const [validFrom, setValidFrom] = useState(period?.valid_from ?? '');
+  const [validTo, setValidTo] = useState(period?.valid_to ?? '');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function save(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (mieterId === '') {
+      setError('Bitte einen Mieter wählen.');
+      return;
+    }
+    if (!validFrom) {
+      setError('Bitte ein Beginn-Datum wählen.');
+      return;
+    }
+    setError(null);
+    setBusy(true);
+    const body = {
+      mieter_id: mieterId,
+      valid_from: validFrom,
+      valid_to: validTo === '' ? null : validTo,
+    };
+    try {
+      if (period) {
+        await api.patch(`/measuring-points/${mpId}/mieters/${period.id}`, body);
+      } else {
+        await api.post(`/measuring-points/${mpId}/mieters`, body);
+      }
+      onSaved();
+    } catch (err) {
+      if (err instanceof ApiError) setError(err.problem.detail ?? err.problem.title);
+      else setError('Speichern fehlgeschlagen.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <form onSubmit={(e) => void save(e)} className="space-y-3">
+      <Select
+        label="Mieter"
+        value={mieterId}
+        onChange={(e) => setMieterId(e.target.value ? Number(e.target.value) : '')}
+        required
+      >
+        <option value="">— bitte wählen —</option>
+        {mieters.map((m) => (
+          <option key={m.id} value={m.id}>
+            {m.name}
+          </option>
+        ))}
+      </Select>
+      <TextField
+        label="Gültig ab"
+        type="date"
+        value={validFrom}
+        onChange={(e) => setValidFrom(e.target.value)}
+        required
+      />
+      <TextField
+        label="Gültig bis (leer = aktive Periode)"
+        type="date"
+        value={validTo}
+        onChange={(e) => setValidTo(e.target.value)}
+      />
+      {error ? <div className="text-caption text-danger">{error}</div> : null}
+      <div className="flex gap-2">
+        <Button type="submit" variant="filled" disabled={busy} fullWidth>
+          {busy ? 'Speichere…' : 'Speichern'}
+        </Button>
+        <Button type="button" variant="bordered" onClick={onCancel}>
+          Abbrechen
+        </Button>
+      </div>
+    </form>
+  );
+}
+
+function ChangeMieterForm({
+  mpId,
+  mieters,
+  onSaved,
+  onCancel,
+}: {
+  mpId: number;
+  mieters: MieterRead[];
+  onSaved: () => void;
+  onCancel: () => void;
+}) {
+  const [mieterId, setMieterId] = useState<number | ''>('');
+  const [validFrom, setValidFrom] = useState(new Date().toISOString().slice(0, 10));
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function save(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (mieterId === '') {
+      setError('Bitte einen Mieter wählen.');
+      return;
+    }
+    setError(null);
+    setBusy(true);
+    try {
+      await api.post(`/measuring-points/${mpId}/change-mieter`, {
+        mieter_id: mieterId,
+        valid_from: validFrom,
+      });
+      onSaved();
+    } catch (err) {
+      if (err instanceof ApiError) setError(err.problem.detail ?? err.problem.title);
+      else setError('Wechsel fehlgeschlagen.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <form onSubmit={(e) => void save(e)} className="space-y-3">
+      <Select
+        label="Neuer Mieter"
+        value={mieterId}
+        onChange={(e) => setMieterId(e.target.value ? Number(e.target.value) : '')}
+        required
+      >
+        <option value="">— bitte wählen —</option>
+        {mieters.map((m) => (
+          <option key={m.id} value={m.id}>
+            {m.name}
           </option>
         ))}
       </Select>

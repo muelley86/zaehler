@@ -28,6 +28,7 @@ from meters.models import (
     Location,
     MeasuringPoint,
     MeterType,
+    MieterAssignment,
     OwnerAssignment,
     PhysicalMeter,
     Reading,
@@ -38,11 +39,15 @@ from meters.models import (
     UserRole,
 )
 from meters.schemas import (
+    ChangeMieterRequest,
     ChangeOwnerRequest,
     ChangeSupplierRequest,
     MeasuringPointCreate,
     MeasuringPointRead,
     MeasuringPointUpdate,
+    MieterAssignmentCreate,
+    MieterAssignmentRead,
+    MieterAssignmentUpdate,
     MpAccessUserRead,
     OwnerAssignmentCreate,
     OwnerAssignmentRead,
@@ -56,6 +61,29 @@ from meters.schemas import (
 from meters.services.access import assert_can_access_mp, restrict_mp_query
 from meters.services.audit import record
 from meters.services.meter_replacement import install_first_meter, replace_meter
+
+# Mieter-Service mit Aliassen — strukturgleich zum Owner-/Supplier-Service.
+from meters.services.mieter_assignment import (
+    assign_mieter,
+)
+from meters.services.mieter_assignment import (
+    create_assignment as create_mieter_assignment,
+)
+from meters.services.mieter_assignment import (
+    current_assignment as current_mieter_assignment,
+)
+from meters.services.mieter_assignment import (
+    current_assignments_bulk as current_mieter_assignments_bulk,
+)
+from meters.services.mieter_assignment import (
+    delete_assignment as delete_mieter_assignment,
+)
+from meters.services.mieter_assignment import (
+    list_history as list_mieter_history_service,
+)
+from meters.services.mieter_assignment import (
+    update_assignment as update_mieter_assignment,
+)
 from meters.services.owner_assignment import (
     assign_owner,
     create_assignment,
@@ -111,6 +139,7 @@ def _to_read(
     *,
     current_owner: OwnerAssignment | None = None,
     current_supplier: SupplierAssignment | None = None,
+    current_mieter: MieterAssignment | None = None,
 ) -> MeasuringPointRead:
     data = MeasuringPointRead.model_validate(mp)
     location = mp.location
@@ -135,6 +164,13 @@ def _to_read(
     if supplier_assignment is not None and supplier_assignment.supplier is not None:
         data.current_supplier_id = supplier_assignment.supplier.id
         data.current_supplier_name = supplier_assignment.supplier.name
+    # Mieter: identischer Mechanismus wie der Owner-/Lieferant-Lookup darueber.
+    mieter_assignment = current_mieter
+    if mieter_assignment is None and db is not None:
+        mieter_assignment = current_mieter_assignment(db, mp.id)
+    if mieter_assignment is not None and mieter_assignment.mieter is not None:
+        data.current_mieter_id = mieter_assignment.mieter.id
+        data.current_mieter_name = mieter_assignment.mieter.name
     return data
 
 
@@ -164,11 +200,13 @@ def list_measuring_points(db: DbDep, user: CurrentUser) -> list[MeasuringPointRe
     ids = [m.id for m in items]
     owners_by_mp = current_assignments_bulk(db, ids)
     suppliers_by_mp = current_supplier_assignments_bulk(db, ids)
+    mieters_by_mp = current_mieter_assignments_bulk(db, ids)
     return [
         _to_read(
             m,
             current_owner=owners_by_mp.get(m.id),
             current_supplier=suppliers_by_mp.get(m.id),
+            current_mieter=mieters_by_mp.get(m.id),
         )
         for m in items
     ]
@@ -281,6 +319,16 @@ def create_measuring_point(
             mp_id=mp.id,
             supplier_id=payload.supplier_id,
             valid_from=payload.supplier_valid_from or payload.installed_at,
+            user_id=admin.id,
+            ip_address=client_ip(request),
+        )
+    # Initiales Mieter-Assignment — optional, gleiche Semantik wie der Owner-Block.
+    if payload.mieter_id is not None:
+        assign_mieter(
+            db,
+            mp_id=mp.id,
+            mieter_id=payload.mieter_id,
+            valid_from=payload.mieter_valid_from or payload.installed_at,
             user_id=admin.id,
             ip_address=client_ip(request),
         )
@@ -826,6 +874,123 @@ def delete_supplier_period(
     admin: AdminUser,
 ) -> None:
     delete_supplier_assignment(
+        db,
+        mp_id=mp_id,
+        assignment_id=assignment_id,
+        user_id=admin.id,
+        ip_address=client_ip(request),
+    )
+    db.commit()
+
+
+# ---------------------------------------------------------------------------
+# Mieter-Historie + Wechsel-Endpoint — 1:1-Spiegel der Owner-Endpoints.
+# Die Zuordnung ist optional; eine MP muss keinen Mieter haben.
+# ---------------------------------------------------------------------------
+
+
+def _mieter_assignment_to_read(a: MieterAssignment) -> MieterAssignmentRead:
+    data = MieterAssignmentRead.model_validate(a)
+    data.mieter_name = a.mieter.name if a.mieter is not None else None
+    return data
+
+
+@router.get("/{mp_id}/mieters", response_model=list[MieterAssignmentRead])
+def list_mieter_history(
+    mp_id: int,
+    db: DbDep,
+    user: CurrentUser,
+) -> list[MieterAssignmentRead]:
+    assert_can_access_mp(db, user, mp_id)
+    return [_mieter_assignment_to_read(a) for a in list_mieter_history_service(db, mp_id)]
+
+
+@router.post("/{mp_id}/change-mieter", response_model=MeasuringPointRead)
+def change_mieter_endpoint(
+    mp_id: int,
+    payload: ChangeMieterRequest,
+    request: Request,
+    db: DbDep,
+    admin: AdminUser,
+) -> MeasuringPointRead:
+    assign_mieter(
+        db,
+        mp_id=mp_id,
+        mieter_id=payload.mieter_id,
+        valid_from=payload.valid_from,
+        user_id=admin.id,
+        ip_address=client_ip(request),
+    )
+    db.commit()
+    refreshed = _load_with_meters(db, mp_id)
+    assert refreshed is not None
+    return _to_read(refreshed, db)
+
+
+# Historien-Editor (admin-only): Perioden der Mieter-Historie anlegen,
+# korrigieren und loeschen — inkl. Rueckdatierung und Luecken (Leerstand).
+# Validierung (keine Ueberlappung, max. eine offene Periode) liegt im Service.
+
+
+@router.post(
+    "/{mp_id}/mieters",
+    response_model=MieterAssignmentRead,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_mieter_period(
+    mp_id: int,
+    payload: MieterAssignmentCreate,
+    request: Request,
+    db: DbDep,
+    admin: AdminUser,
+) -> MieterAssignmentRead:
+    assignment = create_mieter_assignment(
+        db,
+        mp_id=mp_id,
+        mieter_id=payload.mieter_id,
+        valid_from=payload.valid_from,
+        valid_to=payload.valid_to,
+        user_id=admin.id,
+        ip_address=client_ip(request),
+    )
+    db.commit()
+    db.refresh(assignment)
+    return _mieter_assignment_to_read(assignment)
+
+
+@router.patch("/{mp_id}/mieters/{assignment_id}", response_model=MieterAssignmentRead)
+def update_mieter_period(
+    mp_id: int,
+    assignment_id: int,
+    payload: MieterAssignmentUpdate,
+    request: Request,
+    db: DbDep,
+    admin: AdminUser,
+) -> MieterAssignmentRead:
+    assignment = update_mieter_assignment(
+        db,
+        mp_id=mp_id,
+        assignment_id=assignment_id,
+        mieter_id=payload.mieter_id,
+        valid_from=payload.valid_from,
+        valid_to=payload.valid_to,
+        user_id=admin.id,
+        ip_address=client_ip(request),
+    )
+    db.commit()
+    db.refresh(assignment)
+    return _mieter_assignment_to_read(assignment)
+
+
+@router.delete("/{mp_id}/mieters/{assignment_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_mieter_period(
+    mp_id: int,
+    assignment_id: int,
+    request: Request,
+    db: DbDep,
+    admin: AdminUser,
+) -> None:
+    delete_mieter_assignment(
         db,
         mp_id=mp_id,
         assignment_id=assignment_id,

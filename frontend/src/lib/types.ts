@@ -142,6 +142,26 @@ export interface OwnerAssignmentRead {
   valid_to: string | null;
 }
 
+/** Mieter — wie OwnerRead, aber ohne Steuer-IDs (Privatmieter). */
+export interface MieterRead {
+  id: number;
+  name: string;
+  address_street: string | null;
+  address_postcode: string | null;
+  address_city: string | null;
+  email: string | null;
+  phone: string | null;
+  note: string | null;
+}
+
+export interface MieterAssignmentRead {
+  id: number;
+  mieter_id: number | null;
+  mieter_name: string | null;
+  valid_from: string;
+  valid_to: string | null;
+}
+
 /** Lieferant — identischer Feldsatz wie OwnerRead (gespiegeltes Backend-Schema). */
 export interface SupplierRead {
   id: number;
@@ -204,6 +224,8 @@ export interface MeasuringPointRead {
   current_owner_name: string | null;
   current_supplier_id: number | null;
   current_supplier_name: string | null;
+  current_mieter_id: number | null;
+  current_mieter_name: string | null;
   kostenstelle: number | null;
   physical_meters: PhysicalMeterRead[];
 }

@@ -18,6 +18,7 @@ import {
   Database,
   Gauge,
   Handshake,
+  KeyRound,
   MapPin,
   QrCode,
   ScrollText,
@@ -84,6 +85,14 @@ export const ADMIN_SECTIONS: AdminNavItem[] = [
     short: 'Lief.',
     icon: createElement(Handshake, { size: 18 }),
     description: 'Lieferanten-Stammdaten und MP-Zuordnung',
+    color: 'primary',
+  },
+  {
+    to: '/admin/mieter',
+    label: 'Mieter',
+    short: 'Miet.',
+    icon: createElement(KeyRound, { size: 18 }),
+    description: 'Mieter-Stammdaten und optionale MP-Zuordnung',
     color: 'primary',
   },
   {

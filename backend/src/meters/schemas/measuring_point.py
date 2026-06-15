@@ -106,6 +106,10 @@ class MeasuringPointCreate(MeasuringPointBase):
     # Optionaler erster Lieferant — gleiche Semantik wie owner_id.
     supplier_id: int | None = None
     supplier_valid_from: date | None = None
+    # Optionaler erster Mieter — gleiche Semantik wie owner_id (optional,
+    # kein Assignment, wenn ``mieter_id=None``).
+    mieter_id: int | None = None
+    mieter_valid_from: date | None = None
 
     @model_validator(mode="after")
     def _registers_match_type(self) -> Self:
@@ -165,6 +169,9 @@ class MeasuringPointRead(APIModel):
     # Aktueller Lieferant — gleiches Muster wie current_owner_*.
     current_supplier_id: int | None = None
     current_supplier_name: str | None = None
+    # Aktueller Mieter — gleiches Muster; ``None``, wenn keine offene Periode.
+    current_mieter_id: int | None = None
+    current_mieter_name: str | None = None
     physical_meters: list[PhysicalMeterRead]
 
 

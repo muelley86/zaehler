@@ -13,6 +13,7 @@ from meters.api.v1 import (
     locations,
     main_locations,
     measuring_points,
+    mieters,
     owners,
     physical_meters,
     qr_tokens,
@@ -33,6 +34,7 @@ router.include_router(locations.router)
 router.include_router(main_locations.router)
 router.include_router(owners.router)
 router.include_router(suppliers.router)
+router.include_router(mieters.router)
 router.include_router(measuring_points.router)
 router.include_router(virtual_measuring_points.router)
 router.include_router(physical_meters.router)

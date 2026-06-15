@@ -21,6 +21,7 @@ from meters.models._enums import HeatingSource, MeterType
 
 if TYPE_CHECKING:
     from meters.models.location import Location
+    from meters.models.mieter_assignment import MieterAssignment
     from meters.models.owner_assignment import OwnerAssignment
     from meters.models.physical_meter import PhysicalMeter
     from meters.models.supplier_assignment import SupplierAssignment
@@ -82,4 +83,12 @@ class MeasuringPoint(Base, TimestampMixin):
         back_populates="measuring_point",
         cascade="all, delete-orphan",
         order_by="SupplierAssignment.valid_from",
+    )
+    # Periodisierte Mieter-Historie — optionale Zuordnung, gleiches Modell wie
+    # die Owner-Historie (aktuelles Assignment = ``valid_to IS NULL``).
+    mieter_assignments: Mapped[list[MieterAssignment]] = relationship(
+        "MieterAssignment",
+        back_populates="measuring_point",
+        cascade="all, delete-orphan",
+        order_by="MieterAssignment.valid_from",
     )
