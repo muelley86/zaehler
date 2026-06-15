@@ -122,9 +122,7 @@ def test_postcode_must_be_five_digits(admin_client: TestClient) -> None:
 
 
 def test_email_invalid(admin_client: TestClient) -> None:
-    bad = admin_client.post(
-        "/api/v1/mieters", json={"last_name": "Email-BAD", "email": "kein-at"}
-    )
+    bad = admin_client.post("/api/v1/mieters", json={"last_name": "Email-BAD", "email": "kein-at"})
     assert bad.status_code == 422
 
     ok = admin_client.post(
