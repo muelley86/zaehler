@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { FormEvent, MouseEvent } from 'react';
-import { Link } from 'react-router-dom';
-import { Building2, Pencil, Trash2 } from 'lucide-react';
+import type { FormEvent } from 'react';
+import { Building2 } from 'lucide-react';
 
-import { Button, Card, EmptyState, LargeTitle, Section, Sheet, TextField } from '@/components/ui';
+import { Button, EmptyState, LargeTitle, Section, Sheet, TextField } from '@/components/ui';
 import { ApiError, api } from '@/lib/api';
 import type { LocationRead, MainLocationRead } from '@/lib/types';
+
+import { MasterDataList } from '../_shared/MasterDataList';
 
 export function MainLocationsAdminPage() {
   const [items, setItems] = useState<MainLocationRead[] | null>(null);
@@ -31,8 +32,25 @@ export function MainLocationsAdminPage() {
 
   const refresh = () => setTick((t) => t + 1);
 
+  async function handleDelete(item: MainLocationRead) {
+    if (
+      !window.confirm(
+        `Hauptstandort "${item.name}" loeschen? Zugeordnete Zaehlerstandorte bleiben erhalten, verlieren aber die Zuordnung.`,
+      )
+    )
+      return;
+    setError(null);
+    try {
+      await api.delete(`/main-locations/${item.id}`);
+      refresh();
+    } catch (err) {
+      if (err instanceof ApiError) setError(err.problem.detail ?? err.problem.title);
+      else setError('Loeschen fehlgeschlagen.');
+    }
+  }
+
   // Anzahl der zugeordneten Zaehlerstandorte pro Hauptstandort — fuer die
-  // Karten-Anzeige. Locations ohne ``main_location_id`` werden ignoriert.
+  // Sublabel-Zeile. Locations ohne ``main_location_id`` werden ignoriert.
   const locationCountByMain = useMemo(() => {
     const map = new Map<number, number>();
     locations?.forEach((loc) => {
@@ -54,25 +72,30 @@ export function MainLocationsAdminPage() {
 
       <CreateForm onCreated={refresh} />
 
-      {items && items.length === 0 ? (
-        <EmptyState
-          icon={<Building2 size={32} />}
-          title="Noch keine Hauptstandorte"
-          description="Ein Hauptstandort gruppiert mehrere Zaehlerstandorte zu einer logischen Einheit."
-        />
-      ) : (
-        <div className="grid gap-4 sm:grid-cols-2">
-          {(items ?? []).map((item) => (
-            <MainLocationCard
-              key={item.id}
-              item={item}
-              locationCount={locationCountByMain.get(item.id) ?? 0}
-              onEdit={() => setEditing(item)}
-              onChanged={refresh}
-            />
-          ))}
-        </div>
-      )}
+      <MasterDataList
+        items={items}
+        icon={<Building2 size={18} />}
+        getId={(m) => m.id}
+        getName={(m) => m.name}
+        getSearchText={(m) => m.name.toLowerCase()}
+        mpCount={(id) => locationCountByMain.get(id) ?? 0}
+        formatCount={(n) =>
+          n === 0
+            ? 'Keine Zaehlerstandorte'
+            : `${n} ${n === 1 ? 'Zaehlerstandort' : 'Zaehlerstandorte'}`
+        }
+        getDetailHref={(m) => `/admin/hauptstandorte/${m.id}`}
+        searchPlaceholder="Hauptstandort suchen…"
+        emptyState={
+          <EmptyState
+            icon={<Building2 size={32} />}
+            title="Noch keine Hauptstandorte"
+            description="Ein Hauptstandort gruppiert mehrere Zaehlerstandorte zu einer logischen Einheit."
+          />
+        }
+        onEdit={(m) => setEditing(m)}
+        onDelete={handleDelete}
+      />
 
       <Sheet
         open={editing !== null}
@@ -91,109 +114,6 @@ export function MainLocationsAdminPage() {
         ) : null}
       </Sheet>
     </>
-  );
-}
-
-function MainLocationCard({
-  item,
-  locationCount,
-  onEdit,
-  onChanged,
-}: {
-  item: MainLocationRead;
-  locationCount: number;
-  onEdit: () => void;
-  onChanged: () => void;
-}) {
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  async function remove() {
-    if (
-      !window.confirm(
-        `Hauptstandort "${item.name}" loeschen? Zugeordnete Zaehlerstandorte bleiben erhalten, verlieren aber die Zuordnung.`,
-      )
-    )
-      return;
-    setBusy(true);
-    setError(null);
-    try {
-      await api.delete(`/main-locations/${item.id}`);
-      onChanged();
-    } catch (err) {
-      if (err instanceof ApiError) setError(err.problem.detail ?? err.problem.title);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  // Ganze Karte verlinkt auf die Detailseite; die Aktions-Buttons isolieren
-  // ihren Klick, damit sie nicht navigieren — Muster wie in MasterDataList.
-  const isolate = (fn: () => void) => (e: MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    fn();
-  };
-
-  return (
-    <Card padded={false}>
-      <Link
-        to={`/admin/hauptstandorte/${item.id}`}
-        className="hover:bg-fill/40 block rounded-card p-5 transition-colors"
-        aria-label={`${item.name} öffnen`}
-      >
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex min-w-0 items-start gap-3">
-            <div className="bg-gradient-primary shadow-glow-primary flex h-11 w-11 shrink-0 items-center justify-center rounded-card text-white">
-              <Building2 size={20} strokeWidth={2} />
-            </div>
-            <div className="min-w-0">
-              <div className="truncate text-headline tracking-tight text-label">{item.name}</div>
-              <div className="text-caption text-tertiary">
-                {locationCount === 0
-                  ? 'Keine Zaehlerstandorte'
-                  : `${locationCount} ${locationCount === 1 ? 'Zaehlerstandort' : 'Zaehlerstandorte'}`}
-              </div>
-            </div>
-          </div>
-          <div className="flex gap-1">
-            <Button
-              variant="plain"
-              size="sm"
-              leftIcon={<Pencil size={14} />}
-              onClick={isolate(onEdit)}
-              aria-label={`${item.name} bearbeiten`}
-            >
-              Bearbeiten
-            </Button>
-            <Button
-              variant="plain"
-              size="sm"
-              leftIcon={<Trash2 size={14} />}
-              onClick={isolate(() => void remove())}
-              disabled={busy}
-              className="hover:bg-danger/10 text-danger"
-              aria-label={`${item.name} loeschen`}
-            >
-              Loeschen
-            </Button>
-          </div>
-        </div>
-
-        <div
-          className="mt-4 rounded-pill border-l-2 border-primary bg-fill p-3 text-body-sm text-secondary"
-          style={{ borderLeftWidth: '3px' }}
-        >
-          {item.note ? item.note : <em className="text-tertiary">Keine Notiz</em>}
-        </div>
-
-        {error ? (
-          <div className="border-danger/40 bg-danger/10 mt-3 rounded-pill border-hairline p-2 text-caption text-danger">
-            {error}
-          </div>
-        ) : null}
-      </Link>
-    </Card>
   );
 }
 

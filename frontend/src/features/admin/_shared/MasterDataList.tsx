@@ -15,6 +15,8 @@ interface MasterDataListProps<T> {
   getSearchText: (item: T) => string;
   /** Anzahl zugeordneter Messstellen für die Sublabel-Zeile. */
   mpCount: (id: number) => number;
+  /** Optionaler Formatter für die Sublabel-Zeile (Default: „X Messstellen"). */
+  formatCount?: (count: number) => string;
   /** Ziel-URL der Detailseite — die ganze Zeile ist ein Link dorthin. */
   getDetailHref: (item: T) => string;
   searchPlaceholder: string;
@@ -41,6 +43,7 @@ export function MasterDataList<T>({
   getName,
   getSearchText,
   mpCount,
+  formatCount,
   getDetailHref,
   searchPlaceholder,
   emptyState,
@@ -94,7 +97,7 @@ export function MasterDataList<T>({
                   to={getDetailHref(item)}
                   icon={icon}
                   label={name}
-                  sublabel={countLabel(mpCount(id))}
+                  sublabel={(formatCount ?? countLabel)(mpCount(id))}
                   trailing={
                     <div className="flex shrink-0 items-center gap-1">
                       <button

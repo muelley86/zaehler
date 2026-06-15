@@ -1,5 +1,7 @@
 import { useParams } from 'react-router-dom';
 
+import { Section } from '@/components/ui';
+import { LocationMap } from '@/components/LocationMap';
 import type { LocationRead } from '@/lib/types';
 
 import { MasterDataDetailPage, formatAddress } from '../_shared/MasterDataDetailPage';
@@ -26,6 +28,15 @@ export function LocationDetailPage() {
         { label: 'Koordinaten', value: formatCoordinates(loc) },
         { label: 'Notiz', value: loc.note },
       ]}
+      afterRows={(loc) =>
+        loc.latitude !== null && loc.longitude !== null ? (
+          <Section header="Karte">
+            <div className="p-5 pt-0">
+              <LocationMap latitude={loc.latitude} longitude={loc.longitude} height={220} />
+            </div>
+          </Section>
+        ) : null
+      }
     />
   );
 }
