@@ -10,6 +10,13 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.61.0](https://github.com/muelley86/zaehler/compare/v2.60.1...v2.61.0) (2026-06-15)
+
+
+### Funktionen
+
+* **mieter:** Mieter-Stammdaten mit optionaler periodisierter MP-Zuordnung ([#271](https://github.com/muelley86/zaehler/issues/271)) ([b93fdcf](https://github.com/muelley86/zaehler/commit/b93fdcf00561354e265fb1c3eab68025e8a23503))
+
 ## [2.60.1](https://github.com/muelley86/zaehler/compare/v2.60.0...v2.60.1) (2026-06-12)
 
 
