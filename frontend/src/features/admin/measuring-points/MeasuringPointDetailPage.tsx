@@ -2116,7 +2116,7 @@ function MieterPeriodForm({
         <option value="">— bitte wählen —</option>
         {mieters.map((m) => (
           <option key={m.id} value={m.id}>
-            {m.name}
+            {m.display_name}
           </option>
         ))}
       </Select>
@@ -2195,7 +2195,7 @@ function ChangeMieterForm({
         <option value="">— bitte wählen —</option>
         {mieters.map((m) => (
           <option key={m.id} value={m.id}>
-            {m.name}
+            {m.display_name}
           </option>
         ))}
       </Select>

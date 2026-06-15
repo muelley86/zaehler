@@ -37,7 +37,9 @@ def _create_mp(
 
 
 def _create_mieter(client: TestClient, name: str) -> int:
-    resp = client.post("/api/v1/mieters", json={"name": name})
+    # Nachname als Anzeigename — ohne Vorname ist display_name == last_name,
+    # daher bleiben die current_mieter_name-Assertions ("<name>") gueltig.
+    resp = client.post("/api/v1/mieters", json={"last_name": name})
     return int(resp.json()["id"])
 
 

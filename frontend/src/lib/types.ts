@@ -142,10 +142,13 @@ export interface OwnerAssignmentRead {
   valid_to: string | null;
 }
 
-/** Mieter — wie OwnerRead, aber ohne Steuer-IDs (Privatmieter). */
+/** Mieter — natürliche Person (Vorname optional, Nachname Pflicht), ohne Steuer-IDs.
+ *  `display_name` ist „Nachname, Vorname" (vom Backend abgeleitet). */
 export interface MieterRead {
   id: number;
-  name: string;
+  first_name: string | null;
+  last_name: string;
+  display_name: string;
   address_street: string | null;
   address_postcode: string | null;
   address_city: string | null;

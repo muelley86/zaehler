@@ -29,7 +29,10 @@ class Mieter(Base, TimestampMixin):
     __tablename__ = "mieter"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    name: Mapped[str] = mapped_column(String(120), unique=True, nullable=False)
+    # Mieter sind natuerliche Personen: Vorname optional, Nachname Pflicht.
+    # Kein UNIQUE — Namensgleichheit (zwei „Thomas Mueller") ist real erlaubt.
+    first_name: Mapped[str | None] = mapped_column(String(80))
+    last_name: Mapped[str] = mapped_column(String(80), nullable=False)
     address_street: Mapped[str | None] = mapped_column(String(200))
     address_postcode: Mapped[str | None] = mapped_column(String(20))
     address_city: Mapped[str | None] = mapped_column(String(120))
@@ -41,3 +44,9 @@ class Mieter(Base, TimestampMixin):
         back_populates="mieter",
         passive_deletes=True,
     )
+
+    @property
+    def display_name(self) -> str:
+        """Anzeigeform „Nachname, Vorname" (ohne Vorname nur Nachname).
+        Einzige Quelle fuer Listen, Dropdowns und die Mieter-Historie."""
+        return f"{self.last_name}, {self.first_name}" if self.first_name else self.last_name

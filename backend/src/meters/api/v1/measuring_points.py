@@ -170,7 +170,7 @@ def _to_read(
         mieter_assignment = current_mieter_assignment(db, mp.id)
     if mieter_assignment is not None and mieter_assignment.mieter is not None:
         data.current_mieter_id = mieter_assignment.mieter.id
-        data.current_mieter_name = mieter_assignment.mieter.name
+        data.current_mieter_name = mieter_assignment.mieter.display_name
     return data
 
 
@@ -891,7 +891,7 @@ def delete_supplier_period(
 
 def _mieter_assignment_to_read(a: MieterAssignment) -> MieterAssignmentRead:
     data = MieterAssignmentRead.model_validate(a)
-    data.mieter_name = a.mieter.name if a.mieter is not None else None
+    data.mieter_name = a.mieter.display_name if a.mieter is not None else None
     return data
 
 
