@@ -27,7 +27,9 @@ vi.mock('@/features/auth/auth-context', () => ({
 function _mieter(overrides: Partial<MieterRead>): MieterRead {
   return {
     id: 1,
-    name: 'Mieter',
+    first_name: null,
+    last_name: 'Mieter',
+    display_name: 'Mieter',
     address_street: null,
     address_postcode: null,
     address_city: null,
@@ -51,21 +53,23 @@ afterEach(() => {
 });
 
 describe('MietersAdminPage', () => {
-  it('listet Mieter mit Adresse und Kontakt', async () => {
+  it('listet Mieter mit Anzeigename, Adresse und Kontakt', async () => {
     _mock([
       _mieter({
         id: 1,
-        name: 'Erika Mustermann',
+        first_name: 'Erika',
+        last_name: 'Mustermann',
+        display_name: 'Mustermann, Erika',
         address_street: 'Mietweg 2',
         address_postcode: '12345',
         address_city: 'Beispielstadt',
         email: 'erika@example.com',
       }),
-      _mieter({ id: 2, name: 'Hans Beispiel' }),
+      _mieter({ id: 2, last_name: 'Beispiel', display_name: 'Beispiel' }),
     ]);
     renderWithRouter(<MietersAdminPage />);
-    expect(await screen.findByText('Erika Mustermann')).toBeInTheDocument();
-    expect(screen.getByText('Hans Beispiel')).toBeInTheDocument();
+    expect(await screen.findByText('Mustermann, Erika')).toBeInTheDocument();
+    expect(screen.getByText('Beispiel')).toBeInTheDocument();
     expect(screen.getByText(/Mietweg 2, 12345, Beispielstadt/)).toBeInTheDocument();
     expect(screen.getByText(/erika@example\.com/)).toBeInTheDocument();
   });
@@ -76,31 +80,35 @@ describe('MietersAdminPage', () => {
     expect(await screen.findByText('Noch keine Mieter')).toBeInTheDocument();
   });
 
-  it('legt einen Mieter per POST an', async () => {
+  it('legt einen Mieter per POST an (Vorname optional, Nachname Pflicht)', async () => {
     _mock([]);
     let postBody: Record<string, unknown> | null = null;
     server.use(
       http.post('/api/v1/mieters', async ({ request }) => {
         postBody = (await request.json()) as Record<string, unknown>;
-        return HttpResponse.json(_mieter({ id: 5, name: 'Neuer Mieter' }), { status: 201 });
+        return HttpResponse.json(_mieter({ id: 5, first_name: 'Neuer', last_name: 'Mieter' }), {
+          status: 201,
+        });
       }),
     );
     const user = userEvent.setup();
     renderWithRouter(<MietersAdminPage />);
 
-    await user.type(await screen.findByLabelText('Name'), 'Neuer Mieter');
+    await user.type(await screen.findByLabelText('Vorname (optional)'), 'Neuer');
+    await user.type(screen.getByLabelText('Nachname'), 'Mieter');
     await user.type(screen.getByLabelText('E-Mail'), 'info@example.com');
     await user.click(screen.getByRole('button', { name: 'Anlegen' }));
 
     await waitFor(() => expect(postBody).not.toBeNull());
-    expect(postBody!['name']).toBe('Neuer Mieter');
+    expect(postBody!['first_name']).toBe('Neuer');
+    expect(postBody!['last_name']).toBe('Mieter');
     expect(postBody!['email']).toBe('info@example.com');
     // Leere optionale Felder werden als null gesendet.
     expect(postBody!['address_street']).toBeNull();
   });
 
   it('löscht einen Mieter nach Bestätigung per DELETE', async () => {
-    _mock([_mieter({ id: 3, name: 'Alt-Mieter' })]);
+    _mock([_mieter({ id: 3, last_name: 'Alt-Mieter', display_name: 'Alt-Mieter' })]);
     const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
     let deleted = false;
     server.use(

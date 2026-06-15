@@ -104,7 +104,7 @@ function MieterCard({
   async function remove() {
     if (
       !window.confirm(
-        `Mieter "${mieter.name}" löschen?\n\nMessstellen behalten ihre Daten, die historische Zuordnung wird auf „unbekannt" gesetzt.`,
+        `Mieter "${mieter.display_name}" löschen?\n\nMessstellen behalten ihre Daten, die historische Zuordnung wird auf „unbekannt" gesetzt.`,
       )
     )
       return;
@@ -133,7 +133,9 @@ function MieterCard({
             <KeyRound size={20} strokeWidth={2} />
           </div>
           <div className="min-w-0">
-            <div className="truncate text-headline tracking-tight text-label">{mieter.name}</div>
+            <div className="truncate text-headline tracking-tight text-label">
+              {mieter.display_name}
+            </div>
             <div className="text-caption text-tertiary">
               {mpCount === 0
                 ? 'Keine Messstellen'
@@ -181,7 +183,8 @@ function MieterCard({
 }
 
 interface MieterFormState {
-  name: string;
+  first_name: string;
+  last_name: string;
   address_street: string;
   address_postcode: string;
   address_city: string;
@@ -192,7 +195,8 @@ interface MieterFormState {
 
 function emptyFormState(): MieterFormState {
   return {
-    name: '',
+    first_name: '',
+    last_name: '',
     address_street: '',
     address_postcode: '',
     address_city: '',
@@ -204,7 +208,8 @@ function emptyFormState(): MieterFormState {
 
 function fromMieter(m: MieterRead): MieterFormState {
   return {
-    name: m.name,
+    first_name: m.first_name ?? '',
+    last_name: m.last_name,
     address_street: m.address_street ?? '',
     address_postcode: m.address_postcode ?? '',
     address_city: m.address_city ?? '',
@@ -216,7 +221,8 @@ function fromMieter(m: MieterRead): MieterFormState {
 
 function toBody(s: MieterFormState): Record<string, unknown> {
   return {
-    name: s.name,
+    first_name: s.first_name || null,
+    last_name: s.last_name,
     address_street: s.address_street || null,
     address_postcode: s.address_postcode || null,
     address_city: s.address_city || null,
@@ -316,12 +322,19 @@ function FormFields({
   }
   return (
     <>
-      <TextField
-        label="Name"
-        value={state.name}
-        onChange={(e) => set('name', e.target.value)}
-        required
-      />
+      <div className="grid grid-cols-2 gap-2">
+        <TextField
+          label="Vorname (optional)"
+          value={state.first_name}
+          onChange={(e) => set('first_name', e.target.value)}
+        />
+        <TextField
+          label="Nachname"
+          value={state.last_name}
+          onChange={(e) => set('last_name', e.target.value)}
+          required
+        />
+      </div>
       <TextField
         label="Straße + Hausnr. (optional)"
         value={state.address_street}
