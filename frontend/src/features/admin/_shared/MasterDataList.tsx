@@ -98,7 +98,7 @@ export function MasterDataList<T>({
                         onClick={() => onEdit(item)}
                         aria-label={`${name} bearbeiten`}
                         title="Bearbeiten"
-                        className="hover:bg-fill flex h-8 w-8 items-center justify-center rounded-full text-tertiary transition-colors hover:text-primary-deep"
+                        className="flex h-8 w-8 items-center justify-center rounded-full text-tertiary transition-colors hover:bg-fill hover:text-primary-deep"
                       >
                         <Pencil size={15} />
                       </button>
