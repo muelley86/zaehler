@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import type { ReactNode } from 'react';
 import { ArrowLeft } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
@@ -31,6 +32,8 @@ interface MasterDataDetailPageProps<T> {
   fallbackTitle: string;
   getTitle: (entity: T) => string;
   getRows: (entity: T) => DetailRow[];
+  /** Optionaler Zusatzinhalt, gerendert nach den Stammdaten und vor den Messstellen. */
+  afterRows?: (entity: T) => ReactNode;
 }
 
 /**
@@ -47,6 +50,7 @@ export function MasterDataDetailPage<T>({
   fallbackTitle,
   getTitle,
   getRows,
+  afterRows,
 }: MasterDataDetailPageProps<T>) {
   const [entity, setEntity] = useState<T | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -110,6 +114,8 @@ export function MasterDataDetailPage<T>({
           ))}
         </Section>
       ) : null}
+
+      {entity && afterRows ? afterRows(entity) : null}
 
       {validId ? <RelatedMeasuringPoints resource={resource} id={id} /> : null}
     </>

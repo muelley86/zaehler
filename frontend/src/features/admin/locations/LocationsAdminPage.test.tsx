@@ -137,7 +137,7 @@ describe('LocationsAdminPage — Karten-Navigation', () => {
     window.sessionStorage.clear();
   });
 
-  it('verlinkt die ganze Karte auf die Detailseite', async () => {
+  it('verlinkt die ganze Zeile auf die Detailseite', async () => {
     _mockList([_loc({ id: 7, name: 'Keller' })]);
     renderWithRouter(
       <>
@@ -146,8 +146,8 @@ describe('LocationsAdminPage — Karten-Navigation', () => {
       </>,
     );
 
-    const link = await screen.findByRole('link', { name: 'Keller öffnen' });
-    expect(link).toHaveAttribute('href', '/admin/standorte/7');
+    await screen.findByText('Keller');
+    expect(screen.getByRole('link')).toHaveAttribute('href', '/admin/standorte/7');
   });
 
   it('öffnet beim Klick auf Bearbeiten den Dialog, ohne zur Detailseite zu navigieren', async () => {
