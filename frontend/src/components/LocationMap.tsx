@@ -58,6 +58,8 @@ interface Props {
   height?: number;
   /** Edit-Mode — Marker draggable, Click setzt neu, onChange wird gerufen. */
   interactive?: boolean;
+  /** Nur-Ansicht-Zoom/Pan ohne Marker-Bearbeitung (z. B. Detailseite). */
+  zoomable?: boolean;
   onChange?: ((lat: number, lng: number) => void) | undefined;
   /** Initialer Zoom. Default 16 (Read), 13 (Edit, mehr Übersicht). */
   zoom?: number;
@@ -68,11 +70,15 @@ export function LocationMap({
   longitude,
   height = 220,
   interactive = false,
+  zoomable = false,
   onChange,
   zoom,
 }: Props) {
   ensureDefaultIcon();
   const initialZoom = zoom ?? (interactive ? 13 : 16);
+  // View-Controls (Zoom/Pan) sind im Edit- ODER Zoom-Modus aktiv; Marker-
+  // Bearbeitung (Drag/Click) bleibt dem Edit-Modus vorbehalten.
+  const viewControls = interactive || zoomable;
   const [layer, setLayer] = useState<LayerId>('osm');
 
   return (
@@ -83,12 +89,12 @@ export function LocationMap({
       <MapContainer
         center={[latitude, longitude]}
         zoom={initialZoom}
-        scrollWheelZoom={interactive}
-        dragging={interactive}
-        zoomControl={interactive}
-        doubleClickZoom={interactive}
-        touchZoom={interactive}
-        keyboard={interactive}
+        scrollWheelZoom={viewControls}
+        dragging={viewControls}
+        zoomControl={viewControls}
+        doubleClickZoom={viewControls}
+        touchZoom={viewControls}
+        keyboard={viewControls}
         style={{ height: '100%', width: '100%' }}
       >
         {layer === 'osm' ? (

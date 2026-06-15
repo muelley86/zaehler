@@ -6,6 +6,7 @@
 import { http, HttpResponse } from 'msw';
 import { describe, expect, it } from 'vitest';
 import { screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 
 import { renderWithRouter } from '@/tests/render';
 import { server } from '@/tests/server';
@@ -95,5 +96,61 @@ describe('RelatedMeasuringPoints', () => {
     renderWithRouter(<RelatedMeasuringPoints resource="owners" id={7} />);
 
     expect(await screen.findByText('Keine Messstellen zugeordnet.')).toBeInTheDocument();
+  });
+});
+
+function _state(mp: MeasuringPointRead): MeasuringPointWithStateRead {
+  return { measuring_point: mp, registers: [] };
+}
+
+function _mockResource(path: string, items: MeasuringPointWithStateRead[]) {
+  server.use(http.get(`/api/v1/${path}`, () => HttpResponse.json(items)));
+}
+
+describe('RelatedMeasuringPoints — Filter', () => {
+  it('filtert nach Typ und stellt mit „Filter zurücksetzen" wieder her', async () => {
+    _mockResource('owners/7/measuring-points', [
+      _state(_mp({ id: 42, name: 'Strom-MP', type: 'electricity' })),
+      _state(_mp({ id: 43, name: 'Wasser-MP', type: 'water' })),
+    ]);
+    const user = userEvent.setup();
+    renderWithRouter(<RelatedMeasuringPoints resource="owners" id={7} />);
+
+    expect(await screen.findByText('Strom-MP')).toBeInTheDocument();
+    expect(screen.getByText('Wasser-MP')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Typ' }));
+    await user.click(await screen.findByRole('checkbox', { name: 'Wasser' }));
+
+    expect(screen.getByText('Wasser-MP')).toBeInTheDocument();
+    expect(screen.queryByText('Strom-MP')).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Filter zurücksetzen' }));
+    expect(screen.getByText('Strom-MP')).toBeInTheDocument();
+    expect(screen.getByText('Wasser-MP')).toBeInTheDocument();
+  });
+
+  it('blendet auf der Eigentümer-Seite den Eigentümer-Filter aus', async () => {
+    // Zwei verschiedene Eigentümer (würde sonst das Dropdown zeigen), gleicher
+    // Typ (kein Typ-Filter) → die einzige Multi-Wert-Dimension ist ausgeschlossen.
+    _mockResource('owners/7/measuring-points', [
+      _state(_mp({ id: 42, name: 'MP-A', current_owner_id: 1, current_owner_name: 'Eigt A' })),
+      _state(_mp({ id: 43, name: 'MP-B', current_owner_id: 2, current_owner_name: 'Eigt B' })),
+    ]);
+    renderWithRouter(<RelatedMeasuringPoints resource="owners" id={7} />);
+
+    await screen.findByText('MP-A');
+    expect(screen.queryByRole('button', { name: 'Eigentümer' })).not.toBeInTheDocument();
+  });
+
+  it('blendet auf der Hauptstandort-Seite den Hauptstandort-Filter aus', async () => {
+    _mockResource('main-locations/5/measuring-points', [
+      _state(_mp({ id: 42, name: 'MP-A', main_location_id: 5, main_location_name: 'HS 5' })),
+      _state(_mp({ id: 43, name: 'MP-B', main_location_id: 6, main_location_name: 'HS 6' })),
+    ]);
+    renderWithRouter(<RelatedMeasuringPoints resource="main-locations" id={5} />);
+
+    await screen.findByText('MP-A');
+    expect(screen.queryByRole('button', { name: 'Hauptstandort' })).not.toBeInTheDocument();
   });
 });
