@@ -158,6 +158,12 @@ export function MeasuringPointsAdminPage() {
     rememberFilters,
     ID_CODEC,
   );
+  const [mieterFilter, setMieterFilter] = useStickyState<Set<number | null>>(
+    FILTER_NS + 'mieter',
+    new Set(),
+    rememberFilters,
+    ID_CODEC,
+  );
 
   useEffect(() => {
     Promise.all([
@@ -191,6 +197,16 @@ export function MeasuringPointsAdminPage() {
     return Array.from(map.entries());
   }, [points]);
 
+  const mieterOptions = useMemo(() => {
+    const map = new Map<number, string>();
+    points?.forEach((mp) => {
+      if (mp.current_mieter_id !== null && !map.has(mp.current_mieter_id)) {
+        map.set(mp.current_mieter_id, mp.current_mieter_name ?? `#${mp.current_mieter_id}`);
+      }
+    });
+    return Array.from(map.entries());
+  }, [points]);
+
   // Lieferant abweichend aus der Stammliste (bereits fuers Create-Formular
   // gefetcht): das Dropdown soll sichtbar sein, sobald Lieferanten existieren —
   // auch wenn noch keine Messstelle einen zugeordnet hat.
@@ -216,22 +232,25 @@ export function MeasuringPointsAdminPage() {
           (typeFilter.size === 0 || typeFilter.has(mp.type)) &&
           (ownerFilter.size === 0 || ownerFilter.has(mp.current_owner_id)) &&
           (supplierFilter.size === 0 || supplierFilter.has(mp.current_supplier_id)) &&
-          (mainLocationFilter.size === 0 || mainLocationFilter.has(mp.main_location_id)),
+          (mainLocationFilter.size === 0 || mainLocationFilter.has(mp.main_location_id)) &&
+          (mieterFilter.size === 0 || mieterFilter.has(mp.current_mieter_id)),
       ),
-    [points, typeFilter, ownerFilter, supplierFilter, mainLocationFilter],
+    [points, typeFilter, ownerFilter, supplierFilter, mainLocationFilter, mieterFilter],
   );
 
   const hasActiveFilters =
     typeFilter.size > 0 ||
     ownerFilter.size > 0 ||
     supplierFilter.size > 0 ||
-    mainLocationFilter.size > 0;
+    mainLocationFilter.size > 0 ||
+    mieterFilter.size > 0;
 
   function resetFilters() {
     setTypeFilter(new Set());
     setOwnerFilter(new Set());
     setSupplierFilter(new Set());
     setMainLocationFilter(new Set());
+    setMieterFilter(new Set());
   }
 
   return (
@@ -280,6 +299,19 @@ export function MeasuringPointsAdminPage() {
               ]}
               selected={supplierFilter}
               onChange={setSupplierFilter}
+            />
+          ) : null}
+          {mieterOptions.length > 0 ? (
+            <MultiSelectDropdown
+              label="Mieter"
+              options={[
+                ...mieterOptions.map(
+                  ([id, name]): DropdownOption<number | null> => ({ value: id, label: name }),
+                ),
+                { value: null, label: 'ohne Mieter' } satisfies DropdownOption<number | null>,
+              ]}
+              selected={mieterFilter}
+              onChange={setMieterFilter}
             />
           ) : null}
           {mainLocationOptions.length > 0 ? (
