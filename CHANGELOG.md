@@ -10,6 +10,13 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.65.0](https://github.com/muelley86/zaehler/compare/v2.64.0...v2.65.0) (2026-06-15)
+
+
+### Funktionen
+
+* **messstellen:** Detailseiten für Zähler-/Hauptstandort mit zugeordneten Messstellen ([#284](https://github.com/muelley86/zaehler/issues/284)) ([d6bc410](https://github.com/muelley86/zaehler/commit/d6bc41053481e495edac1c119c53be2b85ae27da))
+
 ## [2.64.0](https://github.com/muelley86/zaehler/compare/v2.63.1...v2.64.0) (2026-06-15)
 
 
