@@ -13,10 +13,17 @@ from fastapi import APIRouter, Request, status
 from sqlalchemy import select
 
 from meters.api.deps import AdminUser, CurrentUser, DbDep, client_ip
+from meters.api.v1.measuring_points import measuring_points_with_state
 from meters.core.problem import ProblemError
 from meters.models import AuditAction, AuditEntityType, Mieter
-from meters.schemas import MieterCreate, MieterRead, MieterUpdate
+from meters.schemas import (
+    MeasuringPointWithStateRead,
+    MieterCreate,
+    MieterRead,
+    MieterUpdate,
+)
 from meters.services.audit import record
+from meters.services.mieter_assignment import select_measuring_points_for_mieter
 
 router = APIRouter(prefix="/mieters", tags=["mieters"])
 
@@ -45,6 +52,20 @@ def get_mieter(mieter_id: int, db: DbDep, _user: CurrentUser) -> MieterRead:
     if obj is None:
         raise ProblemError(status_code=404, title="Mieter not found")
     return MieterRead.model_validate(obj)
+
+
+@router.get("/{mieter_id}/measuring-points", response_model=list[MeasuringPointWithStateRead])
+def list_mieter_measuring_points(
+    mieter_id: int, db: DbDep, user: CurrentUser
+) -> list[MeasuringPointWithStateRead]:
+    """Aktuell diesem Mieter zugeordnete Messstellen, mit aktuellem Stand.
+
+    Quelle der Mieter-Detailseite. Nur offene Zuordnungen; Recorder sehen via
+    ``restrict_mp_query`` nur ihre zugaenglichen MPs.
+    """
+    if db.get(Mieter, mieter_id) is None:
+        raise ProblemError(status_code=404, title="Mieter not found")
+    return measuring_points_with_state(db, select_measuring_points_for_mieter(mieter_id), user)
 
 
 @router.post("", response_model=MieterRead, status_code=status.HTTP_201_CREATED)

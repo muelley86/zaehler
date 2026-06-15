@@ -12,12 +12,38 @@ from __future__ import annotations
 from collections.abc import Iterable
 from datetime import date
 
-from sqlalchemy import or_, select
+from sqlalchemy import Select, or_, select
 from sqlalchemy.orm import Session, selectinload
 
 from meters.core.problem import ProblemError
-from meters.models import AuditAction, AuditEntityType, MeasuringPoint, Mieter, MieterAssignment
+from meters.models import (
+    AuditAction,
+    AuditEntityType,
+    MeasuringPoint,
+    Mieter,
+    MieterAssignment,
+    PhysicalMeter,
+)
 from meters.services.audit import record
+
+
+def select_measuring_points_for_mieter(mieter_id: int) -> Select[tuple[MeasuringPoint]]:
+    """Select auf alle MPs, deren **aktueller** Mieter ``mieter_id`` ist.
+
+    Aktuell = offene Periode (``valid_to IS NULL``). Eager-Load von Location +
+    Zaehlern/Registern fuer ``to_measuring_point_read``. Gibt das Statement
+    zurueck — der Endpoint legt noch ``restrict_mp_query`` darauf.
+    """
+    return (
+        select(MeasuringPoint)
+        .join(MieterAssignment, MieterAssignment.measuring_point_id == MeasuringPoint.id)
+        .where(MieterAssignment.mieter_id == mieter_id, MieterAssignment.valid_to.is_(None))
+        .options(
+            selectinload(MeasuringPoint.location),
+            selectinload(MeasuringPoint.physical_meters).selectinload(PhysicalMeter.registers),
+        )
+        .order_by(MeasuringPoint.name)
+    )
 
 
 def current_assignment(db: Session, mp_id: int) -> MieterAssignment | None:

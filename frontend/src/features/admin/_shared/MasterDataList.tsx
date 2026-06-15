@@ -15,6 +15,8 @@ interface MasterDataListProps<T> {
   getSearchText: (item: T) => string;
   /** Anzahl zugeordneter Messstellen für die Sublabel-Zeile. */
   mpCount: (id: number) => number;
+  /** Ziel-URL der Detailseite — die ganze Zeile ist ein Link dorthin. */
+  getDetailHref: (item: T) => string;
   searchPlaceholder: string;
   emptyState: ReactNode;
   onEdit: (item: T) => void;
@@ -39,6 +41,7 @@ export function MasterDataList<T>({
   getName,
   getSearchText,
   mpCount,
+  getDetailHref,
   searchPlaceholder,
   emptyState,
   onEdit,
@@ -88,6 +91,7 @@ export function MasterDataList<T>({
               return (
                 <Row
                   key={id}
+                  to={getDetailHref(item)}
                   icon={icon}
                   label={name}
                   sublabel={countLabel(mpCount(id))}
@@ -95,7 +99,11 @@ export function MasterDataList<T>({
                     <div className="flex shrink-0 items-center gap-1">
                       <button
                         type="button"
-                        onClick={() => onEdit(item)}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          onEdit(item);
+                        }}
                         aria-label={`${name} bearbeiten`}
                         title="Bearbeiten"
                         className="flex h-8 w-8 items-center justify-center rounded-full text-tertiary transition-colors hover:bg-fill hover:text-primary-deep"
@@ -104,7 +112,11 @@ export function MasterDataList<T>({
                       </button>
                       <button
                         type="button"
-                        onClick={() => void handleDelete(item)}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          void handleDelete(item);
+                        }}
                         disabled={pending.has(id)}
                         aria-label={`${name} löschen`}
                         title="Löschen"

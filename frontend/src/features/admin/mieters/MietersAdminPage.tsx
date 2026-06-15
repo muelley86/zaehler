@@ -79,6 +79,7 @@ export function MietersAdminPage() {
           [m.display_name, m.address_city, m.email, m.phone].filter(Boolean).join(' ').toLowerCase()
         }
         mpCount={(id) => mpCountByMieter.get(id) ?? 0}
+        getDetailHref={(m) => `/admin/mieter/${m.id}`}
         searchPlaceholder="Mieter suchen (Name oder Ort)…"
         emptyState={
           <EmptyState

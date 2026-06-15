@@ -13,10 +13,17 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
 from meters.api.deps import AdminUser, CurrentUser, DbDep, client_ip
+from meters.api.v1.measuring_points import measuring_points_with_state
 from meters.core.problem import ProblemError
 from meters.models import AuditAction, AuditEntityType, Supplier
-from meters.schemas import SupplierCreate, SupplierRead, SupplierUpdate
+from meters.schemas import (
+    MeasuringPointWithStateRead,
+    SupplierCreate,
+    SupplierRead,
+    SupplierUpdate,
+)
 from meters.services.audit import record
+from meters.services.supplier_assignment import select_measuring_points_for_supplier
 
 router = APIRouter(prefix="/suppliers", tags=["suppliers"])
 
@@ -33,6 +40,20 @@ def get_supplier(supplier_id: int, db: DbDep, _user: CurrentUser) -> SupplierRea
     if obj is None:
         raise ProblemError(status_code=404, title="Supplier not found")
     return SupplierRead.model_validate(obj)
+
+
+@router.get("/{supplier_id}/measuring-points", response_model=list[MeasuringPointWithStateRead])
+def list_supplier_measuring_points(
+    supplier_id: int, db: DbDep, user: CurrentUser
+) -> list[MeasuringPointWithStateRead]:
+    """Aktuell diesem Lieferanten zugeordnete Messstellen, mit aktuellem Stand.
+
+    Quelle der Lieferanten-Detailseite. Nur offene Zuordnungen; Recorder sehen
+    via ``restrict_mp_query`` nur ihre zugaenglichen MPs.
+    """
+    if db.get(Supplier, supplier_id) is None:
+        raise ProblemError(status_code=404, title="Supplier not found")
+    return measuring_points_with_state(db, select_measuring_points_for_supplier(supplier_id), user)
 
 
 @router.post("", response_model=SupplierRead, status_code=status.HTTP_201_CREATED)

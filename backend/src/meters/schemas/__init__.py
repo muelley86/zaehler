@@ -35,6 +35,7 @@ from meters.schemas.measuring_point import (
     MeasuringPointCreate,
     MeasuringPointRead,
     MeasuringPointUpdate,
+    MeasuringPointWithStateRead,
     ReplaceMeterRequest,
 )
 from meters.schemas.mieter import MieterCreate, MieterRead, MieterUpdate
@@ -132,6 +133,7 @@ __all__ = [
     "MeasuringPointCreate",
     "MeasuringPointRead",
     "MeasuringPointUpdate",
+    "MeasuringPointWithStateRead",
     "MieterAssignmentCreate",
     "MieterAssignmentRead",
     "MieterAssignmentUpdate",

@@ -14,7 +14,7 @@ from __future__ import annotations
 from decimal import Decimal
 
 from fastapi import APIRouter, Request, status
-from sqlalchemy import func, select
+from sqlalchemy import Select, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session as DbSession
 from sqlalchemy.orm import selectinload
@@ -45,6 +45,7 @@ from meters.schemas import (
     MeasuringPointCreate,
     MeasuringPointRead,
     MeasuringPointUpdate,
+    MeasuringPointWithStateRead,
     MieterAssignmentCreate,
     MieterAssignmentRead,
     MieterAssignmentUpdate,
@@ -93,7 +94,7 @@ from meters.services.owner_assignment import (
     list_history,
     update_assignment,
 )
-from meters.services.state import state_for_measuring_point
+from meters.services.state import RegisterState, state_for_measuring_point
 
 # Supplier-Service mit Aliassen — die Funktionsnamen kollidieren sonst mit
 # dem strukturgleichen Owner-Service.
@@ -133,7 +134,7 @@ def _load_with_meters(db: DbSession, mp_id: int) -> MeasuringPoint | None:
     )
 
 
-def _to_read(
+def to_measuring_point_read(
     mp: MeasuringPoint,
     db: DbSession | None = None,
     *,
@@ -174,6 +175,47 @@ def _to_read(
     return data
 
 
+def _to_state_read(s: RegisterState) -> RegisterStateRead:
+    return RegisterStateRead(
+        register_id=s.register_id,
+        physical_meter_id=s.physical_meter_id,
+        obis_code=s.obis_code,
+        label=s.label,
+        unit=s.unit,
+        is_active=s.is_active,
+        accepts_deliveries=s.accepts_deliveries,
+        last_reading_at=s.last_reading_at,
+        last_reading_value=s.last_reading_value,
+        refilled_since=s.refilled_since,
+        current_value=s.current_value,
+    )
+
+
+def measuring_points_with_state(
+    db: DbSession,
+    stmt: Select[tuple[MeasuringPoint]],
+    user: User,
+) -> list[MeasuringPointWithStateRead]:
+    """Fuehrt ``stmt`` (Select auf MeasuringPoint) unter Zugriffs-Restriktion aus
+    und buendelt jede MP mit ihrem aktuellen Register-Stand.
+
+    Datenquelle der Stammdaten-Reverse-Lookups (Eigentuemer/Lieferant/Mieter):
+    ``restrict_mp_query`` blendet fuer Recorder nicht-zugreifbare MPs aus, Admin
+    sieht alle. Owner-/Supplier-/Mieter-Namen befuellt ``to_measuring_point_read``.
+    """
+    stmt = restrict_mp_query(stmt, user, mp_id_column=MeasuringPoint.id)
+    mps = list(db.scalars(stmt))
+    return [
+        MeasuringPointWithStateRead(
+            measuring_point=to_measuring_point_read(mp, db),
+            registers=[
+                _to_state_read(s) for s in state_for_measuring_point(db, measuring_point_id=mp.id)
+            ],
+        )
+        for mp in mps
+    ]
+
+
 def _ensure_location(db: DbSession, location_id: int | None) -> None:
     if location_id is None:
         return
@@ -194,7 +236,7 @@ def list_measuring_points(db: DbDep, user: CurrentUser) -> list[MeasuringPointRe
     stmt = restrict_mp_query(stmt, user, mp_id_column=MeasuringPoint.id)
     items = list(db.scalars(stmt))
     # Owner-/Supplier-Assignments fuer alle MPs in je einer Query vorladen.
-    # Kein db an _to_read durchreichen, damit der Single-Query-Fallback fuer
+    # Kein db an to_measuring_point_read durchreichen, damit der Single-Query-Fallback fuer
     # MPs ohne Owner/Supplier nicht greift. ids als Liste materialisieren —
     # ein Generator waere nach dem ersten Bulk-Call konsumiert.
     ids = [m.id for m in items]
@@ -202,7 +244,7 @@ def list_measuring_points(db: DbDep, user: CurrentUser) -> list[MeasuringPointRe
     suppliers_by_mp = current_supplier_assignments_bulk(db, ids)
     mieters_by_mp = current_mieter_assignments_bulk(db, ids)
     return [
-        _to_read(
+        to_measuring_point_read(
             m,
             current_owner=owners_by_mp.get(m.id),
             current_supplier=suppliers_by_mp.get(m.id),
@@ -225,7 +267,7 @@ def get_measuring_point(mp_id: int, db: DbDep, user: CurrentUser) -> MeasuringPo
     )
     if mp is None:
         raise ProblemError(status_code=404, title="Measuring point not found")
-    return _to_read(mp, db)
+    return to_measuring_point_read(mp, db)
 
 
 @router.post("", response_model=MeasuringPointRead, status_code=status.HTTP_201_CREATED)
@@ -335,7 +377,7 @@ def create_measuring_point(
     db.commit()
     refreshed = _load_with_meters(db, mp.id)
     assert refreshed is not None
-    return _to_read(refreshed, db)
+    return to_measuring_point_read(refreshed, db)
 
 
 @router.patch("/{mp_id}", response_model=MeasuringPointRead)
@@ -478,7 +520,7 @@ def update_measuring_point(
     db.commit()
     refreshed = _load_with_meters(db, mp.id)
     assert refreshed is not None
-    return _to_read(refreshed, db)
+    return to_measuring_point_read(refreshed, db)
 
 
 @router.delete("/{mp_id}", status_code=204)
@@ -562,7 +604,7 @@ def replace_meter_endpoint(
         ) from exc
     refreshed = _load_with_meters(db, mp.id)
     assert refreshed is not None
-    return _to_read(refreshed, db)
+    return to_measuring_point_read(refreshed, db)
 
 
 @router.get("/{mp_id}/state", response_model=list[RegisterStateRead])
@@ -575,22 +617,7 @@ def get_state(
     if db.get(MeasuringPoint, mp_id) is None:
         raise ProblemError(status_code=404, title="Measuring point not found")
     states = state_for_measuring_point(db, measuring_point_id=mp_id)
-    return [
-        RegisterStateRead(
-            register_id=s.register_id,
-            physical_meter_id=s.physical_meter_id,
-            obis_code=s.obis_code,
-            label=s.label,
-            unit=s.unit,
-            is_active=s.is_active,
-            accepts_deliveries=s.accepts_deliveries,
-            last_reading_at=s.last_reading_at,
-            last_reading_value=s.last_reading_value,
-            refilled_since=s.refilled_since,
-            current_value=s.current_value,
-        )
-        for s in states
-    ]
+    return [_to_state_read(s) for s in states]
 
 
 @router.get("/{mp_id}/users", response_model=list[MpAccessUserRead])
@@ -691,7 +718,7 @@ def change_owner_endpoint(
     db.commit()
     refreshed = _load_with_meters(db, mp_id)
     assert refreshed is not None
-    return _to_read(refreshed, db)
+    return to_measuring_point_read(refreshed, db)
 
 
 # Historien-Editor (admin-only): Perioden der Eigentuemer-Historie anlegen,
@@ -807,7 +834,7 @@ def change_supplier_endpoint(
     db.commit()
     refreshed = _load_with_meters(db, mp_id)
     assert refreshed is not None
-    return _to_read(refreshed, db)
+    return to_measuring_point_read(refreshed, db)
 
 
 # Historien-Editor (admin-only): Perioden der Lieferanten-Historie anlegen,
@@ -924,7 +951,7 @@ def change_mieter_endpoint(
     db.commit()
     refreshed = _load_with_meters(db, mp_id)
     assert refreshed is not None
-    return _to_read(refreshed, db)
+    return to_measuring_point_read(refreshed, db)
 
 
 # Historien-Editor (admin-only): Perioden der Mieter-Historie anlegen,
