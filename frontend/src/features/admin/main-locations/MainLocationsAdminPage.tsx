@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { FormEvent } from 'react';
+import type { FormEvent, MouseEvent } from 'react';
+import { Link } from 'react-router-dom';
 import { Building2, Pencil, Trash2 } from 'lucide-react';
 
 import { Button, Card, EmptyState, LargeTitle, Section, Sheet, TextField } from '@/components/ui';
@@ -126,51 +127,72 @@ function MainLocationCard({
     }
   }
 
+  // Ganze Karte verlinkt auf die Detailseite; die Aktions-Buttons isolieren
+  // ihren Klick, damit sie nicht navigieren — Muster wie in MasterDataList.
+  const isolate = (fn: () => void) => (e: MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    fn();
+  };
+
   return (
-    <Card>
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex min-w-0 items-start gap-3">
-          <div className="bg-gradient-primary shadow-glow-primary flex h-11 w-11 shrink-0 items-center justify-center rounded-card text-white">
-            <Building2 size={20} strokeWidth={2} />
-          </div>
-          <div className="min-w-0">
-            <div className="truncate text-headline tracking-tight text-label">{item.name}</div>
-            <div className="text-caption text-tertiary">
-              {locationCount === 0
-                ? 'Keine Zaehlerstandorte'
-                : `${locationCount} ${locationCount === 1 ? 'Zaehlerstandort' : 'Zaehlerstandorte'}`}
+    <Card padded={false}>
+      <Link
+        to={`/admin/hauptstandorte/${item.id}`}
+        className="hover:bg-fill/40 block rounded-card p-5 transition-colors"
+        aria-label={`${item.name} öffnen`}
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex min-w-0 items-start gap-3">
+            <div className="bg-gradient-primary shadow-glow-primary flex h-11 w-11 shrink-0 items-center justify-center rounded-card text-white">
+              <Building2 size={20} strokeWidth={2} />
+            </div>
+            <div className="min-w-0">
+              <div className="truncate text-headline tracking-tight text-label">{item.name}</div>
+              <div className="text-caption text-tertiary">
+                {locationCount === 0
+                  ? 'Keine Zaehlerstandorte'
+                  : `${locationCount} ${locationCount === 1 ? 'Zaehlerstandort' : 'Zaehlerstandorte'}`}
+              </div>
             </div>
           </div>
+          <div className="flex gap-1">
+            <Button
+              variant="plain"
+              size="sm"
+              leftIcon={<Pencil size={14} />}
+              onClick={isolate(onEdit)}
+              aria-label={`${item.name} bearbeiten`}
+            >
+              Bearbeiten
+            </Button>
+            <Button
+              variant="plain"
+              size="sm"
+              leftIcon={<Trash2 size={14} />}
+              onClick={isolate(() => void remove())}
+              disabled={busy}
+              className="hover:bg-danger/10 text-danger"
+              aria-label={`${item.name} loeschen`}
+            >
+              Loeschen
+            </Button>
+          </div>
         </div>
-        <div className="flex gap-1">
-          <Button variant="plain" size="sm" leftIcon={<Pencil size={14} />} onClick={onEdit}>
-            Bearbeiten
-          </Button>
-          <Button
-            variant="plain"
-            size="sm"
-            leftIcon={<Trash2 size={14} />}
-            onClick={() => void remove()}
-            disabled={busy}
-            className="hover:bg-danger/10 text-danger"
-          >
-            Loeschen
-          </Button>
-        </div>
-      </div>
 
-      <div
-        className="mt-4 rounded-pill border-l-2 border-primary bg-fill p-3 text-body-sm text-secondary"
-        style={{ borderLeftWidth: '3px' }}
-      >
-        {item.note ? item.note : <em className="text-tertiary">Keine Notiz</em>}
-      </div>
-
-      {error ? (
-        <div className="border-danger/40 bg-danger/10 mt-3 rounded-pill border-hairline p-2 text-caption text-danger">
-          {error}
+        <div
+          className="mt-4 rounded-pill border-l-2 border-primary bg-fill p-3 text-body-sm text-secondary"
+          style={{ borderLeftWidth: '3px' }}
+        >
+          {item.note ? item.note : <em className="text-tertiary">Keine Notiz</em>}
         </div>
-      ) : null}
+
+        {error ? (
+          <div className="border-danger/40 bg-danger/10 mt-3 rounded-pill border-hairline p-2 text-caption text-danger">
+            {error}
+          </div>
+        ) : null}
+      </Link>
     </Card>
   );
 }

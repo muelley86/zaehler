@@ -10,11 +10,17 @@ import { http, HttpResponse } from 'msw';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { useLocation } from 'react-router-dom';
 
 import { renderWithRouter } from '@/tests/render';
 import { server } from '@/tests/server';
 
 import { LocationsAdminPage } from './LocationsAdminPage';
+
+function LocationProbe() {
+  const loc = useLocation();
+  return <div data-testid="loc">{loc.pathname}</div>;
+}
 
 vi.mock('@/features/auth/auth-context', () => ({
   useAuth: () => ({
@@ -122,5 +128,42 @@ describe('LocationsAdminPage — Hauptstandort-Filter', () => {
 
     expect(screen.queryByText('Garage')).not.toBeInTheDocument(); // Filter wirkt
     expect(window.sessionStorage.getItem('filters.adminLocations.mainLocation')).toBeNull();
+  });
+});
+
+describe('LocationsAdminPage — Karten-Navigation', () => {
+  afterEach(() => {
+    window.localStorage.clear();
+    window.sessionStorage.clear();
+  });
+
+  it('verlinkt die ganze Karte auf die Detailseite', async () => {
+    _mockList([_loc({ id: 7, name: 'Keller' })]);
+    renderWithRouter(
+      <>
+        <LocationsAdminPage />
+        <LocationProbe />
+      </>,
+    );
+
+    const link = await screen.findByRole('link', { name: 'Keller öffnen' });
+    expect(link).toHaveAttribute('href', '/admin/standorte/7');
+  });
+
+  it('öffnet beim Klick auf Bearbeiten den Dialog, ohne zur Detailseite zu navigieren', async () => {
+    _mockList([_loc({ id: 7, name: 'Keller' })]);
+    const user = userEvent.setup();
+    renderWithRouter(
+      <>
+        <LocationsAdminPage />
+        <LocationProbe />
+      </>,
+    );
+
+    await screen.findByText('Keller');
+    await user.click(screen.getByRole('button', { name: 'Keller bearbeiten' }));
+
+    // Button isoliert den Klick — die Route bleibt auf der Liste (Start: "/").
+    expect(screen.getByTestId('loc')).not.toHaveTextContent('/admin/standorte/7');
   });
 });
