@@ -13,10 +13,17 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
 from meters.api.deps import AdminUser, CurrentUser, DbDep, client_ip
+from meters.api.v1.measuring_points import measuring_points_with_state
 from meters.core.problem import ProblemError
 from meters.models import AuditAction, AuditEntityType, MainLocation
-from meters.schemas import MainLocationCreate, MainLocationRead, MainLocationUpdate
+from meters.schemas import (
+    MainLocationCreate,
+    MainLocationRead,
+    MainLocationUpdate,
+    MeasuringPointWithStateRead,
+)
 from meters.services.audit import record
+from meters.services.location_queries import select_measuring_points_for_main_location
 
 router = APIRouter(prefix="/main-locations", tags=["main-locations"])
 
@@ -37,6 +44,25 @@ def get_main_location(
     if obj is None:
         raise ProblemError(status_code=404, title="MainLocation not found")
     return MainLocationRead.model_validate(obj)
+
+
+@router.get(
+    "/{main_location_id}/measuring-points",
+    response_model=list[MeasuringPointWithStateRead],
+)
+def list_main_location_measuring_points(
+    main_location_id: int, db: DbDep, user: CurrentUser
+) -> list[MeasuringPointWithStateRead]:
+    """Messstellen ueber alle untergeordneten Zaehlerstandorte, mit aktuellem Stand.
+
+    Quelle der Hauptstandort-Detailseite. Aggregiert ueber den Join MP -> Location;
+    Recorder sehen via ``restrict_mp_query`` nur ihre zugaenglichen MPs.
+    """
+    if db.get(MainLocation, main_location_id) is None:
+        raise ProblemError(status_code=404, title="MainLocation not found")
+    return measuring_points_with_state(
+        db, select_measuring_points_for_main_location(main_location_id), user
+    )
 
 
 @router.post("", response_model=MainLocationRead, status_code=status.HTTP_201_CREATED)

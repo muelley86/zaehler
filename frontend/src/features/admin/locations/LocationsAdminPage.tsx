@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { FormEvent } from 'react';
+import type { FormEvent, MouseEvent } from 'react';
+import { Link } from 'react-router-dom';
 import { Crosshair, Map as MapIcon, MapPin, Pencil, Trash2 } from 'lucide-react';
 
 import {
@@ -217,86 +218,108 @@ function LocationCard({
 
   const hasGeo = loc.latitude !== null && loc.longitude !== null;
 
+  // Ganze Karte verlinkt auf die Detailseite; die Aktions-Buttons isolieren
+  // ihren Klick (preventDefault/stopPropagation), damit sie nicht navigieren —
+  // dasselbe Muster wie in MasterDataList (Eigentümer/Lieferant/Mieter).
+  const isolate = (fn: () => void) => (e: MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    fn();
+  };
+
   return (
-    <Card>
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex min-w-0 items-start gap-3">
-          <div className="bg-gradient-primary shadow-glow-primary flex h-11 w-11 shrink-0 items-center justify-center rounded-card text-white">
-            <MapPin size={20} strokeWidth={2} />
-          </div>
-          <div className="min-w-0">
-            <div className="truncate text-headline tracking-tight text-label">{loc.name}</div>
-            <div className="text-caption text-tertiary">
-              {mpCount === 0
-                ? 'Keine Messstellen'
-                : `${mpCount} ${mpCount === 1 ? 'Messstelle' : 'Messstellen'}`}
-            </div>
-            {loc.main_location_name ? (
-              <div className="mt-0.5 text-caption text-tertiary">
-                Hauptstandort:{' '}
-                <span className="font-medium text-secondary">{loc.main_location_name}</span>
-              </div>
-            ) : null}
-          </div>
-        </div>
-        <div className="flex gap-1">
-          <Button variant="plain" size="sm" leftIcon={<Pencil size={14} />} onClick={onEdit}>
-            Bearbeiten
-          </Button>
-          <Button
-            variant="plain"
-            size="sm"
-            leftIcon={<Trash2 size={14} />}
-            onClick={() => void remove()}
-            disabled={busy}
-            className="hover:bg-danger/10 text-danger"
-          >
-            Löschen
-          </Button>
-        </div>
-      </div>
-
-      <div
-        className="mt-4 rounded-pill border-l-2 border-primary bg-fill p-3 text-body-sm text-secondary"
-        style={{ borderLeftWidth: '3px' }}
+    <Card padded={false}>
+      <Link
+        to={`/admin/standorte/${loc.id}`}
+        className="hover:bg-fill/40 block rounded-card p-5 transition-colors"
+        aria-label={`${loc.name} öffnen`}
       >
-        {loc.note ? loc.note : <em className="text-tertiary">Keine Notiz</em>}
-      </div>
-
-      {loc.address_street || loc.address_postcode || loc.address_city ? (
-        <div className="mt-2 text-caption text-tertiary">
-          <div className="text-caption-bold uppercase">Adresse</div>
-          <div className="text-secondary">
-            {[
-              loc.address_street,
-              [loc.address_postcode, loc.address_city].filter(Boolean).join(' '),
-            ]
-              .filter((s) => s && s.trim())
-              .join(', ')}
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex min-w-0 items-start gap-3">
+            <div className="bg-gradient-primary shadow-glow-primary flex h-11 w-11 shrink-0 items-center justify-center rounded-card text-white">
+              <MapPin size={20} strokeWidth={2} />
+            </div>
+            <div className="min-w-0">
+              <div className="truncate text-headline tracking-tight text-label">{loc.name}</div>
+              <div className="text-caption text-tertiary">
+                {mpCount === 0
+                  ? 'Keine Messstellen'
+                  : `${mpCount} ${mpCount === 1 ? 'Messstelle' : 'Messstellen'}`}
+              </div>
+              {loc.main_location_name ? (
+                <div className="mt-0.5 text-caption text-tertiary">
+                  Hauptstandort:{' '}
+                  <span className="font-medium text-secondary">{loc.main_location_name}</span>
+                </div>
+              ) : null}
+            </div>
+          </div>
+          <div className="flex gap-1">
+            <Button
+              variant="plain"
+              size="sm"
+              leftIcon={<Pencil size={14} />}
+              onClick={isolate(onEdit)}
+              aria-label={`${loc.name} bearbeiten`}
+            >
+              Bearbeiten
+            </Button>
+            <Button
+              variant="plain"
+              size="sm"
+              leftIcon={<Trash2 size={14} />}
+              onClick={isolate(() => void remove())}
+              disabled={busy}
+              className="hover:bg-danger/10 text-danger"
+              aria-label={`${loc.name} löschen`}
+            >
+              Löschen
+            </Button>
           </div>
         </div>
-      ) : null}
 
-      {hasGeo && loc.latitude !== null && loc.longitude !== null ? (
-        <button
-          type="button"
-          onClick={onShowMap}
-          className="mt-2 flex w-full items-center gap-2 rounded-pill border-hairline border-border bg-fill px-3 py-2 text-left text-caption transition-colors hover:bg-fill-strong"
-          aria-label={`${loc.name} auf Karte zeigen`}
+        <div
+          className="mt-4 rounded-pill border-l-2 border-primary bg-fill p-3 text-body-sm text-secondary"
+          style={{ borderLeftWidth: '3px' }}
         >
-          <MapIcon size={14} className="shrink-0 text-primary-deep" />
-          <span className="num text-secondary">
-            {loc.latitude.toFixed(6)}, {loc.longitude.toFixed(6)}
-          </span>
-          <span className="ml-auto text-caption font-semibold text-primary-deep">Karte ↗</span>
-        </button>
-      ) : null}
-
-      {error ? (
-        <div className="border-danger/40 bg-danger/10 mt-3 rounded-pill border-hairline p-2 text-caption text-danger">
-          {error}
+          {loc.note ? loc.note : <em className="text-tertiary">Keine Notiz</em>}
         </div>
-      ) : null}
+
+        {loc.address_street || loc.address_postcode || loc.address_city ? (
+          <div className="mt-2 text-caption text-tertiary">
+            <div className="text-caption-bold uppercase">Adresse</div>
+            <div className="text-secondary">
+              {[
+                loc.address_street,
+                [loc.address_postcode, loc.address_city].filter(Boolean).join(' '),
+              ]
+                .filter((s) => s && s.trim())
+                .join(', ')}
+            </div>
+          </div>
+        ) : null}
+
+        {hasGeo && loc.latitude !== null && loc.longitude !== null ? (
+          <button
+            type="button"
+            onClick={isolate(onShowMap)}
+            className="mt-2 flex w-full items-center gap-2 rounded-pill border-hairline border-border bg-fill px-3 py-2 text-left text-caption transition-colors hover:bg-fill-strong"
+            aria-label={`${loc.name} auf Karte zeigen`}
+          >
+            <MapIcon size={14} className="shrink-0 text-primary-deep" />
+            <span className="num text-secondary">
+              {loc.latitude.toFixed(6)}, {loc.longitude.toFixed(6)}
+            </span>
+            <span className="ml-auto text-caption font-semibold text-primary-deep">Karte ↗</span>
+          </button>
+        ) : null}
+
+        {error ? (
+          <div className="border-danger/40 bg-danger/10 mt-3 rounded-pill border-hairline p-2 text-caption text-danger">
+            {error}
+          </div>
+        ) : null}
+      </Link>
     </Card>
   );
 }

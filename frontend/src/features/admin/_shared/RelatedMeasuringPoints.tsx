@@ -6,7 +6,12 @@ import type { MeasuringPointWithStateRead } from '@/lib/types';
 
 import { MeasuringPointSummaryCard } from './MeasuringPointSummaryCard';
 
-export type MasterDataResource = 'owners' | 'suppliers' | 'mieters';
+export type MasterDataResource =
+  | 'owners'
+  | 'suppliers'
+  | 'mieters'
+  | 'locations'
+  | 'main-locations';
 
 /**
  * Lädt und zeigt die aktuell einem Stammdatensatz zugeordneten Messstellen

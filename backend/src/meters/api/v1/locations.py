@@ -14,10 +14,17 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from meters.api.deps import AdminUser, CurrentUser, DbDep, client_ip
+from meters.api.v1.measuring_points import measuring_points_with_state
 from meters.core.problem import ProblemError
 from meters.models import AuditAction, AuditEntityType, Location, MainLocation
-from meters.schemas import LocationCreate, LocationRead, LocationUpdate
+from meters.schemas import (
+    LocationCreate,
+    LocationRead,
+    LocationUpdate,
+    MeasuringPointWithStateRead,
+)
 from meters.services.audit import record
+from meters.services.location_queries import select_measuring_points_for_location
 
 
 def _to_read(loc: Location) -> LocationRead:
@@ -49,6 +56,23 @@ def get_location(location_id: int, db: DbDep, _user: CurrentUser) -> LocationRea
     if loc is None:
         raise ProblemError(status_code=404, title="Location not found")
     return _to_read(loc)
+
+
+@router.get(
+    "/{location_id}/measuring-points",
+    response_model=list[MeasuringPointWithStateRead],
+)
+def list_location_measuring_points(
+    location_id: int, db: DbDep, user: CurrentUser
+) -> list[MeasuringPointWithStateRead]:
+    """Diesem Zaehlerstandort zugeordnete Messstellen, mit aktuellem Stand.
+
+    Quelle der Zaehlerstandort-Detailseite. Recorder sehen via ``restrict_mp_query``
+    nur ihre zugaenglichen MPs.
+    """
+    if db.get(Location, location_id) is None:
+        raise ProblemError(status_code=404, title="Location not found")
+    return measuring_points_with_state(db, select_measuring_points_for_location(location_id), user)
 
 
 @router.post("", response_model=LocationRead, status_code=status.HTTP_201_CREATED)

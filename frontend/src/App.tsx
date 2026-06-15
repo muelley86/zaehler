@@ -50,9 +50,19 @@ const LocationsAdminPage = lazy(() =>
     default: m.LocationsAdminPage,
   })),
 );
+const LocationDetailPage = lazy(() =>
+  import('@/features/admin/locations/LocationDetailPage').then((m) => ({
+    default: m.LocationDetailPage,
+  })),
+);
 const MainLocationsAdminPage = lazy(() =>
   import('@/features/admin/main-locations/MainLocationsAdminPage').then((m) => ({
     default: m.MainLocationsAdminPage,
+  })),
+);
+const MainLocationDetailPage = lazy(() =>
+  import('@/features/admin/main-locations/MainLocationDetailPage').then((m) => ({
+    default: m.MainLocationDetailPage,
   })),
 );
 const OwnersAdminPage = lazy(() =>
@@ -231,7 +241,9 @@ export function App() {
             <Route path="messstellen" element={<MeasuringPointsAdminPage />} />
             <Route path="messstellen/:id" element={<MeasuringPointDetailPage />} />
             <Route path="standorte" element={<LocationsAdminPage />} />
+            <Route path="standorte/:id" element={<LocationDetailPage />} />
             <Route path="hauptstandorte" element={<MainLocationsAdminPage />} />
+            <Route path="hauptstandorte/:id" element={<MainLocationDetailPage />} />
             <Route path="eigentuemer" element={<OwnersAdminPage />} />
             <Route path="eigentuemer/:id" element={<OwnerDetailPage />} />
             <Route path="lieferanten" element={<SuppliersAdminPage />} />
