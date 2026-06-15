@@ -10,6 +10,13 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.67.0](https://github.com/muelley86/zaehler/compare/v2.66.0...v2.67.0) (2026-06-15)
+
+
+### Funktionen
+
+* **messstellen:** Filter in „Zugeordnete Messstellen" + Karte zoombar mit Google-Maps-Link ([#288](https://github.com/muelley86/zaehler/issues/288)) ([a4a4592](https://github.com/muelley86/zaehler/commit/a4a4592e9c4b83ea2cf84a31d5de1cf418d72eee))
+
 ## [2.66.0](https://github.com/muelley86/zaehler/compare/v2.65.0...v2.66.0) (2026-06-15)
 
 
