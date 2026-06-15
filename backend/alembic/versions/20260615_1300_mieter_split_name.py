@@ -41,9 +41,7 @@ def upgrade() -> None:
 def downgrade() -> None:
     with op.batch_alter_table("mieter", schema=None) as batch_op:
         batch_op.add_column(sa.Column("name", sa.String(length=120), nullable=True))
-    op.execute(
-        "UPDATE mieter SET name = TRIM(COALESCE(first_name || ' ', '') || last_name)"
-    )
+    op.execute("UPDATE mieter SET name = TRIM(COALESCE(first_name || ' ', '') || last_name)")
     with op.batch_alter_table("mieter", schema=None) as batch_op:
         batch_op.alter_column("name", existing_type=sa.String(length=120), nullable=False)
         batch_op.create_unique_constraint("uq_mieter_name", ["name"])
