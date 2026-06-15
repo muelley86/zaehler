@@ -55,6 +55,8 @@ function _mp(overrides: Record<string, unknown>) {
     current_owner_name: null,
     current_supplier_id: null,
     current_supplier_name: null,
+    current_mieter_id: null,
+    current_mieter_name: null,
     is_bidirectional: false,
     has_dual_tariff: false,
     transformer_factor: null,
@@ -294,6 +296,39 @@ describe('MeasuringPointsAdminPage Wizard', () => {
     expect(screen.getByText('MP-Mueller')).toBeInTheDocument();
     expect(screen.getByText('MP-Ohne')).toBeInTheDocument();
     expect(screen.queryByText('MP-Schmidt')).not.toBeInTheDocument();
+  });
+
+  it('filtert die Liste nach Mieter inkl. „ohne Mieter"-Option', async () => {
+    _mockList([
+      _mp({
+        id: 1,
+        name: 'MP-Erika',
+        current_mieter_id: 5,
+        current_mieter_name: 'Mustermann, Erika',
+      }),
+      _mp({
+        id: 2,
+        name: 'MP-Thomas',
+        current_mieter_id: 6,
+        current_mieter_name: 'Müller, Thomas',
+      }),
+      _mp({ id: 3, name: 'MP-Ohne' }),
+    ]);
+    const user = userEvent.setup();
+    renderWithRouter(<MeasuringPointsAdminPage />);
+
+    expect(await screen.findByText('MP-Erika')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Mieter' }));
+    await user.click(await screen.findByRole('checkbox', { name: 'Mustermann, Erika' }));
+    expect(screen.getByText('MP-Erika')).toBeInTheDocument();
+    expect(screen.queryByText('MP-Thomas')).not.toBeInTheDocument();
+    expect(screen.queryByText('MP-Ohne')).not.toBeInTheDocument();
+
+    // „ohne Mieter" zusätzlich ankreuzen → MP ohne Zuordnung kommt dazu.
+    await user.click(screen.getByRole('checkbox', { name: 'ohne Mieter' }));
+    expect(screen.getByText('MP-Erika')).toBeInTheDocument();
+    expect(screen.getByText('MP-Ohne')).toBeInTheDocument();
+    expect(screen.queryByText('MP-Thomas')).not.toBeInTheDocument();
   });
 
   it('filtert die Liste nach Lieferant inkl. „ohne Lieferant"-Option', async () => {
