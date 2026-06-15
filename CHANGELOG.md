@@ -10,6 +10,13 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.66.0](https://github.com/muelley86/zaehler/compare/v2.65.0...v2.66.0) (2026-06-15)
+
+
+### Funktionen
+
+* **messstellen:** Zähler-/Hauptstandort-Listen minimalistisch (MasterDataList) ([#286](https://github.com/muelley86/zaehler/issues/286)) ([7331aa6](https://github.com/muelley86/zaehler/commit/7331aa6ac4ec262166c45da56b57be16dc220ce8))
+
 ## [2.65.0](https://github.com/muelley86/zaehler/compare/v2.64.0...v2.65.0) (2026-06-15)
 
 
