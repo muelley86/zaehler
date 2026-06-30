@@ -10,6 +10,13 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.67.1](https://github.com/muelley86/zaehler/compare/v2.67.0...v2.67.1) (2026-06-30)
+
+
+### Fehlerbehebungen
+
+* **readings:** Platzhalter statt rotem X in der Foto-Vorschau ([#291](https://github.com/muelley86/zaehler/issues/291)) ([3659839](https://github.com/muelley86/zaehler/commit/365983988f770a57179d142075e677afd33b6e5f))
+
 ## [2.67.0](https://github.com/muelley86/zaehler/compare/v2.66.0...v2.67.0) (2026-06-15)
 
 
