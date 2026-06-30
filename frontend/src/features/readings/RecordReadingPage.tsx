@@ -1,7 +1,7 @@
 import { lazy, memo, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Camera, Check, Gauge, ImageIcon, QrCode, X } from 'lucide-react';
+import { Camera, Check, Gauge, ImageIcon, ImageOff, QrCode, X } from 'lucide-react';
 
 import {
   Button,
@@ -652,19 +652,32 @@ const MAX_PHOTOS = 6;
 
 function PhotoThumb({ file, onRemove }: { file: File; onRemove: () => void }) {
   const [url, setUrl] = useState<string | null>(null);
+  // HEIC/HEIF (iPhone-Standard) kann von Desktop-/Android-Browsern nicht im
+  // ``<img>`` dekodiert werden → ohne Abfangen erscheint das Broken-Image-Icon
+  // (rotes X). Wir zeigen stattdessen einen Platzhalter; Upload + spätere
+  // Server-JPEG-Ansicht sind davon unberührt.
+  const [error, setError] = useState(false);
   useEffect(() => {
     const u = URL.createObjectURL(file);
     setUrl(u);
+    setError(false);
     return () => URL.revokeObjectURL(u);
   }, [file]);
   return (
     <div className="relative">
-      {url ? (
+      {url && !error ? (
         <img
           src={url}
           alt="Vorschau"
+          onError={() => setError(true)}
           className="h-20 w-20 rounded-card border-hairline border-border object-cover"
         />
+      ) : null}
+      {error ? (
+        <div className="flex h-20 w-20 flex-col items-center justify-center gap-1 rounded-card border-hairline border-border bg-fill px-1 text-center text-tertiary">
+          <ImageOff size={20} />
+          <span className="text-[10px] leading-tight">Vorschau n. verfügbar</span>
+        </div>
       ) : null}
       <button
         type="button"
