@@ -41,7 +41,9 @@ export function TokenAssignSheet({
     setBusy(true);
     setError(null);
     try {
-      await api.post(`/qr-tokens/${token}/assign`, { measuring_point_id: mpId });
+      await api.post(`/qr-tokens/${encodeURIComponent(token)}/assign`, {
+        measuring_point_id: mpId,
+      });
       onAssigned(mpId);
     } catch (err) {
       if (err instanceof ApiError) setError(err.problem.detail ?? err.problem.title);

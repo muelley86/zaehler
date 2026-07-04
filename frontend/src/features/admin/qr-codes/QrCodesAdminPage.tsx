@@ -71,6 +71,28 @@ export function migrateLayoutId(value: unknown): LabelLayoutId | null {
   return LEGACY_LAYOUT_MAP[value] ?? null;
 }
 
+const OVERRIDE_FIELDS = ['marginTopMm', 'marginLeftMm', 'hPitchMm', 'vPitchMm'] as const;
+
+/**
+ * Übernimmt aus einem (untrusted) localStorage-Objekt NUR endliche Zahlen.
+ * Die Override-Werte fließen in QrTokensPrintSheet in ein ``style="…mm"``-
+ * Attribut; ein manipulierter String könnte sonst aus dem Attribut ausbrechen
+ * (HTML-Injection). Ungültige/fehlende Felder fallen still auf den Layout-
+ * Default zurück (siehe ``applyOverride``).
+ */
+function sanitizeOverride(value: unknown): LayoutOverride | null {
+  if (!value || typeof value !== 'object') return null;
+  const record = value as Record<string, unknown>;
+  const clean: LayoutOverride = {};
+  for (const field of OVERRIDE_FIELDS) {
+    const raw = record[field];
+    if (typeof raw === 'number' && Number.isFinite(raw)) {
+      clean[field] = raw;
+    }
+  }
+  return Object.keys(clean).length > 0 ? clean : null;
+}
+
 function loadPrefs(): StoredPrefs {
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
@@ -82,7 +104,8 @@ function loadPrefs(): StoredPrefs {
     const migratedOverrides: Partial<Record<LabelLayoutId, LayoutOverride>> = {};
     for (const [oldKey, override] of Object.entries(parsed.overrides ?? {})) {
       const newKey = migrateLayoutId(oldKey);
-      if (newKey && override) migratedOverrides[newKey] = override;
+      const clean = sanitizeOverride(override);
+      if (newKey && clean) migratedOverrides[newKey] = clean;
     }
     return {
       selectedLayout: migratedSelected,

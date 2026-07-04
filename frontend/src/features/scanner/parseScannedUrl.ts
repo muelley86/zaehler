@@ -29,6 +29,15 @@ const TOKEN_RE = /^[0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{8}$/;
 // Path-Match für /q/<TOKEN> mit optionalem Trailing-Slash.
 const Q_PATH_RE = /^\/q\/([0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{8})\/?$/;
 
+/**
+ * Prüft, ob ein String ein gültiges 8-Zeichen-Crockford-Base32-Token ist.
+ * Gemeinsame Format-Prüfung für alle Stellen, die ein Token aus einer URL/
+ * einem Query-Param übernehmen, bevor es in einen API-Pfad eingebaut wird.
+ */
+export function isValidToken(token: string): boolean {
+  return TOKEN_RE.test(token);
+}
+
 export function parseScannedUrl(decoded: string): ScannedQr | null {
   const text = decoded.trim();
   if (text === '') return null;
