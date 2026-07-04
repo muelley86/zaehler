@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+from datetime import date
 from typing import Any
 
+import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy.exc import IntegrityError
 
 from meters.db import SessionLocal
 from meters.models import AuditAction, AuditLog, OwnerAssignment
@@ -39,6 +42,36 @@ def _create_mp(
 def _create_owner(client: TestClient, name: str) -> int:
     resp = client.post("/api/v1/owners", json={"name": name})
     return int(resp.json()["id"])
+
+
+def test_partial_unique_index_rejects_second_open_period(admin_client: TestClient) -> None:
+    """Der partielle UNIQUE-Index laesst pro MP nur EINE offene Periode zu (P-5).
+
+    DB-Garantie unabhaengig vom App-Check: zwei ``valid_to IS NULL``-Zeilen fuer
+    dieselbe MP muessen am Index scheitern (analog physical_meter).
+    """
+    mp_id = _create_mp(admin_client, "MP-Open-Unique", "SN-OU-1")["id"]
+    owner_a = _create_owner(admin_client, "Con-A")
+    owner_b = _create_owner(admin_client, "Con-B")
+    with SessionLocal() as db:
+        db.add(
+            OwnerAssignment(
+                measuring_point_id=mp_id,
+                owner_id=owner_a,
+                valid_from=date(2024, 1, 1),
+                valid_to=None,
+            )
+        )
+        db.add(
+            OwnerAssignment(
+                measuring_point_id=mp_id,
+                owner_id=owner_b,
+                valid_from=date(2024, 6, 1),
+                valid_to=None,
+            )
+        )
+        with pytest.raises(IntegrityError):
+            db.commit()
 
 
 def test_create_mp_with_owner_creates_open_assignment(admin_client: TestClient) -> None:
