@@ -18,6 +18,7 @@ import {
 import type { DropdownOption } from '@/components/ui';
 import { PageGlows } from '@/components/PageGlows';
 import { ApiError, api, isPlausibilityWarning } from '@/lib/api';
+import { csvField } from '@/lib/csv';
 import {
   formatDateDe,
   formatDateTimeDe,
@@ -1475,18 +1476,4 @@ function itemKey(item: Item): string {
 function itemEditable(item: Item, me: Me | null): boolean {
   if (!me) return false;
   return item.kind === 'delivery' ? me.role === 'admin' : canEdit(me, item.reading);
-}
-
-function csvField(value: string): string {
-  // Schutz gegen CSV-Formel-Injection in Excel/Calc: Werte, die mit
-  // ``=``, ``+``, ``-`` oder ``@`` beginnen, werden mit einem Apostroph
-  // prefixed, damit Tabellen sie nicht als Formel ausführen.
-  let safe = value;
-  if (/^[=+\-@]/.test(safe)) {
-    safe = `'${safe}`;
-  }
-  if (/[;"\n\r]/.test(safe)) {
-    return `"${safe.replace(/"/g, '""')}"`;
-  }
-  return safe;
 }
