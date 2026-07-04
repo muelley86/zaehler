@@ -71,7 +71,15 @@ def test_reject_duplicate_owner_name(admin_client: TestClient) -> None:
 
 
 def test_owner_admin_only(admin_client: TestClient, recorder_client: TestClient) -> None:
-    assert recorder_client.get("/api/v1/owners").status_code == 200
+    # Anlegen (Vorbedingung): existierender Eigentuemer fuer den Detail-Read.
+    owner_id = admin_client.post("/api/v1/owners", json={"name": "Muster GmbH"}).json()["id"]
+    # Lesen von Liste + Detaildatensatz ist admin-only — Eigentuemer-Stammdaten
+    # enthalten PII (Adresse, USt-/Steuer-ID; N-1). Das zugriffsgefilterte
+    # ``/{id}/measuring-points`` (nur MP-Daten, keine PII) bleibt bewusst offen
+    # (siehe test_master_data_measuring_points).
+    assert recorder_client.get("/api/v1/owners").status_code == 403
+    assert recorder_client.get(f"/api/v1/owners/{owner_id}").status_code == 403
+    # Schreiben bleibt admin-only.
     assert recorder_client.post("/api/v1/owners", json={"name": "Verboten"}).status_code == 403
 
 

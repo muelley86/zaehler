@@ -71,7 +71,11 @@ def test_reject_duplicate_supplier_name(admin_client: TestClient) -> None:
 
 
 def test_supplier_admin_only(admin_client: TestClient, recorder_client: TestClient) -> None:
-    assert recorder_client.get("/api/v1/suppliers").status_code == 200
+    supplier_id = admin_client.post("/api/v1/suppliers", json={"name": "Muster AG"}).json()["id"]
+    # Lesen von Liste + Detail ist admin-only (einheitlich mit Owner/Mieter, N-1).
+    # Das zugriffsgefilterte ``/{id}/measuring-points`` bleibt fuer Recorder offen.
+    assert recorder_client.get("/api/v1/suppliers").status_code == 403
+    assert recorder_client.get(f"/api/v1/suppliers/{supplier_id}").status_code == 403
     assert recorder_client.post("/api/v1/suppliers", json={"name": "Verboten"}).status_code == 403
 
 
