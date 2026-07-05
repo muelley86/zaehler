@@ -10,6 +10,13 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.68.2](https://github.com/muelley86/zaehler/compare/v2.68.1...v2.68.2) (2026-07-05)
+
+
+### Fehlerbehebungen
+
+* **deploy:** Code+venv read-only via ReadOnlyPaths (N-11, Teil 2) ([#312](https://github.com/muelley86/zaehler/issues/312)) ([bfcd8d0](https://github.com/muelley86/zaehler/commit/bfcd8d0ef12318354f1375f8f1731bce90dbf264))
+
 ## [2.68.1](https://github.com/muelley86/zaehler/compare/v2.68.0...v2.68.1) (2026-07-05)
 
 
