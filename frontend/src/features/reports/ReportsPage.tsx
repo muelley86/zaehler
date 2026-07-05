@@ -25,6 +25,7 @@ import {
 } from '@/components/ui';
 import { PageGlows } from '@/components/PageGlows';
 import { ApiError, api } from '@/lib/api';
+import { csvField } from '@/lib/csv';
 import { formatDe } from '@/lib/format';
 import { TYPE_LABELS } from '@/lib/meterLabels';
 import { useFilterPrefs } from '@/features/prefs/filter-prefs-context';
@@ -107,19 +108,6 @@ function numOptions(
   return [...map.entries()]
     .map(([id, label]) => ({ id, label }))
     .sort((a, b) => a.label.localeCompare(b.label));
-}
-
-function csvField(value: string): string {
-  // Schutz gegen CSV-Formel-Injection in Excel/Calc: Werte, die mit ``=``,
-  // ``+``, ``-`` oder ``@`` beginnen, werden mit einem Apostroph prefixed.
-  let safe = value;
-  if (/^[=+\-@]/.test(safe)) {
-    safe = `'${safe}`;
-  }
-  if (/[;"\n\r]/.test(safe)) {
-    return `"${safe.replace(/"/g, '""')}"`;
-  }
-  return safe;
 }
 
 function downloadCsv(filename: string, rows: string[][]): void {

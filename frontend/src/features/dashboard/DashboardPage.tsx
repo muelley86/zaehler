@@ -14,6 +14,7 @@ import {
 import type { DropdownOption } from '@/components/ui';
 import { PageGlows } from '@/components/PageGlows';
 import { ApiError, api } from '@/lib/api';
+import { csvField } from '@/lib/csv';
 import { formatDateDe, formatDe } from '@/lib/format';
 import type {
   ConsumptionPoint,
@@ -833,11 +834,4 @@ function ConsumptionSummarySkeleton() {
       </div>
     </div>
   );
-}
-
-function csvField(value: string): string {
-  if (/[;"\n\r]/.test(value)) {
-    return `"${value.replace(/"/g, '""')}"`;
-  }
-  return value;
 }
