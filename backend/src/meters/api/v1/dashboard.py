@@ -32,9 +32,13 @@ from meters.schemas.dashboard import (
     DashboardVirtualMeasuringPoint,
 )
 from meters.services.access import accessible_mp_ids, restrict_mp_query
-from meters.services.consumption import aggregate_consumption, consumption_for_measuring_point
+from meters.services.consumption import (
+    PointsCache,
+    aggregate_consumption,
+    consumption_for_measuring_point,
+)
 from meters.services.monthly_consumption import monthly_points_for_measuring_point
-from meters.services.state import state_for_measuring_point
+from meters.services.state import state_for_measuring_points
 from meters.services.virtual_measuring_point import (
     consumption_for_virtual_mp,
     visible_virtual_mps,
@@ -81,6 +85,11 @@ def dashboard(
     for reading, mp_id in db.execute(read_stmt).all():
         readings_by_mp.setdefault(mp_id, []).append(_to_read(reading))
 
+    # State aller MPs in konstant drei Queries statt drei pro MP; ein Request-
+    # Cache teilt die (teure) MP-Historie zwischen realen und virtuellen Items.
+    states_by_mp = state_for_measuring_points(db, mp_ids)
+    points_cache: PointsCache = {}
+
     items: list[DashboardMeasuringPoint] = []
     for mp_id in mp_ids:
         # Monats-Granularität aus dem materialisierten Cache, sonst on-the-fly —
@@ -88,7 +97,9 @@ def dashboard(
         if granularity == "month":
             points = monthly_points_for_measuring_point(db, mp_id)
         else:
-            points = consumption_for_measuring_point(db, measuring_point_id=mp_id)
+            points = consumption_for_measuring_point(
+                db, measuring_point_id=mp_id, cache=points_cache
+            )
         points = aggregate_consumption(
             points, granularity=granularity, from_date=from_at, to_date=to_at
         )
@@ -117,7 +128,7 @@ def dashboard(
                 refilled_since=s.refilled_since,
                 current_value=s.current_value,
             )
-            for s in state_for_measuring_point(db, measuring_point_id=mp_id)
+            for s in states_by_mp.get(mp_id, [])
         ]
         items.append(
             DashboardMeasuringPoint(
@@ -146,7 +157,12 @@ def dashboard(
                     unit=p.unit,
                 )
                 for p in consumption_for_virtual_mp(
-                    db, vmp, granularity=granularity or "day", from_date=from_at, to_date=to_at
+                    db,
+                    vmp,
+                    granularity=granularity or "day",
+                    from_date=from_at,
+                    to_date=to_at,
+                    cache=points_cache,
                 )
             ],
         )

@@ -36,6 +36,7 @@ from meters.models import Location, MeasuringPoint, MeterType, ReportDimension, 
 from meters.services.access import restrict_mp_query
 from meters.services.consumption import (
     Granularity,
+    PointsCache,
     aggregate_consumption,
     clip_consumption_to_range,
     consumption_for_measuring_point,
@@ -145,6 +146,9 @@ def aggregate_report(
         return []
 
     owners = current_assignments_bulk(db, [mp.id for mp in mps])
+    # Request-Cache: dieselbe MP-Historie braucht die Real-Schleife UND
+    # _virtual_rows (Komponenten virtueller MPs) — nur einmal laden.
+    points_cache: PointsCache = {}
 
     # (group_key, group_label, meter_type, unit, direction, period_start, period_end) -> Decimal
     sums: dict[
@@ -177,7 +181,9 @@ def aggregate_report(
         if granularity == "month":
             points = monthly_points_for_measuring_point(db, mp.id)
         else:
-            points = consumption_for_measuring_point(db, measuring_point_id=mp.id)
+            points = consumption_for_measuring_point(
+                db, measuring_point_id=mp.id, cache=points_cache
+            )
         if granularity is None:
             # Gesamt-Modus: Intervalle taggenau auf den Zeitraum clippen (anteiliger
             # Verbrauch) statt sie ueber period_end ganz/gar-nicht zu zaehlen —
@@ -222,6 +228,7 @@ def aggregate_report(
             from_date=from_date,
             to_date=to_date,
             filters=filters,
+            cache=points_cache,
         )
     )
     rows.sort(
@@ -245,6 +252,7 @@ def _virtual_rows(
     from_date: date | None,
     to_date: date | None,
     filters: ReportFilter,
+    cache: PointsCache | None = None,
 ) -> list[GroupBucketRow]:
     """Zeilen fuer virtuelle (verrechnete) Messstellen.
 
@@ -269,7 +277,7 @@ def _virtual_rows(
         if filters.meter_types is not None and vmp.type not in filters.meter_types:
             continue
         points = consumption_for_virtual_mp(
-            db, vmp, granularity=granularity, from_date=from_date, to_date=to_date
+            db, vmp, granularity=granularity, from_date=from_date, to_date=to_date, cache=cache
         )
         for p in points:
             rows.append(

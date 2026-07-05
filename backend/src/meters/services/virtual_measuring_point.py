@@ -34,6 +34,7 @@ from meters.services.access import accessible_mp_ids
 from meters.services.consumption import (
     ConsumptionPoint,
     Granularity,
+    PointsCache,
     aggregate_consumption,
     clip_consumption_to_range,
     consumption_for_measuring_point,
@@ -79,6 +80,7 @@ def _component_points(
     granularity: Granularity | None,
     from_date: date | None,
     to_date: date | None,
+    cache: PointsCache | None = None,
 ) -> list[ConsumptionPoint]:
     """Richtungsgefilterte, auf den Zeitraum zugeschnittene Punkte EINER
     Komponente — ohne Vorzeichen. ``granularity is None`` = Gesamt-Modus
@@ -86,7 +88,9 @@ def _component_points(
     if granularity == "month":
         points = monthly_points_for_measuring_point(db, comp.measuring_point_id)
     else:
-        points = consumption_for_measuring_point(db, measuring_point_id=comp.measuring_point_id)
+        points = consumption_for_measuring_point(
+            db, measuring_point_id=comp.measuring_point_id, cache=cache
+        )
     points = [p for p in points if direction_of(p.obis_code) == comp.direction.value]
     if granularity is None:
         return clip_consumption_to_range(points, from_date=from_date, to_date=to_date)
@@ -102,6 +106,7 @@ def consumption_for_virtual_mp(
     granularity: Granularity | None,
     from_date: date | None,
     to_date: date | None,
+    cache: PointsCache | None = None,
 ) -> list[ConsumptionPoint]:
     """Netto-Verbrauchsreihe der virtuellen MP.
 
@@ -113,7 +118,7 @@ def consumption_for_virtual_mp(
     buckets: dict[tuple[date, date, str], Decimal] = {}
     for comp in vmp.components:
         points = _component_points(
-            db, comp, granularity=granularity, from_date=from_date, to_date=to_date
+            db, comp, granularity=granularity, from_date=from_date, to_date=to_date, cache=cache
         )
         for p in points:
             if granularity is None:
