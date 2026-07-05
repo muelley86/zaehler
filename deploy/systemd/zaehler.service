@@ -34,7 +34,11 @@ EnvironmentFile=-/opt/zaehler/data/meters.env
 # Bind-Host und -Port kommen aus meters.env (METERS_BIND_HOST, METERS_BIND_PORT).
 # Default: 0.0.0.0:8000 — direkter LAN-Zugriff.
 # Sobald ein HTTPS-Reverse-Proxy davor steht, in meters.env auf 127.0.0.1 setzen.
-ExecStart=/opt/zaehler/.local/bin/uv run python -m meters.server
+# --no-sync: die venv wird bereits beim Deploy per `uv sync --frozen` erzeugt
+# (zaehler.sh), daher beim Service-Start NICHT erneut synchronisieren — sonst
+# müsste `backend/.venv` schreibbar sein und ReadWritePaths könnte nicht auf
+# data/ verengt werden.
+ExecStart=/opt/zaehler/.local/bin/uv run --no-sync python -m meters.server
 
 Restart=on-failure
 RestartSec=3
@@ -52,11 +56,17 @@ ProtectKernelLogs=true
 ProtectClock=true
 ProtectHostname=true
 ProtectProc=invisible
-# Schreibzugriff auf das gesamte App-Verzeichnis — uv legt dort seinen Cache
-# (~/.cache/uv) und die virtuelle Umgebung (backend/.venv) an, der Frontend-
-# Build schreibt nach backend/src/meters/static/. Außerhalb von /opt/zaehler
-# bleibt das Dateisystem read-only.
-ReadWritePaths=/opt/zaehler
+# Zur Laufzeit braucht der Dienst nur data/ (SQLite-DB, WAL, Fotos) und den
+# uv-Cache schreibbar. Quellcode und venv (backend/.venv) bleiben read-only —
+# eine kompromittierte App kann so keinen Code/kein venv persistent verändern.
+# (venv wird beim Deploy via `uv sync --frozen` erzeugt, Start läuft mit
+# `--no-sync`; Frontend-Build schreibt static/ ebenfalls nur zur Deploy-Zeit.)
+# data/ existiert immer (DB); .cache mit '-' = nur einbinden, wenn vorhanden
+# (verhindert Start-Fehler, falls der uv-Cache noch nicht angelegt wurde).
+# ACHTUNG: nur auf dem echten LXC verifizierbar — nach dem Deploy einmal
+# `systemctl restart zaehler` + `systemctl status`/Logs prüfen. Startet uv
+# wegen fehlendem Schreibpfad nicht, auf `/opt/zaehler` zurücksetzen.
+ReadWritePaths=/opt/zaehler/data -/opt/zaehler/.cache
 RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
 RestrictNamespaces=true
 RestrictRealtime=true
