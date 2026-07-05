@@ -39,10 +39,15 @@ def _csp() -> str:
         "default-src 'self'",
         "script-src 'self'",
         "style-src 'self' 'unsafe-inline'",
+        # ``blob:`` für die lokale Foto-Vorschau beim Erfassen: der Picker
+        # zeigt frisch gewählte Dateien per ``URL.createObjectURL(file)`` an
+        # (Object-URL) — ohne ``blob:`` blockiert die CSP das ``<img>`` auf
+        # jedem Browser (iPhone wie Desktop). Nur Same-Origin-Blobs, die die
+        # Seite selbst erzeugt; kein Remote-Load, keine Skript-Ausführung.
         # Tile-PNGs für die Standort-Karte (LocationMap). Browser lädt
         # die Tiles direkt vom jeweiligen CDN, keine API von uns.
         # OSM = Default-Layer; Esri = Satellit/Hybrid-Layer.
-        "img-src 'self' data: https://*.tile.openstreetmap.org https://server.arcgisonline.com",
+        "img-src 'self' data: blob: https://*.tile.openstreetmap.org https://server.arcgisonline.com",
         "font-src 'self' data:",
         # Nominatim für Geocoding-Suche im MapPicker (Adresse → Koordinaten),
         # kostenlos, fair-use 1 req/s. Pflicht-Attribution im UI.

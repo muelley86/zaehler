@@ -1,7 +1,17 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Camera, Download, ImageIcon, ListChecks, Pencil, Search, Trash2, X } from 'lucide-react';
+import {
+  Camera,
+  Download,
+  ImageIcon,
+  ImageOff,
+  ListChecks,
+  Pencil,
+  Search,
+  Trash2,
+  X,
+} from 'lucide-react';
 
 import { useAuth } from '@/features/auth/auth-context';
 import { PhotoLightbox } from '@/features/readings/PhotoLightbox';
@@ -1337,19 +1347,31 @@ function PhotoEditField({
 
 function PendingThumb({ file, onRemove }: { file: File; onRemove: () => void }) {
   const [url, setUrl] = useState<string | null>(null);
+  // HEIC/HEIF (iPhone-Standard) kann von Desktop-/Android-Browsern nicht im
+  // ``<img>`` dekodiert werden → ohne Abfangen erscheint das Broken-Image-Icon
+  // (rotes X). Wir zeigen stattdessen einen Platzhalter (analog PhotoThumb).
+  const [error, setError] = useState(false);
   useEffect(() => {
     const u = URL.createObjectURL(file);
     setUrl(u);
+    setError(false);
     return () => URL.revokeObjectURL(u);
   }, [file]);
   return (
     <div className="relative">
-      {url ? (
+      {url && !error ? (
         <img
           src={url}
           alt="Neu"
+          onError={() => setError(true)}
           className="h-20 w-20 rounded-card border-hairline border-primary object-cover"
         />
+      ) : null}
+      {error ? (
+        <div className="flex h-20 w-20 flex-col items-center justify-center gap-1 rounded-card border-hairline border-primary bg-fill px-1 text-center text-tertiary">
+          <ImageOff size={20} />
+          <span className="text-[10px] leading-tight">Vorschau n. verfügbar</span>
+        </div>
       ) : null}
       <button
         type="button"
