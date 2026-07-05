@@ -271,6 +271,28 @@ describe('RecordReadingPage', () => {
     expect(readingBodies[0]?.reading_at).toMatch(/Z$/);
   });
 
+  it('zeigt einen Platzhalter, wenn die Foto-Vorschau nicht dekodiert werden kann', async () => {
+    _mockListEndpoints([_mp()]);
+
+    renderWithRouter(<RecordReadingPage />);
+    await screen.findByText('Bezug');
+
+    const fileInput = screen.getByTestId('record-photo-camera-input');
+    const file = new File([new Uint8Array([0xff, 0xd8, 0xff])], 'meter.heic', {
+      type: 'image/heic',
+    });
+    fireEvent.change(fileInput, { target: { files: [file] } });
+
+    // Die Vorschau erscheint zunächst als <img> mit blob:-URL …
+    const img = await screen.findByAltText('Vorschau');
+    // … kann der Browser das Bild aber nicht dekodieren (z. B. HEIC auf dem
+    // Desktop), greift onError und ersetzt es durch den Platzhalter (#291).
+    fireEvent.error(img);
+
+    expect(await screen.findByText('Vorschau n. verfügbar')).toBeInTheDocument();
+    expect(screen.queryByAltText('Vorschau')).not.toBeInTheDocument();
+  });
+
   it('ruft navigator.geolocation auf, wenn ein Foto hochgeladen wird', async () => {
     _mockListEndpoints([_mp()]);
     // navigator.geolocation in jsdom mocken — wir verifizieren ueber den
