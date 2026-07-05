@@ -10,6 +10,13 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.68.3](https://github.com/muelley86/zaehler/compare/v2.68.2...v2.68.3) (2026-07-05)
+
+
+### Performance
+
+* **measuring-points:** gezielte Refetches + RegisterTable-Memo (Q-2, Q-3) ([#314](https://github.com/muelley86/zaehler/issues/314)) ([8fcef5c](https://github.com/muelley86/zaehler/commit/8fcef5cb38c7d4387970f06e1db581df54dc1a43))
+
 ## [2.68.2](https://github.com/muelley86/zaehler/compare/v2.68.1...v2.68.2) (2026-07-05)
 
 
