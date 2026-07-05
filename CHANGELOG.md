@@ -10,6 +10,18 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.68.4](https://github.com/muelley86/zaehler/compare/v2.68.3...v2.68.4) (2026-07-05)
+
+
+### Fehlerbehebungen
+
+* **readings:** Foto-Vorschau via CSP img-src blob: freigeben ([#318](https://github.com/muelley86/zaehler/issues/318)) ([39bcf6e](https://github.com/muelley86/zaehler/commit/39bcf6e845194cd5397b44a116e87487842977df))
+
+
+### Dokumentation
+
+* AUDIT.md §G Umsetzungs-Nachtrag (Backlog 04.07. vollstaendig) ([#316](https://github.com/muelley86/zaehler/issues/316)) ([1cda417](https://github.com/muelley86/zaehler/commit/1cda417e3d90658064a31948fab898aaac532392))
+
 ## [2.68.3](https://github.com/muelley86/zaehler/compare/v2.68.2...v2.68.3) (2026-07-05)
 
 
