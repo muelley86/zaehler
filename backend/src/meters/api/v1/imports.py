@@ -8,9 +8,9 @@ Frontend aufgelöste Mapping die Readings an (idempotent). Siehe
 
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, BinaryIO
 
-from fastapi import APIRouter, File, Request, UploadFile
+from fastapi import APIRouter, BackgroundTasks, File, Request, UploadFile
 
 from meters.api.deps import AdminUser, DbDep, client_ip
 from meters.core.problem import ProblemError
@@ -20,10 +20,25 @@ from meters.schemas.import_readings import (
     ImportPreviewResponse,
 )
 from meters.services.import_readings import build_preview, commit_readings
+from meters.services.monthly_consumption import defer_recompute, recompute_registers
 
 router = APIRouter(prefix="/imports", tags=["imports"])
 
 _MAX_UPLOAD_BYTES = 5 * 1024 * 1024  # 5 MB reichen für Monats-Zählerstände dicke.
+_READ_CHUNK_BYTES = 1024 * 1024
+
+
+def _read_limited(fp: BinaryIO, limit: int) -> bytes:
+    """Upload chunk-weise einlesen und bei Überschreitung SOFORT abbrechen —
+    statt erst alles in den RAM zu lesen und danach zu prüfen."""
+    chunks: list[bytes] = []
+    total = 0
+    while chunk := fp.read(_READ_CHUNK_BYTES):
+        total += len(chunk)
+        if total > limit:
+            raise ProblemError(status_code=400, title="Datei zu groß", detail="Maximal 5 MB.")
+        chunks.append(chunk)
+    return b"".join(chunks)
 
 
 @router.post("/readings/preview", response_model=ImportPreviewResponse)
@@ -40,9 +55,7 @@ def preview_import(
             title="Nicht unterstütztes Format",
             detail="Nur .xlsx oder .csv werden unterstützt.",
         )
-    content = file.file.read()
-    if len(content) > _MAX_UPLOAD_BYTES:
-        raise ProblemError(status_code=400, title="Datei zu groß", detail="Maximal 5 MB.")
+    content = _read_limited(file.file, _MAX_UPLOAD_BYTES)
     try:
         return build_preview(db, filename=filename, content=content)
     except Exception as exc:
@@ -60,6 +73,7 @@ def commit_import(
     request: Request,
     db: DbDep,
     admin: AdminUser,
+    background: BackgroundTasks,
 ) -> ImportCommitResponse:
     result = commit_readings(
         db,
@@ -68,5 +82,13 @@ def commit_import(
         ip_address=client_ip(request),
         source_filename=payload.source_filename,
     )
+    # Monats-Cache NICHT synchron im Request neu berechnen — ein Massen-Import
+    # kann hunderte Register betreffen; die sequenzielle Neuberechnung würde die
+    # Response blockieren (Reverse-Proxy-Timeout). Stattdessen nach dem Commit
+    # im Hintergrund. Bis der Task durch ist, sind die Monats-Diagramme kurz
+    # veraltet (wie beim bereits akzeptierten Stale-Verhalten, kein Datenverlust).
+    register_ids = defer_recompute(db)
     db.commit()
+    if register_ids:
+        background.add_task(recompute_registers, register_ids)
     return result

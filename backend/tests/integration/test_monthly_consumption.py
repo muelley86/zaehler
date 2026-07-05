@@ -11,13 +11,17 @@ from datetime import date
 from decimal import Decimal
 
 from fastapi.testclient import TestClient
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from meters.cli import _refresh_monthly_cache
 from meters.models import MonthlyConsumption
 from meters.services.consumption import aggregate_consumption, consumption_for_measuring_point
-from meters.services.monthly_consumption import recompute_all, recompute_register
+from meters.services.monthly_consumption import (
+    recompute_all,
+    recompute_register,
+    recompute_registers,
+)
 
 
 def _setup(admin_client: TestClient) -> tuple[int, int]:
@@ -198,3 +202,21 @@ def test_hook_updates_table_on_reading_delete(admin_client: TestClient, db: Sess
 
     admin_client.delete(f"/api/v1/readings/{r2['id']}")
     assert date(2024, 2, 29) not in _table(db, reg_id)  # Hook hat ihn wieder entfernt
+
+
+def test_recompute_registers_rebuilds_cache(admin_client: TestClient, db: Session) -> None:
+    """P-7: der Background-Worker ``recompute_registers`` baut den Monats-Cache
+    genauso auf wie der synchrone Hook (Muster fuer den deferred Import-Recompute)."""
+    _mp, reg = _setup(admin_client)
+    _add(admin_client, reg, "110.000", "2024-02-15T12:00:00")
+    _add(admin_client, reg, "130.000", "2024-03-15T12:00:00")
+    expected = _table(db, reg)
+    assert expected  # synchroner Hook hat schon befuellt
+
+    # Cache leeren und ueber den Background-Worker neu aufbauen.
+    db.execute(delete(MonthlyConsumption).where(MonthlyConsumption.register_id == reg))
+    db.commit()
+    assert _table(db, reg) == {}
+
+    recompute_registers([reg])
+    assert _table(db, reg) == expected
