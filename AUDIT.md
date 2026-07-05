@@ -110,6 +110,53 @@ Getrennte PRs je Themen-Cluster (Konvention: mehrteilige Aufgaben splitten):
 8. **`fix(frontend)`** — N-8 (Token-Validierung) + N-9 (localStorage-Validierung). Kleine Härtungen.
 9. **`chore`/`refactor` (niedrig)** — P-6 (Search-Cap), P-7 (Import-Background-Recompute), N-12; Q-1..Q-5 (Refactors) nach Bedarf.
 
+### G. Umsetzungs-Nachtrag (2026-07-05) — Backlog vollständig abgearbeitet
+
+Der komplette Maßnahmenplan aus §F wurde in **verhaltenserhaltenden** Einzel-PRs
+(je Themen-Cluster) umgesetzt und über **sechs Releases** (2.67.2 → 2.68.3)
+ausgeliefert. Jeder Befund einzeln im Quelltext verifiziert; bestehende Tests
+blieben durchgehend grün (Backend 593→598, Frontend 328→337). **Alle 24 Befunde
+aus §A/§B/§C sind erledigt & live** — es ist nichts aus diesem Audit mehr offen.
+
+| ID | Status | Release | Umsetzung (Kurz) |
+|---|---|---|---|
+| **N-1** | ✅ | 2.67.2 | `list_*`/`get_*` für owners/suppliers/mieters auf `AdminUser`; `/{id}/measuring-points` bewusst offen (nur MP-Daten, keine PII). |
+| **N-2** | ✅ | 2.67.2 | `starlette>=1.3.1` + `python-multipart 0.0.32` + `pydantic-settings 2.14.2`; **ohne** Overrides (Lehre #241/#242), osv `uv.lock`=0. |
+| **N-3** | ✅ | 2.67.2 | Entpack-Größendeckel in `_extract_archive` (laufende Summe + `file_size`). |
+| **N-4** | ✅ | 2.67.2 | Staging-Race behoben: `_reserved`-Set direkt nach `mkdir()`, Orphan-Sweep respektiert es. |
+| **N-5** | ✅ | 2.67.2 | Upload-Cap `_MAX_CONCURRENT_STAGED=3` → 429 auf `/restore/upload`. |
+| **N-6** | ✅ | 2.67.2 | `csvField` nach `lib/csv.ts` extrahiert (DRY), Dashboard-CSV bekommt Formel-Guard. |
+| **N-7** | ✅ | 2.67.2 | `printf %q` gegen Command-Injection in `as_user` (3 Stellen). |
+| **N-8** | ✅ | 2.67.2 | `TOKEN_RE`-Gate + `encodeURIComponent` vor `?token=`-Fetch. |
+| **N-9** | ✅ | 2.67.2 | `sanitizeOverride` (Laufzeitprüfung) für localStorage-Druckparameter. |
+| **N-10** | ✅ | 2.67.2 | `mktemp` statt festem `/tmp/nodesource_setup.sh` (+ SC2155). |
+| **N-11** | ✅ | 2.68.1 + 2.68.2 | Zweistufig: Teil 1 `uv run --no-sync` (2.68.1); Teil 2 Code+venv read-only via **`ReadOnlyPaths=/opt/zaehler/repo/{backend,frontend}`** + `PYTHONDONTWRITEBYTECODE=1` (2.68.2). Ansatz ggü. §F **umgedreht** — reales LXC-Split-Layout (Fotos+Restore-Staging unter `/opt/zaehler/repo/data`) hätte ein enges `ReadWritePaths` gebrochen; `ReadWritePaths=/opt/zaehler` bleibt → null Funktionsrisiko. Am LXC verifiziert. |
+| **N-12** | ✅ | 2.68.1 | `_read_limited` (chunkweises Lesen, früher Abbruch) statt `file.file.read()`. |
+| **P-1** | ✅ | 2.67.3 | `measuring_points_with_state` reicht Bulk-Dicts + Bulk-State durch (1+6N → wenige Queries). |
+| **P-2** | ✅ | 2.67.3 | Dashboard: Bulk-State + geteilter `PointsCache` (mit P-3/P-4). |
+| **P-3** | ✅ | 2.67.3 | Virtuelle MPs teilen den Request-`PointsCache` (keine Doppel-Voll-Ladung). |
+| **P-4** | ✅ | 2.67.3 | `aggregate_report` nutzt denselben `PointsCache`. |
+| **P-5** | ✅ | 2.67.2 | Partial-Unique-Index `uq_*_assignment_open_per_mp` (Migration 0033) + `open_period_guard` → 409. |
+| **P-6** | ✅ | 2.68.1 | `SEARCH_SQL_CAP=1000` (`.limit()`) vor der Python-Sortierung. |
+| **P-7** | ✅ | 2.68.1 | `defer_recompute` + `recompute_registers` via `BackgroundTasks` für `/imports/readings/commit`. |
+| **Q-1** | ✅ | 2.68.0 | Generische `AssignmentHistoryCard<T>` in `_shared/` ersetzt 3× gespiegelte Cards. |
+| **Q-2** | ✅ | 2.68.3 | Gezieltes `refreshMp` (nur MP nachladen) für die Zuordnungs-Cards statt vollem `tick`-Refetch. |
+| **Q-3** | ✅ | 2.68.3 | `stateByRegister`/`allRegisters` in `RegisterTable` per `useMemo`. |
+| **Q-4** | ✅ | 2.68.0 | Gemeinsame `parseJsonResponse<T>()` aus `request()`/`upload()` extrahiert. |
+| **Q-5** | ✅ | 2.68.0 | Listen-Caps (`MP_PAGE_SIZE=100`, `ALL_CONFIRM_THRESHOLD=500`, `REPORT_ROW_CAP=500`) — dependency-frei (kein `react-window`, LXC-Lockfile-sicher). |
+
+**Bewusst NICHT umgesetzt (Nutzer-Entscheidung, kein offener Befund):** Layout-Smell
+`media_dir` (Fotos im Git-Checkout `/opt/zaehler/repo/data` statt bei der DB) — durch
+den Deploy nachweislich sicher (`git reset --hard` nur getrackte Dateien, `git clean`
+nur auf `backend/src/meters/static`); eine Foto-Migration wäre reine Kosmetik mit
+Prod-Daten-Risiko und wurde verworfen.
+
+**§D-Alt-Befunde:** 2.3 war bereits behoben; **7.2** (`ReadingsListPage`-Split),
+**1.5** (Bool/Timestamp-Konvention), **6.3** (Python-`sorted` in `consumption`),
+**7.1** (Audit-Decorator) bleiben offen — alle „niedrig", nicht Teil dieses Backlogs.
+Zurückgestellte Härtungen (TOTP-Encryption-at-rest, `cookie_secure`-LAN-Default,
+Offline-Queue) unverändert wie dokumentiert.
+
 ---
 
 ## Status-Nachtrag (2026-05-29)
