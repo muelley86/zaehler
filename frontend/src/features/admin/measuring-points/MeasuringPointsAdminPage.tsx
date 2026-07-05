@@ -125,6 +125,11 @@ const TYPE_CODEC = setCodec<MeterType>(isMeterType);
 const isIdMember = (x: unknown): x is number | null => x === null || typeof x === 'number';
 const ID_CODEC = setCodec<number | null>(isIdMember);
 
+// Client-seitiges inkrementelles Rendern: bei Firmen-Skala (hunderte MPs)
+// nicht alle Karten auf einmal in den DOM haengen. Filter grenzt zuerst ein;
+// „Weitere anzeigen" blendet die naechste Portion ein.
+const MP_PAGE_SIZE = 100;
+
 export function MeasuringPointsAdminPage() {
   const [points, setPoints] = useState<MeasuringPointRead[] | null>(null);
   const [locations, setLocations] = useState<LocationRead[]>([]);
@@ -133,6 +138,7 @@ export function MeasuringPointsAdminPage() {
   const [mieters, setMieters] = useState<MieterRead[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
+  const [visibleCount, setVisibleCount] = useState(MP_PAGE_SIZE);
   // „Filter merken": Filter je Seite in sessionStorage gespiegelt; sonst
   // normales useState (unverändertes Verhalten).
   const { rememberFilters } = useFilterPrefs();
@@ -341,9 +347,18 @@ export function MeasuringPointsAdminPage() {
       ) : null}
 
       <div className="space-y-3">
-        {filtered.map((mp) => (
+        {filtered.slice(0, visibleCount).map((mp) => (
           <MPCard key={mp.id} mp={mp} onChanged={refresh} />
         ))}
+        {filtered.length > visibleCount ? (
+          <Button
+            variant="bordered"
+            size="sm"
+            onClick={() => setVisibleCount((c) => c + MP_PAGE_SIZE)}
+          >
+            Weitere anzeigen ({filtered.length - visibleCount})
+          </Button>
+        ) : null}
         {points && points.length > 0 && filtered.length === 0 ? (
           <div className="text-tertiary">Keine Messstellen für diese Filter.</div>
         ) : null}

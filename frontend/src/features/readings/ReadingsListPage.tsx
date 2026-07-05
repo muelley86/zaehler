@@ -144,6 +144,9 @@ function entriesToItems(entries: EntryRead[], registerIndex: Map<number, Registe
 // Seitengröße der serverseitigen Pagination; „Weitere 50" lädt die nächste
 // Seite vom Server nach, „Alle" lädt alle Treffer.
 const PAGE_SIZE = 50;
+// Ab dieser Trefferzahl fragt „Alle anzeigen" vorher nach — das Laden UND
+// Rendern der vollen Menge (bei Firmen-Skala evtl. tausende) kann kurz haken.
+const ALL_CONFIRM_THRESHOLD = 500;
 
 export function ReadingsListPage() {
   const { me } = useAuth();
@@ -422,6 +425,14 @@ export function ReadingsListPage() {
   }
 
   async function loadAll(): Promise<void> {
+    if (
+      total > ALL_CONFIRM_THRESHOLD &&
+      !window.confirm(
+        `„Alle anzeigen" lädt und zeigt ${total} Einträge auf einmal — das kann kurz haken. Fortfahren?`,
+      )
+    ) {
+      return;
+    }
     const gen = genRef.current;
     try {
       const page = await api.get<EntriesPage>(
