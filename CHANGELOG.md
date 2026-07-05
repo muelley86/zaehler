@@ -10,6 +10,24 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.67.2](https://github.com/muelley86/zaehler/compare/v2.67.1...v2.67.2) (2026-07-05)
+
+
+### Fehlerbehebungen
+
+* **csv:** Formel-Injection-Schutz im Dashboard-Export vereinheitlichen (N-6) ([#298](https://github.com/muelley86/zaehler/issues/298)) ([f537511](https://github.com/muelley86/zaehler/commit/f5375113bd2c3acc925d3f1d317ac3a8a9665c02))
+* **db:** Partial-Unique-Index gegen ueberlappende offene Zuordnungen (P-5) ([#300](https://github.com/muelley86/zaehler/issues/300)) ([9797515](https://github.com/muelley86/zaehler/commit/9797515dad8cde0f7fd22b3a9994ada50fb83b18))
+* **deploy:** Command-Injection-Schutz + /tmp-Race + SC2155 in zaehler.sh ([#296](https://github.com/muelley86/zaehler/issues/296)) ([8141bec](https://github.com/muelley86/zaehler/commit/8141becffedc59188e8c6c19e2b0a9ddd46fb96d))
+* **deps:** starlette 1.3.1 + python-multipart 0.0.32 (DoS-CVEs) ([#294](https://github.com/muelley86/zaehler/issues/294)) ([094bb39](https://github.com/muelley86/zaehler/commit/094bb396a8b684e79d05a5f6ba883ba69465cd1c))
+* **frontend:** Token-Format-Gate + localStorage-Validierung (N-8, N-9) ([#299](https://github.com/muelley86/zaehler/issues/299)) ([e6843b0](https://github.com/muelley86/zaehler/commit/e6843b03ad2133b117c8d4018b595b27a02e7a1f))
+* **restore:** Zip-Bomb-Deckel, Staging-Race-Schutz, Upload-Cap ([#297](https://github.com/muelley86/zaehler/issues/297)) ([bcec847](https://github.com/muelley86/zaehler/commit/bcec847f35d06af0f48349f70526e808656a1700))
+* **security:** Stammdaten-Read (Owner/Supplier/Mieter) admin-only (N-1) ([#295](https://github.com/muelley86/zaehler/issues/295)) ([aeff739](https://github.com/muelley86/zaehler/commit/aeff739960e4028b60147302f500cc859a912682))
+
+
+### Dokumentation
+
+* **audit:** Voll-Audit 2026-07-04 (v2.67.1) ([#293](https://github.com/muelley86/zaehler/issues/293)) ([d8e9829](https://github.com/muelley86/zaehler/commit/d8e98295ca691a093eb2b43225b9d109195e2887))
+
 ## [2.67.1](https://github.com/muelley86/zaehler/compare/v2.67.0...v2.67.1) (2026-06-30)
 
 
