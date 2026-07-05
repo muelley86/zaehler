@@ -28,19 +28,12 @@ interface RequestOptions {
   signal?: AbortSignal;
 }
 
-async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
-  const { method = 'GET', body, signal } = options;
-  const init: RequestInit = {
-    method,
-    credentials: 'same-origin',
-    headers: { Accept: 'application/json' },
-  };
-  if (signal) init.signal = signal;
-  if (body !== undefined) {
-    init.headers = { ...init.headers, 'Content-Type': 'application/json' };
-    init.body = JSON.stringify(body);
-  }
-  const resp = await fetch(`${API_BASE}${path}`, init);
+/**
+ * Gemeinsames Response-Handling für ``request`` und ``upload``: 204 → undefined,
+ * sonst JSON parsen; Fehler-Responses werden zur typisierten ``ApiError``
+ * (RFC-7807, Fallback aus statusText/status).
+ */
+async function parseJsonResponse<T>(resp: Response): Promise<T> {
   if (resp.status === 204) {
     return undefined as T;
   }
@@ -56,6 +49,22 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   return data as T;
 }
 
+async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
+  const { method = 'GET', body, signal } = options;
+  const init: RequestInit = {
+    method,
+    credentials: 'same-origin',
+    headers: { Accept: 'application/json' },
+  };
+  if (signal) init.signal = signal;
+  if (body !== undefined) {
+    init.headers = { ...init.headers, 'Content-Type': 'application/json' };
+    init.body = JSON.stringify(body);
+  }
+  const resp = await fetch(`${API_BASE}${path}`, init);
+  return parseJsonResponse<T>(resp);
+}
+
 async function upload<T>(path: string, method: 'PUT' | 'POST', formData: FormData): Promise<T> {
   // Multipart-Upload: kein Content-Type setzen — der Browser muss den
   // ``multipart/form-data; boundary=…`` selbst generieren.
@@ -65,17 +74,7 @@ async function upload<T>(path: string, method: 'PUT' | 'POST', formData: FormDat
     headers: { Accept: 'application/json' },
     body: formData,
   });
-  if (resp.status === 204) return undefined as T;
-  const text = await resp.text();
-  const data: unknown = text ? JSON.parse(text) : null;
-  if (!resp.ok) {
-    const problem: ProblemDetails =
-      data && typeof data === 'object'
-        ? (data as ProblemDetails)
-        : { title: resp.statusText, status: resp.status };
-    throw new ApiError(problem);
-  }
-  return data as T;
+  return parseJsonResponse<T>(resp);
 }
 
 export const api = {
