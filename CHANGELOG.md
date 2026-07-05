@@ -10,6 +10,19 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.68.0](https://github.com/muelley86/zaehler/compare/v2.67.3...v2.68.0) (2026-07-05)
+
+
+### Funktionen
+
+* **lists:** Cap/Hinweis fuer grosse Listen (Q-5) ([#306](https://github.com/muelley86/zaehler/issues/306)) ([c423808](https://github.com/muelley86/zaehler/commit/c4238083a61db1e6e7a8542f8603cb79a3750ace))
+
+
+### Refactoring
+
+* **api:** parseJsonResponse aus request/upload extrahieren (Q-4) ([#304](https://github.com/muelley86/zaehler/issues/304)) ([cca27d8](https://github.com/muelley86/zaehler/commit/cca27d84619a8987b92c2f2ff34b3a93174fbd76))
+* **measuring-points:** generische AssignmentHistoryCard (Q-1) ([#305](https://github.com/muelley86/zaehler/issues/305)) ([c20fb81](https://github.com/muelley86/zaehler/commit/c20fb81819f27997d025fdbe7184d5b02e32a31f))
+
 ## [2.67.3](https://github.com/muelley86/zaehler/compare/v2.67.2...v2.67.3) (2026-07-05)
 
 
