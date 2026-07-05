@@ -15,6 +15,7 @@ import {
   TypeBadge,
 } from '@/components/ui';
 import { PageGlows } from '@/components/PageGlows';
+import { isValidToken } from '@/features/scanner/parseScannedUrl';
 import { ApiError, api, isPlausibilityWarning } from '@/lib/api';
 import { formatDateTimeDe, formatDe, localInputToIso, nowForInput, parseDe } from '@/lib/format';
 import { mapWithConcurrency } from '@/lib/concurrency';
@@ -135,13 +136,23 @@ export function RecordReadingPage() {
     const next = new URLSearchParams(searchParams);
     next.delete('token');
 
+    // Token-Format prüfen, BEVOR es in den API-Pfad eingebaut wird — ein
+    // manipulierter Query-Param (z. B. `..%2f..`) darf den Fetch-Pfad nicht
+    // verschieben. Gleiche Prüfung wie beim gescannten QR-Code.
+    const token = tokenParam.trim();
+    if (!isValidToken(token)) {
+      setParamWarning('Ungültiger QR-Code.');
+      setSearchParams(next, { replace: true });
+      return;
+    }
+
     api
-      .get<QrTokenResolveResponse>(`/qr-tokens/${tokenParam}/resolve`)
+      .get<QrTokenResolveResponse>(`/qr-tokens/${encodeURIComponent(token)}/resolve`)
       .then((resolved) => {
         if (resolved.measuring_point_id !== null) {
           setMpId(resolved.measuring_point_id);
         } else if (resolved.can_assign) {
-          setAssignToken(tokenParam);
+          setAssignToken(token);
         } else {
           setParamWarning(
             'Dieser QR-Code ist noch keiner Messstelle zugeordnet — bitte den Admin um die Zuordnung bitten.',

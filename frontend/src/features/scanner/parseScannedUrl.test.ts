@@ -8,7 +8,23 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { parseScannedUrl } from './parseScannedUrl';
+import { isValidToken, parseScannedUrl } from './parseScannedUrl';
+
+describe('isValidToken — Format-Gate vor dem API-Pfad (N-8)', () => {
+  it('akzeptiert 8-Zeichen-Crockford-Base32 (beide Schreibweisen)', () => {
+    expect(isValidToken('K7MP3X9F')).toBe(true);
+    expect(isValidToken('k7mp3x9f')).toBe(true);
+  });
+
+  it('lehnt falsche Länge, Pfad-Anteile und Traversal-Sequenzen ab', () => {
+    expect(isValidToken('K7MP3X9')).toBe(false); // 7 Zeichen
+    expect(isValidToken('K7MP3X9FF')).toBe(false); // 9 Zeichen
+    expect(isValidToken('../../users')).toBe(false);
+    expect(isValidToken('..%2f..%2f')).toBe(false);
+    expect(isValidToken('K7MP3X9I')).toBe(false); // I ist nicht im Alphabet
+    expect(isValidToken('')).toBe(false);
+  });
+});
 
 describe('parseScannedUrl — /q/<token> Shortpath (Default ab 2.x)', () => {
   it('parst eine vollständige URL mit /q/<token>', () => {
