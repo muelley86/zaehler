@@ -25,6 +25,12 @@ class ConsumptionPoint:
     unit: str
 
 
+# Request-scoped Memoisierung von ``consumption_for_measuring_point`` je
+# ``measuring_point_id``. Wird pro Request angelegt und durchgereicht (Dashboard,
+# Reports, virtuelle MPs), damit dieselbe MP-Historie nicht mehrfach geladen wird.
+PointsCache = dict[int, list["ConsumptionPoint"]]
+
+
 def _pairwise(readings: list[Reading]) -> Iterator[tuple[Reading, Reading]]:
     it = iter(readings)
     try:
@@ -104,8 +110,17 @@ def consumption_for_measuring_point(
     db: DbSession,
     *,
     measuring_point_id: int,
+    cache: PointsCache | None = None,
 ) -> list[ConsumptionPoint]:
-    """Aggregiert Verbrauch über alle PhysicalMeter und Register einer MeasuringPoint."""
+    """Aggregiert Verbrauch über alle PhysicalMeter und Register einer MeasuringPoint.
+
+    ``cache`` (optional) memoisiert das Ergebnis je ``measuring_point_id`` für die
+    Dauer EINES Requests — damit dieselbe MP-Historie nicht mehrfach geladen wird
+    (z. B. eine reale MP, die auch Komponente einer virtuellen MP ist). Aufrufer
+    mutieren die zurückgegebene Liste nicht.
+    """
+    if cache is not None and measuring_point_id in cache:
+        return cache[measuring_point_id]
     mp = db.scalar(
         select(MeasuringPoint)
         .where(MeasuringPoint.id == measuring_point_id)
@@ -126,6 +141,8 @@ def consumption_for_measuring_point(
         for register in meter.registers:
             out.extend(consumption_for_register(register, transformer_factor=factor))
     out.sort(key=lambda p: (p.period_end, p.obis_code))
+    if cache is not None:
+        cache[measuring_point_id] = out
     return out
 
 

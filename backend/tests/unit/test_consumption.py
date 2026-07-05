@@ -94,6 +94,49 @@ def test_consumption_simple_increase(db: Session) -> None:
     assert [p.consumption for p in points] == [Decimal("10.0"), Decimal("15.0")]
 
 
+def test_consumption_cache_skips_second_load(db: Session) -> None:
+    """P-3/P-4: der Request-Cache liefert die MP-Historie beim zweiten Aufruf
+    ohne erneute DB-Query und identisch (dieselbe Liste)."""
+    from sqlalchemy import event
+
+    from meters.db import engine
+    from meters.services.consumption import PointsCache
+
+    mp = _make_point(db)
+    register = mp.physical_meters[0].registers[0]
+    db.add(
+        Reading(
+            register_id=register.id,
+            value=Decimal("130.0"),
+            reading_at=datetime(2024, 4, 1),
+            created_by_user_id=_ensure_user(db),
+        )
+    )
+    db.commit()
+
+    uncached = consumption_for_measuring_point(db, measuring_point_id=mp.id)
+    cache: PointsCache = {}
+    first = consumption_for_measuring_point(db, measuring_point_id=mp.id, cache=cache)
+    # Ergebnis mit Cache == ohne Cache.
+    assert [(p.period_end, p.consumption) for p in first] == [
+        (p.period_end, p.consumption) for p in uncached
+    ]
+
+    # Zweiter Aufruf trifft den Cache: keine DB-Query, dieselbe Liste zurueck.
+    queries: list[str] = []
+
+    def collect(_c: object, _cur: object, statement: str, *_a: object, **_kw: object) -> None:
+        queries.append(statement)
+
+    event.listen(engine, "before_cursor_execute", collect)
+    try:
+        second = consumption_for_measuring_point(db, measuring_point_id=mp.id, cache=cache)
+    finally:
+        event.remove(engine, "before_cursor_execute", collect)
+    assert second is first
+    assert queries == []
+
+
 def test_consumption_rollover(db: Session) -> None:
     mp = _make_point(db)
     register = mp.physical_meters[0].registers[0]
