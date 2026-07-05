@@ -1,6 +1,9 @@
 """Eigentuemer — zentraler Stammdatensatz fuer Messstellen-Eigentuemer.
 
-Lesen darf jeder eingeloggte User (Filter/Auswahl-UI), Schreiben nur Admin.
+Lesen UND Schreiben nur Admin: Eigentuemer-Stammdaten enthalten personenbezogene
+Daten (Adresse, E-Mail, USt-/Steuer-ID). Recorder brauchen sie nicht — die
+Filter-/Auswahl-UI speist sich aus den MP-Feldern ``current_owner_name`` (pro MP
+zugriffsgefiltert), nicht aus diesem Endpoint.
 Beim Loeschen werden ``owner_assignment``-Eintraege via DB-Cascade ``SET
 NULL`` entkoppelt — die historischen Eigentuemer-Perioden bleiben erhalten,
 zeigen aber in der UI „unbekannt".
@@ -29,13 +32,13 @@ router = APIRouter(prefix="/owners", tags=["owners"])
 
 
 @router.get("", response_model=list[OwnerRead])
-def list_owners(db: DbDep, _user: CurrentUser) -> list[OwnerRead]:
+def list_owners(db: DbDep, _admin: AdminUser) -> list[OwnerRead]:
     rows = list(db.scalars(select(Owner).order_by(Owner.name)))
     return [OwnerRead.model_validate(r) for r in rows]
 
 
 @router.get("/{owner_id}", response_model=OwnerRead)
-def get_owner(owner_id: int, db: DbDep, _user: CurrentUser) -> OwnerRead:
+def get_owner(owner_id: int, db: DbDep, _admin: AdminUser) -> OwnerRead:
     obj = db.get(Owner, owner_id)
     if obj is None:
         raise ProblemError(status_code=404, title="Owner not found")
@@ -48,8 +51,9 @@ def list_owner_measuring_points(
 ) -> list[MeasuringPointWithStateRead]:
     """Aktuell diesem Eigentuemer zugeordnete Messstellen, mit aktuellem Stand.
 
-    Quelle der Eigentuemer-Detailseite. Nur offene Zuordnungen; Recorder sehen
-    via ``restrict_mp_query`` nur ihre zugaenglichen MPs.
+    Quelle der Eigentuemer-Detailseite. Liefert nur MP-Daten (keine Owner-PII),
+    daher — anders als die Stammdaten-Liste/-Detail — auch fuer Recorder offen;
+    ``restrict_mp_query`` blendet nicht zugaengliche MPs aus.
     """
     if db.get(Owner, owner_id) is None:
         raise ProblemError(status_code=404, title="Owner not found")

@@ -1,6 +1,9 @@
 """Mieter — zentraler Stammdatensatz fuer (optionale) Messstellen-Mieter.
 
-Lesen darf jeder eingeloggte User (Filter/Auswahl-UI), Schreiben nur Admin.
+Lesen UND Schreiben nur Admin: Mieter-Stammdaten sind personenbezogene Daten
+(Klarname, Privatadresse, E-Mail, Telefon). Recorder brauchen sie nicht — die
+Filter-/Auswahl-UI speist sich aus den MP-Feldern ``current_mieter_name`` (pro
+MP zugriffsgefiltert), nicht aus diesem Endpoint.
 Mieter sind natuerliche Personen (Vorname optional, Nachname Pflicht) und
 duerfen namensgleich sein — daher kein UNIQUE. Beim Loeschen werden
 ``mieter_assignment``-Eintraege via DB-Cascade ``SET NULL`` entkoppelt; die
@@ -41,13 +44,13 @@ _MIETER_FIELDS = (
 
 
 @router.get("", response_model=list[MieterRead])
-def list_mieters(db: DbDep, _user: CurrentUser) -> list[MieterRead]:
+def list_mieters(db: DbDep, _admin: AdminUser) -> list[MieterRead]:
     rows = list(db.scalars(select(Mieter).order_by(Mieter.last_name, Mieter.first_name)))
     return [MieterRead.model_validate(r) for r in rows]
 
 
 @router.get("/{mieter_id}", response_model=MieterRead)
-def get_mieter(mieter_id: int, db: DbDep, _user: CurrentUser) -> MieterRead:
+def get_mieter(mieter_id: int, db: DbDep, _admin: AdminUser) -> MieterRead:
     obj = db.get(Mieter, mieter_id)
     if obj is None:
         raise ProblemError(status_code=404, title="Mieter not found")
@@ -60,8 +63,9 @@ def list_mieter_measuring_points(
 ) -> list[MeasuringPointWithStateRead]:
     """Aktuell diesem Mieter zugeordnete Messstellen, mit aktuellem Stand.
 
-    Quelle der Mieter-Detailseite. Nur offene Zuordnungen; Recorder sehen via
-    ``restrict_mp_query`` nur ihre zugaenglichen MPs.
+    Quelle der Mieter-Detailseite. Liefert nur MP-Daten (keine Mieter-PII),
+    daher — anders als die Stammdaten-Liste/-Detail — auch fuer Recorder offen;
+    ``restrict_mp_query`` blendet nicht zugaengliche MPs aus.
     """
     if db.get(Mieter, mieter_id) is None:
         raise ProblemError(status_code=404, title="Mieter not found")

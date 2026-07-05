@@ -1,6 +1,9 @@
 """Lieferanten — zentraler Stammdatensatz fuer Energie-Verkaeufer.
 
-Lesen darf jeder eingeloggte User (Filter/Auswahl-UI), Schreiben nur Admin.
+Lesen UND Schreiben nur Admin: einheitlich mit Eigentuemer-/Mieter-Stammdaten
+(gleiches Adress-/Kontakt-/USt-Datenmodell). Recorder brauchen sie nicht — die
+Filter-/Auswahl-UI speist sich aus den MP-Feldern ``current_supplier_name`` (pro
+MP zugriffsgefiltert), nicht aus diesem Endpoint.
 Beim Loeschen werden ``supplier_assignment``-Eintraege via DB-Cascade ``SET
 NULL`` entkoppelt — die historischen Lieferanten-Perioden bleiben erhalten,
 zeigen aber in der UI „unbekannt".
@@ -29,13 +32,13 @@ router = APIRouter(prefix="/suppliers", tags=["suppliers"])
 
 
 @router.get("", response_model=list[SupplierRead])
-def list_suppliers(db: DbDep, _user: CurrentUser) -> list[SupplierRead]:
+def list_suppliers(db: DbDep, _admin: AdminUser) -> list[SupplierRead]:
     rows = list(db.scalars(select(Supplier).order_by(Supplier.name)))
     return [SupplierRead.model_validate(r) for r in rows]
 
 
 @router.get("/{supplier_id}", response_model=SupplierRead)
-def get_supplier(supplier_id: int, db: DbDep, _user: CurrentUser) -> SupplierRead:
+def get_supplier(supplier_id: int, db: DbDep, _admin: AdminUser) -> SupplierRead:
     obj = db.get(Supplier, supplier_id)
     if obj is None:
         raise ProblemError(status_code=404, title="Supplier not found")
@@ -48,8 +51,9 @@ def list_supplier_measuring_points(
 ) -> list[MeasuringPointWithStateRead]:
     """Aktuell diesem Lieferanten zugeordnete Messstellen, mit aktuellem Stand.
 
-    Quelle der Lieferanten-Detailseite. Nur offene Zuordnungen; Recorder sehen
-    via ``restrict_mp_query`` nur ihre zugaenglichen MPs.
+    Quelle der Lieferanten-Detailseite. Liefert nur MP-Daten (keine PII), daher
+    — anders als die Stammdaten-Liste/-Detail — auch fuer Recorder offen;
+    ``restrict_mp_query`` blendet nicht zugaengliche MPs aus.
     """
     if db.get(Supplier, supplier_id) is None:
         raise ProblemError(status_code=404, title="Supplier not found")
