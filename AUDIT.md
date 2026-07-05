@@ -10,6 +10,108 @@ Keine Code-Änderungen sind in diesem Audit enthalten — Befunde sind reine Dia
 
 ---
 
+## Voll-Audit (2026-07-04, v2.67.1, HEAD `7e41e1c`)
+
+Anlass: Seit den letzten Audits (Code-Walk 2026-05-05 + Status-Nachtrag 29.05.
+unten; Tool-Audit `audit/security_audit_040626.md`) sind **57 Commits / ~13
+Releases (v2.55–v2.67.1)** dazugekommen, mit großen, bis dato **nie auditierten**
+Features: Voll-Backup-ZIP + GUI-Restore, virtuelle (verrechnete) Messstellen,
+Eigentümer-/Lieferanten-/Mieter-Stammdaten mit periodisierten Zuordnungen,
+Reports-Erweiterungen, Node-24-Anhebung. Zusätzlich rückt der geplante
+**Firmen-Rollout** Skalierung in den Vordergrund.
+
+Methodik: Tool-Sweep (dieselbe Suite wie Juni, Roh-Ausgaben in
+`audit/raw-20260704/`) + 4 parallele Code-Walks (Security Backend, Security
+Frontend/Deploy/CI, Performance/Skalierung Backend, Frontend-Qualität). **Jeder**
+Befund wurde anschließend einzeln im Quelltext (und wo relevant gegen die Tests)
+nachverifiziert; nicht belegbare Tool-/Agenten-Treffer sind unten transparent als
+False Positives geführt. Kein Anwendungscode wurde in diesem Audit geändert.
+
+Schweregrade: **hoch** (Sicherheitslücke/Korrektheits- oder Skalierungsproblem mit
+breiter Wirkung), **mittel** (eingeschränkter Blast-Radius / Härtung), **niedrig**
+(Hygiene). Keine **kritischen** Befunde.
+
+### A. Neue Befunde (verifiziert)
+
+| ID | Schweregrad | Datei:Zeile | Befund | Minimal-Fix (funktionserhaltend) |
+|---|---|---|---|---|
+| **N-1** | hoch | `api/v1/{mieters,owners,suppliers}.py:43/31/31` (`list_*`, `CurrentUser` statt `AdminUser`) | Jeder eingeloggte **Recorder** kann per `GET /api/v1/mieters` bzw. `/owners`/`/suppliers` die **komplette** Stammdatenliste systemweit lesen — inkl. Mieter-Klarname + **Privatadresse/E-Mail/Telefon** und Eigentümer-**USt-/Steuer-ID** — unabhängig von seinem `UserMeasuringPointAccess`. Durch Test `test_mieters.py:96` / `test_owners.py` (Recorder → 200) belegt; per Docstring als „jeder eingeloggte User darf lesen" **bewusst** so gebaut, durchbricht aber das sonst konsequente 404-statt-403-Zugriffsmodell für die sensibelsten PII. DSGVO-relevant beim Firmen-Rollout (Recorder Standort A sieht Mieter-PII aller Standorte). | Für Nicht-Admins reduziertes Read-Modell (nur `id` + Anzeigename für Dropdown/Filter) oder separater `…/lookup`-Endpoint; volle Felder admin-only. **Funktionsrisiko:** Recorder-Frontend gegenprüfen, ob es mehr als den Namen braucht (Filter-UI nutzt nur `id`+Label). |
+| **N-2** | hoch | Deps: `starlette 1.0.1`, `python-multipart 0.0.27` (`backend/uv.lock`) | Zwei **produktionswirksame** DoS-CVEs (osv-scanner): starlette urlencoded-Form-DoS (GHSA-82w8-qh3p-5jfq, CVSS 7.5 — `request.form()` ignoriert `max_fields`/`max_part_size` bei `x-www-form-urlencoded`) und python-multipart quadratische Parse-Zeit bei Semikolon-Feldern (GHSA-5rvq-cxj2-64vf, 7.5). Unauth. erreichbar über jeden Form-Endpoint (Login-POST). | `starlette>=1.3.1`, `python-multipart>=0.0.30`. FastAPI 0.136.1 verlangt nur `starlette>=0.46` → Bump kollisionsfrei. Deploy-sicher **ohne** pnpm/uv-Overrides (Lehre aus #241/#242). **Funktionsrisiko:** minimal, Patch-/Minor-Bumps. |
+| **N-3** | mittel | `services/restore.py:164-201` (`_extract_archive`) | Restore-ZIP: `_copy_limited` begrenzt nur die **komprimierte** Upload-Größe (1 GiB). Beim Entpacken wird weder `member.file_size` noch eine laufende Summe geprüft → **Dekompressions-Bombe** kann das Filesystem füllen → Totalausfall (SQLite-Writes/WAL) für alle. Admin-only, aber mit dem Rollout viele Admin-Konten. | In `_extract_archive` vor dem Kopieren `member.file_size` + laufende Gesamtsumme gegen harten Deckel prüfen (JPEGs komprimieren kaum → großzügiger Faktor bricht nichts). **Funktionsrisiko:** keins für legitime Backups. |
+| **N-4** | mittel | `services/restore.py:114-128` + `216-235` (`_cleanup_expired`/`stage_upload`) | Ein Staging-Verzeichnis wird erst **am Ende** von `_stage_into` in `_staged` registriert. Ein parallel laufender zweiter Upload sieht es als „verwaist" und `rmtree`t es mitten im ersten Vorgang → unbehandelte `FileNotFoundError` (500) im Wartungs-Flow. Kein TTL-Ablauf nötig, nur zeitliche Überlappung (großes Backup, langsame Leitung, Mehr-Admin). | Verzeichnis sofort nach `mkdir()` in eine lock-geschützte „reserved"-Menge eintragen; Orphan-Sweep respektiert sie. **Funktionsrisiko:** rein interne State-Verwaltung. |
+| **N-5** | mittel | `api/v1/restore.py:28`, `api/v1/imports.py:29` | Kein Rate-Limit / keine Nebenläufigkeitsbegrenzung auf `/restore/upload` (bis 1 GiB + Extraktion/Integritätscheck je Aufruf) und `/imports/*` (openpyxl-Parsing). Einziger Limiter im Backend ist Login/2FA. Zweite Verteidigungslinie fehlt (kompromittiertes Admin-Konto). | Vorhandenes Limiter-Muster pro `user.id` wiederverwenden, oder Anzahl offener `_staged`-Einträge deckeln (sonst 429). **Funktionsrisiko:** keins bei sinnvoller Schwelle (Restore/Import selten). |
+| **N-6** | mittel | `features/dashboard/DashboardPage.tsx:838-843` (`csvField`) | Dashboard-CSV-Export fehlt der **Formel-Injection-Schutz** (`'`-Präfix bei führendem `= + - @`), den `ReadingsListPage.tsx`/`ReportsPage.tsx` haben **und CLAUDE.md für alle drei Frontend-CSVs dokumentiert**. Exportierte Freitextfelder (`mp.name`, `current_owner_name`, `main_location_name`, `installation_location`) landen unescaped → CSV-Formel-Injection in Excel/Calc (CWE-1236). | `^[=+\-@]`-Präfix-Behandlung ergänzen; sauber: gemeinsames `lib/csv.ts` (DRY gegen künftige Drift). **Funktionsrisiko:** keins für normale Werte. |
+| **N-7** | mittel | `deploy/lxc/zaehler.sh:552,1377,1512` (`as_user`, `:140`) | `as_user()` führt `sudo -u zaehler bash -lc "... $*"` aus — **zweite** Shell-Auswertung. Das Passwort wird via `--password '$WIZ_ADMIN_PASSWORD'`/`$admin_pw`/`$pw` interpoliert; nur Längenprüfung (≥12), keine Zeichenprüfung. Ein `'` bricht aus → Command-Injection als User `zaehler` (darf `systemctl restart`, schreibt `meters.env`/`METERS_SECRET_KEY`). Bricht mindestens jede Provisionierung mit `ADMIN_PASSWORD` aus einem Secret-Store, dessen Zeichensatz nicht kontrolliert ist (`install`/`fix-database`/`reset-password`). | Passwort vor Interpolation escapen: `pw_esc=${WIZ_ADMIN_PASSWORD//\'/\'\\\'\'}` → `--password '$pw_esc'` (o. `printf %q`). **Funktionsrisiko:** keins; Passwörter mit `'` funktionieren danach zusätzlich korrekt. |
+| **N-8** | niedrig | `features/readings/RecordReadingPage.tsx:132`, `features/scanner/TokenAssignSheet.tsx:44` | `?token=`-Query-Param wird — anders als überall sonst (`parseScannedUrl` mit `TOKEN_RE`, Print-Sheet mit `encodeURIComponent`) — **ungeprüft/unkodiert** in `api.get(\`/qr-tokens/${tokenParam}/resolve\`)` interpoliert. `..%2f`-Sequenzen verschieben den (credentialed) Fetch-Pfad same-origin. Backend-AuthZ + POST-only-Mutationen mildern die Wirkung. | Vor Nutzung `TOKEN_RE`-Prüfung (sonst verwerfen) bzw. `encodeURIComponent`. **Funktionsrisiko:** keins; gültige 8-Zeichen-Tokens unverändert. |
+| **N-9** | niedrig | `features/admin/qr-codes/QrCodesAdminPage.tsx:74` (`loadPrefs`), `QrTokensPrintSheet.tsx:293` | localStorage-Druckparameter (`marginTopMm`…) werden per `as Partial<StoredPrefs>` **ohne Laufzeitprüfung** übernommen und unescaped in ein `style="…"`-Attribut via `document.write()` interpoliert. Ein `"` bricht aus dem Attribut → HTML/CSS-Injection im Druckfenster (CSP `script-src 'self'` verhindert Skript). Braucht Erst-Zugriff (DevTools/andere XSS). | Beim Laden je Feld `Number.isFinite(...)` prüfen (Fallback Default), analog zur schon vorhandenen `handleChange`-Validierung. **Funktionsrisiko:** keins für gültige Werte. |
+| **N-10** | niedrig | `deploy/lxc/zaehler.sh:183-191` | Neu mit #290 (Node-24): NodeSource-Installer wird nach festem `/tmp/nodesource_setup.sh` geladen und als root ausgeführt (TOCTOU/Symlink-Race; keine Signaturprüfung). LXC ist Einzelzweck-Container → Risiko klein. | `tmp_setup=$(mktemp)` statt festem Pfad. **Funktionsrisiko:** keins. |
+| **N-11** | niedrig | `deploy/systemd/zaehler.service:37,59` | `ReadWritePaths=/opt/zaehler` weiter als nötig (wegen `uv run`-Re-Sync beim Start) → RCE im App-Prozess könnte eigenen Code/venv persistent ändern. | `ExecStart … uv run --no-sync …` + `ReadWritePaths=/opt/zaehler/data`. **Funktionsrisiko:** prüfen — `--no-sync` startet bei pyproject-Drift ohne Auto-Sync; Deploy macht `uv sync --frozen` bereits separat. Beide Deploy-Varianten unberührt. |
+| **N-12** | niedrig | `api/v1/imports.py:43-45` | Import liest die Datei komplett (`file.file.read()`), **dann** erst 5-MB-Prüfung — inkonsistent zum chunk-weisen `_copy_limited`. Bei 5-MB-Cap harmlos, würde bei Limit-Anhebung/Wiederverwendung zum Problem. | Chunkweise lesen + früh abbrechen. **Funktionsrisiko:** keins (gleicher 400). |
+
+### B. Skalierungs-Befunde (Firmen-Rollout, verifiziert)
+
+| ID | Schweregrad | Datei:Zeile | Befund | Minimal-Fix |
+|---|---|---|---|---|
+| **P-1** | hoch | `api/v1/measuring_points.py:194-216` (`measuring_points_with_state`) | Reicht **keine** Bulk-Dicts durch → jede MP fällt auf `current_assignment`+`current_supplier_assignment`+`current_mieter_assignment` **und** `state_for_measuring_point` einzeln zurück ≈ **1 + 6·N Queries**. Genutzt von `GET /{owners,suppliers,mieters,locations,main-locations}/{id}/measuring-points`. Bei 150 MPs >900 Roundtrips je Detailseite. Das korrekte Bulk-Muster existiert bereits in `list_measuring_points:226-254`. | Bulk-Dicts (`current_*_assignments_bulk`) durchreichen + Bulk-State-Query über alle MP-IDs. **Funktionsrisiko:** keins (identische Werte/Reihenfolge). |
+| **P-2** | hoch | `api/v1/dashboard.py:85-121` | Schleife über alle zugänglichen MPs ruft `state_for_measuring_point` (pro MP) + bei Nicht-Monats-Granularität `consumption_for_measuring_point` (lädt **komplette** Historie je MP) auf; `from_at`/`to_at` filtern erst in Python → Datenmenge wächst mit Gesamt-Historie, nicht mit dem Zeitraum. | State bulk (eine Query über alle MP-IDs) + Request-Cache `mp_id→points` (mit P-3/P-4 geteilt). **Funktionsrisiko:** keins bei korrektem Bulk; Cache nur pro Request. |
+| **P-3** | hoch | `services/virtual_measuring_point.py:86-95` + `dashboard.py:134-154` | Virtuelle MPs laden die volle Komponenten-Historie erneut, obwohl dieselbe MP im selben Request oft schon geladen wurde → dieselbe teure Voll-Ladung 2–3× pro Request. | Gemeinsames `points_cache` durchreichen. **Funktionsrisiko:** keins (identische Rohpunkte). |
+| **P-4** | hoch | `services/report_aggregation.py:177-180` | `aggregate_report` iteriert über **alle** MPs des Mandanten und lädt bei Nicht-Monats-Granularität pro MP die volle Historie (auch `/reports/aggregate.csv`); kein Zeitraum-Pushdown in SQL. | Gemeinsamer Request-Cache (mit P-2/P-3); mittelfristig `daily_consumption`-Materialisierung analog `monthly_consumption`. **Funktionsrisiko:** keins bei Caching der Rohpunkte. |
+| **P-5** | mittel | `services/{owner,supplier,mieter}_assignment.py` + Migrationen `20260528_1228`/`20260612_1100`/`20260615_1200` | Invariante „genau ein offenes Assignment je MP" nur per Check-then-Insert in der App; **kein** Partial-Unique-Index `WHERE valid_to IS NULL` (Migrationen legen nur `unique=False`-Indizes an). Zwei parallele Admin-Requests können still zwei offene Perioden anlegen. Referenzmuster existiert: `20260505_1000_one_active_meter.py`. | Partial-Unique-Index je Tabelle + `IntegrityError`→409 (wie `replace_meter_endpoint`). **Funktionsrisiko:** keins im Normalbetrieb (spiegelt die App-Prüfung). |
+| **P-6** | mittel | `api/v1/search.py:74-111` | Kein `.limit()` im SQL: kurzer Substring (`MIN_QUERY_LEN=2`) matcht bei großer Firma viele MPs, alle werden voll eager-geladen (Location/MainLocation/PhysicalMeter/Owner-Historie) + in Python sortiert, erst dann auf `limit` gekürzt. | SQL-Hard-Cap `.limit(1000)` (deutlich > `MAX_LIMIT=200`) vor der Python-Sortierung. **Funktionsrisiko:** minimal (Cap großzügig). |
+| **P-7** | mittel | `services/monthly_consumption.py:136-150` (`_after_commit`) | Cache-Neuberechnung ist **nicht** O(n²) (dedupliziert auf Register), läuft aber **synchron** im Request-Thread; ein initialer Massenimport (hunderte Register) blockiert die Response → Reverse-Proxy-Timeout-Risiko. | Für `/imports/readings/commit` `_SKIP_KEY` setzen + Recompute via `BackgroundTasks` nach Response. **Funktionsrisiko:** kurz veraltete Monats-Diagramme bis der Task durch ist (wie bereits akzeptiertes Stale-Verhalten). |
+
+### C. Frontend-Qualität (verifiziert)
+
+| ID | Schweregrad | Datei:Zeile | Befund | Minimal-Fix |
+|---|---|---|---|---|
+| **Q-1** | mittel | `features/admin/measuring-points/MeasuringPointDetailPage.tsx:1561-2560` | ~970 Zeilen (38 %) sind 3× struktur-identische Historien-Cards (Owner/Mieter/Supplier; Kommentar: „1:1-Spiegel"). Jede Verhaltensänderung 3× pflegen → Drift-Gefahr. | Generische `AssignmentHistoryCard<T>` (analog vorhandenem `MasterDataList<T>`). **Funktionsrisiko:** keins bei sorgfältiger Extraktion. |
+| **Q-2** | mittel | s. Datei `:101-154,203-213` | Geteilter `tick`-Zähler: jede Card-Änderung triggert **beide** Top-Level-`useEffect`s (4 Requests), auch irrelevante. | Card-spezifische `onChanged`-Callbacks / PATCH-Rückgabewert statt Full-Refetch. **Funktionsrisiko:** gering — prüfen, dass Stammdaten-Card nach Perioden-Wechsel aktuell bleibt. |
+| **Q-3** | mittel | s. Datei `:1245-1254` (`RegisterTable`) | Map+flatMap+sort bei jedem Render, während das analoge `sortedMeters:725` bewusst `useMemo` hat. | `useMemo([states, mp.physical_meters])`. **Funktionsrisiko:** keins. |
+| **Q-4** | mittel | `lib/api.ts:31-79` | `request()` und `upload()` duplizieren Response-Parsing/`ProblemDetails`/`ApiError` wortgleich. | Gemeinsame `parseJsonResponse<T>()`-Hilfsfunktion. **Funktionsrisiko:** keins. |
+| **Q-5** | niedrig–mittel *(unsicher, skalenabhängig)* | `MeasuringPointsAdminPage.tsx:343`, `ReadingsListPage.tsx:423/740`, `ReportsPage.tsx:793/847` | Ungebremstes Rendern großer Listen/Tabellen (MP-Liste, „Alle anzeigen", Report-Tabellen) ohne Virtualisierung/Cap — heute (Haushalt) unkritisch, beim Firmen-Rollout spürbar. | Warnschwelle/Cap oder Virtualisierung (`react-window`) ab >100–500 Zeilen; CSV als Pfad für große Mengen. **Funktionsrisiko:** Virtualisierung ändert DOM → RTL-Tests anpassen. |
+
+### D. Status der 5 offenen Alt-Befunde (aus Nachtrag 2026-05-29)
+
+- **2.3** (Dashboard-Datumsfilter per String-`.slice(0,10)`): ✅ **behoben** — Zeitraum geht als `from_at`/`to_at`-Query an `/dashboard` (`DashboardPage.tsx:215`).
+- **7.2** (`ReadingsListPage.tsx` >1000 Z.): ⬜ **offen** — 1492 Z. (intern via `memo`/`useCallback` sauber, nur Datei-Split offen).
+- **1.5** (`register.is_active` bool vs. `physical_meter.removed_at` timestamp): ⬜ **offen** (Design-Entscheidung, kein Bug).
+- **6.3** (`services/consumption.py` Python-`sorted()`): ⬜ **offen** (bewusst, kleine Mengen; siehe aber P-2/P-4, die dieses Laden in heißen Pfaden multiplizieren).
+- **7.1** (Audit-`record()` inline dupliziert): ⬜ **offen** — 56 Aufrufe über 15 Dateien, kein Decorator/Context-Manager.
+
+### E. Bewusst NICHT als Befund gewertet (False Positives / bekannt / zurückgestellt)
+
+Belegt die „keine False Positives"-Anforderung — diese Tool-/Agenten-Treffer wurden geprüft und verworfen:
+
+- **Bandit B608** `restore.py:158` (`SELECT COUNT(*) FROM "{table}"`): Tabellenname aus **fester** interner Whitelist (`user`/`measuring_point`/`reading`/`reading_photo`), kein User-Input → **False Positive**.
+- **Bandit B104** `config.py:62` (`0.0.0.0`) & **Semgrep bcrypt-hash** `auth.py:34` (`_DUMMY_PASSWORD_HASH`, Anti-Timing) & **Default `secret_key`** (Boot-Assertion): **bekannt/bewusst**, unverändert.
+- **Semgrep Flask-format-string** `qr_tokens.py:87`, `qr.py:67`: FastAPI liefert JSON/String, kein Flask-HTML-Template; f-String baut nur eine URL — **False Positive** (Flask-Heuristik auf FastAPI).
+- **Semgrep logger-credential-leak** `qr_tokens.py:254`: loggt `token_str[:2]…` (maskiert), kein Secret → **False Positive**.
+- **Semgrep postMessage `'*'`** `handoff/mockup/tweaks-panel.jsx`: Mockup, **nicht ausgeliefert** → **False Positive**.
+- **Semgrep uv/pnpm-Supply-Chain-Hygiene** (`exclude-newer`/`minimumReleaseAge`/`blockExoticSubdeps`/`trustPolicy`): Härtungs-**Empfehlungen**, keine Schwachstellen; als optionale Supply-Chain-Härtung fürs Rollout notiert (niedrig), kein Befund.
+- **osv `pydantic-settings` 2.14.0→2.14.2** (GHSA-4xgf, 7.1): Symlink-Bypass **nur** bei `secrets_nested_subdir=True` — App nutzt das nicht → **nicht ausnutzbar** (Mitnahme-Bump optional).
+- **osv `starlette` GHSA-wqp7 (SSRF)**: nur Windows (UNC/`StaticFiles`); LXC ist Linux → **nicht anwendbar** (durch N-2-Bump ohnehin miterledigt).
+- **osv `form-data` 4.0.5→4.0.6** (npm, 8.7): **dev-only** (via `jsdom`→`vitest`), nicht ausgeliefert → niedrig, kein Prod-Befund.
+- **gitleaks (5 Treffer)**: ausschließlich Test-Passwörter in `backend/tests/` → **bekannt**.
+- **trufflehog**: 0. **zizmor**: 0 (CI-Härtung nach Node-24 #290 intakt). **checkov**: 0. **shellcheck SC2155** `zaehler.sh:822,1364`: Rückgabewert-Maskierung, niedrig (schon im Juni notiert).
+- **Zurückgestellte Items** (nicht neu „entdeckt"): TOTP-Secret-Klartext-at-rest, `cookie_secure`-LAN-Default, HMAC-Session-Lookup nicht constant-time, Offline-Queue (PWA). Unverändert wie dokumentiert.
+- **Sauber gegengeprüft (kein Befund):** Zip-Slip/Symlink im Restore (Whitelist-Extraktion + `test_restore_ignores_zip_slip_entries`), Maintenance-503-Gate, Restore-Rollback-Vollständigkeit, virtuelle-MP-Zyklen (FK nur auf reale MP), Foto-IDOR/Traversal (`photo_full_path` `resolve()`+`is_relative_to`, Pillow-Decode), `search`/`entries`/`dashboard`/`report_aggregation` MP-Zugriffsfilter, QR-Assign-Scope, Origin-Check auf Multipart, alle `target="_blank"` mit `rel="noopener"`, kein `dangerouslySetInnerHTML`, kein `any`.
+
+### F. Priorisierter Maßnahmenplan (für den Folge-Schritt, PR-Schnitt)
+
+Getrennte PRs je Themen-Cluster (Konvention: mehrteilige Aufgaben splitten):
+
+1. **`fix(deps)`** — N-2: starlette ≥1.3.1 + python-multipart ≥0.0.30 (ohne Overrides, Lockfile-Regen). *Löst produktive DoS-CVEs, kleinstes Risiko.* Mitnahme optional: pydantic-settings 2.14.2.
+2. **`fix(security)` PII** — N-1: Recorder-Read der Stammdaten auf `id`+Name reduzieren / `…/lookup`-Endpoint; volle Felder admin-only. *Höchste Datenschutz-Priorität für den Rollout.* Frontend-Recorder-Ansicht mitprüfen.
+3. **`fix(deploy)`** — N-7 (Passwort-Escaping) + N-10 (`mktemp`) + N-11 (`--no-sync`/`ReadWritePaths`) + SC2155. *Deploy-Härtung, ein PR.*
+4. **`fix(restore)`** — N-3 (entpackte Größe) + N-4 (Staging-Race) + N-5 (Rate-Limit/Cap). *Restore-Härtungs-Cluster.*
+5. **`fix(csv)`** — N-6: Formel-Schutz Dashboard + Extraktion `lib/csv.ts` (DRY). Kleiner PR.
+6. **`perf(reports)`** — P-1..P-4: Bulk-Loading + geteilter Request-Points-Cache. *Größter Skalierungs-Hebel; ggf. P-1 (Detailseiten) und P-2..P-4 (Dashboard/Reports) in zwei PRs.*
+7. **`fix(db)`** — P-5: Partial-Unique-Index gegen überlappende Zuordnungsperioden (+ Migration + 409-Handling).
+8. **`fix(frontend)`** — N-8 (Token-Validierung) + N-9 (localStorage-Validierung). Kleine Härtungen.
+9. **`chore`/`refactor` (niedrig)** — P-6 (Search-Cap), P-7 (Import-Background-Recompute), N-12; Q-1..Q-5 (Refactors) nach Bedarf.
+
+---
+
 ## Status-Nachtrag (2026-05-29)
 
 Verifikation gegen den aktuellen `main` (HEAD `8efe152`, Release 2.24.4). Geprüft
