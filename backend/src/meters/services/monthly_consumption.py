@@ -11,6 +11,7 @@ Backfill (:func:`recompute_all`, CLI).
 from __future__ import annotations
 
 import logging
+from collections.abc import Iterable
 from datetime import date
 from decimal import Decimal
 
@@ -148,6 +149,37 @@ def _after_commit(session: Session) -> None:
             fresh.commit()
     except Exception:
         _logger.exception("monthly_consumption-Recompute fehlgeschlagen: %s", register_ids)
+
+
+def defer_recompute(session: Session) -> set[int]:
+    """Übernimmt die aktuell als dirty markierten Register (Kopie), unterdrückt
+    die SYNCHRONE Neuberechnung im ``after_commit``-Hook dieser Session und gibt
+    die IDs für eine spätere (Background-)Neuberechnung zurück.
+
+    Für den Massen-Import: der Request soll nicht auf die Neuberechnung hunderter
+    Register warten (Reverse-Proxy-Timeout). Aufrufen NACH dem flush der Roh-
+    Daten (``_DIRTY_KEY`` ist dann befüllt) und VOR dem Commit.
+    """
+    ids = set(session.info.get(_DIRTY_KEY) or ())
+    session.info[_SKIP_KEY] = True
+    return ids
+
+
+def recompute_registers(register_ids: Iterable[int]) -> None:
+    """Neuberechnung der Monats-Werte für die genannten Register in einer eigenen
+    Session — für ``BackgroundTasks``. Fehler werden nur geloggt (Cache bleibt
+    stale, kein Datenverlust); identisches Muster wie ``_after_commit``."""
+    ids = list(register_ids)
+    if not ids:
+        return
+    try:
+        with SessionLocal() as fresh:
+            fresh.info[_SKIP_KEY] = True  # eigene Schreibvorgänge nicht erneut einsammeln
+            for register_id in ids:
+                recompute_register(fresh, register_id)
+            fresh.commit()
+    except Exception:
+        _logger.exception("monthly_consumption-Background-Recompute fehlgeschlagen: %s", ids)
 
 
 def _after_rollback(session: Session) -> None:
