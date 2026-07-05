@@ -38,6 +38,11 @@ router = APIRouter(prefix="/search", tags=["search"])
 MIN_QUERY_LEN = 2
 DEFAULT_LIMIT = 50
 MAX_LIMIT = 200
+# Harte SQL-Obergrenze VOR der Python-Klassifizierung/-Sortierung: ein kurzer
+# Substring (MIN_QUERY_LEN=2) kann bei großem Bestand einen Großteil der Tabelle
+# matchen — jeder Treffer würde sonst voll eager-geladen. Deutlich über
+# MAX_LIMIT, damit reale Suchen (Trefferzahl < Cap) unverändert ranken.
+SEARCH_SQL_CAP = 1000
 
 
 @router.get("", response_model=list[SearchHit])
@@ -100,6 +105,7 @@ def search(
         .distinct()
     )
     stmt = restrict_mp_query(stmt, user, mp_id_column=MeasuringPoint.id)
+    stmt = stmt.limit(SEARCH_SQL_CAP)
 
     hits: list[SearchHit] = []
     for mp in db.scalars(stmt).unique():
