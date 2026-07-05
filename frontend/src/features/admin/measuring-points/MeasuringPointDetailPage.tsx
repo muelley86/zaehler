@@ -100,6 +100,20 @@ export function MeasuringPointDetailPage() {
 
   const refresh = useCallback(() => setTick((t) => t + 1), []);
 
+  // Leichter Refresh nur für Zuordnungs-Cards (Owner/Lieferant/Mieter): eine
+  // Zuordnungsänderung berührt weder Register/State noch Consumption/Location —
+  // sie ändert nur `mp.current_*`. Statt über `tick` alle vier Top-Level-Fetches
+  // anzustoßen (u. a. das teure consumption), laden wir hier gezielt nur die MP
+  // nach. Die Card selbst hält ihre Perioden-Liste über einen eigenen Fetch aktuell.
+  const refreshMp = useCallback(() => {
+    api
+      .get<MeasuringPointRead>(`/measuring-points/${mpId}`)
+      .then(setMp)
+      .catch(() => {
+        /* nicht kritisch */
+      });
+  }, [mpId]);
+
   useEffect(() => {
     if (!Number.isFinite(mpId)) {
       navigate('/admin/messstellen', { replace: true });
@@ -202,11 +216,11 @@ export function MeasuringPointDetailPage() {
 
       <PhysicalMetersCard mp={mp} onChanged={refresh} />
 
-      <AssignmentHistoryCard mp={mp} onChanged={refresh} config={OWNER_ASSIGNMENT_CONFIG} />
+      <AssignmentHistoryCard mp={mp} onChanged={refreshMp} config={OWNER_ASSIGNMENT_CONFIG} />
 
-      <AssignmentHistoryCard mp={mp} onChanged={refresh} config={SUPPLIER_ASSIGNMENT_CONFIG} />
+      <AssignmentHistoryCard mp={mp} onChanged={refreshMp} config={SUPPLIER_ASSIGNMENT_CONFIG} />
 
-      <AssignmentHistoryCard mp={mp} onChanged={refresh} config={MIETER_ASSIGNMENT_CONFIG} />
+      <AssignmentHistoryCard mp={mp} onChanged={refreshMp} config={MIETER_ASSIGNMENT_CONFIG} />
 
       <ConsumptionChart consumption={consumption} mp={mp} />
 
@@ -1242,16 +1256,20 @@ function RegisterTable({
   const isHeating = mp.type === 'heating';
   const canEditRegisters = isHeating && activeMeter !== null;
 
-  const stateByRegister = new Map(states.map((s) => [s.register_id, s]));
-  const allRegisters = mp.physical_meters
-    .flatMap((meter) =>
-      meter.registers.map((r) => ({
-        register: r,
-        meterSerial: meter.serial_number,
-        meterRemovedAt: meter.removed_at,
-      })),
-    )
-    .sort((a, b) => a.register.obis_code.localeCompare(b.register.obis_code));
+  const stateByRegister = useMemo(() => new Map(states.map((s) => [s.register_id, s])), [states]);
+  const allRegisters = useMemo(
+    () =>
+      mp.physical_meters
+        .flatMap((meter) =>
+          meter.registers.map((r) => ({
+            register: r,
+            meterSerial: meter.serial_number,
+            meterRemovedAt: meter.removed_at,
+          })),
+        )
+        .sort((a, b) => a.register.obis_code.localeCompare(b.register.obis_code)),
+    [mp.physical_meters],
+  );
 
   return (
     <Section
