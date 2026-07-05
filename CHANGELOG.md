@@ -10,6 +10,15 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.68.1](https://github.com/muelley86/zaehler/compare/v2.68.0...v2.68.1) (2026-07-05)
+
+
+### Fehlerbehebungen
+
+* **deploy:** systemd-Start mit uv run --no-sync (N-11, Teil 1) ([#310](https://github.com/muelley86/zaehler/issues/310)) ([5f27358](https://github.com/muelley86/zaehler/commit/5f27358ea907bc8457d2bef58f36eeaf21094b9d))
+* **imports:** Background-Recompute + chunked Upload-Read (P-7, N-12) ([#309](https://github.com/muelley86/zaehler/issues/309)) ([54275c1](https://github.com/muelley86/zaehler/commit/54275c1f32047a5d342d31523e135c2a0bfbdd75))
+* **search:** SQL-Hard-Cap gegen unbegrenzte Treffer-Materialisierung (P-6) ([#308](https://github.com/muelley86/zaehler/issues/308)) ([0dd0a40](https://github.com/muelley86/zaehler/commit/0dd0a40017004c88343f3ed5376a6cbdebec6236))
+
 ## [2.68.0](https://github.com/muelley86/zaehler/compare/v2.67.3...v2.68.0) (2026-07-05)
 
 
