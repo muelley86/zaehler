@@ -23,6 +23,7 @@ from meters.models import (
     OwnerAssignment,
     PhysicalMeter,
 )
+from meters.services.assignment_guard import open_period_guard
 from meters.services.audit import record
 
 
@@ -136,7 +137,8 @@ def assign_owner(
         },
         ip_address=ip_address,
     )
-    db.flush()
+    with open_period_guard(db, kind="Eigentümer"):
+        db.flush()
     return new_assignment
 
 

@@ -16,7 +16,7 @@ from __future__ import annotations
 from datetime import date
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Date, ForeignKey
+from sqlalchemy import Date, ForeignKey, Index, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from meters.db import Base, TimestampMixin
@@ -28,6 +28,17 @@ if TYPE_CHECKING:  # pragma: no cover
 
 class MieterAssignment(Base, TimestampMixin):
     __tablename__ = "mieter_assignment"
+    # Partieller UNIQUE-Index — pro MeasuringPoint hoechstens eine offene
+    # Periode (``valid_to IS NULL``). DB-Garantie gegen parallele Requests,
+    # die den App-Ueberlappungs-Check beide passieren (analog physical_meter).
+    __table_args__ = (
+        Index(
+            "uq_mieter_assignment_open_per_mp",
+            "measuring_point_id",
+            unique=True,
+            sqlite_where=text("valid_to IS NULL"),
+        ),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     measuring_point_id: Mapped[int] = mapped_column(
