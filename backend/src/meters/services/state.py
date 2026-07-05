@@ -83,48 +83,27 @@ def state_for_register(db: DbSession, register: Register) -> RegisterState:
     )
 
 
-def state_for_measuring_point(
-    db: DbSession,
-    *,
-    measuring_point_id: int,
-) -> list[RegisterState]:
-    """Aktueller Bestand aller aktiven Register des aktuell installierten Zählers.
-
-    Verwendet **drei Bulk-Queries** statt eines N+1-Loops:
-    1) MP + Meter + Register eager,
-    2) per Window-Function alle letzten Readings der aktiven Register in
-       einer Query,
-    3) alle relevanten Deliveries der tank-faehigen Register in einer
-       Query (Cutoff pro Register wird Python-seitig angewendet).
-
-    Vorher waren es 2 Queries pro Register - bei 30 MPs * ~3 Registern
-    sind das ~180 Roundtrips. Jetzt sind es 3 unabhaengig von der Anzahl
-    der Register.
-    """
-    mp = db.scalar(
-        select(MeasuringPoint)
-        .where(MeasuringPoint.id == measuring_point_id)
-        .options(
-            selectinload(MeasuringPoint.physical_meters).selectinload(PhysicalMeter.registers),
-        )
-    )
-    if mp is None:
-        return []
-
-    active_registers: list[Register] = [
+def _active_registers(mp: MeasuringPoint) -> list[Register]:
+    """Aktive Register des aktuell installierten (nicht entfernten) Zählers."""
+    return [
         r
         for meter in mp.physical_meters
         if meter.removed_at is None
         for r in meter.registers
         if r.is_active
     ]
-    if not active_registers:
-        return []
-    register_ids = [r.id for r in active_registers]
 
-    # Bulk 2: letzte Reading pro Register via ROW_NUMBER() Window-Function.
-    # SQLite ≥ 3.25 unterstuetzt Window-Funktionen; wir laufen mindestens
-    # auf 3.35 (Python 3.13 bundle), das passt.
+
+def _last_reading_by_register(
+    db: DbSession, register_ids: list[int]
+) -> dict[int, tuple[Decimal, datetime]]:
+    """Letztes Reading pro Register — eine Query via ROW_NUMBER()-Window-Function.
+
+    SQLite ≥ 3.25 unterstuetzt Window-Funktionen; wir laufen mindestens auf 3.35
+    (Python-3.13-Bundle). Unabhaengig von der Anzahl der Register eine Query.
+    """
+    if not register_ids:
+        return {}
     rn = (
         func.row_number()
         .over(
@@ -139,52 +118,132 @@ def state_for_measuring_point(
         .subquery()
     )
     last_rows = db.execute(select(last_subq).where(last_subq.c.rn == 1)).all()
-    last_by_register: dict[int, tuple[Decimal, datetime]] = {
-        row.register_id: (row.value, row.reading_at) for row in last_rows
-    }
+    return {row.register_id: (row.value, row.reading_at) for row in last_rows}
 
-    # Bulk 3: alle Deliveries der tank-faehigen Register, Cutoff pro Register
-    # in Python angewendet. Bei einem Privat-Tank sind das maximal ein paar
-    # hundert Zeilen ueber die ganze App-Lebensdauer — kein DB-Stress.
+
+def _refilled_by_register(
+    db: DbSession,
+    active_registers: list[Register],
+    last_by_register: dict[int, tuple[Decimal, datetime]],
+) -> dict[int, Decimal]:
+    """Summe der Lieferungen NACH dem letzten Reading, je nachfuellbarem Register.
+
+    Eine Query fuer alle tank-faehigen Register; der Cutoff pro Register wird
+    Python-seitig angewendet (bei einem Privat-Tank nur ein paar hundert Zeilen).
+    """
     refilled_by_register: dict[int, Decimal] = {}
     delivery_register_ids = [r.id for r in active_registers if r.accepts_deliveries]
-    if delivery_register_ids:
-        delivery_rows = db.execute(
-            select(Delivery.register_id, Delivery.amount, Delivery.delivery_at).where(
-                Delivery.register_id.in_(delivery_register_ids)
+    if not delivery_register_ids:
+        return refilled_by_register
+    delivery_rows = db.execute(
+        select(Delivery.register_id, Delivery.amount, Delivery.delivery_at).where(
+            Delivery.register_id.in_(delivery_register_ids)
+        )
+    ).all()
+    for row in delivery_rows:
+        last = last_by_register.get(row.register_id)
+        cutoff = last[1] if last is not None else None
+        if cutoff is None or row.delivery_at > cutoff:
+            refilled_by_register[row.register_id] = (
+                refilled_by_register.get(row.register_id, Decimal("0")) + row.amount
             )
-        ).all()
-        for row in delivery_rows:
-            last = last_by_register.get(row.register_id)
-            cutoff = last[1] if last is not None else None
-            if cutoff is None or row.delivery_at > cutoff:
-                refilled_by_register[row.register_id] = (
-                    refilled_by_register.get(row.register_id, Decimal("0")) + row.amount
-                )
+    return refilled_by_register
 
-    out: list[RegisterState] = []
-    for register in active_registers:
-        last = last_by_register.get(register.id)
-        last_value = last[0] if last is not None else None
-        last_at = last[1] if last is not None else None
-        refilled = refilled_by_register.get(register.id, Decimal("0"))
-        current: Decimal | None = last_value + refilled if last_value is not None else None
-        out.append(
-            RegisterState(
-                register_id=register.id,
-                physical_meter_id=register.physical_meter_id,
-                obis_code=register.obis_code,
-                label=register.label,
-                unit=register.unit,
-                is_active=register.is_active,
-                accepts_deliveries=register.accepts_deliveries,
-                last_reading_at=last_at,
-                last_reading_value=last_value,
-                refilled_since=refilled,
-                current_value=current,
+
+def _build_state(
+    register: Register,
+    last_by_register: dict[int, tuple[Decimal, datetime]],
+    refilled_by_register: dict[int, Decimal],
+) -> RegisterState:
+    last = last_by_register.get(register.id)
+    last_value = last[0] if last is not None else None
+    last_at = last[1] if last is not None else None
+    refilled = refilled_by_register.get(register.id, Decimal("0"))
+    current: Decimal | None = last_value + refilled if last_value is not None else None
+    return RegisterState(
+        register_id=register.id,
+        physical_meter_id=register.physical_meter_id,
+        obis_code=register.obis_code,
+        label=register.label,
+        unit=register.unit,
+        is_active=register.is_active,
+        accepts_deliveries=register.accepts_deliveries,
+        last_reading_at=last_at,
+        last_reading_value=last_value,
+        refilled_since=refilled,
+        current_value=current,
+    )
+
+
+def state_for_measuring_point(
+    db: DbSession,
+    *,
+    measuring_point_id: int,
+) -> list[RegisterState]:
+    """Aktueller Bestand aller aktiven Register des aktuell installierten Zählers.
+
+    Drei Bulk-Queries (MP+Meter+Register eager, letzte Readings per Window-
+    Function, Deliveries der Tank-Register) statt eines N+1-Loops — unabhaengig
+    von der Register-Anzahl. Fuer VIELE MPs auf einmal siehe
+    ``state_for_measuring_points``.
+    """
+    mp = db.scalar(
+        select(MeasuringPoint)
+        .where(MeasuringPoint.id == measuring_point_id)
+        .options(
+            selectinload(MeasuringPoint.physical_meters).selectinload(PhysicalMeter.registers),
+        )
+    )
+    if mp is None:
+        return []
+    active_registers = _active_registers(mp)
+    if not active_registers:
+        return []
+    last_by_register = _last_reading_by_register(db, [r.id for r in active_registers])
+    refilled_by_register = _refilled_by_register(db, active_registers, last_by_register)
+    return [_build_state(r, last_by_register, refilled_by_register) for r in active_registers]
+
+
+def state_for_measuring_points(
+    db: DbSession,
+    measuring_point_ids: list[int],
+) -> dict[int, list[RegisterState]]:
+    """Aktueller Bestand fuer MEHRERE Messstellen — konstante Query-Anzahl.
+
+    Genau drei Queries (MP+Meter+Register eager, letzte Readings, Deliveries)
+    fuer die ganze Liste statt drei PRO MP. Verhaltensgleich zu
+    ``state_for_measuring_point`` je MP; das Ergebnis ist nach ``mp_id``
+    gruppiert (MPs ohne aktive Register fehlen im Dict → Aufrufer nutzt
+    ``.get(mp_id, [])``).
+    """
+    ids = list(measuring_point_ids)
+    if not ids:
+        return {}
+    mps = list(
+        db.scalars(
+            select(MeasuringPoint)
+            .where(MeasuringPoint.id.in_(ids))
+            .options(
+                selectinload(MeasuringPoint.physical_meters).selectinload(PhysicalMeter.registers),
             )
         )
-    return out
+    )
+    active_by_mp = {mp.id: _active_registers(mp) for mp in mps}
+    all_active = [r for regs in active_by_mp.values() for r in regs]
+    if not all_active:
+        return {}
+    last_by_register = _last_reading_by_register(db, [r.id for r in all_active])
+    refilled_by_register = _refilled_by_register(db, all_active, last_by_register)
+    return {
+        mp_id: [_build_state(r, last_by_register, refilled_by_register) for r in regs]
+        for mp_id, regs in active_by_mp.items()
+        if regs
+    }
 
 
-__all__ = ["RegisterState", "state_for_measuring_point", "state_for_register"]
+__all__ = [
+    "RegisterState",
+    "state_for_measuring_point",
+    "state_for_measuring_points",
+    "state_for_register",
+]

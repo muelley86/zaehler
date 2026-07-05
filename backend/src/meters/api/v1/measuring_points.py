@@ -94,7 +94,11 @@ from meters.services.owner_assignment import (
     list_history,
     update_assignment,
 )
-from meters.services.state import RegisterState, state_for_measuring_point
+from meters.services.state import (
+    RegisterState,
+    state_for_measuring_point,
+    state_for_measuring_points,
+)
 
 # Supplier-Service mit Aliassen — die Funktionsnamen kollidieren sonst mit
 # dem strukturgleichen Owner-Service.
@@ -205,12 +209,24 @@ def measuring_points_with_state(
     """
     stmt = restrict_mp_query(stmt, user, mp_id_column=MeasuringPoint.id)
     mps = list(db.scalars(stmt))
+    # Bulk-Preload statt N+1: Owner-/Supplier-/Mieter-Assignments in je einer
+    # Query, State aller MPs in konstant drei Queries. Kein db an
+    # to_measuring_point_read durchreichen, damit der Single-Query-Fallback
+    # nicht greift (identisch zu list_measuring_points).
+    ids = [mp.id for mp in mps]
+    owners_by_mp = current_assignments_bulk(db, ids)
+    suppliers_by_mp = current_supplier_assignments_bulk(db, ids)
+    mieters_by_mp = current_mieter_assignments_bulk(db, ids)
+    states_by_mp = state_for_measuring_points(db, ids)
     return [
         MeasuringPointWithStateRead(
-            measuring_point=to_measuring_point_read(mp, db),
-            registers=[
-                _to_state_read(s) for s in state_for_measuring_point(db, measuring_point_id=mp.id)
-            ],
+            measuring_point=to_measuring_point_read(
+                mp,
+                current_owner=owners_by_mp.get(mp.id),
+                current_supplier=suppliers_by_mp.get(mp.id),
+                current_mieter=mieters_by_mp.get(mp.id),
+            ),
+            registers=[_to_state_read(s) for s in states_by_mp.get(mp.id, [])],
         )
         for mp in mps
     ]

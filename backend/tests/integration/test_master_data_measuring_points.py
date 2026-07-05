@@ -81,6 +81,63 @@ def _grant(db: Session, *, user: User, mp_id: int, granted_by: User) -> None:
     db.commit()
 
 
+def _count_owner_mp_queries(client: TestClient, owner_id: int) -> int:
+    """Zaehlt die DB-Queries eines GET /owners/{id}/measuring-points-Requests."""
+    from sqlalchemy import event
+
+    from meters.db import engine
+
+    queries: list[str] = []
+
+    def collect(_c: object, _cur: object, statement: str, *_a: object, **_kw: object) -> None:
+        queries.append(statement)
+
+    event.listen(engine, "before_cursor_execute", collect)
+    try:
+        resp = client.get(f"/api/v1/owners/{owner_id}/measuring-points")
+    finally:
+        event.remove(engine, "before_cursor_execute", collect)
+    assert resp.status_code == 200, resp.text
+    return len(queries)
+
+
+def test_detail_page_measuring_points_no_n_plus_one(admin_client: TestClient) -> None:
+    """P-1: GET /owners/{id}/measuring-points darf NICHT mit der MP-Anzahl skalieren.
+
+    measuring_points_with_state nutzt Bulk-Assignment-Dicts + Bulk-State
+    (state_for_measuring_points). Bei N+1 braeuchte der 6-MP-Fall deutlich mehr
+    Queries als der 2-MP-Fall (~1+6N).
+    """
+    owner_small = _create_owner(admin_client, "Perf-Small")
+    for i in range(2):
+        mp = _create_mp(
+            admin_client,
+            name=f"Perf-S-{i}",
+            serial=f"SN-PS-{i}",
+            assign_kwarg="owner_id",
+            assign_id=owner_small,
+        )
+        _add_reading(admin_client, mp["physical_meters"][0]["registers"][0]["id"], f"{10 + i}")
+
+    owner_large = _create_owner(admin_client, "Perf-Large")
+    for i in range(6):
+        mp = _create_mp(
+            admin_client,
+            name=f"Perf-L-{i}",
+            serial=f"SN-PL-{i}",
+            assign_kwarg="owner_id",
+            assign_id=owner_large,
+        )
+        _add_reading(admin_client, mp["physical_meters"][0]["registers"][0]["id"], f"{10 + i}")
+
+    q_small = _count_owner_mp_queries(admin_client, owner_small)  # 2 MPs
+    q_large = _count_owner_mp_queries(admin_client, owner_large)  # 6 MPs
+    assert q_large <= q_small, (
+        f"N+1: 2 MPs -> {q_small} Queries, 6 MPs -> {q_large} Queries "
+        "(measuring_points_with_state skaliert mit der MP-Anzahl)"
+    )
+
+
 # (resource, creator, mp_kwarg, change_path, change_key)
 PARAMS = [
     pytest.param("owners", _create_owner, "owner_id", "change-owner", "owner_id", id="owners"),
