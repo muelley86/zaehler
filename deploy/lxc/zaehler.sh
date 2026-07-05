@@ -180,7 +180,10 @@ ensure_node_lts() {
     msg_run "NodeSource-Repository für Node ${NODE_MAJOR_REQUIRED}.x einbinden"
     DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends \
         ca-certificates curl gnupg >/dev/null
-    local tmp_setup=/tmp/nodesource_setup.sh
+    # mktemp statt festem /tmp-Pfad: verhindert ein Symlink-/TOCTOU-Race auf
+    # einen vorhersagbaren Namen (das Skript wird gleich als root ausgefuehrt).
+    local tmp_setup
+    tmp_setup=$(mktemp)
     curl -fsSL "https://deb.nodesource.com/setup_${NODE_MAJOR_REQUIRED}.x" -o "$tmp_setup"
     # Das NodeSource-Setup-Skript ruft intern ``apt`` auf, was eine
     # ``WARNING: apt does not have a stable CLI interface``-Zeile auf
@@ -549,7 +552,13 @@ cmd_install_admin() {
         return 0
     fi
     msg_run "create-admin '$WIZ_ADMIN_USER' (force-change beim ersten Login)"
-    as_user "cd '$REPO_DIR/backend' && uv run python -m meters.cli create-admin --username '$WIZ_ADMIN_USER' --password '$WIZ_ADMIN_PASSWORD' --force-change"
+    # printf %q quotet Sonderzeichen shell-sicher: as_user reicht den String
+    # durch eine ZWEITE ``bash -lc`` — ein ' im Passwort/Usernamen wuerde sonst
+    # aus dem --password '...'-Literal ausbrechen (Command-Injection).
+    local admin_user_q admin_pw_q
+    admin_user_q=$(printf '%q' "$WIZ_ADMIN_USER")
+    admin_pw_q=$(printf '%q' "$WIZ_ADMIN_PASSWORD")
+    as_user "cd '$REPO_DIR/backend' && uv run python -m meters.cli create-admin --username $admin_user_q --password $admin_pw_q --force-change"
     ok "Admin '$WIZ_ADMIN_USER' angelegt"
 }
 
@@ -819,7 +828,10 @@ cmd_restore() {
     [ -f "$archive" ] || die "Datei nicht gefunden: $archive"
 
     local db="$DATA_DIR/meters.db"
-    local broken="$DATA_DIR/meters.db.broken-$(date +%Y%m%d-%H%M%S)"
+    # Declare + assign getrennt (SC2155): sonst maskiert der Exit-Code von date
+    # den Rueckgabewert von ``local``.
+    local broken
+    broken="$DATA_DIR/meters.db.broken-$(date +%Y%m%d-%H%M%S)"
 
     step "Service stoppen"
     systemctl stop "$SERVICE_NAME"
@@ -1361,7 +1373,8 @@ cmd_fix_database() {
 
     step "2/5  Aktuelle DB beiseite legen"
     if [ -f "$db_file" ]; then
-        local broken="$DATA_DIR/meters.db.broken-$(date +%Y%m%d-%H%M%S)"
+        local broken  # declare + assign getrennt (SC2155)
+        broken="$DATA_DIR/meters.db.broken-$(date +%Y%m%d-%H%M%S)"
         mv "$db_file" "$broken"
         rm -f "$DATA_DIR/meters.db-shm" "$DATA_DIR/meters.db-wal" || true
         ok "DB nach $broken verschoben (kann manuell wiederhergestellt werden)"
@@ -1374,7 +1387,11 @@ cmd_fix_database() {
     ok "Schema auf aktuellem Stand"
 
     step "4/5  Admin-Benutzer anlegen"
-    as_user "cd '$REPO_DIR/backend' && uv run python -m meters.cli create-admin --username '$admin_user' --password '$admin_pw' --force-change"
+    # Shell-sicheres Quoting (siehe cmd_install_admin) — zweite bash -lc in as_user.
+    local admin_user_q admin_pw_q
+    admin_user_q=$(printf '%q' "$admin_user")
+    admin_pw_q=$(printf '%q' "$admin_pw")
+    as_user "cd '$REPO_DIR/backend' && uv run python -m meters.cli create-admin --username $admin_user_q --password $admin_pw_q --force-change"
     ok "Admin '$admin_user' angelegt — Passwort beim ersten Login zu ändern"
 
     step "5/5  Service starten"
@@ -1509,7 +1526,11 @@ cmd_reset_password() {
     fi
 
     msg_run "reset-password '$user' (force-change beim nächsten Login)"
-    as_user "cd '$REPO_DIR/backend' && uv run python -m meters.cli reset-password --username '$user' --password '$pw' --force-change"
+    # Shell-sicheres Quoting (siehe cmd_install_admin) — zweite bash -lc in as_user.
+    local user_q pw_q
+    user_q=$(printf '%q' "$user")
+    pw_q=$(printf '%q' "$pw")
+    as_user "cd '$REPO_DIR/backend' && uv run python -m meters.cli reset-password --username $user_q --password $pw_q --force-change"
     ok "Passwort für '$user' zurückgesetzt"
     if is_interactive; then
         wt_msgbox "Fertig" "Passwort für '$user' wurde gesetzt.\n\nBeim nächsten Login wird ein neues Passwort verlangt." || true
