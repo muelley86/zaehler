@@ -73,6 +73,16 @@ _COPY_CHUNK_BYTES = 1024 * 1024
 _POOL_DRAIN_TIMEOUT_S = 5.0
 _POOL_DRAIN_POLL_S = 0.1
 
+# Obergrenze der ENTPACKTEN Gesamtgröße, relativ zum (komprimierten) Upload-
+# Limit. Schützt vor Dekompressions-Bomben (ein ZIP füllt sonst die Platte).
+# Großzügig gewählt: ein legitimes Backup (SQLite-Snapshot + kaum komprimierbare
+# JPEGs) bleibt weit darunter, eine Bombe (Faktor 1000+) wird sicher gestoppt.
+_EXTRACT_EXPANSION_FACTOR = 20
+
+# Maximale Zahl gleichzeitig offener (gestageter oder gerade hochladender)
+# Restore-Vorgänge. Bremst wiederholte teure Uploads (Disk/CPU) ab.
+_MAX_CONCURRENT_STAGED = 3
+
 
 @dataclass(frozen=True)
 class SessionKeepInfo:
@@ -98,6 +108,10 @@ class StagedRestore:
 
 
 _staged: dict[str, StagedRestore] = {}
+# Verzeichnisse, die gerade angelegt, aber noch nicht in ``_staged`` registriert
+# sind (Upload/Validierung läuft). Ohne diese Reservierung würde der Orphan-
+# Sweep eines PARALLELEN Uploads das noch aktive Verzeichnis löschen (TOCTOU).
+_reserved: set[Path] = set()
 _staged_lock = threading.Lock()
 
 
@@ -118,7 +132,9 @@ def _cleanup_expired() -> None:
         expired = [s for s in _staged.values() if s.created_at < cutoff]
         for entry in expired:
             del _staged[entry.token]
-        known_dirs = {s.dir for s in _staged.values()}
+        # Reservierte (gerade hochladende) Verzeichnisse gelten als „bekannt",
+        # damit der Orphan-Sweep sie nicht mitten im Upload löscht.
+        known_dirs = {s.dir for s in _staged.values()} | set(_reserved)
     for entry in expired:
         shutil.rmtree(entry.dir, ignore_errors=True)
     root = _staging_root()
@@ -171,6 +187,11 @@ def _extract_archive(archive: zipfile.ZipFile, staging: Path, warnings: list[str
     photos_dir.mkdir()
     photo_count = 0
     db_found = False
+    # Laufende Summe der ENTPACKTEN Bytes gegen einen harten Deckel — während
+    # des Kopierens geprüft (nicht dem Header-Feld ``file_size`` vertraut, das
+    # eine Bombe unterschätzen kann).
+    extracted_bytes = 0
+    max_extracted = settings.backup_max_upload_bytes * _EXTRACT_EXPANSION_FACTOR
     for member in archive.infolist():
         name = member.filename
         if name.endswith("/"):
@@ -191,7 +212,19 @@ def _extract_archive(archive: zipfile.ZipFile, staging: Path, warnings: list[str
             warnings.append(f"Unerwartete Datei im Archiv ignoriert: {name}")
             continue
         with archive.open(member) as src, open(target, "wb") as dest:
-            shutil.copyfileobj(src, dest, _COPY_CHUNK_BYTES)
+            while chunk := src.read(_COPY_CHUNK_BYTES):
+                extracted_bytes += len(chunk)
+                if extracted_bytes > max_extracted:
+                    raise ProblemError(
+                        status_code=413,
+                        title="Backup zu groß",
+                        detail=(
+                            "Der entpackte Inhalt des Archivs überschreitet das "
+                            f"Limit von {max_extracted // (1024 * 1024)} MB — "
+                            "das Backup ist ungültig oder beschädigt."
+                        ),
+                    )
+                dest.write(chunk)
     if not db_found:
         raise ProblemError(
             status_code=400,
@@ -227,12 +260,29 @@ def stage_upload(upload: UploadFile) -> RestorePreviewResponse:
 
     token = secrets.token_urlsafe(16)
     staging = _staging_root() / f"restore-{token}"
-    staging.mkdir(parents=True, exist_ok=False)
+    # Cap + Reservierung unter dem Lock: verhindert unbegrenzt viele parallele
+    # (teure) Uploads und schützt das Verzeichnis vor dem Orphan-Sweep eines
+    # zweiten Uploads, bis es in ``_staged`` registriert ist.
+    with _staged_lock:
+        if len(_staged) + len(_reserved) >= _MAX_CONCURRENT_STAGED:
+            raise ProblemError(
+                status_code=429,
+                title="Zu viele offene Wiederherstellungen",
+                detail=(
+                    "Es sind bereits mehrere Backup-Uploads in Bearbeitung. "
+                    "Bitte kurz warten und erneut versuchen."
+                ),
+            )
+        _reserved.add(staging)
     try:
+        staging.mkdir(parents=True, exist_ok=False)
         return _stage_into(upload, token, staging)
     except Exception:
         shutil.rmtree(staging, ignore_errors=True)
         raise
+    finally:
+        with _staged_lock:
+            _reserved.discard(staging)
 
 
 def _stage_into(upload: UploadFile, token: str, staging: Path) -> RestorePreviewResponse:

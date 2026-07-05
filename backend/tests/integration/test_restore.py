@@ -213,6 +213,50 @@ def test_restore_rejects_garbage_db(admin_client: TestClient) -> None:
     assert "SQLite" in resp.json()["detail"]
 
 
+def test_restore_rejects_decompression_bomb(
+    admin_client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Ein ZIP, dessen ENTPACKTER Inhalt das Limit sprengt, wird abgelehnt (N-3).
+
+    Kleines Upload-Limit setzen -> Extract-Cap = 50 KB * 20 = 1 MB. Ein stark
+    komprimierbarer 2-MB-Eintrag rutscht unter das Upload-Limit, sprengt aber
+    beim Entpacken den Deckel.
+    """
+    monkeypatch.setattr(settings, "backup_max_upload_bytes", 50_000)
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+        archive.writestr("meters.db", b"\0" * (2 * 1024 * 1024))
+    resp = _upload(admin_client, buf.getvalue())
+    assert resp.status_code == 413, resp.text
+    assert "entpackt" in resp.json()["detail"].lower()
+
+
+def test_restore_upload_cap_returns_429(admin_client: TestClient) -> None:
+    """Zu viele gleichzeitig offene Uploads werden mit 429 abgewiesen (N-5)."""
+    from meters.services import restore as restore_service
+
+    # Isolation: evtl. Reste aus anderen Tests entfernen.
+    restore_service._staged.clear()
+    restore_service._reserved.clear()
+    head = head_revision()
+    assert head
+    tokens: list[str] = []
+    try:
+        for _ in range(3):
+            resp = _upload(
+                admin_client, _zip_bytes({"meters.db": _sqlite_bytes_with_revision(head)})
+            )
+            assert resp.status_code == 200, resp.text
+            tokens.append(resp.json()["token"])
+        # Der 4. Upload überschreitet den Cap (_MAX_CONCURRENT_STAGED = 3).
+        over = _upload(admin_client, _zip_bytes({"meters.db": _sqlite_bytes_with_revision(head)}))
+        assert over.status_code == 429, over.text
+    finally:
+        for token in tokens:
+            admin_client.delete(f"/api/v1/restore/{token}")
+        restore_service._reserved.clear()
+
+
 def test_restore_ignores_zip_slip_entries(admin_client: TestClient) -> None:
     """Pfad-Traversal-Einträge werden ignoriert und gemeldet, nie extrahiert."""
     head = head_revision()
