@@ -88,7 +88,7 @@ def test_parallel_readings_same_register_and_at_collide() -> None:
                     "reading_at": "2024-06-01T08:00:00",
                 },
             )
-            return r.status_code
+            return int(r.status_code)
         finally:
             _close(c)
 
@@ -124,7 +124,7 @@ def test_parallel_replace_meter_only_one_succeeds() -> None:
                     "initial_readings": {"water": "0.0"},
                 },
             )
-            return r.status_code
+            return int(r.status_code)
         finally:
             _close(c)
 

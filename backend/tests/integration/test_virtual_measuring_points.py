@@ -155,7 +155,7 @@ def test_validation_errors_422(admin_client: TestClient) -> None:
             "/api/v1/virtual-measuring-points",
             json={"name": "Kaputt", "type": mp_type, "components": components},
         )
-        return resp.status_code
+        return int(resp.status_code)
 
     # Leere Komponentenliste (Pydantic min_length=1).
     assert post([]) == 422
