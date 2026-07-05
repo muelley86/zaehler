@@ -748,6 +748,11 @@ function GroupLabelCell({
   return <>{text}</>;
 }
 
+// Render-Cap fuer die Ergebnis-/Vergleichs-Tabellen: bei Firmen-Skala
+// (Dimension Messstelle x Bezug/Einspeisung x Tages-/Wochen-Buckets) koennen
+// es tausende Zeilen werden. Der CSV-Export liefert weiterhin die volle Menge.
+const REPORT_ROW_CAP = 500;
+
 function ResultTable({
   rows,
   showPeriod,
@@ -779,7 +784,7 @@ function ResultTable({
           </tr>
         </thead>
         <tbody>
-          {rows.map((r) => {
+          {rows.slice(0, REPORT_ROW_CAP).map((r) => {
             const suffix = directionSuffix(r, bidiGroups);
             return (
               <tr
@@ -804,6 +809,12 @@ function ResultTable({
           })}
         </tbody>
       </table>
+      {rows.length > REPORT_ROW_CAP ? (
+        <div className="p-2 text-caption text-tertiary">
+          Nur die ersten {REPORT_ROW_CAP} von {rows.length} Zeilen angezeigt — für die volle Menge
+          den CSV-Export nutzen.
+        </div>
+      ) : null}
     </Section>
   );
 }
@@ -833,7 +844,7 @@ function ComparisonTable({ rows, groupHeader }: { rows: ComparisonRow[]; groupHe
           </tr>
         </thead>
         <tbody>
-          {rows.map((r) => {
+          {rows.slice(0, REPORT_ROW_CAP).map((r) => {
             const suffix = directionSuffix(r, bidiGroups);
             return (
               <tr key={r.key} className="border-border/50 border-b">
@@ -859,6 +870,12 @@ function ComparisonTable({ rows, groupHeader }: { rows: ComparisonRow[]; groupHe
           })}
         </tbody>
       </table>
+      {rows.length > REPORT_ROW_CAP ? (
+        <div className="p-2 text-caption text-tertiary">
+          Nur die ersten {REPORT_ROW_CAP} von {rows.length} Zeilen angezeigt — für die volle Menge
+          den CSV-Export nutzen.
+        </div>
+      ) : null}
     </Section>
   );
 }
