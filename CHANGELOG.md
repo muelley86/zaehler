@@ -10,6 +10,13 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.68.6](https://github.com/muelley86/zaehler/compare/v2.68.5...v2.68.6) (2026-07-06)
+
+
+### Fehlerbehebungen
+
+* **deploy:** pnpm-Upgrade via npm-Reinstall statt self-update ([21cbb04](https://github.com/muelley86/zaehler/commit/21cbb04a450b93bfcc6469d12cd4670b70a8a692))
+
 ## [2.68.5](https://github.com/muelley86/zaehler/compare/v2.68.4...v2.68.5) (2026-07-06)
 
 
