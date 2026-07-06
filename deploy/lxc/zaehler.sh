@@ -485,11 +485,11 @@ EOF
         else
             uv self update >/dev/null 2>&1 || true
         fi
-        if ! command -v pnpm >/dev/null; then
-            npm install -g --prefix "$HOME/.local" pnpm@'"$PNPM_VERSION"' >/dev/null 2>&1
-        else
-            pnpm self-update >/dev/null 2>&1 || true
-        fi
+        # pnpm immer idempotent auf PNPM_VERSION installieren (nicht `self-update`
+        # als else-Zweig — das aktualisiert bei npm-globalem pnpm nur eine separate
+        # Standalone-Kopie und lässt die aktive Binary auf einer alten Version, s.
+        # cmd_upgrade_tools). npm@11 zieht das neueste 11.x und trifft ~/.local/bin.
+        npm install -g --prefix "$HOME/.local" pnpm@'"$PNPM_VERSION"' >/dev/null 2>&1
     '
     ok "uv $(as_user 'uv --version' 2>/dev/null | awk '{print $2}'), pnpm $(as_user 'pnpm --version' 2>/dev/null) bereit"
 
@@ -689,11 +689,14 @@ cmd_upgrade_tools() {
             curl -LsSf https://astral.sh/uv/install.sh | sh
         fi
 
-        if command -v pnpm >/dev/null; then
-            pnpm self-update || npm install -g --prefix "$HOME/.local" pnpm@'"$PNPM_VERSION"' || true
-        else
-            npm install -g --prefix "$HOME/.local" pnpm@'"$PNPM_VERSION"'
-        fi
+        # pnpm deterministisch auf PNPM_VERSION bringen. `pnpm self-update` NICHT
+        # als Primärweg: kam pnpm via `npm install -g`, aktualisiert self-update nur
+        # eine separate Standalone-Kopie (~/.local/share/pnpm), während die aktive
+        # npm-globale Binary (~/.local/bin/pnpm) mit PATH-Vorrang unveraendert bleibt
+        # -> Version bleibt haengen (9.x trotz "success"). npm-Reinstall trifft die
+        # aktive Binary und ist idempotent (pnpm@11 = neuestes 11.x).
+        npm install -g --prefix "$HOME/.local" pnpm@'"$PNPM_VERSION"'
+        hash -r 2>/dev/null || true   # Command-Cache der Subshell auffrischen
 
         echo "Nachher: uv $(uv --version), pnpm $(pnpm --version)"
     '
