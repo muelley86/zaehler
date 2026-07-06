@@ -10,6 +10,13 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.68.5](https://github.com/muelley86/zaehler/compare/v2.68.4...v2.68.5) (2026-07-06)
+
+
+### Fehlerbehebungen
+
+* **deploy:** pnpm 11.10.0 pinnen + upgrade-app warnt bei veraltetem pnpm ([1a5fce7](https://github.com/muelley86/zaehler/commit/1a5fce7611a08836ca1e6a0f1b816ff2e1d79510))
+
 ## [2.68.4](https://github.com/muelley86/zaehler/compare/v2.68.3...v2.68.4) (2026-07-05)
 
 
