@@ -725,6 +725,20 @@ cmd_upgrade_app() {
         die "Abgebrochen — Frontend-Build würde sonst inkonsistent sein."
     fi
 
+    # Weiche Vorbedingung: ein veralteter pnpm-Major (z. B. 9.x, wenn
+    # 'upgrade-tools' nie lief) baut zwar noch, läuft aber ohne aktuelle Fixes.
+    # Nur warnen, nicht abbrechen — der Build selbst funktioniert weiter.
+    local pnpm_major=0 pnpm_ver=''
+    if as_user 'command -v pnpm >/dev/null 2>&1'; then
+        pnpm_ver=$(as_user 'pnpm --version' 2>/dev/null)
+        pnpm_major=$(printf '%s' "$pnpm_ver" | sed -E 's/^([0-9]+).*/\1/')
+        case "$pnpm_major" in ''|*[!0-9]*) pnpm_major=0 ;; esac
+    fi
+    if [ "$pnpm_major" -lt "$PNPM_VERSION" ] 2>/dev/null; then
+        warn "Installierte pnpm-Version (v${pnpm_ver:-?}) ist älter als Major ${PNPM_VERSION}."
+        warn "Empfehlung: 'sudo $0 upgrade-tools' bringt pnpm auf die aktuelle Version."
+    fi
+
     step "1/8  Backup der Datenbank"
     "$REPO_DIR/deploy/lxc/backup.sh" || warn "Backup fehlgeschlagen — Update wird trotzdem fortgesetzt."
 

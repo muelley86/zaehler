@@ -263,6 +263,13 @@ Nur App-Code ohne System-/Tool-Updates: `sudo zaehler upgrade-app`. `upgrade-app
 setzt dabei auch die **Zeitzone idempotent** auf `Europe/Berlin` (heilt Bestands-
 Container, die noch auf UTC stehen).
 
+> **Hinweis:** `upgrade-app` aktualisiert **uv/pnpm nicht** — nur `upgrade-all`
+> bzw. `upgrade-tools` bringen die Tool-Chain auf die aktuelle Version. Wer nur
+> `upgrade-app` fährt, bleibt sonst dauerhaft auf der alten pnpm-Version hängen
+> (z. B. pnpm 9.x, während das Repo bereits 11.x pinnt). Daher gelegentlich
+> `sudo zaehler upgrade-all` oder `sudo zaehler upgrade-tools` mitlaufen lassen.
+> `upgrade-app` warnt inzwischen, wenn pnpm veraltet ist.
+
 **Zeitzone separat setzen** (z. B. ohne ein App-Update abzuwarten):
 
 ```bash
