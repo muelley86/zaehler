@@ -1,4 +1,13 @@
-import { BarChart3, Filter, KeyRound, LayoutGrid, LogOut, Moon, Sun } from 'lucide-react';
+import {
+  BarChart3,
+  CloudUpload,
+  Filter,
+  KeyRound,
+  LayoutGrid,
+  LogOut,
+  Moon,
+  Sun,
+} from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
@@ -6,6 +15,7 @@ import { useAuth } from '@/features/auth/auth-context';
 import { TwoFactorSection } from '@/features/auth/TwoFactorSection';
 import { useOnlineStatus } from '@/features/offline/offline-context';
 import { useFilterPrefs } from '@/features/prefs/filter-prefs-context';
+import { countOpen } from '@/lib/offline/outbox';
 import { Card, LargeTitle, Row, RowGroup, Section, Switch } from '@/components/ui';
 import { PageGlows } from '@/components/PageGlows';
 import { cx } from '@/components/ui/cx';
@@ -40,7 +50,7 @@ function applyTheme(choice: ThemeChoice) {
 
 export function MorePage() {
   const { me, logout } = useAuth();
-  const { isOnline } = useOnlineStatus();
+  const { isOnline, pendingCount } = useOnlineStatus();
   const { rememberFilters, setRememberFilters } = useFilterPrefs();
   const navigate = useNavigate();
   const isAdmin = me?.role === 'admin';
@@ -53,6 +63,16 @@ export function MorePage() {
       // Offline kann die Server-Session nicht invalidiert werden — und ein
       // rein lokaler Logout würde den Offline-Zugriff sinnlos zerstören.
       window.alert('Abmelden ist offline nicht möglich.');
+      return;
+    }
+    // Nicht synchronisierte Erfassungen würden beim Logout-Purge verworfen.
+    const open = me ? await countOpen(me.id).catch(() => 0) : 0;
+    if (
+      open > 0 &&
+      !window.confirm(
+        `${open === 1 ? 'Eine nicht synchronisierte Erfassung' : `${open} nicht synchronisierte Erfassungen`} — trotzdem abmelden und verwerfen?`,
+      )
+    ) {
       return;
     }
     await logout();
@@ -159,6 +179,12 @@ export function MorePage() {
         {/* Konto */}
         <Section header="Konto">
           <RowGroup>
+            <Row
+              to="/sync"
+              icon={<CloudUpload size={20} />}
+              label="Ausstehende Synchronisierung"
+              value={pendingCount > 0 ? String(pendingCount) : undefined}
+            />
             <Row to="/passwort-aendern" icon={<KeyRound size={20} />} label="Passwort ändern" />
             <Row
               onClick={() => void handleLogout()}

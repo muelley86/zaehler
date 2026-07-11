@@ -15,6 +15,7 @@ import { useState, type ReactNode } from 'react';
 import {
   BarChart3,
   ClipboardList,
+  CloudUpload,
   Gauge,
   LayoutDashboard,
   LogOut,
@@ -29,6 +30,7 @@ import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { GlobalSearchSheet } from '@/features/_shell/GlobalSearchSheet';
 import { useAuth } from '@/features/auth/auth-context';
 import { useOnlineStatus } from '@/features/offline/offline-context';
+import { countOpen } from '@/lib/offline/outbox';
 import { GlobalDateRange } from './GlobalDateRange';
 import { OfflineBanner } from './OfflineBanner';
 import { cx } from './ui/cx';
@@ -99,7 +101,7 @@ function Avatar({ name, role }: { name: string; role: string }) {
 
 export function AppShell({ children }: { children: ReactNode }) {
   const { me, logout } = useAuth();
-  const { isOnline } = useOnlineStatus();
+  const { isOnline, pendingCount } = useOnlineStatus();
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const isAdmin = me?.role === 'admin';
@@ -107,6 +109,16 @@ export function AppShell({ children }: { children: ReactNode }) {
   const showMobileDateBar = DATE_ROUTES.includes(pathname);
 
   async function handleLogout() {
+    // Nicht synchronisierte Erfassungen würden beim Logout-Purge verworfen.
+    const open = me ? await countOpen(me.id).catch(() => 0) : 0;
+    if (
+      open > 0 &&
+      !window.confirm(
+        `${open === 1 ? 'Eine nicht synchronisierte Erfassung' : `${open} nicht synchronisierte Erfassungen`} — trotzdem abmelden und verwerfen?`,
+      )
+    ) {
+      return;
+    }
     await logout();
     navigate('/login', { replace: true });
   }
@@ -203,6 +215,23 @@ export function AppShell({ children }: { children: ReactNode }) {
               ))}
             </>
           )}
+
+          {pendingCount > 0 ? (
+            <NavLink to="/sync" className={sidebarLink} data-testid="sidebar-sync">
+              {(state) => (
+                <>
+                  {renderActiveRail(state)}
+                  <span className={cx('shrink-0', state.isActive ? 'opacity-100' : 'opacity-70')}>
+                    <CloudUpload size={18} />
+                  </span>
+                  Synchronisierung
+                  <span className="ml-auto rounded-pill bg-primary px-1.5 py-0.5 text-[10px] font-bold text-white">
+                    {pendingCount}
+                  </span>
+                </>
+              )}
+            </NavLink>
+          ) : null}
 
           <div className="px-2.5 pb-1.5 pt-4 text-caption-bold uppercase text-tertiary">Profil</div>
           {SECONDARY_NAV.map((n) => (
@@ -337,7 +366,17 @@ export function AppShell({ children }: { children: ReactNode }) {
             <span>Erfassungen</span>
           </NavLink>
           <NavLink to="/mehr" className={tabBarLink}>
-            <MoreHorizontal size={22} strokeWidth={2} />
+            <span className="relative">
+              <MoreHorizontal size={22} strokeWidth={2} />
+              {pendingCount > 0 ? (
+                <span
+                  data-testid="tabbar-sync-badge"
+                  className="absolute -right-2.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-pill bg-primary px-1 text-[9px] font-bold text-white"
+                >
+                  {pendingCount}
+                </span>
+              ) : null}
+            </span>
             <span>Mehr</span>
           </NavLink>
         </nav>

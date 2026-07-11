@@ -18,10 +18,14 @@ import { PageGlows } from '@/components/PageGlows';
 import { isValidToken } from '@/features/scanner/parseScannedUrl';
 import { ApiError, NetworkError, api, isPlausibilityWarning } from '@/lib/api';
 import { StaleDataHint } from '@/components/StaleDataHint';
+import { useAuth } from '@/features/auth/auth-context';
 import { formatDateTimeDe, formatDe, localInputToIso, nowForInput, parseDe } from '@/lib/format';
 import { mapWithConcurrency } from '@/lib/concurrency';
 import { tryGetDeviceLocation } from '@/lib/geo';
 import { compressImage } from '@/lib/imageCompression';
+import { loadMasterDataSnapshot } from '@/lib/offline/masterData';
+import { enqueueGroup } from '@/lib/offline/outbox';
+import { SYNCED_EVENT } from '@/lib/offline/syncEngine';
 import { describeMeterType } from '@/lib/meterLabels';
 import type {
   DeliveryRead,
@@ -73,6 +77,7 @@ function monthEndInput(month: string): string {
 }
 
 export function RecordReadingPage() {
+  const { me } = useAuth();
   const [points, setPoints] = useState<MeasuringPointRead[] | null>(null);
   const [stateByRegister, setStateByRegister] = useState<Map<number, RegisterStateRead>>(
     () => new Map(),
@@ -93,6 +98,7 @@ export function RecordReadingPage() {
   const [assignToken, setAssignToken] = useState<string | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
 
+  const meId = me?.id ?? null;
   useEffect(() => {
     api
       .getWithMeta<MeasuringPointRead[]>('/measuring-points')
@@ -100,16 +106,33 @@ export function RecordReadingPage() {
         setPoints(data);
         setServedAt(responseServedAt);
       })
-      .catch((err: unknown) => {
-        if (err instanceof ApiError) setLoadError(err.problem.detail ?? err.problem.title);
-        else if (err instanceof NetworkError)
-          // Offline UND nichts im SW-Cache (sonst hätte NetworkFirst die
-          // gecachte Antwort geliefert) — ohne Stammdaten keine Erfassung.
+      .catch(async (err: unknown) => {
+        if (err instanceof ApiError) {
+          setLoadError(err.problem.detail ?? err.problem.title);
+          return;
+        }
+        if (!(err instanceof NetworkError)) return;
+        // Offline UND nichts im SW-Cache (sonst hätte NetworkFirst die
+        // gecachte Antwort geliefert) — der aktive Stammdaten-Snapshot
+        // garantiert die Erfassung trotzdem.
+        const snapshot = meId !== null ? await loadMasterDataSnapshot(meId) : null;
+        if (snapshot) {
+          setPoints(snapshot.points);
+          setServedAt(new Date(snapshot.fetchedAt));
+          setStateByRegister((prev) => {
+            const next = new Map(prev);
+            for (const states of Object.values(snapshot.statesByMpId)) {
+              for (const s of states) next.set(s.register_id, s);
+            }
+            return next;
+          });
+        } else {
           setLoadError(
             'Offline — noch keine gespeicherten Daten. Bitte die Seite einmal öffnen, während der Server erreichbar ist.',
           );
+        }
       });
-  }, []);
+  }, [meId]);
 
   // Letzte Stände aller MPs nachladen — wir brauchen sie für die
   // Plausibilitäts-Deltas pro Register. Bei vielen MPs (>20) wuerde ein
@@ -122,19 +145,29 @@ export function RecordReadingPage() {
       (mp) =>
         api
           .get<RegisterStateRead[]>(`/measuring-points/${mp.id}/state`)
-          .catch(() => [] as RegisterStateRead[]),
+          // null = Request gescheitert (z. B. offline) — dann den bereits
+          // bekannten Stand (Cache/Snapshot) NICHT überschreiben.
+          .catch(() => null),
       5,
     ).then((results) => {
-      const next = new Map<number, RegisterStateRead>();
-      for (const list of results) {
-        for (const s of list) next.set(s.register_id, s);
-      }
-      setStateByRegister(next);
+      setStateByRegister((prev) => {
+        const next = new Map(prev);
+        for (const list of results) {
+          if (!list) continue;
+          for (const s of list) next.set(s.register_id, s);
+        }
+        return next;
+      });
     });
   };
 
   useEffect(() => {
     refreshStates(points);
+    // Nach jedem erfolgreichen Sync-Lauf die "letzter Stand"-Anzeigen
+    // aktualisieren — hier schaden veraltete Werte am meisten.
+    const handler = () => refreshStates(points);
+    window.addEventListener(SYNCED_EVENT, handler);
+    return () => window.removeEventListener(SYNCED_EVENT, handler);
   }, [points]);
 
   // Token-Pfad: wenn ?token=X gesetzt ist, beim Backend auflösen.
@@ -385,6 +418,7 @@ function ReadingsForm({
   stateByRegister: Map<number, RegisterStateRead>;
   onSaved: () => void;
 }) {
+  const { me } = useAuth();
   // Pro MP eigene Form-State, damit Wechsel der MP die Eingaben löscht.
   const [values, setValues] = useState<Record<number, string>>({});
   const [readingAt, setReadingAt] = useState(nowForInput());
@@ -438,6 +472,81 @@ function ReadingsForm({
     });
   }
 
+  /**
+   * Server nicht erreichbar: die noch nicht gespeicherten Register dieses
+   * Submits (inkl. Fotos) in die Offline-Queue legen. Der Sync spielt sie
+   * ab, sobald der Server wieder antwortet; Konflikte landen auf /sync.
+   */
+  async function enqueueRemaining(
+    rest: { ar: ActiveRegister; numeric: string }[],
+    alreadySavedOnline: number,
+  ): Promise<void> {
+    if (!me) {
+      setError('Keine Anmeldung — Eintrag kann nicht offline gespeichert werden.');
+      return;
+    }
+    // Soft-Plausibilitätscheck gegen den letzten bekannten Stand — offline
+    // kann der Server nicht warnen. acknowledge_warnings bleibt trotzdem
+    // false: beim Sync ist das Server-Urteil maßgeblich (Konflikt-UI).
+    const toQueue: { ar: ActiveRegister; numeric: string }[] = [];
+    for (const entry of rest) {
+      const state = stateByRegister.get(entry.ar.register.id);
+      const last = state?.current_value != null ? Number(state.current_value) : Number.NaN;
+      if (state && Number.isFinite(last) && Number(entry.numeric) < last) {
+        const ok = window.confirm(
+          `${entry.ar.register.label} (${entry.ar.register.obis_code}): Wert liegt unter dem letzten bekannten Stand (${formatDe(state.current_value ?? '')} ${entry.ar.register.unit}).\n\nTrotzdem offline speichern?`,
+        );
+        if (!ok) continue;
+      }
+      toQueue.push(entry);
+    }
+    if (toQueue.length === 0) {
+      setError('Nichts gespeichert.');
+      return;
+    }
+
+    const readingAtIso = localInputToIso(effectiveReadingInput);
+    const compressed =
+      photos.length > 0 ? await Promise.all(photos.map((p) => compressImage(p))) : [];
+    const gps = photos.length > 0 ? await tryGetDeviceLocation() : null;
+    const { photosDropped } = await enqueueGroup({
+      userId: me.id,
+      readings: toQueue.map(({ ar, numeric }) => ({
+        registerId: ar.register.id,
+        mpName: mp.name,
+        registerLabel: ar.register.label,
+        registerUnit: ar.register.unit,
+        obisCode: ar.register.obis_code,
+        value: numeric,
+        readingAt: readingAtIso,
+        note: note || null,
+      })),
+      photos: compressed.map((file) => ({
+        blob: file,
+        gpsLat: gps?.lat ?? null,
+        gpsLon: gps?.lon ?? null,
+      })),
+    });
+
+    const queuedMsg =
+      toQueue.length === 1
+        ? '1 Stand offline gespeichert — wird synchronisiert, sobald der Server erreichbar ist.'
+        : `${toQueue.length} Stände offline gespeichert — werden synchronisiert, sobald der Server erreichbar ist.`;
+    setSuccess(
+      alreadySavedOnline > 0 ? `${alreadySavedOnline} direkt gespeichert; ${queuedMsg}` : queuedMsg,
+    );
+    if (photosDropped) {
+      setPhotoWarning('Speicher voll — Fotos konnten nicht offline gesichert werden.');
+    } else if (alreadySavedOnline > 0 && photos.length > 0) {
+      setPhotoWarning(
+        'Fotos werden an die offline gespeicherten Einträge angehängt — bei den bereits online gespeicherten ggf. im Bearbeiten-Dialog nachreichen.',
+      );
+    }
+    setValues({});
+    setNote('');
+    setPhotos([]);
+  }
+
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError(null);
@@ -457,27 +566,47 @@ function ReadingsForm({
     let savedCount = 0;
     const savedIds: number[] = [];
     try {
+      // Erst ALLE Werte parsen — geht der Server mitten im Submit verloren,
+      // muss der Rest der Gruppe fertig geparst in die Offline-Queue können.
+      const parsed: { ar: ActiveRegister; numeric: string }[] = [];
       for (const { ar, raw } of filled) {
-        let numeric: string;
         try {
-          numeric = parseDe(raw);
+          parsed.push({ ar, numeric: parseDe(raw) });
         } catch (err) {
           if (err instanceof RangeError) {
             throw new Error(`${ar.register.label}: ${err.message}`);
           }
           throw err;
         }
+      }
+
+      for (let index = 0; index < parsed.length; index += 1) {
+        const entry = parsed[index];
+        if (!entry) continue;
+        const { ar, numeric } = entry;
         let saved: ReadingRead | null = null;
         try {
           saved = await postOne(ar.register.id, numeric, false);
         } catch (err) {
+          if (err instanceof NetworkError) {
+            await enqueueRemaining(parsed.slice(index), savedCount);
+            return;
+          }
           if (err instanceof ApiError && isPlausibilityWarning(err)) {
             const detail = err.problem.detail ?? err.problem.title;
             const ok = window.confirm(
               `${ar.register.label} (${ar.register.obis_code}): ${detail}\n\nTrotzdem speichern?`,
             );
             if (!ok) continue;
-            saved = await postOne(ar.register.id, numeric, true);
+            try {
+              saved = await postOne(ar.register.id, numeric, true);
+            } catch (retryErr) {
+              if (retryErr instanceof NetworkError) {
+                await enqueueRemaining(parsed.slice(index), savedCount);
+                return;
+              }
+              throw retryErr;
+            }
           } else {
             throw err;
           }

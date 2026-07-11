@@ -126,6 +126,9 @@ const SessionsAdminPage = lazy(() =>
     default: m.SessionsAdminPage,
   })),
 );
+const PendingSyncPage = lazy(() =>
+  import('@/features/offline/PendingSyncPage').then((m) => ({ default: m.PendingSyncPage })),
+);
 const MorePage = lazy(() =>
   import('@/features/more/MorePage').then((m) => ({ default: m.MorePage })),
 );
@@ -224,6 +227,7 @@ export function App() {
           {/* Detail einer verrechneten Messstelle — kein AdminOnly: das
               Backend liefert 404, wenn der Recorder keinen Vollzugriff hat. */}
           <Route path="/verrechnung/:id" element={<VirtualPointDetailPage />} />
+          <Route path="/sync" element={<PendingSyncPage />} />
           <Route path="/mehr" element={<MorePage />} />
           <Route path="/passwort-aendern" element={<ChangePasswordPage />} />
           <Route path="/2fa-einrichten" element={<TwoFactorSetupPage />} />

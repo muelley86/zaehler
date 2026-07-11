@@ -12,6 +12,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 
 import { ApiError, NetworkError, api } from '@/lib/api';
+import { clearAll as clearOfflineData } from '@/lib/offline/outbox';
 import type { LoginResponse, Me } from '@/lib/types';
 import { AuthContext } from './auth-context';
 import type { AuthState, LoginResult } from './auth-context';
@@ -81,6 +82,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Offline-Snapshot mit entfernen — nach explizitem Logout darf kein
       // Offline-Kaltstart mehr in den Account des vorherigen Users führen.
       clearMeSnapshot();
+      // Offline-Queue + Stammdaten-Snapshot ebenfalls purgen (die UI hat
+      // bei offenen Einträgen vorher einen Confirm gezeigt).
+      try {
+        await clearOfflineData();
+      } catch {
+        /* IndexedDB fehlt (Test/alte Umgebung) — egal. */
+      }
       // SW-Cache leeren — sonst serviert der NetworkFirst-Cache
       // beim nächsten Login auf demselben Gerät noch alte API-Antworten
       // des vorherigen Users (Same-Origin, gleiches Cookie-Bucket).
