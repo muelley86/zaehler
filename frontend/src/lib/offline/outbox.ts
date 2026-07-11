@@ -133,8 +133,14 @@ export async function listItems(userId: number): Promise<OutboxReading[]> {
   );
 }
 
+/** Stati, die ein Auto-Retry sinnvoll erneut versuchen kann — Konflikte
+ * und Fehler brauchen dagegen eine Nutzer-Entscheidung auf /sync. */
+const RETRYABLE_STATUSES: readonly OutboxStatus[] = ['pending', 'photos_pending'];
+
 export interface OpenSummary {
   count: number;
+  /** Teilmenge von count mit Status pending/photos_pending — Auto-Retry-Basis. */
+  retryableCount: number;
   /** createdAt des ältesten offenen Items (ISO) — Basis der Alters-Warnung. */
   oldestCreatedAt: string | null;
 }
@@ -143,11 +149,12 @@ export interface OpenSummary {
 export async function openSummary(userId: number): Promise<OpenSummary> {
   const items = await listItems(userId);
   const open = items.filter((item) => OPEN_STATUSES.includes(item.status));
+  const retryableCount = open.filter((item) => RETRYABLE_STATUSES.includes(item.status)).length;
   const oldestCreatedAt = open.reduce<string | null>(
     (oldest, item) => (oldest === null || item.createdAt < oldest ? item.createdAt : oldest),
     null,
   );
-  return { count: open.length, oldestCreatedAt };
+  return { count: open.length, retryableCount, oldestCreatedAt };
 }
 
 /** Anzahl offener (nicht abgeschlossener) Items des Users — Badge-Zähler. */

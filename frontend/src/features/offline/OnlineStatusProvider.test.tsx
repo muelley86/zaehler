@@ -5,9 +5,9 @@
 
 import 'fake-indexeddb/auto';
 import { IDBFactory } from 'fake-indexeddb';
-import { act, render, screen } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { OfflineBanner } from '@/components/OfflineBanner';
 import { StaleDataHint } from '@/components/StaleDataHint';
@@ -90,6 +90,17 @@ const ME: Me = {
   last_login_at: null,
 };
 
+const READING = {
+  registerId: 12,
+  mpName: 'Hauptzähler Strom',
+  registerLabel: 'Bezug',
+  registerUnit: 'kWh',
+  obisCode: '1.8.0',
+  value: '100.5',
+  readingAt: '2026-07-10T18:00:00Z',
+  note: null,
+};
+
 const AUTH: AuthState = {
   me: ME,
   loading: false,
@@ -111,22 +122,7 @@ describe('OnlineStatusProvider oldestPendingAt', () => {
     // Der Sync-Versuch beim Mount scheitert als Netzfehler — Items bleiben liegen.
     server.use(http.post('/api/v1/readings', () => HttpResponse.error()));
 
-    await enqueueGroup({
-      userId: 7,
-      readings: [
-        {
-          registerId: 12,
-          mpName: 'Hauptzähler Strom',
-          registerLabel: 'Bezug',
-          registerUnit: 'kWh',
-          obisCode: '1.8.0',
-          value: '100.5',
-          readingAt: '2026-07-10T18:00:00Z',
-          note: null,
-        },
-      ],
-      photos: [],
-    });
+    await enqueueGroup({ userId: 7, readings: [READING], photos: [] });
     const [item] = await listItems(7);
     await updateItem(item?.id ?? '', { createdAt: '2026-07-01T06:00:00Z' });
 
@@ -139,6 +135,39 @@ describe('OnlineStatusProvider oldestPendingAt', () => {
     );
 
     expect(await screen.findByText('1:2026-07-01T06:00:00Z')).toBeInTheDocument();
+  });
+
+  it('plant nach Netzfehler automatisch einen neuen Sync-Versuch (Backoff)', async () => {
+    globalThis.indexedDB = new IDBFactory();
+    resetOfflineDbForTests();
+    let posts = 0;
+    server.use(
+      http.post('/api/v1/readings', () => {
+        posts += 1;
+        return HttpResponse.error();
+      }),
+    );
+    await enqueueGroup({ userId: 7, readings: [READING], photos: [] });
+
+    // Fake timers ab Mount, sonst liefe der Scheduler-Timeout in Echtzeit;
+    // shouldAdvanceTime lässt waitFor/msw parallel normal weiterlaufen.
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      render(
+        <AuthContext.Provider value={AUTH}>
+          <OnlineStatusProvider>
+            <ProbeOldest />
+          </OnlineStatusProvider>
+        </AuthContext.Provider>,
+      );
+      await waitFor(() => expect(posts).toBe(1));
+
+      // 30 s vorspulen — der Scheduler muss den nächsten Versuch anstoßen.
+      await vi.advanceTimersByTimeAsync(30_000);
+      await waitFor(() => expect(posts).toBe(2));
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 

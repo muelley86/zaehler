@@ -4,8 +4,8 @@
  * Handgerollt statt workbox-background-sync: iOS Safari hat kein
  * SyncManager-API, und die Konfliktbehandlung (400-Plausibilität, 409-
  * Duplikat) braucht App-Kontext und UI. Getriggert wird eventbasiert
- * (App-Start, online-Event, Sichtbarkeitswechsel, Login, manuell) —
- * bewusst kein Backoff-Timer.
+ * (App-Start, online-Event, Sichtbarkeitswechsel, Login, manuell);
+ * Retries nach Netzfehlern plant `syncScheduler.ts` (Backoff 30 s → 5 min).
  *
  * Ablauf-Garantien:
  * - Strikt sequenziell, sortiert nach readingAt: die Server-Plausibilität
