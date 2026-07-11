@@ -162,6 +162,34 @@ export async function countOpen(userId: number): Promise<number> {
   return (await openSummary(userId)).count;
 }
 
+export interface PendingRegisterValue {
+  value: string;
+  readingAt: string;
+}
+
+/** Werte, die als „letzter bekannter Stand" taugen: noch nicht versucht
+ * (pending/photos_pending) oder vom Server bereits akzeptiert (photo_error =
+ * Reading gespeichert, nur das Foto fehlt). Vom Server abgelehnte bzw.
+ * bestrittene Werte (conflict_*, error) dürfen NICHT überlagern. */
+const OVERLAY_STATUSES: readonly OutboxStatus[] = ['pending', 'photos_pending', 'photo_error'];
+
+/**
+ * Neuester überlagerungsfähiger Wert je Register (nach readingAt) —
+ * überlagert beim Erfassen den Server-„letzten Stand", solange der Sync
+ * aussteht.
+ */
+export async function latestPendingByRegister(
+  userId: number,
+): Promise<Map<number, PendingRegisterValue>> {
+  const items = await listItems(userId); // sortiert nach readingAt aufsteigend
+  const map = new Map<number, PendingRegisterValue>();
+  for (const item of items) {
+    if (!OVERLAY_STATUSES.includes(item.status)) continue;
+    map.set(item.registerId, { value: item.value, readingAt: item.readingAt });
+  }
+  return map;
+}
+
 export async function getItem(id: string): Promise<OutboxReading | undefined> {
   const db = await getOfflineDb();
   return db.get('outbox-readings', id);

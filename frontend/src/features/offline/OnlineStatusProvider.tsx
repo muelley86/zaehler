@@ -27,7 +27,10 @@ import {
   reportOnline,
   subscribeConnectivity,
 } from '@/lib/offline/connectivity';
-import { refreshMasterDataSnapshot } from '@/lib/offline/masterData';
+import {
+  refreshMasterDataSnapshot,
+  refreshMasterDataSnapshotIfStale,
+} from '@/lib/offline/masterData';
 import { openSummary, subscribeOutbox } from '@/lib/offline/outbox';
 import { getSyncPhase, runSync, subscribeSyncState } from '@/lib/offline/syncEngine';
 import type { SyncPhase } from '@/lib/offline/syncEngine';
@@ -142,6 +145,9 @@ export function OnlineStatusProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (userId === null) return;
     void doSync();
+    // Wer lange nur online arbeitet (leere Queue), bekäme sonst nie einen
+    // frischen Stammdaten-Snapshot — der Nach-Sync-Refresh feuert dann nicht.
+    void refreshMasterDataSnapshotIfStale(userId);
     try {
       void navigator.storage?.persist?.().catch(() => undefined);
     } catch {
