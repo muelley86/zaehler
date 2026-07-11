@@ -9,12 +9,16 @@
  * 5. Submit ohne Werte → Inline-Error
  */
 
+import 'fake-indexeddb/auto';
+import { IDBFactory } from 'fake-indexeddb';
 import { http, HttpResponse } from 'msw';
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useNavigate } from 'react-router-dom';
 
+import { resetOfflineDbForTests } from '@/lib/offline/db';
+import { listItems } from '@/lib/offline/outbox';
 import { renderWithRouter } from '@/tests/render';
 import { server } from '@/tests/server';
 
@@ -498,5 +502,36 @@ describe('RecordReadingPage', () => {
     await waitFor(() => expect(bodies).toHaveLength(1));
     // 2024-05 -> Monatsende 31.05. (lokal Mittag), Datum stabil unabhängig von TZ.
     expect(bodies[0]!.reading_at).toMatch(/^2024-05-31/);
+  });
+});
+
+describe('RecordReadingPage — Offline-Erfassung', () => {
+  it('Netzfehler beim Speichern → Eintrag landet in der Offline-Queue, Toast, leeres Formular', async () => {
+    globalThis.indexedDB = new IDBFactory();
+    resetOfflineDbForTests();
+    _mockListEndpoints([_mp()]);
+    server.use(http.post('/api/v1/readings', () => HttpResponse.error()));
+
+    const user = userEvent.setup();
+    renderWithRouter(<RecordReadingPage />);
+    await screen.findByText('Bezug');
+
+    const input = screen.getByPlaceholderText(/leer = nicht erfassen/i);
+    await user.type(input, '123');
+    await user.click(screen.getByRole('button', { name: /^Speichern$/i }));
+
+    await waitFor(() =>
+      expect(screen.getByTestId('record-success')).toHaveTextContent(/offline gespeichert/i),
+    );
+    const items = await listItems(1);
+    expect(items).toHaveLength(1);
+    expect(items[0]).toMatchObject({
+      registerId: 100,
+      value: '123',
+      status: 'pending',
+      mpName: 'Strom Hauptzähler',
+      userId: 1,
+    });
+    expect(screen.getByPlaceholderText(/leer = nicht erfassen/i)).toHaveValue('');
   });
 });
