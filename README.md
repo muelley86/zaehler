@@ -31,9 +31,15 @@ Die fachliche Spezifikation steht in [`CLAUDE.md`](./CLAUDE.md).
 - **CSV-Export** auf Dashboard- und Erfassungs-Seite.
 - **Offline-Erfassung (PWA)** — als App installierbar („Zum Home-Bildschirm");
   Zählerstände (inkl. Fotos) lassen sich ohne Serververbindung erfassen und
-  synchronisieren automatisch, sobald die App den Server wieder erreicht
-  (Konflikte werden unter „Synchronisierung" zur Entscheidung angeboten);
-  historische Daten bleiben offline als letzter bekannter Stand sichtbar.
+  synchronisieren automatisch, sobald die App den Server wieder erreicht —
+  nach Netzfehlern wiederholt die App den Sync selbsttätig (Backoff bis
+  5 min); Konflikte werden unter „Synchronisierung" zur Entscheidung
+  angeboten. Noch nicht übertragene Einträge bleiben in der Erfassungsliste
+  sichtbar und gelten beim Erfassen als „letzter Stand (ausstehend)". Die
+  Sync-Seite zeigt die Speicherbelegung und warnt, wenn Einträge mehrere
+  Tage unsynchronisiert liegen; auf iOS empfiehlt die App die Installation
+  (schützt vor Safaris 7-Tage-Speicherbereinigung). Historische Daten
+  bleiben offline als letzter bekannter Stand sichtbar.
 - **Liquid-Glass-UI** in OKLCH-Farben mit warmem Orange-Akzent,
   Light/Dark-Modus erst- und gleichrangig (System-Setting + manueller
   Toggle), JetBrains Mono mit `tabular-nums` für alle Zahlen, responsive
