@@ -29,6 +29,11 @@ Die fachliche Spezifikation steht in [`CLAUDE.md`](./CLAUDE.md).
 - **Dashboard** mit Verbrauchs- und Stand-Diagrammen, Filter nach Standort,
   Zählerart, Messstelle und Zeitraum, plus aggregierter Verbrauchs-Übersicht.
 - **CSV-Export** auf Dashboard- und Erfassungs-Seite.
+- **Offline-Erfassung (PWA)** — als App installierbar („Zum Home-Bildschirm");
+  Zählerstände (inkl. Fotos) lassen sich ohne Serververbindung erfassen und
+  synchronisieren automatisch, sobald die App den Server wieder erreicht
+  (Konflikte werden unter „Synchronisierung" zur Entscheidung angeboten);
+  historische Daten bleiben offline als letzter bekannter Stand sichtbar.
 - **Liquid-Glass-UI** in OKLCH-Farben mit warmem Orange-Akzent,
   Light/Dark-Modus erst- und gleichrangig (System-Setting + manueller
   Toggle), JetBrains Mono mit `tabular-nums` für alle Zahlen, responsive
@@ -99,7 +104,11 @@ direkt im LAN erreichbar — kein manuelles Editieren von `meters.env`
 nötig. Wer HTTPS via Reverse-Proxy nachschalten will, ruft danach
 `zaehler.sh configure-network` auf — geführter Wizard, drei Topologien
 (LAN-only / Proxy auf anderem Host / Proxy auf gleichem Host), schreibt
-alle nötigen Werte automatisch.
+alle nötigen Werte automatisch. Hinweis: Für den **Offline-Kaltstart**
+der PWA (App ohne Netz öffnen, s. Funktionsumfang) braucht der Browser
+einen Secure Context — wer die Offline-Funktion nutzen will, sollte die
+HTTPS-Variante einrichten; bei Direkt-HTTP funktioniert online alles wie
+gehabt, und Netzabbrüche in geöffneter App werden ebenfalls abgefangen.
 
 ## Backup & Wiederherstellen
 

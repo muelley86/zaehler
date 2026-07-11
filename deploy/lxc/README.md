@@ -92,6 +92,14 @@ Zur Erinnerung: nach dem Install ist die App **immer** per
 `http://<container-ip>:8000` im LAN erreichbar. Der nachfolgende
 Abschnitt beschreibt nur die optionale HTTPS-Härtung.
 
+Seit v2.69.0 relevant: Der **Offline-Kaltstart** der PWA (App ohne
+erreichbaren Server öffnen) setzt einen Secure Context voraus — der
+Service Worker registriert sich nur über HTTPS. Wer die
+Offline-Erfassung unterwegs nutzen will, sollte also diese
+HTTPS-Variante einrichten. Bei Direkt-HTTP läuft die App online
+unverändert; Netzabbrüche bei bereits geöffneter App fängt die
+Offline-Queue auch dort ab.
+
 **Im Container** stellst du die Topologie geführt um — kein manuelles
 Editieren von `meters.env`:
 
