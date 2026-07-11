@@ -10,6 +10,13 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.70.1](https://github.com/muelley86/zaehler/compare/v2.70.0...v2.70.1) (2026-07-11)
+
+
+### Dokumentation
+
+* Offline-Härtung v2.70.0 dokumentieren ([#330](https://github.com/muelley86/zaehler/issues/330)) ([30c8868](https://github.com/muelley86/zaehler/commit/30c886818239be97e20978df043c7bf28ebd2363))
+
 ## [2.70.0](https://github.com/muelley86/zaehler/compare/v2.69.0...v2.70.0) (2026-07-11)
 
 
