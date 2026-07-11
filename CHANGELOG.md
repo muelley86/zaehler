@@ -10,6 +10,20 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.70.0](https://github.com/muelley86/zaehler/compare/v2.69.0...v2.70.0) (2026-07-11)
+
+
+### Funktionen
+
+* **frontend:** Offline-Datensicherheit — Install-Hinweis, Alters-Warnung, Speicher-Anzeige ([#327](https://github.com/muelley86/zaehler/issues/327)) ([0980d4d](https://github.com/muelley86/zaehler/commit/0980d4db1333451c804d9ce19208a49e0a66c186))
+* **frontend:** Offline-Einträge sichtbar machen (Client-Merge light) ([#329](https://github.com/muelley86/zaehler/issues/329)) ([2d6f486](https://github.com/muelley86/zaehler/commit/2d6f48651721bd19002ed77a1b480a1f45a2ada4))
+* **frontend:** Sync-Retry mit Backoff nach Netzfehlern ([#328](https://github.com/muelley86/zaehler/issues/328)) ([b07f4ae](https://github.com/muelley86/zaehler/commit/b07f4ae084c9f2df4976d2718fb6dd05e2db0230))
+
+
+### Dokumentation
+
+* Offline-Modus dokumentieren (v2.69.0) ([#325](https://github.com/muelley86/zaehler/issues/325)) ([7215c7c](https://github.com/muelley86/zaehler/commit/7215c7c47d7fd71656e11dbd87adc5e63d8f2d13))
+
 ## [2.69.0](https://github.com/muelley86/zaehler/compare/v2.68.6...v2.69.0) (2026-07-11)
 
 
