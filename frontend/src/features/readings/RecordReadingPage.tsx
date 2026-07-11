@@ -16,7 +16,8 @@ import {
 } from '@/components/ui';
 import { PageGlows } from '@/components/PageGlows';
 import { isValidToken } from '@/features/scanner/parseScannedUrl';
-import { ApiError, api, isPlausibilityWarning } from '@/lib/api';
+import { ApiError, NetworkError, api, isPlausibilityWarning } from '@/lib/api';
+import { StaleDataHint } from '@/components/StaleDataHint';
 import { formatDateTimeDe, formatDe, localInputToIso, nowForInput, parseDe } from '@/lib/format';
 import { mapWithConcurrency } from '@/lib/concurrency';
 import { tryGetDeviceLocation } from '@/lib/geo';
@@ -77,6 +78,9 @@ export function RecordReadingPage() {
     () => new Map(),
   );
   const [loadError, setLoadError] = useState<string | null>(null);
+  // Zeitpunkt der (ggf. aus dem SW-Cache stammenden) Messstellen-Antwort —
+  // offline als "Stand von <Datum>" angezeigt.
+  const [servedAt, setServedAt] = useState<Date | null>(null);
 
   const [mpId, setMpId] = useState<number | null>(null);
   const [mode, setMode] = useState<Mode>('reading');
@@ -91,10 +95,19 @@ export function RecordReadingPage() {
 
   useEffect(() => {
     api
-      .get<MeasuringPointRead[]>('/measuring-points')
-      .then(setPoints)
+      .getWithMeta<MeasuringPointRead[]>('/measuring-points')
+      .then(({ data, servedAt: responseServedAt }) => {
+        setPoints(data);
+        setServedAt(responseServedAt);
+      })
       .catch((err: unknown) => {
         if (err instanceof ApiError) setLoadError(err.problem.detail ?? err.problem.title);
+        else if (err instanceof NetworkError)
+          // Offline UND nichts im SW-Cache (sonst hätte NetworkFirst die
+          // gecachte Antwort geliefert) — ohne Stammdaten keine Erfassung.
+          setLoadError(
+            'Offline — noch keine gespeicherten Daten. Bitte die Seite einmal öffnen, während der Server erreichbar ist.',
+          );
       });
   }, []);
 
@@ -254,6 +267,8 @@ export function RecordReadingPage() {
     <PageContainer>
       <div className="space-y-5">
         <LargeTitle title="Erfassen" />
+
+        <StaleDataHint servedAt={servedAt} />
 
         {paramWarning ? (
           <div

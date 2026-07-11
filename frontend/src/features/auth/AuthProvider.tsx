@@ -11,10 +11,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 
-import { ApiError, api } from '@/lib/api';
+import { ApiError, NetworkError, api } from '@/lib/api';
 import type { LoginResponse, Me } from '@/lib/types';
 import { AuthContext } from './auth-context';
 import type { AuthState, LoginResult } from './auth-context';
+import { clearMeSnapshot, loadMeSnapshot, saveMeSnapshot } from './meSnapshot';
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [me, setMe] = useState<Me | null>(null);
@@ -24,9 +25,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const data = await api.get<Me>('/auth/me');
       setMe(data);
+      saveMeSnapshot(data);
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
+        // Server sagt explizit "nicht angemeldet" — Snapshot ist damit
+        // ungültig und darf keinen Offline-Kaltstart mehr ermöglichen.
         setMe(null);
+        clearMeSnapshot();
+      } else if (err instanceof NetworkError) {
+        // Server nicht erreichbar (unterwegs, Server nur im Heimnetz):
+        // letzten bekannten User wiederherstellen, damit die App mit
+        // gecachten Daten rendert statt auf "Lade…" zu hängen. Ohne
+        // Snapshot bleibt es bei der Login-Seite.
+        setMe(loadMeSnapshot());
       } else {
         throw err;
       }
@@ -46,6 +57,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     if (data.me) {
       setMe(data.me);
+      saveMeSnapshot(data.me);
       return { kind: 'ok', me: data.me };
     }
     throw new Error('Login-Antwort ohne me oder challenge_token');
@@ -57,6 +69,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       code,
     });
     setMe(data);
+    saveMeSnapshot(data);
     return data;
   }, []);
 
@@ -65,6 +78,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await api.post('/auth/logout');
     } finally {
       setMe(null);
+      // Offline-Snapshot mit entfernen — nach explizitem Logout darf kein
+      // Offline-Kaltstart mehr in den Account des vorherigen Users führen.
+      clearMeSnapshot();
       // SW-Cache leeren — sonst serviert der NetworkFirst-Cache
       // beim nächsten Login auf demselben Gerät noch alte API-Antworten
       // des vorherigen Users (Same-Origin, gleiches Cookie-Bucket).

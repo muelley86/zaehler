@@ -6,6 +6,7 @@
  * dem RFC-7807-Format des Backends). 204-Antworten werden zu `undefined`.
  */
 
+import { reportOffline, reportOnline } from './offline/connectivity';
 import type { ProblemDetails } from './types';
 
 const API_BASE = '/api/v1';
@@ -20,6 +21,45 @@ export class ApiError extends Error {
     this.status = problem.status;
     this.problem = problem;
   }
+}
+
+/**
+ * Netzfehler (Server nicht erreichbar): fetch hat KEINE Response geliefert —
+ * offline, DNS-Fehler, Connection refused. Vorher schlug hier ein roher
+ * `TypeError` durch, der alle `instanceof ApiError`-Zweige umging und zu
+ * stummen Fehlern führte. Aborts werden bewusst NICHT gewrappt.
+ */
+export class NetworkError extends Error {
+  override cause: unknown;
+
+  constructor(cause: unknown) {
+    super('Server nicht erreichbar');
+    this.name = 'NetworkError';
+    this.cause = cause;
+  }
+}
+
+function isAbortError(err: unknown): boolean {
+  return err instanceof DOMException && (err.name === 'AbortError' || err.name === 'TimeoutError');
+}
+
+/**
+ * fetch mit Offline-Erkennung: jede erhaltene Response (auch 4xx/5xx) meldet
+ * "online", jede Netz-Rejection meldet "offline" und wird zum `NetworkError`.
+ */
+async function fetchWithConnectivity(input: string, init: RequestInit): Promise<Response> {
+  let resp: Response;
+  try {
+    resp = await fetch(input, init);
+  } catch (err) {
+    if (isAbortError(err)) {
+      throw err;
+    }
+    reportOffline();
+    throw new NetworkError(err);
+  }
+  reportOnline();
+  return resp;
 }
 
 interface RequestOptions {
@@ -49,7 +89,7 @@ async function parseJsonResponse<T>(resp: Response): Promise<T> {
   return data as T;
 }
 
-async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
+function buildRequestInit(options: RequestOptions): RequestInit {
   const { method = 'GET', body, signal } = options;
   const init: RequestInit = {
     method,
@@ -61,14 +101,18 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
     init.headers = { ...init.headers, 'Content-Type': 'application/json' };
     init.body = JSON.stringify(body);
   }
-  const resp = await fetch(`${API_BASE}${path}`, init);
+  return init;
+}
+
+async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
+  const resp = await fetchWithConnectivity(`${API_BASE}${path}`, buildRequestInit(options));
   return parseJsonResponse<T>(resp);
 }
 
 async function upload<T>(path: string, method: 'PUT' | 'POST', formData: FormData): Promise<T> {
   // Multipart-Upload: kein Content-Type setzen — der Browser muss den
   // ``multipart/form-data; boundary=…`` selbst generieren.
-  const resp = await fetch(`${API_BASE}${path}`, {
+  const resp = await fetchWithConnectivity(`${API_BASE}${path}`, {
     method,
     credentials: 'same-origin',
     headers: { Accept: 'application/json' },
@@ -77,8 +121,32 @@ async function upload<T>(path: string, method: 'PUT' | 'POST', formData: FormDat
   return parseJsonResponse<T>(resp);
 }
 
+/**
+ * GET-Antwort inkl. Zeitstempel: `servedAt` stammt aus dem `Date`-Header.
+ * Kommt die Antwort aus dem Service-Worker-Cache (Workbox speichert die
+ * Response samt Headern), ist das der Zeitpunkt der URSPRÜNGLICHEN
+ * Server-Antwort — genau das "Stand von …" für die Offline-Anzeige.
+ */
+export interface WithMeta<T> {
+  data: T;
+  servedAt: Date | null;
+}
+
+async function getWithMeta<T>(path: string, signal?: AbortSignal): Promise<WithMeta<T>> {
+  const resp = await fetchWithConnectivity(
+    `${API_BASE}${path}`,
+    buildRequestInit(signal ? { signal } : {}),
+  );
+  const dateHeader = resp.headers.get('date');
+  const parsed = dateHeader ? new Date(dateHeader) : null;
+  const servedAt = parsed !== null && !Number.isNaN(parsed.getTime()) ? parsed : null;
+  const data = await parseJsonResponse<T>(resp);
+  return { data, servedAt };
+}
+
 export const api = {
   get: <T>(path: string, signal?: AbortSignal) => request<T>(path, signal ? { signal } : {}),
+  getWithMeta,
   post: <T>(path: string, body?: unknown) => request<T>(path, { method: 'POST', body }),
   patch: <T>(path: string, body?: unknown) => request<T>(path, { method: 'PATCH', body }),
   put: <T>(path: string, body?: unknown) => request<T>(path, { method: 'PUT', body }),

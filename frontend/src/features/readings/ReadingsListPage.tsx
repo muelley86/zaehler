@@ -27,6 +27,7 @@ import {
 } from '@/components/ui';
 import type { DropdownOption } from '@/components/ui';
 import { PageGlows } from '@/components/PageGlows';
+import { StaleDataHint } from '@/components/StaleDataHint';
 import { ApiError, api, isPlausibilityWarning } from '@/lib/api';
 import { csvField } from '@/lib/csv';
 import {
@@ -165,6 +166,9 @@ export function ReadingsListPage() {
   const [entries, setEntries] = useState<EntryRead[]>([]);
   const [total, setTotal] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  // Zeitpunkt der (ggf. aus dem SW-Cache stammenden) Listen-Antwort —
+  // offline als "Stand von <Datum>" angezeigt.
+  const [servedAt, setServedAt] = useState<Date | null>(null);
   const [tick, setTick] = useState(0);
   // Generationszähler: jede Filter-/Refresh-Neuladung erhöht ihn; späte
   // „Weitere/Alle"-Antworten einer alten Generation werden verworfen.
@@ -300,11 +304,12 @@ export function ReadingsListPage() {
     const gen = genRef.current;
     const controller = new AbortController();
     api
-      .get<EntriesPage>(`/entries?${buildEntriesQuery(0, PAGE_SIZE)}`, controller.signal)
-      .then((page) => {
+      .getWithMeta<EntriesPage>(`/entries?${buildEntriesQuery(0, PAGE_SIZE)}`, controller.signal)
+      .then(({ data: page, servedAt: responseServedAt }) => {
         if (gen !== genRef.current) return;
         setEntries(page.items);
         setTotal(page.total);
+        setServedAt(responseServedAt);
       })
       .catch((err: unknown) => {
         if (err instanceof DOMException && err.name === 'AbortError') return;
@@ -602,6 +607,8 @@ export function ReadingsListPage() {
           </div>
         }
       />
+
+      <StaleDataHint servedAt={servedAt} />
 
       <Section header="Filter">
         <div className="space-y-3 p-5">

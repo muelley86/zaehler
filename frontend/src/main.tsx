@@ -20,6 +20,7 @@ import 'leaflet/dist/leaflet.css';
 
 import { App } from './App';
 import { AuthProvider } from './features/auth/AuthProvider';
+import { OnlineStatusProvider } from './features/offline/OnlineStatusProvider';
 import { FilterPrefsProvider } from './features/prefs/FilterPrefsProvider';
 import './styles/index.css';
 
@@ -32,9 +33,11 @@ createRoot(container).render(
   <StrictMode>
     <BrowserRouter>
       <AuthProvider>
-        <FilterPrefsProvider>
-          <App />
-        </FilterPrefsProvider>
+        <OnlineStatusProvider>
+          <FilterPrefsProvider>
+            <App />
+          </FilterPrefsProvider>
+        </OnlineStatusProvider>
       </AuthProvider>
     </BrowserRouter>
   </StrictMode>,

@@ -98,7 +98,12 @@ export default defineConfig({
             options: {
               cacheName: 'api-get',
               networkTimeoutSeconds: 5,
-              expiration: { maxEntries: 50, maxAgeSeconds: 60 * 5 },
+              // Offline-Lesemodus: Einträge lange behalten, damit unterwegs
+              // (Server nur im Heimnetz erreichbar) der letzte bekannte Stand
+              // angezeigt werden kann. NetworkFirst fragt online IMMER zuerst
+              // den Server — die lange TTL ändert am Online-Verhalten nichts,
+              // sie bestimmt nur, wie alt ein Cache-FALLBACK sein darf.
+              expiration: { maxEntries: 200, maxAgeSeconds: 60 * 60 * 24 * 30 },
               cacheableResponse: { statuses: [200] },
             },
           },
