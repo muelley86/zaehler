@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 
 import { useAuth } from '@/features/auth/auth-context';
 import { TwoFactorSection } from '@/features/auth/TwoFactorSection';
+import { useOnlineStatus } from '@/features/offline/offline-context';
 import { useFilterPrefs } from '@/features/prefs/filter-prefs-context';
 import { Card, LargeTitle, Row, RowGroup, Section, Switch } from '@/components/ui';
 import { PageGlows } from '@/components/PageGlows';
@@ -39,6 +40,7 @@ function applyTheme(choice: ThemeChoice) {
 
 export function MorePage() {
   const { me, logout } = useAuth();
+  const { isOnline } = useOnlineStatus();
   const { rememberFilters, setRememberFilters } = useFilterPrefs();
   const navigate = useNavigate();
   const isAdmin = me?.role === 'admin';
@@ -47,6 +49,12 @@ export function MorePage() {
   useEffect(() => applyTheme(themeChoice), [themeChoice]);
 
   async function handleLogout() {
+    if (!isOnline) {
+      // Offline kann die Server-Session nicht invalidiert werden — und ein
+      // rein lokaler Logout würde den Offline-Zugriff sinnlos zerstören.
+      window.alert('Abmelden ist offline nicht möglich.');
+      return;
+    }
     await logout();
     navigate('/login', { replace: true });
   }

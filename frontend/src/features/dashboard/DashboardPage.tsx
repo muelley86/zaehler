@@ -13,6 +13,7 @@ import {
 } from '@/components/ui';
 import type { DropdownOption } from '@/components/ui';
 import { PageGlows } from '@/components/PageGlows';
+import { StaleDataHint } from '@/components/StaleDataHint';
 import { ApiError, api } from '@/lib/api';
 import { csvField } from '@/lib/csv';
 import { formatDateDe, formatDe } from '@/lib/format';
@@ -96,6 +97,9 @@ export function DashboardPage() {
   // ältere Backend-Stände liefern das Feld nicht).
   const [virtualItems, setVirtualItems] = useState<DashboardVirtualMeasuringPoint[]>([]);
   const [error, setError] = useState<string | null>(null);
+  // Zeitpunkt der (ggf. aus dem SW-Cache stammenden) Dashboard-Antwort —
+  // offline als "Stand von <Datum>" angezeigt.
+  const [servedAt, setServedAt] = useState<Date | null>(null);
   // Wird `true`, sobald der gebündelte Dashboard-Load fertig ist. Bis dahin
   // zeigen wir Skeletons, damit beim Cutover möglichst wenig wandert (CLS).
   const [mpDataReady, setMpDataReady] = useState(false);
@@ -217,8 +221,8 @@ export function DashboardPage() {
     if (from) params.set('from_at', from);
     if (to) params.set('to_at', to);
     api
-      .get<DashboardResponse>(`/dashboard?${params}`, controller.signal)
-      .then((data) => {
+      .getWithMeta<DashboardResponse>(`/dashboard?${params}`, controller.signal)
+      .then(({ data, servedAt: responseServedAt }) => {
         if (controller.signal.aborted) return;
         const cById: ConsumptionsByMP = {};
         for (const item of data.items) {
@@ -226,6 +230,7 @@ export function DashboardPage() {
         }
         setConsumptions(cById);
         setVirtualItems(data.virtual_items ?? []);
+        setServedAt(responseServedAt);
         setMpDataReady(true);
         setRefreshing(false);
       })
@@ -447,6 +452,8 @@ export function DashboardPage() {
           </Button>
         }
       />
+
+      <StaleDataHint servedAt={servedAt} />
 
       <Section header="Ansicht">
         <div className="space-y-4 p-5">

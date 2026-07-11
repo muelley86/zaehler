@@ -5,8 +5,11 @@ import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 
 import { Button, Card, TextField } from '@/components/ui';
 import { PageGlows } from '@/components/PageGlows';
-import { ApiError } from '@/lib/api';
+import { ApiError, NetworkError } from '@/lib/api';
 import { useAuth } from './auth-context';
+
+const SERVER_UNREACHABLE =
+  'Server nicht erreichbar — bist du im richtigen Netzwerk (z. B. Heim-WLAN)?';
 
 type Step = 'credentials' | 'totp';
 
@@ -44,6 +47,7 @@ export function LoginPage() {
       }
     } catch (err) {
       if (err instanceof ApiError) setError(err.problem.detail ?? err.problem.title);
+      else if (err instanceof NetworkError) setError(SERVER_UNREACHABLE);
       else setError('Login fehlgeschlagen.');
     } finally {
       setBusy(false);
@@ -62,6 +66,7 @@ export function LoginPage() {
       });
     } catch (err) {
       if (err instanceof ApiError) setError(err.problem.detail ?? err.problem.title);
+      else if (err instanceof NetworkError) setError(SERVER_UNREACHABLE);
       else setError('Code abgelehnt.');
     } finally {
       setBusy(false);

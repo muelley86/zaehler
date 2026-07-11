@@ -1,9 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { ApiError, api } from './api';
+import { ApiError, NetworkError, api } from './api';
+import { getIsOnline, reportOnline } from './offline/connectivity';
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  // Konnektivitäts-Zustand normalisieren, damit Tests sich nicht beeinflussen.
+  reportOnline();
 });
 
 function stubFetch(status: number, body?: unknown): void {
@@ -46,5 +49,84 @@ describe('api — gemeinsames Response-Handling (parseJsonResponse)', () => {
   it('upload teilt dieselbe Fehlerbehandlung', async () => {
     stubFetch(400, { title: 'Bad', status: 400 });
     await expect(api.upload('/x', new FormData())).rejects.toBeInstanceOf(ApiError);
+  });
+});
+
+describe('api — Netzfehler (Offline-Erkennung)', () => {
+  it('fetch-Rejection → typisierter NetworkError statt rohem TypeError', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => Promise.reject(new TypeError('Failed to fetch'))),
+    );
+    const err = await api.get('/x').catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(NetworkError);
+    expect(err).not.toBeInstanceOf(ApiError);
+  });
+
+  it('AbortError wird NICHT gewrappt (Abort-Flows bleiben intakt)', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => Promise.reject(new DOMException('aborted', 'AbortError'))),
+    );
+    const err = await api.get('/x').catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(DOMException);
+    expect((err as DOMException).name).toBe('AbortError');
+    expect(err).not.toBeInstanceOf(NetworkError);
+  });
+
+  it('Netzfehler meldet offline, erfolgreiche Response meldet online', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => Promise.reject(new TypeError('Failed to fetch'))),
+    );
+    await api.get('/x').catch(() => undefined);
+    expect(getIsOnline()).toBe(false);
+
+    stubFetch(200, { ok: true });
+    await api.get('/x');
+    expect(getIsOnline()).toBe(true);
+  });
+
+  it('auch eine Fehler-Response (4xx) meldet online — der Server hat geantwortet', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => Promise.reject(new TypeError('Failed to fetch'))),
+    );
+    await api.get('/x').catch(() => undefined);
+    expect(getIsOnline()).toBe(false);
+
+    stubFetch(500);
+    await api.get('/x').catch(() => undefined);
+    expect(getIsOnline()).toBe(true);
+  });
+
+  it('upload wrappt Netzfehler ebenfalls in NetworkError', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => Promise.reject(new TypeError('Failed to fetch'))),
+    );
+    await expect(api.upload('/x', new FormData())).rejects.toBeInstanceOf(NetworkError);
+  });
+});
+
+describe('api.getWithMeta — Antwort mit Zeitstempel des Servers/Caches', () => {
+  it('liefert Daten + servedAt aus dem Date-Header', async () => {
+    const headers = { date: 'Sat, 11 Jul 2026 10:00:00 GMT' };
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() =>
+        Promise.resolve(new Response(JSON.stringify({ id: 1 }), { status: 200, headers })),
+      ),
+    );
+    const result = await api.getWithMeta<{ id: number }>('/x');
+    expect(result.data).toEqual({ id: 1 });
+    expect(result.servedAt).toEqual(new Date('2026-07-11T10:00:00Z'));
+  });
+
+  it('fehlender/ungültiger Date-Header → servedAt null', async () => {
+    stubFetch(200, { id: 1 });
+    const result = await api.getWithMeta<{ id: number }>('/x');
+    expect(result.data).toEqual({ id: 1 });
+    expect(result.servedAt).toBeNull();
   });
 });

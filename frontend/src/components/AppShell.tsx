@@ -28,7 +28,9 @@ import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 
 import { GlobalSearchSheet } from '@/features/_shell/GlobalSearchSheet';
 import { useAuth } from '@/features/auth/auth-context';
+import { useOnlineStatus } from '@/features/offline/offline-context';
 import { GlobalDateRange } from './GlobalDateRange';
+import { OfflineBanner } from './OfflineBanner';
 import { cx } from './ui/cx';
 
 // Datums-relevante Routen: nur hier zeigt der mobile Header die Datums-Leiste
@@ -97,6 +99,7 @@ function Avatar({ name, role }: { name: string; role: string }) {
 
 export function AppShell({ children }: { children: ReactNode }) {
   const { me, logout } = useAuth();
+  const { isOnline } = useOnlineStatus();
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const isAdmin = me?.role === 'admin';
@@ -238,7 +241,9 @@ export function AppShell({ children }: { children: ReactNode }) {
               onClick={() => void handleLogout()}
               aria-label="Abmelden"
               data-testid="sidebar-logout"
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-tertiary transition-colors hover:bg-fill hover:text-danger"
+              disabled={!isOnline}
+              title={isOnline ? undefined : 'Abmelden ist offline nicht möglich'}
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-tertiary transition-colors hover:bg-fill hover:text-danger disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-tertiary"
             >
               <LogOut size={16} />
             </button>
@@ -277,6 +282,8 @@ export function AppShell({ children }: { children: ReactNode }) {
             <GlobalDateRange variant="mobile" />
           </div>
         ) : null}
+
+        <OfflineBanner />
 
         <main className="min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden pb-24 md:pb-8">
           {children}
