@@ -21,7 +21,10 @@ import {
   retryPhotos,
   subscribeOutbox,
 } from '@/lib/offline/outbox';
+import { IosInstallHintCard } from './IosInstallHintCard';
 import { useOnlineStatus } from './offline-context';
+import { PendingAgeBanner } from './PendingAgeBanner';
+import { StorageSummary } from './StorageSummary';
 
 const STATUS_LABELS: Record<OutboxStatus, string> = {
   pending: 'Wartet',
@@ -54,7 +57,7 @@ function StatusPill({ status }: { status: OutboxStatus }) {
     <span
       className={
         isWarning
-          ? 'border-warning/40 bg-warning/10 rounded-pill border-hairline px-2 py-0.5 text-caption font-semibold text-secondary'
+          ? 'rounded-pill border-hairline border-warning/40 bg-warning/10 px-2 py-0.5 text-caption font-semibold text-secondary'
           : 'rounded-pill border-hairline border-border bg-fill px-2 py-0.5 text-caption text-secondary'
       }
     >
@@ -92,7 +95,7 @@ function serverComparison(item: OutboxReading): { label: string; value: string }
 
 export function PendingSyncPage() {
   const { me } = useAuth();
-  const { isOnline, syncPhase, lastSyncAt, runSyncNow } = useOnlineStatus();
+  const { isOnline, syncPhase, lastSyncAt, oldestPendingAt, runSyncNow } = useOnlineStatus();
   const [items, setItems] = useState<OutboxReading[] | null>(null);
   const [detailId, setDetailId] = useState<string | null>(null);
 
@@ -160,6 +163,13 @@ export function PendingSyncPage() {
             ? `Zuletzt synchronisiert: ${formatDateTimeDe(lastSyncAt.toISOString())}`
             : null}
       </div>
+
+      <div className="space-y-3 pb-3 empty:hidden">
+        {/* Bewusst NICHT ausblendbar: hier stehen offene Einträge auf dem Spiel. */}
+        <IosInstallHintCard />
+        <PendingAgeBanner oldestPendingAt={oldestPendingAt} />
+      </div>
+      <StorageSummary />
 
       {items === null ? (
         <div className="text-tertiary">Lade…</div>
@@ -231,19 +241,19 @@ export function PendingSyncPage() {
             </div>
 
             {detail.status === 'conflict_warning' && detail.problem ? (
-              <div className="border-warning/40 bg-warning/10 rounded-card border-hairline p-3 text-caption text-secondary">
+              <div className="rounded-card border-hairline border-warning/40 bg-warning/10 p-3 text-caption text-secondary">
                 {String(detail.problem.detail ?? detail.problem.title)}
               </div>
             ) : null}
             {detail.status === 'conflict_duplicate' ? (
-              <div className="border-warning/40 bg-warning/10 rounded-card border-hairline p-3 text-caption text-secondary">
+              <div className="rounded-card border-hairline border-warning/40 bg-warning/10 p-3 text-caption text-secondary">
                 Für dieses Register und diesen Zeitpunkt existiert bereits ein Eintrag mit
                 abweichendem Wert. Der Servereintrag bleibt bestehen — dieser Eintrag kann nur
                 verworfen werden.
               </div>
             ) : null}
             {(detail.status === 'photo_error' || detail.status === 'error') && detail.lastError ? (
-              <div className="border-danger/40 bg-danger/10 rounded-card border-hairline p-3 text-caption text-danger">
+              <div className="rounded-card border-hairline border-danger/40 bg-danger/10 p-3 text-caption text-danger">
                 {detail.lastError}
               </div>
             ) : null}

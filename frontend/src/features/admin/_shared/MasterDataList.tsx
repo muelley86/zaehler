@@ -123,7 +123,7 @@ export function MasterDataList<T>({
                         disabled={pending.has(id)}
                         aria-label={`${name} löschen`}
                         title="Löschen"
-                        className="hover:bg-danger/10 flex h-8 w-8 items-center justify-center rounded-full text-tertiary transition-colors hover:text-danger disabled:opacity-50"
+                        className="flex h-8 w-8 items-center justify-center rounded-full text-tertiary transition-colors hover:bg-danger/10 hover:text-danger disabled:opacity-50"
                       >
                         <Trash2 size={15} />
                       </button>

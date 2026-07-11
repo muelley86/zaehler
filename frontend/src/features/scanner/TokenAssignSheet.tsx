@@ -88,7 +88,7 @@ export function TokenAssignSheet({
           ))}
         </Select>
         {error ? (
-          <div className="border-danger/40 bg-danger/10 rounded-card border-hairline p-3 text-caption text-danger">
+          <div className="rounded-card border-hairline border-danger/40 bg-danger/10 p-3 text-caption text-danger">
             {error}
           </div>
         ) : null}

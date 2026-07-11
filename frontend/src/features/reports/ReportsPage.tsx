@@ -475,7 +475,7 @@ export function ReportsPage() {
         <LargeTitle title="Auswertungen" />
 
         {error ? (
-          <div className="border-danger/40 bg-danger/10 rounded-card border-hairline p-3 text-danger">
+          <div className="rounded-card border-hairline border-danger/40 bg-danger/10 p-3 text-danger">
             {error}
           </div>
         ) : null}
@@ -656,7 +656,7 @@ export function ReportsPage() {
         </Section>
 
         {result?.partial ? (
-          <div className="border-warning/40 bg-warning/10 rounded-card border-hairline p-3 text-body-sm text-secondary">
+          <div className="rounded-card border-hairline border-warning/40 bg-warning/10 p-3 text-body-sm text-secondary">
             Als Erfasser werden nur Messstellen mit Zugriff einbezogen — die Summen können
             unvollständig sein.
           </div>

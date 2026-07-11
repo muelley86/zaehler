@@ -565,7 +565,7 @@ export function ReadingsListPage() {
     return (
       <PageContainer>
         <LargeTitle title="Erfassungen" />
-        <div className="border-danger/40 bg-danger/10 rounded-card border-hairline p-3 text-danger">
+        <div className="rounded-card border-hairline border-danger/40 bg-danger/10 p-3 text-danger">
           {error}
         </div>
       </PageContainer>
@@ -715,7 +715,7 @@ export function ReadingsListPage() {
               leftIcon={<Trash2 size={14} />}
               onClick={() => void deleteSelected()}
               disabled={selected.size === 0 || deleting}
-              className="hover:bg-danger/10 text-danger"
+              className="text-danger hover:bg-danger/10"
             >
               Löschen ({selected.size})
             </Button>
@@ -977,7 +977,7 @@ const ReadingItem = memo(function ReadingItem({
           leftIcon={<Trash2 size={14} />}
           disabled={!editable || busy}
           onClick={() => void remove()}
-          className="hover:bg-danger/10 text-danger"
+          className="text-danger hover:bg-danger/10"
         >
           Löschen
         </Button>
@@ -1086,7 +1086,7 @@ const DeliveryItem = memo(function DeliveryItem({
           leftIcon={<Trash2 size={14} />}
           disabled={!editable || busy}
           onClick={() => void remove()}
-          className="hover:bg-danger/10 text-danger"
+          className="text-danger hover:bg-danger/10"
         >
           Löschen
         </Button>

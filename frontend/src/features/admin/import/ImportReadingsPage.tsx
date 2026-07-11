@@ -156,7 +156,7 @@ export function ImportReadingsPage() {
       <LargeTitle title="Import" subtitle="Historische Zählerstände aus Excel/CSV" />
 
       {error ? (
-        <div className="border-danger/40 bg-danger/10 rounded-card border-hairline p-3 text-caption text-danger">
+        <div className="rounded-card border-hairline border-danger/40 bg-danger/10 p-3 text-caption text-danger">
           {error}
         </div>
       ) : null}
@@ -204,7 +204,7 @@ export function ImportReadingsPage() {
       {preview ? (
         <div className="space-y-3">
           {preview.ignored_columns.length > 0 ? (
-            <div className="border-warning/40 bg-warning/10 rounded-card border-hairline p-3 text-caption text-secondary">
+            <div className="rounded-card border-hairline border-warning/40 bg-warning/10 p-3 text-caption text-secondary">
               Ignorierte Spalten (kein Datum erkannt): {preview.ignored_columns.join(', ')}
             </div>
           ) : null}

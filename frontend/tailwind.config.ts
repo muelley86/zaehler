@@ -48,8 +48,12 @@ const config: Config = {
         gas: 'var(--gas)',
         water: 'var(--water)',
         oil: 'var(--oil)',
-        success: 'var(--green)',
-        danger: 'var(--red)',
+        // Literale statt var(): nur so kann Tailwind Opacity-Modifier
+        // (bg-danger/10 …) generieren. Werte = --green/--yellow/--red
+        // in styles/index.css — bei Änderung beide Stellen pflegen.
+        success: 'oklch(0.72 0.15 150 / <alpha-value>)',
+        warning: 'oklch(0.75 0.16 70 / <alpha-value>)',
+        danger: 'oklch(0.65 0.2 25 / <alpha-value>)',
       },
       borderRadius: {
         card: '20px',

@@ -186,7 +186,7 @@ export function MeasuringPointDetailPage() {
     return (
       <>
         <BackLink />
-        <div className="border-danger/40 bg-danger/10 rounded-card border-hairline p-3 text-danger">
+        <div className="rounded-card border-hairline border-danger/40 bg-danger/10 p-3 text-danger">
           {error}
         </div>
       </>
@@ -688,7 +688,7 @@ function StammdatenEditForm({
         hint="5-stellige Zahl (0–99999); leer = nicht gesetzt"
       />
       {error ? (
-        <div className="border-danger/40 bg-danger/10 rounded-card border-hairline p-3 text-caption text-danger">
+        <div className="rounded-card border-hairline border-danger/40 bg-danger/10 p-3 text-caption text-danger">
           {error}
         </div>
       ) : null}
@@ -822,7 +822,7 @@ function PhysicalMeterRow({
             SN {meter.serial_number}
           </span>
           {isActive ? (
-            <span className="bg-success/15 rounded-full px-2 py-0.5 text-caption font-semibold text-success">
+            <span className="rounded-full bg-success/15 px-2 py-0.5 text-caption font-semibold text-success">
               aktiv
             </span>
           ) : (
@@ -902,7 +902,7 @@ function PhysicalMeterEditForm({
         onChange={(e) => setRemovedAt(e.target.value)}
       />
       {error ? (
-        <div className="border-danger/40 bg-danger/10 rounded-card border-hairline p-3 text-caption text-danger">
+        <div className="rounded-card border-hairline border-danger/40 bg-danger/10 p-3 text-caption text-danger">
           {error}
         </div>
       ) : null}
@@ -1031,7 +1031,7 @@ function ReplaceMeterForm({
         </div>
       </div>
       {error ? (
-        <div className="border-danger/40 bg-danger/10 rounded-card border-hairline p-3 text-caption text-danger">
+        <div className="rounded-card border-hairline border-danger/40 bg-danger/10 p-3 text-caption text-danger">
           {error}
         </div>
       ) : null}
@@ -1492,7 +1492,7 @@ function HeatingRegisterEditor({
               type="button"
               onClick={() => void remove(r.id, r.label)}
               aria-label="Register löschen"
-              className="hover:bg-danger/10 flex h-7 w-7 items-center justify-center rounded-full text-danger transition-colors"
+              className="flex h-7 w-7 items-center justify-center rounded-full text-danger transition-colors hover:bg-danger/10"
             >
               <Trash2 size={13} />
             </button>
@@ -1533,7 +1533,7 @@ function HeatingRegisterEditor({
             numeric
           />
           {error ? (
-            <div className="border-danger/40 bg-danger/10 rounded-card border-hairline p-2 text-caption text-danger">
+            <div className="rounded-card border-hairline border-danger/40 bg-danger/10 p-2 text-caption text-danger">
               {error}
             </div>
           ) : null}

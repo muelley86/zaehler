@@ -73,7 +73,7 @@ export function QrCodeCard({ mp }: QrCodeCardProps) {
       </div>
 
       {error ? (
-        <div className="border-danger/40 bg-danger/10 mt-3 rounded-card border-hairline p-3 text-caption text-danger">
+        <div className="mt-3 rounded-card border-hairline border-danger/40 bg-danger/10 p-3 text-caption text-danger">
           {error}
         </div>
       ) : tokens === null ? (

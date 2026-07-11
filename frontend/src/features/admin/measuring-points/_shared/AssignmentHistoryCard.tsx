@@ -367,7 +367,7 @@ export function AssignmentHistoryCard<TAssignment, TMaster>({
                     type="button"
                     onClick={() => void removePeriod(a)}
                     aria-label={config.labels.deleteAriaLabel}
-                    className="hover:bg-danger/10 flex h-7 w-7 items-center justify-center rounded-full text-danger transition-colors"
+                    className="flex h-7 w-7 items-center justify-center rounded-full text-danger transition-colors hover:bg-danger/10"
                   >
                     <Trash2 size={13} />
                   </button>

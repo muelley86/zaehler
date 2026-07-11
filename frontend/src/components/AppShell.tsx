@@ -30,6 +30,7 @@ import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { GlobalSearchSheet } from '@/features/_shell/GlobalSearchSheet';
 import { useAuth } from '@/features/auth/auth-context';
 import { useOnlineStatus } from '@/features/offline/offline-context';
+import { pendingAgeLevel, pendingBadgeClass } from '@/lib/offline/pendingAge';
 import { countOpen } from '@/lib/offline/outbox';
 import { GlobalDateRange } from './GlobalDateRange';
 import { OfflineBanner } from './OfflineBanner';
@@ -101,7 +102,9 @@ function Avatar({ name, role }: { name: string; role: string }) {
 
 export function AppShell({ children }: { children: ReactNode }) {
   const { me, logout } = useAuth();
-  const { isOnline, pendingCount } = useOnlineStatus();
+  const { isOnline, pendingCount, oldestPendingAt } = useOnlineStatus();
+  // Badge färbt sich, wenn Einträge zu lange liegen (iOS-Eviction-Risiko).
+  const pendingBadge = pendingBadgeClass(pendingAgeLevel(oldestPendingAt));
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const isAdmin = me?.role === 'admin';
@@ -225,7 +228,12 @@ export function AppShell({ children }: { children: ReactNode }) {
                     <CloudUpload size={18} />
                   </span>
                   Synchronisierung
-                  <span className="ml-auto rounded-pill bg-primary px-1.5 py-0.5 text-[10px] font-bold text-white">
+                  <span
+                    className={cx(
+                      'ml-auto rounded-pill px-1.5 py-0.5 text-[10px] font-bold text-white',
+                      pendingBadge,
+                    )}
+                  >
                     {pendingCount}
                   </span>
                 </>
@@ -371,7 +379,10 @@ export function AppShell({ children }: { children: ReactNode }) {
               {pendingCount > 0 ? (
                 <span
                   data-testid="tabbar-sync-badge"
-                  className="absolute -right-2.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-pill bg-primary px-1 text-[9px] font-bold text-white"
+                  className={cx(
+                    'absolute -right-2.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-pill px-1 text-[9px] font-bold text-white',
+                    pendingBadge,
+                  )}
                 >
                   {pendingCount}
                 </span>

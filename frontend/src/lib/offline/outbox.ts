@@ -133,10 +133,26 @@ export async function listItems(userId: number): Promise<OutboxReading[]> {
   );
 }
 
+export interface OpenSummary {
+  count: number;
+  /** createdAt des ältesten offenen Items (ISO) — Basis der Alters-Warnung. */
+  oldestCreatedAt: string | null;
+}
+
+/** Anzahl + ältestes createdAt der offenen Items — Badge und Alters-Warnung. */
+export async function openSummary(userId: number): Promise<OpenSummary> {
+  const items = await listItems(userId);
+  const open = items.filter((item) => OPEN_STATUSES.includes(item.status));
+  const oldestCreatedAt = open.reduce<string | null>(
+    (oldest, item) => (oldest === null || item.createdAt < oldest ? item.createdAt : oldest),
+    null,
+  );
+  return { count: open.length, oldestCreatedAt };
+}
+
 /** Anzahl offener (nicht abgeschlossener) Items des Users — Badge-Zähler. */
 export async function countOpen(userId: number): Promise<number> {
-  const items = await listItems(userId);
-  return items.filter((item) => OPEN_STATUSES.includes(item.status)).length;
+  return (await openSummary(userId)).count;
 }
 
 export async function getItem(id: string): Promise<OutboxReading | undefined> {

@@ -186,7 +186,7 @@ export function UserEditSheet({ user, me, onClose, onSaved }: UserEditSheetProps
         {error ? (
           <div
             data-testid="user-edit-error"
-            className="border-danger/40 bg-danger/10 rounded-card border-hairline p-3 text-caption text-danger"
+            className="rounded-card border-hairline border-danger/40 bg-danger/10 p-3 text-caption text-danger"
           >
             {error}
           </div>
@@ -221,7 +221,7 @@ export function UserEditSheet({ user, me, onClose, onSaved }: UserEditSheetProps
             leftIcon={<Trash2 size={14} />}
             onClick={() => void remove()}
             disabled={busy || isSelf}
-            className="hover:bg-danger/10 text-danger"
+            className="text-danger hover:bg-danger/10"
             data-testid="user-edit-delete"
           >
             Benutzer loeschen
