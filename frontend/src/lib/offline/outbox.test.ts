@@ -10,6 +10,7 @@ import {
   countOpen,
   enqueueGroup,
   getGroupPhotos,
+  latestPendingByRegister,
   listItems,
   openSummary,
   updateItem,
@@ -121,6 +122,52 @@ describe('outbox', () => {
     expect(summary.count).toBe(2);
     // Nur pending/photos_pending dürfen einen Auto-Retry auslösen.
     expect(summary.retryableCount).toBe(1);
+  });
+
+  it('latestPendingByRegister liefert den neuesten offenen Wert je Register', async () => {
+    expect((await latestPendingByRegister(1)).size).toBe(0);
+
+    await enqueueGroup({
+      userId: 1,
+      readings: [
+        { ...READING, readingAt: '2026-07-09T18:00:00Z', value: '100' },
+        { ...READING, readingAt: '2026-07-11T18:00:00Z', value: '120' },
+        { ...READING, registerId: 13, readingAt: '2026-07-10T18:00:00Z', value: '7' },
+      ],
+      photos: [],
+    });
+
+    const map = await latestPendingByRegister(1);
+    expect(map.get(12)).toEqual({ value: '120', readingAt: '2026-07-11T18:00:00Z' });
+    expect(map.get(13)).toEqual({ value: '7', readingAt: '2026-07-10T18:00:00Z' });
+    // Fremde User sehen nichts.
+    expect((await latestPendingByRegister(2)).size).toBe(0);
+  });
+
+  it('latestPendingByRegister ignoriert vom Server abgelehnte Werte', async () => {
+    await enqueueGroup({
+      userId: 1,
+      readings: [
+        { ...READING, readingAt: '2026-07-09T18:00:00Z', value: '100' },
+        { ...READING, readingAt: '2026-07-11T18:00:00Z', value: '120' },
+        { ...READING, registerId: 13, readingAt: '2026-07-10T18:00:00Z', value: '7' },
+      ],
+      photos: [],
+    });
+    const items = await listItems(1);
+    // Der NEUERE Wert von Register 12 wurde vom Server als Konflikt abgelehnt.
+    const rejected = items.find((i) => i.value === '120');
+    await updateItem(rejected?.id ?? '', {
+      status: 'conflict_warning',
+      problem: { title: 'Warnung', status: 400 },
+    });
+    // photo_error: Reading ist bereits gespeichert, nur das Foto fehlt — zählt.
+    const photoErr = items.find((i) => i.registerId === 13);
+    await updateItem(photoErr?.id ?? '', { status: 'photo_error' });
+
+    const map = await latestPendingByRegister(1);
+    expect(map.get(12)).toEqual({ value: '100', readingAt: '2026-07-09T18:00:00Z' });
+    expect(map.get(13)).toEqual({ value: '7', readingAt: '2026-07-10T18:00:00Z' });
   });
 
   it('clearAll leert Outbox und Fotos (Logout-Purge)', async () => {

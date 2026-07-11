@@ -50,6 +50,26 @@ export async function refreshMasterDataSnapshot(userId: number): Promise<void> {
   }
 }
 
+/** Snapshot gilt so lange als frisch — danach beim App-Start neu laden. */
+export const SNAPSHOT_MAX_AGE_MS = 60 * 60 * 1000;
+
+/**
+ * Refresh nur bei fehlendem oder überaltertem Snapshot — deckt den Fall
+ * „lange nur online gearbeitet (Queue leer, kein Sync-Lauf)" ab, in dem
+ * der Nach-Sync-Refresh nie feuert.
+ */
+export async function refreshMasterDataSnapshotIfStale(
+  userId: number,
+  maxAgeMs: number = SNAPSHOT_MAX_AGE_MS,
+): Promise<void> {
+  const snapshot = await loadMasterDataSnapshot(userId);
+  if (snapshot) {
+    const age = Date.now() - Date.parse(snapshot.fetchedAt);
+    if (Number.isFinite(age) && age < maxAgeMs) return;
+  }
+  await refreshMasterDataSnapshot(userId);
+}
+
 /**
  * Snapshot NUR für den passenden User laden — Messstellen sind per Recorder
  * berechtigungsgefiltert, fremde Snapshots dürfen nie angezeigt werden.

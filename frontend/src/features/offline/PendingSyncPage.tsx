@@ -12,7 +12,7 @@ import { Button, EmptyState, LargeTitle, Section, Sheet } from '@/components/ui'
 import { PageGlows } from '@/components/PageGlows';
 import { useAuth } from '@/features/auth/auth-context';
 import { formatDateTimeDe, formatDe } from '@/lib/format';
-import type { OutboxReading, OutboxStatus } from '@/lib/offline/db';
+import type { OutboxReading } from '@/lib/offline/db';
 import {
   acknowledgeConflict,
   completeWithoutPhotos,
@@ -24,23 +24,8 @@ import {
 import { IosInstallHintCard } from './IosInstallHintCard';
 import { useOnlineStatus } from './offline-context';
 import { PendingAgeBanner } from './PendingAgeBanner';
+import { StatusPill } from './StatusPill';
 import { StorageSummary } from './StorageSummary';
-
-const STATUS_LABELS: Record<OutboxStatus, string> = {
-  pending: 'Wartet',
-  photos_pending: 'Foto ausstehend',
-  conflict_warning: 'Konflikt',
-  conflict_duplicate: 'Duplikat',
-  photo_error: 'Foto-Fehler',
-  error: 'Fehler',
-};
-
-const WARNING_STATUSES: readonly OutboxStatus[] = [
-  'conflict_warning',
-  'conflict_duplicate',
-  'photo_error',
-  'error',
-];
 
 function PageContainer({ children }: { children: ReactNode }) {
   return (
@@ -48,21 +33,6 @@ function PageContainer({ children }: { children: ReactNode }) {
       <PageGlows accent="electricity" />
       <div className="relative z-10 p-4 md:p-7">{children}</div>
     </div>
-  );
-}
-
-function StatusPill({ status }: { status: OutboxStatus }) {
-  const isWarning = WARNING_STATUSES.includes(status);
-  return (
-    <span
-      className={
-        isWarning
-          ? 'rounded-pill border-hairline border-warning/40 bg-warning/10 px-2 py-0.5 text-caption font-semibold text-secondary'
-          : 'rounded-pill border-hairline border-border bg-fill px-2 py-0.5 text-caption text-secondary'
-      }
-    >
-      {STATUS_LABELS[status]}
-    </span>
   );
 }
 

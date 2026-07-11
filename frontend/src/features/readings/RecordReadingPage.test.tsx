@@ -18,7 +18,7 @@ import userEvent from '@testing-library/user-event';
 import { useNavigate } from 'react-router-dom';
 
 import { resetOfflineDbForTests } from '@/lib/offline/db';
-import { listItems } from '@/lib/offline/outbox';
+import { enqueueGroup, listItems } from '@/lib/offline/outbox';
 import { renderWithRouter } from '@/tests/render';
 import { server } from '@/tests/server';
 
@@ -533,5 +533,76 @@ describe('RecordReadingPage — Offline-Erfassung', () => {
       userId: 1,
     });
     expect(screen.getByPlaceholderText(/leer = nicht erfassen/i)).toHaveValue('');
+  });
+
+  const STATE_100 = {
+    register_id: 100,
+    physical_meter_id: 10,
+    obis_code: '1.8.0',
+    label: 'Bezug',
+    unit: 'kWh',
+    is_active: true,
+    accepts_deliveries: false,
+    last_reading_at: '2026-07-01T10:00:00Z',
+    last_reading_value: '100',
+    current_value: '100',
+    refilled_since: '0',
+  };
+
+  const PENDING_120 = {
+    registerId: 100,
+    mpName: 'Strom Hauptzähler',
+    registerLabel: 'Bezug',
+    registerUnit: 'kWh',
+    obisCode: '1.8.0',
+    value: '120',
+    readingAt: '2026-07-10T10:00:00Z',
+    note: null,
+  };
+
+  it('überlagert den letzten Stand mit neuerem Offline-Wert („ausstehend")', async () => {
+    globalThis.indexedDB = new IDBFactory();
+    resetOfflineDbForTests();
+    server.use(
+      http.get('/api/v1/measuring-points', () => HttpResponse.json([_mp()])),
+      http.get('/api/v1/measuring-points/:id/state', () => HttpResponse.json([STATE_100])),
+    );
+    await enqueueGroup({ userId: 1, readings: [PENDING_120], photos: [] });
+
+    renderWithRouter(<RecordReadingPage />);
+
+    const hint = await screen.findByText(/ausstehend/i);
+    expect(hint.textContent).toMatch(/120/);
+  });
+
+  it('Offline-Plausibilität vergleicht gegen den ausstehenden Offline-Wert', async () => {
+    globalThis.indexedDB = new IDBFactory();
+    resetOfflineDbForTests();
+    server.use(
+      http.get('/api/v1/measuring-points', () => HttpResponse.json([_mp()])),
+      http.get('/api/v1/measuring-points/:id/state', () => HttpResponse.json([STATE_100])),
+      http.post('/api/v1/readings', () => HttpResponse.error()),
+    );
+    await enqueueGroup({ userId: 1, readings: [PENDING_120], photos: [] });
+
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    try {
+      const user = userEvent.setup();
+      renderWithRouter(<RecordReadingPage />);
+      // Erst warten, bis der Outbox-Overlay geladen ist.
+      await screen.findByText(/ausstehend/i);
+
+      await user.type(screen.getByPlaceholderText(/leer = nicht erfassen/i), '110');
+      await user.click(screen.getByRole('button', { name: /^Speichern$/i }));
+      await waitFor(() =>
+        expect(screen.getByTestId('record-success')).toHaveTextContent(/offline gespeichert/i),
+      );
+
+      // 110 > 100 (Serverstand), aber < 120 (ausstehend) — die Warnung kann
+      // nur vom Outbox-Overlay kommen.
+      expect(confirmSpy).toHaveBeenCalledTimes(1);
+    } finally {
+      confirmSpy.mockRestore();
+    }
   });
 });

@@ -24,7 +24,8 @@ import { mapWithConcurrency } from '@/lib/concurrency';
 import { tryGetDeviceLocation } from '@/lib/geo';
 import { compressImage } from '@/lib/imageCompression';
 import { loadMasterDataSnapshot } from '@/lib/offline/masterData';
-import { enqueueGroup } from '@/lib/offline/outbox';
+import { enqueueGroup, latestPendingByRegister, subscribeOutbox } from '@/lib/offline/outbox';
+import type { PendingRegisterValue } from '@/lib/offline/outbox';
 import { SYNCED_EVENT } from '@/lib/offline/syncEngine';
 import { describeMeterType } from '@/lib/meterLabels';
 import type {
@@ -169,6 +170,65 @@ export function RecordReadingPage() {
     window.addEventListener(SYNCED_EVENT, handler);
     return () => window.removeEventListener(SYNCED_EVENT, handler);
   }, [points]);
+
+  // Neueste offene Offline-Werte je Register — solange sie nicht gesynct
+  // sind, kennt der Server sie nicht; Anzeige und Offline-Plausibilität
+  // müssen trotzdem gegen sie vergleichen (zweite Offline-Erfassung).
+  const [pendingByRegister, setPendingByRegister] = useState<Map<number, PendingRegisterValue>>(
+    () => new Map(),
+  );
+  useEffect(() => {
+    if (meId === null) {
+      setPendingByRegister(new Map());
+      return;
+    }
+    let cancelled = false;
+    const update = () => {
+      void latestPendingByRegister(meId)
+        .then((map) => {
+          if (!cancelled) setPendingByRegister(map);
+        })
+        .catch(() => {
+          /* IndexedDB nicht verfügbar — dann kein Overlay. */
+        });
+    };
+    update();
+    const unsubscribe = subscribeOutbox(update);
+    return () => {
+      cancelled = true;
+      unsubscribe();
+    };
+  }, [meId]);
+
+  // Server-Stand + Outbox mischen: ein offener Offline-Wert mit neuerem
+  // readingAt überlagert last_reading_value/current_value seines Registers.
+  const { effectiveStateByRegister, pendingStateRegisterIds } = useMemo(() => {
+    if (pendingByRegister.size === 0) {
+      return {
+        effectiveStateByRegister: stateByRegister,
+        pendingStateRegisterIds: new Set<number>(),
+      };
+    }
+    const merged = new Map(stateByRegister);
+    const ids = new Set<number>();
+    for (const [registerId, pending] of pendingByRegister) {
+      const state = merged.get(registerId);
+      // Ohne Server-Stand fehlen die Pflichtfelder des Registers — kein Overlay.
+      if (!state) continue;
+      const pendingAt = Date.parse(pending.readingAt);
+      if (!Number.isFinite(pendingAt)) continue;
+      const lastAt = state.last_reading_at ? Date.parse(state.last_reading_at) : null;
+      if (lastAt !== null && pendingAt <= lastAt) continue;
+      merged.set(registerId, {
+        ...state,
+        current_value: pending.value,
+        last_reading_value: pending.value,
+        last_reading_at: pending.readingAt,
+      });
+      ids.add(registerId);
+    }
+    return { effectiveStateByRegister: merged, pendingStateRegisterIds: ids };
+  }, [stateByRegister, pendingByRegister]);
 
   // Token-Pfad: wenn ?token=X gesetzt ist, beim Backend auflösen.
   // - assigned MP → setMpId, URL aufräumen
@@ -374,7 +434,8 @@ export function RecordReadingPage() {
             <ReadingsForm
               mp={selectedMP}
               registers={selectedRegisters}
-              stateByRegister={stateByRegister}
+              stateByRegister={effectiveStateByRegister}
+              pendingStateRegisterIds={pendingStateRegisterIds}
               onSaved={() => refreshStates(points)}
             />
           ) : (
@@ -411,11 +472,14 @@ function ReadingsForm({
   mp,
   registers,
   stateByRegister,
+  pendingStateRegisterIds,
   onSaved,
 }: {
   mp: MeasuringPointRead;
   registers: ActiveRegister[];
   stateByRegister: Map<number, RegisterStateRead>;
+  /** Register, deren „letzter Stand" aus der Offline-Queue stammt. */
+  pendingStateRegisterIds: Set<number>;
   onSaved: () => void;
 }) {
   const { me } = useAuth();
@@ -698,6 +762,7 @@ function ReadingsForm({
                 key={ar.register.id}
                 register={ar.register}
                 state={state}
+                statePending={pendingStateRegisterIds.has(ar.register.id)}
                 value={values[ar.register.id] ?? ''}
                 setValue={setValue}
                 transformerFactor={mp.transformer_factor}
@@ -933,12 +998,15 @@ function PhotoPicker({ photos, onChange }: { photos: File[]; onChange: (files: F
 const RegisterRow = memo(function RegisterRow({
   register,
   state,
+  statePending,
   value,
   setValue,
   transformerFactor,
 }: {
   register: RegisterRead;
   state: RegisterStateRead | null;
+  /** true, wenn der angezeigte letzte Stand ein noch nicht gesyncter Offline-Wert ist. */
+  statePending: boolean;
   value: string;
   setValue: (registerId: number, v: string) => void;
   transformerFactor: number | null;
@@ -975,6 +1043,7 @@ const RegisterRow = memo(function RegisterRow({
           {state?.last_reading_value
             ? `${formatDe(state.last_reading_value)} ${register.unit}`
             : '—'}
+          {statePending ? ' (ausstehend)' : ''}
           {state?.last_reading_at ? ` · ${formatDateTimeDe(state.last_reading_at)}` : ''}
         </span>
       </div>

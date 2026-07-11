@@ -28,6 +28,7 @@ import {
 import type { DropdownOption } from '@/components/ui';
 import { PageGlows } from '@/components/PageGlows';
 import { StaleDataHint } from '@/components/StaleDataHint';
+import { PendingEntriesSection } from '@/features/offline/PendingEntriesSection';
 import { ApiError, api, isPlausibilityWarning } from '@/lib/api';
 import { csvField } from '@/lib/csv';
 import {
@@ -609,6 +610,10 @@ export function ReadingsListPage() {
       />
 
       <StaleDataHint servedAt={servedAt} />
+
+      {/* Offline erfasste Einträge — leben bis zum Sync nur in IndexedDB
+          und tauchen deshalb nicht in der Server-Liste darunter auf. */}
+      <PendingEntriesSection />
 
       <Section header="Filter">
         <div className="space-y-3 p-5">

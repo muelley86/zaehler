@@ -5,7 +5,11 @@ import { beforeEach, describe, expect, it } from 'vitest';
 
 import { server } from '@/tests/server';
 import { resetOfflineDbForTests } from './db';
-import { loadMasterDataSnapshot, refreshMasterDataSnapshot } from './masterData';
+import {
+  loadMasterDataSnapshot,
+  refreshMasterDataSnapshot,
+  refreshMasterDataSnapshotIfStale,
+} from './masterData';
 
 const MP = { id: 42, name: 'Hauptzähler Strom' };
 const STATE = { register_id: 12, current_value: '12345.6' };
@@ -39,6 +43,29 @@ describe('masterData — aktiver Stammdaten-Snapshot', () => {
     await refreshMasterDataSnapshot(1);
 
     expect(await loadMasterDataSnapshot(2)).toBeNull();
+  });
+
+  it('IfStale lädt nur bei fehlendem oder überaltertem Snapshot', async () => {
+    let fetches = 0;
+    server.use(
+      http.get('/api/v1/measuring-points', () => {
+        fetches += 1;
+        return HttpResponse.json([MP]);
+      }),
+      http.get('/api/v1/measuring-points/42/state', () => HttpResponse.json([STATE])),
+    );
+
+    // Kein Snapshot vorhanden → lädt.
+    await refreshMasterDataSnapshotIfStale(1, 60_000);
+    expect(fetches).toBe(1);
+
+    // Frischer Snapshot → kein erneuter Fetch.
+    await refreshMasterDataSnapshotIfStale(1, 60_000);
+    expect(fetches).toBe(1);
+
+    // maxAge 0 ⇒ gilt sofort als veraltet → lädt erneut.
+    await refreshMasterDataSnapshotIfStale(1, 0);
+    expect(fetches).toBe(2);
   });
 
   it('Netzfehler beim Refresh wird geschluckt — alter Snapshot bleibt', async () => {
