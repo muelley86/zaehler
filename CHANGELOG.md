@@ -10,6 +10,14 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.69.0](https://github.com/muelley86/zaehler/compare/v2.68.6...v2.69.0) (2026-07-11)
+
+
+### Funktionen
+
+* **frontend:** Offline-Erfassung mit Sync-Warteschlange ([#324](https://github.com/muelley86/zaehler/issues/324)) ([80113c5](https://github.com/muelley86/zaehler/commit/80113c55c7d7d2b7fb971b04f8b2e282a5f10c08))
+* **frontend:** Offline-Lesemodus — Cache, Kaltstart, Offline-Banner ([#321](https://github.com/muelley86/zaehler/issues/321)) ([3d215a7](https://github.com/muelley86/zaehler/commit/3d215a75c5c19b616bf918c147c5141672941069))
+
 ## [2.68.6](https://github.com/muelley86/zaehler/compare/v2.68.5...v2.68.6) (2026-07-06)
 
 
