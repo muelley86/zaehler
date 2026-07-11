@@ -138,7 +138,7 @@ export function DeliveriesSheet({
                     type="button"
                     onClick={() => void remove(d.id)}
                     aria-label="Löschen"
-                    className="hover:bg-danger/10 flex h-8 w-8 items-center justify-center rounded-full text-danger transition-colors"
+                    className="flex h-8 w-8 items-center justify-center rounded-full text-danger transition-colors hover:bg-danger/10"
                   >
                     <Trash2 size={14} />
                   </button>

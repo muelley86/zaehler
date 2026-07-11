@@ -135,7 +135,7 @@ export function UserAccessSheet({ user, onClose, onSaved }: UserAccessSheetProps
   return (
     <Sheet open onClose={onClose} title={`Messstellen-Zugriff · ${user.username}`}>
       {loadingError ? (
-        <div className="border-danger/40 bg-danger/10 rounded-card border-hairline p-3 text-caption text-danger">
+        <div className="rounded-card border-hairline border-danger/40 bg-danger/10 p-3 text-caption text-danger">
           {loadingError}
         </div>
       ) : null}
@@ -257,7 +257,7 @@ export function UserAccessSheet({ user, onClose, onSaved }: UserAccessSheetProps
           </ul>
 
           {error ? (
-            <div className="border-danger/40 bg-danger/10 rounded-card border-hairline p-3 text-caption text-danger">
+            <div className="rounded-card border-hairline border-danger/40 bg-danger/10 p-3 text-caption text-danger">
               {error}
             </div>
           ) : null}

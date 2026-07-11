@@ -11,6 +11,7 @@ import {
   enqueueGroup,
   getGroupPhotos,
   listItems,
+  openSummary,
   updateItem,
 } from './outbox';
 
@@ -83,6 +84,22 @@ describe('outbox', () => {
     await completeItem(items[1]?.id ?? '');
     expect(await getGroupPhotos(groupId)).toHaveLength(0);
     expect(await countOpen(1)).toBe(0);
+  });
+
+  it('openSummary zählt offene Items und liefert das älteste createdAt', async () => {
+    expect(await openSummary(1)).toEqual({ count: 0, oldestCreatedAt: null });
+
+    await enqueueGroup({
+      userId: 1,
+      readings: [READING, { ...READING, registerId: 13 }],
+      photos: [],
+    });
+    const items = await listItems(1);
+    await updateItem(items[0]?.id ?? '', { createdAt: '2026-07-01T06:00:00Z' });
+
+    expect(await openSummary(1)).toEqual({ count: 2, oldestCreatedAt: '2026-07-01T06:00:00Z' });
+    // Fremde User sehen nichts.
+    expect(await openSummary(2)).toEqual({ count: 0, oldestCreatedAt: null });
   });
 
   it('clearAll leert Outbox und Fotos (Logout-Purge)', async () => {

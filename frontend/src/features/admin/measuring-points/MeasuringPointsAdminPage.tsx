@@ -265,7 +265,7 @@ export function MeasuringPointsAdminPage() {
     <>
       <LargeTitle title="Messstellen" />
       {error ? (
-        <div className="border-danger/40 bg-danger/10 rounded-card border-hairline p-3 text-danger">
+        <div className="rounded-card border-hairline border-danger/40 bg-danger/10 p-3 text-danger">
           {error}
         </div>
       ) : null}
@@ -418,13 +418,13 @@ function MPCard({ mp, onChanged }: { mp: MeasuringPointRead; onChanged: () => vo
           disabled={busy}
           aria-label={`Messstelle ${mp.name} löschen`}
           title="Löschen"
-          className="hover:bg-danger/10 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-tertiary transition-colors hover:text-danger disabled:opacity-50"
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-tertiary transition-colors hover:bg-danger/10 hover:text-danger disabled:opacity-50"
         >
           <Trash2 size={14} />
         </button>
       </Link>
       {deleteError ? (
-        <div className="border-danger/40 bg-danger/10 mx-5 mb-4 rounded-card border-hairline p-3 text-caption text-danger">
+        <div className="mx-5 mb-4 rounded-card border-hairline border-danger/40 bg-danger/10 p-3 text-caption text-danger">
           {deleteError}
         </div>
       ) : null}
@@ -777,7 +777,7 @@ function CreateFormFields({
       ) : null}
 
       {error ? (
-        <div className="border-danger/40 bg-danger/10 rounded-card border-hairline p-3 text-caption text-danger">
+        <div className="rounded-card border-hairline border-danger/40 bg-danger/10 p-3 text-caption text-danger">
           {error}
         </div>
       ) : null}
@@ -880,7 +880,7 @@ function RegisterDraftList({
               type="button"
               onClick={() => remove(idx)}
               aria-label="Register entfernen"
-              className="hover:bg-danger/10 mt-1 flex h-7 w-7 items-center justify-center rounded-full text-danger transition-colors"
+              className="mt-1 flex h-7 w-7 items-center justify-center rounded-full text-danger transition-colors hover:bg-danger/10"
             >
               <Trash2 size={13} />
             </button>

@@ -154,7 +154,7 @@ export function GlobalSearchSheet({ open, onClose }: Props) {
         {loading ? <p className="text-caption text-tertiary">Suche läuft …</p> : null}
 
         {error ? (
-          <div className="border-danger/40 bg-danger/10 rounded-pill border-hairline p-2 text-caption text-danger">
+          <div className="rounded-pill border-hairline border-danger/40 bg-danger/10 p-2 text-caption text-danger">
             {error}
           </div>
         ) : null}

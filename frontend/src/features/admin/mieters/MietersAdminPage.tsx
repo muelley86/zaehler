@@ -63,7 +63,7 @@ export function MietersAdminPage() {
     <>
       <LargeTitle title="Mieter" />
       {error ? (
-        <div className="border-danger/40 bg-danger/10 rounded-card border-hairline p-3 text-danger">
+        <div className="rounded-card border-hairline border-danger/40 bg-danger/10 p-3 text-danger">
           {error}
         </div>
       ) : null}

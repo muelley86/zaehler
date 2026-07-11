@@ -274,7 +274,7 @@ export function RecordReadingPage() {
         <LargeTitle title="Erfassen" />
         <div className="text-tertiary">Lade…</div>
         {loadError ? (
-          <div className="border-danger/40 bg-danger/10 mt-3 rounded-card border-hairline p-3 text-caption text-danger">
+          <div className="mt-3 rounded-card border-hairline border-danger/40 bg-danger/10 p-3 text-caption text-danger">
             {loadError}
           </div>
         ) : null}
@@ -306,7 +306,7 @@ export function RecordReadingPage() {
         {paramWarning ? (
           <div
             data-testid="record-param-warning"
-            className="border-warning/40 bg-warning/10 flex items-start justify-between gap-3 rounded-card border-hairline p-3 text-caption text-secondary"
+            className="flex items-start justify-between gap-3 rounded-card border-hairline border-warning/40 bg-warning/10 p-3 text-caption text-secondary"
             style={{ borderColor: 'var(--gas)' }}
           >
             <span>{paramWarning}</span>
@@ -775,7 +775,7 @@ function ReadingsForm({
       {error ? (
         <div
           data-testid="record-error"
-          className="border-danger/40 bg-danger/10 rounded-card border-hairline p-3 text-caption text-danger"
+          className="rounded-card border-hairline border-danger/40 bg-danger/10 p-3 text-caption text-danger"
         >
           {error}
         </div>
@@ -783,7 +783,7 @@ function ReadingsForm({
       {photoWarning ? (
         <div
           data-testid="record-photo-warning"
-          className="border-warning/40 bg-warning/10 rounded-card border-hairline p-3 text-caption text-secondary"
+          className="rounded-card border-hairline border-warning/40 bg-warning/10 p-3 text-caption text-secondary"
           style={{ borderColor: 'var(--gas)' }}
         >
           {photoWarning}
@@ -792,7 +792,7 @@ function ReadingsForm({
       {success ? (
         <div
           data-testid="record-success"
-          className="border-success/40 bg-success/10 rounded-card border-hairline p-3 text-caption text-success"
+          className="rounded-card border-hairline border-success/40 bg-success/10 p-3 text-caption text-success"
         >
           {success}
         </div>
@@ -1113,7 +1113,7 @@ function DeliveryForm({
       {error ? (
         <div
           data-testid="record-error"
-          className="border-danger/40 bg-danger/10 rounded-card border-hairline p-3 text-caption text-danger"
+          className="rounded-card border-hairline border-danger/40 bg-danger/10 p-3 text-caption text-danger"
         >
           {error}
         </div>
@@ -1121,7 +1121,7 @@ function DeliveryForm({
       {success ? (
         <div
           data-testid="record-success"
-          className="border-success/40 bg-success/10 rounded-card border-hairline p-3 text-caption text-success"
+          className="rounded-card border-hairline border-success/40 bg-success/10 p-3 text-caption text-success"
         >
           {success}
         </div>

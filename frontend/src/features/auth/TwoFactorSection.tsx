@@ -235,7 +235,7 @@ function BackupCodesSheet({ codes, onClose }: { codes: string[]; onClose: () => 
     <Sheet open onClose={onClose} title="Backup-Codes">
       <div className="space-y-4">
         <div
-          className="border-warning rounded-card border-hairline bg-fill p-3 text-caption text-secondary"
+          className="rounded-card border-hairline border-warning bg-fill p-3 text-caption text-secondary"
           style={{ borderColor: 'var(--gas)' }}
         >
           <strong className="text-label">Diese Codes werden nur jetzt angezeigt.</strong> Drucke sie

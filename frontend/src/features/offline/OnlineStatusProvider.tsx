@@ -25,7 +25,7 @@ import {
   subscribeConnectivity,
 } from '@/lib/offline/connectivity';
 import { refreshMasterDataSnapshot } from '@/lib/offline/masterData';
-import { countOpen, subscribeOutbox } from '@/lib/offline/outbox';
+import { openSummary, subscribeOutbox } from '@/lib/offline/outbox';
 import { getSyncPhase, runSync, subscribeSyncState } from '@/lib/offline/syncEngine';
 import type { SyncPhase } from '@/lib/offline/syncEngine';
 import { OnlineStatusContext } from './offline-context';
@@ -40,6 +40,7 @@ export function OnlineStatusProvider({ children }: { children: ReactNode }) {
 
   const [isOnline, setIsOnline] = useState(() => getIsOnline());
   const [pendingCount, setPendingCount] = useState(0);
+  const [oldestPendingAt, setOldestPendingAt] = useState<string | null>(null);
   const [syncPhase, setSyncPhase] = useState<SyncPhase>(() => getSyncPhase());
   const [lastSyncAt, setLastSyncAt] = useState<Date | null>(null);
   const userIdRef = useRef(userId);
@@ -83,17 +84,20 @@ export function OnlineStatusProvider({ children }: { children: ReactNode }) {
   // Sync-Phase spiegeln.
   useEffect(() => subscribeSyncState(setSyncPhase), []);
 
-  // Badge-Zähler: bei jeder Outbox-Mutation neu zählen.
+  // Badge-Zähler + Alter: bei jeder Outbox-Mutation neu ermitteln.
   useEffect(() => {
     if (userId === null) {
       setPendingCount(0);
+      setOldestPendingAt(null);
       return;
     }
     let cancelled = false;
     const update = () => {
-      void countOpen(userId)
-        .then((count) => {
-          if (!cancelled) setPendingCount(count);
+      void openSummary(userId)
+        .then((summary) => {
+          if (cancelled) return;
+          setPendingCount(summary.count);
+          setOldestPendingAt(summary.oldestCreatedAt);
         })
         .catch(() => {
           /* IndexedDB nicht verfügbar — Badge bleibt 0. */
@@ -123,8 +127,8 @@ export function OnlineStatusProvider({ children }: { children: ReactNode }) {
   }, [doSync]);
 
   const value = useMemo<OnlineStatusState>(
-    () => ({ isOnline, pendingCount, syncPhase, lastSyncAt, runSyncNow }),
-    [isOnline, pendingCount, syncPhase, lastSyncAt, runSyncNow],
+    () => ({ isOnline, pendingCount, oldestPendingAt, syncPhase, lastSyncAt, runSyncNow }),
+    [isOnline, pendingCount, oldestPendingAt, syncPhase, lastSyncAt, runSyncNow],
   );
   return <OnlineStatusContext.Provider value={value}>{children}</OnlineStatusContext.Provider>;
 }

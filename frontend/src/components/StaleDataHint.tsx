@@ -18,7 +18,7 @@ export function StaleDataHint({ servedAt }: { servedAt: Date | null }) {
   return (
     <span
       data-testid="stale-data-hint"
-      className="border-warning/40 bg-warning/10 inline-flex items-center gap-1.5 rounded-pill border-hairline px-2.5 py-1 text-caption text-secondary"
+      className="inline-flex items-center gap-1.5 rounded-pill border-hairline border-warning/40 bg-warning/10 px-2.5 py-1 text-caption text-secondary"
     >
       <History size={12} aria-hidden />
       Stand von {formatDateTimeDe(servedAt.toISOString())}

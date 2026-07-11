@@ -18,6 +18,8 @@ export interface OnlineStatusState {
   isOnline: boolean;
   /** Offene Einträge in der Offline-Warteschlange (eigener User). */
   pendingCount: number;
+  /** createdAt (ISO) des ältesten offenen Eintrags — für Alters-Warnungen. */
+  oldestPendingAt: string | null;
   syncPhase: SyncPhase;
   lastSyncAt: Date | null;
   /** Sync manuell anstoßen (no-op ohne Provider/angemeldeten User). */
@@ -27,6 +29,7 @@ export interface OnlineStatusState {
 export const OnlineStatusContext = createContext<OnlineStatusState>({
   isOnline: true,
   pendingCount: 0,
+  oldestPendingAt: null,
   syncPhase: 'idle',
   lastSyncAt: null,
   runSyncNow: () => {

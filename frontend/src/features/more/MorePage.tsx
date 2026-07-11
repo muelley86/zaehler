@@ -13,9 +13,11 @@ import { useNavigate } from 'react-router-dom';
 
 import { useAuth } from '@/features/auth/auth-context';
 import { TwoFactorSection } from '@/features/auth/TwoFactorSection';
+import { IosInstallHintCard } from '@/features/offline/IosInstallHintCard';
 import { useOnlineStatus } from '@/features/offline/offline-context';
 import { useFilterPrefs } from '@/features/prefs/filter-prefs-context';
 import { countOpen } from '@/lib/offline/outbox';
+import { pendingAgeLevel, pendingBadgeClass } from '@/lib/offline/pendingAge';
 import { Card, LargeTitle, Row, RowGroup, Section, Switch } from '@/components/ui';
 import { PageGlows } from '@/components/PageGlows';
 import { cx } from '@/components/ui/cx';
@@ -50,7 +52,8 @@ function applyTheme(choice: ThemeChoice) {
 
 export function MorePage() {
   const { me, logout } = useAuth();
-  const { isOnline, pendingCount } = useOnlineStatus();
+  const { isOnline, pendingCount, oldestPendingAt } = useOnlineStatus();
+  const pendingLevel = pendingAgeLevel(oldestPendingAt);
   const { rememberFilters, setRememberFilters } = useFilterPrefs();
   const navigate = useNavigate();
   const isAdmin = me?.role === 'admin';
@@ -136,6 +139,10 @@ export function MorePage() {
           </RowGroup>
         </Section>
 
+        {/* iOS ohne Installation: Hinweis auf „Zum Home-Bildschirm" —
+            hier ausblendbar, auf /sync nicht. */}
+        <IosInstallHintCard dismissible />
+
         {/* Filter — persönliche Einstellung: übrige Filter (Zählerart, Standort,
             …) je Seite für die laufende Browser-Session merken. Der
             Datumsbereich ist davon unabhängig immer global (Navigation). */}
@@ -183,7 +190,22 @@ export function MorePage() {
               to="/sync"
               icon={<CloudUpload size={20} />}
               label="Ausstehende Synchronisierung"
-              value={pendingCount > 0 ? String(pendingCount) : undefined}
+              value={
+                pendingCount > 0 ? (
+                  pendingLevel === 'none' ? (
+                    String(pendingCount)
+                  ) : (
+                    <span
+                      className={cx(
+                        'rounded-pill px-2 py-0.5 text-caption font-bold text-white',
+                        pendingBadgeClass(pendingLevel),
+                      )}
+                    >
+                      {pendingCount}
+                    </span>
+                  )
+                ) : undefined
+              }
             />
             <Row to="/passwort-aendern" icon={<KeyRound size={20} />} label="Passwort ändern" />
             <Row

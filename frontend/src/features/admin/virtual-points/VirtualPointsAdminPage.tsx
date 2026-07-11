@@ -66,7 +66,7 @@ export function VirtualPointsAdminPage() {
         Solar-Einspeisung. Sie erscheint im Dashboard und in den Auswertungen als eigene Reihe.
       </p>
       {error ? (
-        <div className="border-danger/40 bg-danger/10 rounded-card border-hairline p-3 text-danger">
+        <div className="rounded-card border-hairline border-danger/40 bg-danger/10 p-3 text-danger">
           {error}
         </div>
       ) : null}
@@ -167,7 +167,7 @@ function VmpCard({
             leftIcon={<Trash2 size={14} />}
             onClick={() => void remove()}
             disabled={busy}
-            className="hover:bg-danger/10 text-danger"
+            className="text-danger hover:bg-danger/10"
           >
             Löschen
           </Button>
@@ -198,7 +198,7 @@ function VmpCard({
       </ul>
 
       {error ? (
-        <div className="border-danger/40 bg-danger/10 mt-3 rounded-pill border-hairline p-2 text-caption text-danger">
+        <div className="mt-3 rounded-pill border-hairline border-danger/40 bg-danger/10 p-2 text-caption text-danger">
           {error}
         </div>
       ) : null}
@@ -357,7 +357,7 @@ function VmpForm({
               onClick={() => setComponents((prev) => prev.filter((_, i) => i !== idx))}
               disabled={components.length === 1}
               aria-label="Komponente entfernen"
-              className="hover:bg-danger/10 flex h-10 w-10 shrink-0 items-center justify-center rounded-pill text-danger transition-colors disabled:opacity-40"
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-pill text-danger transition-colors hover:bg-danger/10 disabled:opacity-40"
             >
               <Trash2 size={15} />
             </button>
