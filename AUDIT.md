@@ -93,7 +93,7 @@ Belegt die „keine False Positives"-Anforderung — diese Tool-/Agenten-Treffer
 - **osv `form-data` 4.0.5→4.0.6** (npm, 8.7): **dev-only** (via `jsdom`→`vitest`), nicht ausgeliefert → niedrig, kein Prod-Befund.
 - **gitleaks (5 Treffer)**: ausschließlich Test-Passwörter in `backend/tests/` → **bekannt**.
 - **trufflehog**: 0. **zizmor**: 0 (CI-Härtung nach Node-24 #290 intakt). **checkov**: 0. **shellcheck SC2155** `zaehler.sh:822,1364`: Rückgabewert-Maskierung, niedrig (schon im Juni notiert).
-- **Zurückgestellte Items** (nicht neu „entdeckt"): TOTP-Secret-Klartext-at-rest, `cookie_secure`-LAN-Default, HMAC-Session-Lookup nicht constant-time, Offline-Queue (PWA). Unverändert wie dokumentiert.
+- **Zurückgestellte Items** (nicht neu „entdeckt"): TOTP-Secret-Klartext-at-rest, `cookie_secure`-LAN-Default, HMAC-Session-Lookup nicht constant-time. Unverändert wie dokumentiert. Die Offline-Queue (PWA) ist inzwischen ✅ umgesetzt (v2.69.0, PR #321/#324).
 - **Sauber gegengeprüft (kein Befund):** Zip-Slip/Symlink im Restore (Whitelist-Extraktion + `test_restore_ignores_zip_slip_entries`), Maintenance-503-Gate, Restore-Rollback-Vollständigkeit, virtuelle-MP-Zyklen (FK nur auf reale MP), Foto-IDOR/Traversal (`photo_full_path` `resolve()`+`is_relative_to`, Pillow-Decode), `search`/`entries`/`dashboard`/`report_aggregation` MP-Zugriffsfilter, QR-Assign-Scope, Origin-Check auf Multipart, alle `target="_blank"` mit `rel="noopener"`, kein `dangerouslySetInnerHTML`, kein `any`.
 
 ### F. Priorisierter Maßnahmenplan (für den Folge-Schritt, PR-Schnitt)
@@ -154,8 +154,9 @@ Prod-Daten-Risiko und wurde verworfen.
 **§D-Alt-Befunde:** 2.3 war bereits behoben; **7.2** (`ReadingsListPage`-Split),
 **1.5** (Bool/Timestamp-Konvention), **6.3** (Python-`sorted` in `consumption`),
 **7.1** (Audit-Decorator) bleiben offen — alle „niedrig", nicht Teil dieses Backlogs.
-Zurückgestellte Härtungen (TOTP-Encryption-at-rest, `cookie_secure`-LAN-Default,
-Offline-Queue) unverändert wie dokumentiert.
+Zurückgestellte Härtungen (TOTP-Encryption-at-rest, `cookie_secure`-LAN-Default)
+unverändert wie dokumentiert; die Offline-Queue ist inzwischen ✅ umgesetzt
+(v2.69.0, PR #321/#324 — Outbox + Stammdaten-Snapshot in IndexedDB, In-App-Sync-Engine).
 
 ---
 
@@ -233,6 +234,7 @@ Alle 5 ursprünglichen **hoch**-Befunde (2.1, 5.1, 5.2, 5.3, + Test zu 2.1) sind
 - **Befund:** CLAUDE.md Zeile 25 fordert „PWA-fähig (Manifest + Service Worker, offline-tauglich für Erfassung)". Manifest ist da, **kein Service Worker registriert**. Verifiziert per `ls frontend/src/*sw*` (keine Treffer) und Inspektion von `main.tsx` (kein `navigator.serviceWorker.register`).
 - **Auswirkung:** Erfassung am Zählerschrank ohne LAN-Verbindung scheitert; App ist nicht offline-tauglich.
 - **Behebung:** Vite-PWA-Plugin oder eigener `service-worker.ts`. Cache-First für `/assets/*`, Network-First mit Offline-Queue (IndexedDB) für `POST /readings`.
+- **Nachtrag 2026-07-11:** ✅ vollständig behoben — Service Worker seit PR #91 (vite-plugin-pwa), Offline-Queue + Stammdaten-Snapshot (IndexedDB) + In-App-Sync-Engine in v2.69.0 (PR #321/#324); Details in CLAUDE.md „Weitere Features → Offline-Modus".
 
 ### 1.2 Photo-Upload nur teilweise implementiert
 - **Schweregrad:** mittel

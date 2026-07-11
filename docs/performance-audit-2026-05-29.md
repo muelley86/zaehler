@@ -74,3 +74,16 @@ Naechstes Performance-Audit spaetestens:
 - bei Major-Dep-Bump (FastAPI 1.x, SQLAlchemy 3.x, React 19, Vite 7),
 - nach Einfuehrung der Offline-Queue,
 - oder einmal pro Jahr (naechstes Datum: 2027-05).
+
+## Nachtrag 2026-07-11: Offline-Queue umgesetzt (v2.69.0)
+
+Das zurueckgestellte Item 1 ist umgesetzt (PR #321 Offline-Lesemodus,
+PR #324 Offline-Erfassung mit Sync-Warteschlange): IndexedDB-Outbox mit
+Foto-Blobs, aktiver Stammdaten-Snapshot, Queue-UI unter `/sync`,
+Konflikt-Handling (400-Plausibilitaet/409-Duplikat, Nutzer entscheidet;
+wertgleiche 409 Auto-Resolve), MSW-/fake-indexeddb-Tests. Abweichend vom
+damaligen Vorschlag OHNE Background-Sync-API (iOS Safari hat keinen
+SyncManager) — stattdessen In-App-Sync-Engine mit Triggern App-Start/
+Login, `online`-Event, `visibilitychange`, manuell. Details: CLAUDE.md
+„Weitere Features → Offline-Modus". Damit ist der Re-Audit-Trigger
+„nach Einfuehrung der Offline-Queue" ausgeloest.
