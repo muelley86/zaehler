@@ -87,7 +87,7 @@ describe('outbox', () => {
   });
 
   it('openSummary zählt offene Items und liefert das älteste createdAt', async () => {
-    expect(await openSummary(1)).toEqual({ count: 0, oldestCreatedAt: null });
+    expect(await openSummary(1)).toMatchObject({ count: 0, oldestCreatedAt: null });
 
     await enqueueGroup({
       userId: 1,
@@ -97,9 +97,30 @@ describe('outbox', () => {
     const items = await listItems(1);
     await updateItem(items[0]?.id ?? '', { createdAt: '2026-07-01T06:00:00Z' });
 
-    expect(await openSummary(1)).toEqual({ count: 2, oldestCreatedAt: '2026-07-01T06:00:00Z' });
+    expect(await openSummary(1)).toMatchObject({
+      count: 2,
+      oldestCreatedAt: '2026-07-01T06:00:00Z',
+    });
     // Fremde User sehen nichts.
-    expect(await openSummary(2)).toEqual({ count: 0, oldestCreatedAt: null });
+    expect(await openSummary(2)).toMatchObject({ count: 0, oldestCreatedAt: null });
+  });
+
+  it('openSummary unterscheidet retry-fähige von Konflikt-Items', async () => {
+    await enqueueGroup({
+      userId: 1,
+      readings: [READING, { ...READING, registerId: 13 }],
+      photos: [],
+    });
+    const items = await listItems(1);
+    await updateItem(items[0]?.id ?? '', {
+      status: 'conflict_warning',
+      problem: { title: 'Warnung', status: 400 },
+    });
+
+    const summary = await openSummary(1);
+    expect(summary.count).toBe(2);
+    // Nur pending/photos_pending dürfen einen Auto-Retry auslösen.
+    expect(summary.retryableCount).toBe(1);
   });
 
   it('clearAll leert Outbox und Fotos (Logout-Purge)', async () => {
