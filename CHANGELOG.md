@@ -10,6 +10,13 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.71.0](https://github.com/muelley86/zaehler/compare/v2.70.1...v2.71.0) (2026-07-13)
+
+
+### Funktionen
+
+* **frontend:** Standard-Datumsbereich auf letzten + laufenden Monat umstellen ([#332](https://github.com/muelley86/zaehler/issues/332)) ([47626a8](https://github.com/muelley86/zaehler/commit/47626a84ca158b5914576270e75d1656cff2fa39))
+
 ## [2.70.1](https://github.com/muelley86/zaehler/compare/v2.70.0...v2.70.1) (2026-07-11)
 
 
