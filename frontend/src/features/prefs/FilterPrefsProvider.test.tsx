@@ -1,6 +1,7 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 
+import { currentAndLastMonthRange } from '@/lib/dateRange';
 import { FilterPrefsProvider } from './FilterPrefsProvider';
 import { useFilterPrefs } from './filter-prefs-context';
 
@@ -9,14 +10,15 @@ afterEach(() => {
   window.sessionStorage.clear();
 });
 
-const thisYear = new Date().getFullYear();
-const YEAR_RANGE = { from: `${thisYear}-01-01`, to: `${thisYear}-12-31` };
+// Erwarteter Standard: 1. Tag des Vormonats bis Ende des laufenden Monats
+// (der Helfer selbst ist in dateRange.test.ts mit festen Daten abgedeckt).
+const DEFAULT_RANGE = currentAndLastMonthRange(new Date());
 
 describe('FilterPrefsProvider', () => {
-  it('startet mit rememberFilters=false und dateRange = laufendes Jahr', () => {
+  it('startet mit rememberFilters=false und dateRange = letzter + laufender Monat', () => {
     const { result } = renderHook(() => useFilterPrefs(), { wrapper: FilterPrefsProvider });
     expect(result.current.rememberFilters).toBe(false);
-    expect(result.current.dateRange).toEqual(YEAR_RANGE);
+    expect(result.current.dateRange).toEqual(DEFAULT_RANGE);
   });
 
   it('lädt einen gespeicherten dateRange aus sessionStorage', () => {
@@ -40,24 +42,24 @@ describe('FilterPrefsProvider', () => {
     );
   });
 
-  it('stepYear(-1) verschiebt den Bereich um ein Jahr zurück', () => {
+  it('stepMonth(-1) verschiebt den Bereich um einen Monat zurück', () => {
     window.sessionStorage.setItem(
       'app.dateRange',
-      JSON.stringify({ from: '2026-01-01', to: '2026-12-31' }),
+      JSON.stringify({ from: '2026-06-01', to: '2026-07-31' }),
     );
     const { result } = renderHook(() => useFilterPrefs(), { wrapper: FilterPrefsProvider });
-    act(() => result.current.stepYear(-1));
-    expect(result.current.dateRange).toEqual({ from: '2025-01-01', to: '2025-12-31' });
+    act(() => result.current.stepMonth(-1));
+    expect(result.current.dateRange).toEqual({ from: '2026-05-01', to: '2026-06-30' });
   });
 
-  it('resetDateRange setzt den Bereich auf das laufende Kalenderjahr', () => {
+  it('resetDateRange setzt den Bereich auf letzten + laufenden Monat', () => {
     window.sessionStorage.setItem(
       'app.dateRange',
       JSON.stringify({ from: '2020-01-01', to: '2020-12-31' }),
     );
     const { result } = renderHook(() => useFilterPrefs(), { wrapper: FilterPrefsProvider });
     act(() => result.current.resetDateRange());
-    expect(result.current.dateRange).toEqual(YEAR_RANGE);
+    expect(result.current.dateRange).toEqual(DEFAULT_RANGE);
   });
 
   it('Ausschalten von „Filter merken" wischt filters.*-Keys, lässt den Datumsbereich aber unangetastet', () => {

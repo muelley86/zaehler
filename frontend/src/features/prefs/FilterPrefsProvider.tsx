@@ -16,7 +16,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 
-import { currentYearRange, shiftRangeByYears } from '@/lib/dateRange';
+import { currentAndLastMonthRange, shiftRangeByMonths } from '@/lib/dateRange';
 import type { DateRange } from '@/lib/dateRange';
 import { FilterPrefsContext } from './filter-prefs-context';
 import type { FilterPrefsState } from './filter-prefs-context';
@@ -49,7 +49,7 @@ function loadDateRange(): DateRange {
   } catch {
     /* ignore */
   }
-  return currentYearRange(new Date());
+  return currentAndLastMonthRange(new Date());
 }
 
 function clearAllSessionFilterKeys(): void {
@@ -92,8 +92,11 @@ export function FilterPrefsProvider({ children }: { children: ReactNode }) {
   const setDateRange = useCallback((next: DateRange) => setRange(next), []);
   const setFrom = useCallback((v: string) => setRange((r) => ({ ...r, from: v })), []);
   const setTo = useCallback((v: string) => setRange((r) => ({ ...r, to: v })), []);
-  const stepYear = useCallback((delta: number) => setRange((r) => shiftRangeByYears(r, delta)), []);
-  const resetDateRange = useCallback(() => setRange(currentYearRange(new Date())), []);
+  const stepMonth = useCallback(
+    (delta: number) => setRange((r) => shiftRangeByMonths(r, delta)),
+    [],
+  );
+  const resetDateRange = useCallback(() => setRange(currentAndLastMonthRange(new Date())), []);
 
   const value = useMemo<FilterPrefsState>(
     () => ({
@@ -103,7 +106,7 @@ export function FilterPrefsProvider({ children }: { children: ReactNode }) {
       setDateRange,
       setFrom,
       setTo,
-      stepYear,
+      stepMonth,
       resetDateRange,
     }),
     [
@@ -113,7 +116,7 @@ export function FilterPrefsProvider({ children }: { children: ReactNode }) {
       setDateRange,
       setFrom,
       setTo,
-      stepYear,
+      stepMonth,
       resetDateRange,
     ],
   );

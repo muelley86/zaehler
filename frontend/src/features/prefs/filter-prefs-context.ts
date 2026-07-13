@@ -21,9 +21,9 @@ export interface FilterPrefsState {
   setDateRange: (next: DateRange) => void;
   setFrom: (v: string) => void;
   setTo: (v: string) => void;
-  /** Verschiebt den Datumsbereich um `delta` ganze Jahre (−1 = Vorjahr). */
-  stepYear: (delta: number) => void;
-  /** Setzt den Datumsbereich auf den Standard (laufendes Kalenderjahr). */
+  /** Verschiebt den Datumsbereich um `delta` ganze Monate (−1 = einen Monat zurück). */
+  stepMonth: (delta: number) => void;
+  /** Setzt den Datumsbereich auf den Standard (letzter + laufender Monat). */
   resetDateRange: () => void;
 }
 
