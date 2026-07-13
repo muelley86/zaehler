@@ -15,31 +15,36 @@ function pad(n: number): string {
   return String(n).padStart(2, '0');
 }
 
-function isLeapYear(y: number): boolean {
-  return (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0;
+function isoLocal(d: Date): string {
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
-export function currentYearRange(today: Date): DateRange {
+/** Standard-Bereich: 1. Tag des Vormonats bis letzter Tag des laufenden Monats. */
+export function currentAndLastMonthRange(today: Date): DateRange {
   const y = today.getFullYear();
-  return { from: `${y}-01-01`, to: `${y}-12-31` };
+  const m = today.getMonth();
+  return { from: isoLocal(new Date(y, m - 1, 1)), to: isoLocal(new Date(y, m + 1, 0)) };
 }
 
-function shiftIsoByYears(iso: string, delta: number): string {
+function shiftIsoByMonths(iso: string, delta: number): string {
   if (!iso) return iso; // offene Endpunkte unverändert lassen
   const parts = iso.split('-');
   const y = Number(parts[0]);
-  const m = Number(parts[1]);
-  let d = Number(parts[2]);
-  const ny = y + delta;
-  // 29. Februar im Nicht-Schaltjahr auf den 28. clampen.
-  if (m === 2 && d === 29 && !isLeapYear(ny)) d = 28;
-  return `${ny}-${pad(m)}-${pad(d)}`;
+  const m = Number(parts[1]); // 1-basiert
+  const d = Number(parts[2]);
+  // Monatsende bleibt Monatsende (30.06. +1 → 31.07.) — sonst wäre das
+  // Pfeil-Stepping für Monats-Bereiche nicht invertierbar; andere Tage werden
+  // nur auf den letzten Tag des Zielmonats geclampt (31.03. −1 → 28./29.02.).
+  const lastDaySource = new Date(y, m, 0).getDate();
+  const lastDayTarget = new Date(y, m + delta, 0).getDate();
+  const day = d === lastDaySource ? lastDayTarget : Math.min(d, lastDayTarget);
+  return isoLocal(new Date(y, m - 1 + delta, day));
 }
 
-export function shiftRangeByYears(range: DateRange, delta: number): DateRange {
+export function shiftRangeByMonths(range: DateRange, delta: number): DateRange {
   return {
-    from: shiftIsoByYears(range.from, delta),
-    to: shiftIsoByYears(range.to, delta),
+    from: shiftIsoByMonths(range.from, delta),
+    to: shiftIsoByMonths(range.to, delta),
   };
 }
 

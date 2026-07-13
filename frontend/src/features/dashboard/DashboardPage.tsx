@@ -155,7 +155,6 @@ export function DashboardPage() {
   // Der Datumsbereich kommt global aus dem FilterPrefsContext (Navigation);
   // `from`/`to` bleiben lokale Aliase, damit alle abhängigen Effekte/Helfer
   // (Granularitäts-Default, /dashboard-Load, CSV) unverändert weiterlaufen.
-  const currentYear = new Date().getFullYear();
   const from = dateRange.from;
   const to = dateRange.to;
 
@@ -163,7 +162,7 @@ export function DashboardPage() {
   // Aggregations-Granularität, beide in localStorage gemerkt.
   const [chartType, setChartType] = useState<ChartType>(() => loadChartType());
   const [granularity, setGranularity] = useState<Granularity>(
-    () => loadGranularity() ?? defaultGranularity(`${currentYear}-01-01`, `${currentYear}-12-31`),
+    () => loadGranularity() ?? defaultGranularity(from, to),
   );
   // Solange der Nutzer die Granularität nicht selbst gewählt hat, folgt sie
   // automatisch dem Zeitraum.

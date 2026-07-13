@@ -112,7 +112,18 @@ afterEach(() => {
 });
 
 describe('DashboardPage — globale View-Controls', () => {
-  it('Default-Granularität für das laufende Jahr ist Monat', async () => {
+  it('Default-Granularität für den Standard-Bereich (letzter + laufender Monat) ist Woche', async () => {
+    mockEndpoints();
+    renderWithRouter(<DashboardPage />);
+    const woche = await screen.findByRole('button', { name: 'Woche' });
+    expect(woche).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('Default-Granularität für einen Jahres-Bereich ist Monat', async () => {
+    window.sessionStorage.setItem(
+      'app.dateRange',
+      JSON.stringify({ from: '2026-01-01', to: '2026-12-31' }),
+    );
     mockEndpoints();
     renderWithRouter(<DashboardPage />);
     const monat = await screen.findByRole('button', { name: 'Monat' });
