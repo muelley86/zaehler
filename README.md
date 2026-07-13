@@ -28,6 +28,10 @@ Die fachliche Spezifikation steht in [`CLAUDE.md`](./CLAUDE.md).
 - **Audit-Log** über alle Änderungen, inkl. 2FA-Events.
 - **Dashboard** mit Verbrauchs- und Stand-Diagrammen, Filter nach Standort,
   Zählerart, Messstelle und Zeitraum, plus aggregierter Verbrauchs-Übersicht.
+  Der Zeitraum gilt app-weit (auch für Erfassungen und Auswertungen), startet
+  standardmäßig mit dem letzten und dem laufenden Monat, lässt sich mit den
+  Pfeilen monatsweise blättern und über „Datum zurücksetzen" jederzeit wieder
+  auf den Standard stellen.
 - **CSV-Export** auf Dashboard- und Erfassungs-Seite.
 - **Offline-Erfassung (PWA)** — als App installierbar („Zum Home-Bildschirm");
   Zählerstände (inkl. Fotos) lassen sich ohne Serververbindung erfassen und
