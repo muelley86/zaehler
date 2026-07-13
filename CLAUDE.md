@@ -257,6 +257,20 @@ Atomar in einer Transaktion:
   (außer Rollover oder Zählerwechsel) – Warnung, nicht harter Block
 - Übersichtsdashboard mit Verbrauchsdiagrammen pro MeasuringPoint
   (Tag/Monat/Jahr aggregiert)
+- Globaler Datumsbereich (`components/GlobalDateRange.tsx`, State in
+  `features/prefs/FilterPrefsProvider.tsx`, Helfer in `lib/dateRange.ts`):
+  app-weiter Zeitraum-Filter (Dashboard, Erfassungen, Auswertungen — dort per
+  Perioden-Preset statt `shared_range` abwählbar), sitzungspersistent
+  (sessionStorage `app.dateRange`). Standard (v2.71.0): 1. Tag des Vormonats
+  bis letzter Tag des laufenden Monats; „Datum zurücksetzen" stellt genau
+  diesen Standard wieder her. Die ◀/▶-Pfeile verschieben monatsweise
+  (`shiftRangeByMonths`); ein Monatsende bleibt dabei Monatsende
+  (30.06. +1 → 31.07., Stepping invertierbar), andere Tage werden aufs
+  Zielmonatsende geclampt. Die Dashboard-Default-Granularität folgt dem
+  Bereich (`defaultGranularity` in `chartUtils.ts`: ≤45 Tage → Tag,
+  ≤182 → Woche, ≤1096 → Monat, sonst Jahr) — beim 2-Monats-Standard also
+  „Woche"; eine manuell gewählte Granularität bleibt erhalten
+  (localStorage `dashboard.granularity`).
 - Export als CSV (alle Readings) und JSON (vollständiger Dump); CSV im
   deutschen Excel-Format (`;`-Delimiter, Komma-Dezimal, UTF-8-BOM)
 - Login-Seite, "Passwort ändern"-Dialog, erzwungene Änderung beim
