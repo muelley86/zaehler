@@ -10,6 +10,13 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.71.1](https://github.com/muelley86/zaehler/compare/v2.71.0...v2.71.1) (2026-07-13)
+
+
+### Dokumentation
+
+* Standard-Datumsbereich v2.71.0 dokumentieren ([#334](https://github.com/muelley86/zaehler/issues/334)) ([fb794be](https://github.com/muelley86/zaehler/commit/fb794be1bf6fcc397a2cb0bfc5a3a5038fd088f9))
+
 ## [2.71.0](https://github.com/muelley86/zaehler/compare/v2.70.1...v2.71.0) (2026-07-13)
 
 
