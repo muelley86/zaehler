@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { ConsumptionPoint, MeterType } from '@/lib/types';
 
 import { buildComparisonGroups, type ItemLike } from './comparisonSeries';
+import { cp } from './testFixtures';
 
 /** Minimale Messstelle — der Helper nutzt nur id/name/type/consumption. */
 function item(
@@ -12,18 +13,6 @@ function item(
   consumption: ConsumptionPoint[],
 ): ItemLike {
   return { id, name, type, consumption };
-}
-
-/** Ein Verbrauchspunkt (period_start = period_end, der Helper bucket't nicht selbst). */
-function cp(obis: string, periodEnd: string, consumption: string, unit: string): ConsumptionPoint {
-  return {
-    period_start: periodEnd,
-    period_end: periodEnd,
-    register_id: 0,
-    obis_code: obis,
-    consumption,
-    unit,
-  };
 }
 
 /** Index-Zugriff mit Narrowing (tsconfig: noUncheckedIndexedAccess). */
@@ -37,8 +26,8 @@ describe('buildComparisonGroups', () => {
   it('gruppiert nach (Zählerart, Einheit) und sortiert nach TYPE_ORDER', () => {
     const groups = buildComparisonGroups({
       items: [
-        item(2, 'Wasser B', 'water', [cp('water', '2024-01-31', '5', 'm³')]),
-        item(1, 'Strom A', 'electricity', [cp('1.8.0', '2024-01-31', '100', 'kWh')]),
+        item(2, 'Wasser B', 'water', [cp('2024-01-31', '5', 'm³', 'water')]),
+        item(1, 'Strom A', 'electricity', [cp('2024-01-31', '100', 'kWh', '1.8.0')]),
       ],
     });
 
@@ -52,8 +41,8 @@ describe('buildComparisonGroups', () => {
     const groups = buildComparisonGroups({
       items: [
         item(1, 'Strom HT/NT', 'electricity', [
-          cp('1.8.1', '2024-01-31', '60', 'kWh'),
-          cp('1.8.2', '2024-01-31', '40', 'kWh'),
+          cp('2024-01-31', '60', 'kWh', '1.8.1'),
+          cp('2024-01-31', '40', 'kWh', '1.8.2'),
         ]),
       ],
     });
@@ -69,8 +58,8 @@ describe('buildComparisonGroups', () => {
     const groups = buildComparisonGroups({
       items: [
         item(1, 'Strom', 'electricity', [
-          cp('1.8.0', '2024-01-31', '100', 'kWh'),
-          cp('2.8.0', '2024-01-31', '30', 'kWh'),
+          cp('2024-01-31', '100', 'kWh', '1.8.0'),
+          cp('2024-01-31', '30', 'kWh', '2.8.0'),
         ]),
       ],
     });
@@ -88,10 +77,10 @@ describe('buildComparisonGroups', () => {
     const groups = buildComparisonGroups({
       items: [
         item(1, 'A', 'water', [
-          cp('water', '2024-01-31', '5', 'm³'),
-          cp('water', '2024-02-29', '6', 'm³'),
+          cp('2024-01-31', '5', 'm³', 'water'),
+          cp('2024-02-29', '6', 'm³', 'water'),
         ]),
-        item(2, 'B', 'water', [cp('water', '2024-02-29', '7', 'm³')]),
+        item(2, 'B', 'water', [cp('2024-02-29', '7', 'm³', 'water')]),
       ],
     });
 
@@ -106,7 +95,7 @@ describe('buildComparisonGroups', () => {
 
   it('Single-Flow-Messstelle: Label ohne Suffix (nur Name)', () => {
     const groups = buildComparisonGroups({
-      items: [item(7, 'Hauptzähler', 'electricity', [cp('1.8.0', '2024-01-31', '12', 'kWh')])],
+      items: [item(7, 'Hauptzähler', 'electricity', [cp('2024-01-31', '12', 'kWh', '1.8.0')])],
     });
 
     expect(at(groups, 0).labelOf['mp-7::draw']).toBe('Hauptzähler');
@@ -120,8 +109,8 @@ describe('buildComparisonGroups', () => {
   it('seriesKeys sind deterministisch nach Label sortiert', () => {
     const groups = buildComparisonGroups({
       items: [
-        item(1, 'Zeta', 'water', [cp('water', '2024-01-31', '1', 'm³')]),
-        item(2, 'Alpha', 'water', [cp('water', '2024-01-31', '2', 'm³')]),
+        item(1, 'Zeta', 'water', [cp('2024-01-31', '1', 'm³', 'water')]),
+        item(2, 'Alpha', 'water', [cp('2024-01-31', '2', 'm³', 'water')]),
       ],
     });
 
@@ -132,13 +121,13 @@ describe('buildComparisonGroups', () => {
 describe('buildComparisonGroups — verrechnete Messstellen', () => {
   it('fügt eine Netto-Serie im vmp-Namensraum mit "(verrechnet)"-Label hinzu', () => {
     const groups = buildComparisonGroups({
-      items: [item(3, 'Strom A', 'electricity', [cp('1.8.0', '2024-01-31', '100', 'kWh')])],
+      items: [item(3, 'Strom A', 'electricity', [cp('2024-01-31', '100', 'kWh', '1.8.0')])],
       virtualItems: [
         {
           id: 3, // gleiche ID wie die echte MP — darf nicht kollidieren
           name: 'Biogas real',
           type: 'electricity',
-          consumption: [cp('virtual', '2024-01-31', '380', 'kWh')],
+          consumption: [cp('2024-01-31', '380', 'kWh', 'virtual')],
           totals: [],
         },
       ],
@@ -161,7 +150,7 @@ describe('buildComparisonGroups — verrechnete Messstellen', () => {
           id: 1,
           name: 'Netto',
           type: 'electricity',
-          consumption: [cp('virtual', '2024-01-31', '-200', 'kWh')],
+          consumption: [cp('2024-01-31', '-200', 'kWh', 'virtual')],
           totals: [],
         },
       ],
@@ -173,7 +162,7 @@ describe('buildComparisonGroups — verrechnete Messstellen', () => {
 
   it('ohne virtualItems unverändert (Regression)', () => {
     const groups = buildComparisonGroups({
-      items: [item(1, 'Strom A', 'electricity', [cp('1.8.0', '2024-01-31', '100', 'kWh')])],
+      items: [item(1, 'Strom A', 'electricity', [cp('2024-01-31', '100', 'kWh', '1.8.0')])],
     });
     expect(at(groups, 0).seriesKeys).toEqual(['mp-1::draw']);
   });
