@@ -6,6 +6,10 @@ import { ChevronDown } from 'lucide-react';
 import { cx } from './cx';
 
 const PANEL_WIDTH = 256; // Mindestbreite (entspricht w-64)
+// Mindestplatz unterhalb des Triggers, ab dem noch nach unten geöffnet wird —
+// darunter (z. B. Trigger nahe am unteren Sheet-Rand) öffnet das Panel nach
+// oben, sofern dort mehr Platz ist.
+const MIN_PANEL_SPACE = 240;
 
 /**
  * Generische Popover-Hülle: ein Trigger-Button, der ein schwebendes Panel
@@ -43,7 +47,13 @@ export function Dropdown({
   dense?: boolean;
 }) {
   const [open, setOpen] = useState(false);
-  const [pos, setPos] = useState<{ top: number; left: number; width: number } | null>(null);
+  const [pos, setPos] = useState<{
+    top?: number;
+    bottom?: number;
+    left: number;
+    width: number;
+    maxHeight: number;
+  } | null>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const active = badge !== undefined && badge > 0;
@@ -56,7 +66,21 @@ export function Dropdown({
     const width = Math.max(PANEL_WIDTH, r.width);
     const rawLeft = align === 'right' ? r.right - width : r.left;
     const left = Math.max(8, Math.min(rawLeft, window.innerWidth - width - 8));
-    setPos({ top: r.bottom + 4, left, width });
+
+    const spaceBelow = window.innerHeight - r.bottom - 8;
+    const spaceAbove = r.top - 8;
+    const maxHeightCap = 0.7 * window.innerHeight;
+
+    if (spaceBelow < MIN_PANEL_SPACE && spaceAbove > spaceBelow) {
+      // Zu wenig Platz unterhalb (z. B. Trigger im Bottom-Sheet) und oben
+      // ist mehr Raum: Panel nach oben öffnen statt am Viewport-Rand
+      // abgeschnitten zu werden.
+      const maxHeight = Math.max(160, Math.min(spaceAbove, maxHeightCap));
+      setPos({ bottom: window.innerHeight - r.top + 4, left, width, maxHeight });
+    } else {
+      const maxHeight = Math.max(160, Math.min(spaceBelow, maxHeightCap));
+      setPos({ top: r.bottom + 4, left, width, maxHeight });
+    }
   }, [align]);
 
   useEffect(() => {
@@ -139,8 +163,14 @@ export function Dropdown({
         ? createPortal(
             <div
               ref={panelRef}
-              style={{ position: 'fixed', top: pos.top, left: pos.left, width: pos.width }}
-              className="glass z-50 max-h-[70vh] max-w-[calc(100vw-1rem)] overflow-hidden rounded-card border-hairline border-border bg-surface-high shadow-glass dark:shadow-glass-dark"
+              style={{
+                position: 'fixed',
+                ...(pos.top !== undefined ? { top: pos.top } : { bottom: pos.bottom }),
+                left: pos.left,
+                width: pos.width,
+                maxHeight: pos.maxHeight,
+              }}
+              className="glass z-50 max-w-[calc(100vw-1rem)] overflow-hidden rounded-card border-hairline border-border bg-surface-high shadow-glass dark:shadow-glass-dark"
             >
               {content}
             </div>,
