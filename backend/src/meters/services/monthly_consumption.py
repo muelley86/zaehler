@@ -101,6 +101,38 @@ def monthly_points_for_measuring_point(
     ]
 
 
+def monthly_points_for_measuring_points(
+    db: Session, measuring_point_ids: Iterable[int]
+) -> dict[int, list[ConsumptionPoint]]:
+    """Bulk-Pendant zu ``monthly_points_for_measuring_point``: derselbe Join,
+    aber EINE Query für ALLE ``measuring_point_ids`` (statt einer Query je
+    Messstelle), Ergebnis nach ``PhysicalMeter.measuring_point_id`` gruppiert.
+    IDs ohne Monats-Zeilen (z. B. noch keine Ablesung) liefern eine leere
+    Liste, nicht KeyError."""
+    ids = list(measuring_point_ids)
+    out: dict[int, list[ConsumptionPoint]] = {mp_id: [] for mp_id in ids}
+    if not ids:
+        return out
+    rows = db.execute(
+        select(MonthlyConsumption, PhysicalMeter.measuring_point_id)
+        .join(Register, MonthlyConsumption.register_id == Register.id)
+        .join(PhysicalMeter, Register.physical_meter_id == PhysicalMeter.id)
+        .where(PhysicalMeter.measuring_point_id.in_(ids))
+    )
+    for row, mp_id in rows:
+        out[mp_id].append(
+            ConsumptionPoint(
+                period_start=row.period_start,
+                period_end=row.period_end,
+                register_id=row.register_id,
+                obis_code=row.obis_code,
+                consumption=row.consumption,
+                unit=row.unit,
+            )
+        )
+    return out
+
+
 # --- Cache-Invalidierung (B2b) ---------------------------------------------
 #
 # Statt jeden Mutations-Endpunkt einzeln zu instrumentieren (leicht zu

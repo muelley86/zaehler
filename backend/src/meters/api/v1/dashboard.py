@@ -7,10 +7,10 @@ Endpoint liefert dasselbe für **alle zugänglichen** Messstellen in **einer**
 Antwort; die eigentliche Aggregation ist serverseitig günstig.
 
 Reuse: dieselben Services wie die Einzel-Endpoints
-(:func:`consumption_for_measuring_point` / :func:`monthly_points_for_measuring_point`
-+ :func:`aggregate_consumption`, :func:`state_for_measuring_point`) und derselbe
-Recorder-Zugriffsfilter (:func:`restrict_mp_query` / :func:`accessible_mp_ids`),
-damit Werte und Berechtigungen 1:1 zu den Einzel-Routen passen.
+(:func:`points_for_measuring_point` + :func:`aggregate_consumption`,
+:func:`state_for_measuring_point`) und derselbe Recorder-Zugriffsfilter
+(:func:`restrict_mp_query` / :func:`accessible_mp_ids`), damit Werte und
+Berechtigungen 1:1 zu den Einzel-Routen passen.
 """
 
 from __future__ import annotations
@@ -32,12 +32,13 @@ from meters.schemas.dashboard import (
     DashboardVirtualMeasuringPoint,
 )
 from meters.services.access import accessible_mp_ids, restrict_mp_query
-from meters.services.consumption import (
-    PointsCache,
-    aggregate_consumption,
-    consumption_for_measuring_point,
+from meters.services.consumption import aggregate_consumption
+from meters.services.consumption_source import (
+    SourceCache,
+    points_for_measuring_point,
+    prime_source_cache,
+    source_for,
 )
-from meters.services.monthly_consumption import monthly_points_for_measuring_point
 from meters.services.state import state_for_measuring_points
 from meters.services.virtual_measuring_point import (
     consumption_for_virtual_mp,
@@ -88,18 +89,15 @@ def dashboard(
     # State aller MPs in konstant drei Queries statt drei pro MP; ein Request-
     # Cache teilt die (teure) MP-Historie zwischen realen und virtuellen Items.
     states_by_mp = state_for_measuring_points(db, mp_ids)
-    points_cache: PointsCache = {}
+    # Quellenwahl (Monatstabelle vs. on-the-fly) zentral in consumption_source,
+    # identisch zur Einzelroute ``/measuring-points/{id}/consumption``. Bulk-
+    # vorwärmen in wenigen Queries statt einer Query je MP.
+    points_cache = SourceCache()
+    prime_source_cache(db, mp_ids, source=source_for(granularity), cache=points_cache)
 
     items: list[DashboardMeasuringPoint] = []
     for mp_id in mp_ids:
-        # Monats-Granularität aus dem materialisierten Cache, sonst on-the-fly —
-        # identisch zur Einzelroute ``/measuring-points/{id}/consumption``.
-        if granularity == "month":
-            points = monthly_points_for_measuring_point(db, mp_id)
-        else:
-            points = consumption_for_measuring_point(
-                db, measuring_point_id=mp_id, cache=points_cache
-            )
+        points = points_for_measuring_point(db, mp_id, granularity=granularity, cache=points_cache)
         points = aggregate_consumption(
             points, granularity=granularity, from_date=from_at, to_date=to_at
         )
