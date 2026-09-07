@@ -62,20 +62,27 @@ export function Dropdown({
   useEffect(() => {
     if (!open) return;
     place();
+    // capture: true + preventDefault, damit ein Escape zuerst das Dropdown
+    // schließt und NICHT gleichzeitig ein umgebendes Sheet — dessen
+    // Escape-Handler (an document, bubble) prüft defaultPrevented und
+    // ignoriert den Tastendruck dann. Erstes Escape = Dropdown, zweites
+    // Escape = Sheet.
     function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') setOpen(false);
+      if (e.key !== 'Escape') return;
+      e.preventDefault();
+      setOpen(false);
     }
     function onPointer(e: MouseEvent) {
       const t = e.target as Node;
       if (triggerRef.current?.contains(t) || panelRef.current?.contains(t)) return;
       setOpen(false);
     }
-    document.addEventListener('keydown', onKey);
+    document.addEventListener('keydown', onKey, { capture: true });
     document.addEventListener('mousedown', onPointer);
     window.addEventListener('scroll', place, true);
     window.addEventListener('resize', place);
     return () => {
-      document.removeEventListener('keydown', onKey);
+      document.removeEventListener('keydown', onKey, { capture: true });
       document.removeEventListener('mousedown', onPointer);
       window.removeEventListener('scroll', place, true);
       window.removeEventListener('resize', place);
