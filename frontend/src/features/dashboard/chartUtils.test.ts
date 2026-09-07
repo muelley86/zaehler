@@ -1,7 +1,9 @@
 import { afterEach, describe, expect, it } from 'vitest';
 
 import {
-  bucketEndIso,
+  clearChartType,
+  clearGranularity,
+  defaultChartType,
   defaultGranularity,
   loadChartType,
   loadGranularity,
@@ -9,42 +11,8 @@ import {
   saveGranularity,
 } from './chartUtils';
 
-// Hinweis: Die Zeitzone wird global in vite.config.ts (`test.env.TZ`) auf
-// Europe/Berlin gepinnt — die Lokalzeit-Bucketing-Tests unten sind deshalb
-// deterministisch, unabhaengig von der TZ des Test-Runners (CI laeuft in UTC).
-
 afterEach(() => {
   window.localStorage.clear();
-});
-
-describe('bucketEndIso', () => {
-  it('Tag: gibt das Datum selbst zurück (akzeptiert auch Datetime)', () => {
-    expect(bucketEndIso('2024-06-05', 'day')).toBe('2024-06-05');
-    expect(bucketEndIso('2024-06-05T18:30:00Z', 'day')).toBe('2024-06-05');
-  });
-
-  it('Woche: liefert den ISO-Sonntag (Mo–So)', () => {
-    expect(bucketEndIso('2024-06-03', 'week')).toBe('2024-06-09'); // Montag
-    expect(bucketEndIso('2024-06-05', 'week')).toBe('2024-06-09'); // Mittwoch
-    expect(bucketEndIso('2024-06-09', 'week')).toBe('2024-06-09'); // Sonntag
-    expect(bucketEndIso('2024-06-10', 'week')).toBe('2024-06-16'); // nächster Montag
-  });
-
-  it('Monat: liefert den letzten Tag des Monats (inkl. Schaltjahr)', () => {
-    expect(bucketEndIso('2024-02-15', 'month')).toBe('2024-02-29');
-    expect(bucketEndIso('2024-04-10', 'month')).toBe('2024-04-30');
-    expect(bucketEndIso('2024-12-05', 'month')).toBe('2024-12-31');
-  });
-
-  it('Jahr: liefert den 31.12.', () => {
-    expect(bucketEndIso('2024-03-01', 'year')).toBe('2024-12-31');
-  });
-
-  it("Instant um lokale Mitternacht bucket't auf den lokalen Tag (Browser-TZ)", () => {
-    // 2024-12-31T23:00:00Z == 01.01.2025 00:00 Europe/Berlin → lokaler Tag 01.01.2025.
-    expect(bucketEndIso('2024-12-31T23:00:00Z', 'day')).toBe('2025-01-01');
-    expect(bucketEndIso('2024-12-31T23:00:00Z', 'month')).toBe('2025-01-31');
-  });
 });
 
 describe('defaultGranularity', () => {
@@ -65,16 +33,33 @@ describe('defaultGranularity', () => {
   });
 });
 
+describe('defaultChartType', () => {
+  it('Tag/Woche → Linie', () => {
+    expect(defaultChartType('day')).toBe('line');
+    expect(defaultChartType('week')).toBe('line');
+  });
+  it('Monat/Jahr → Balken', () => {
+    expect(defaultChartType('month')).toBe('bar');
+    expect(defaultChartType('year')).toBe('bar');
+  });
+});
+
 describe('localStorage-Helfer', () => {
-  it('loadChartType: Default line; persistiert und liest zurück', () => {
-    expect(loadChartType()).toBe('line');
+  it('loadChartType: null wenn nicht gesetzt; persistiert und liest zurück', () => {
+    expect(loadChartType()).toBeNull();
     saveChartType('bar');
     expect(loadChartType()).toBe('bar');
   });
 
-  it('loadChartType: ungültiger gespeicherter Wert → line', () => {
+  it('loadChartType: ungültiger gespeicherter Wert → null', () => {
     window.localStorage.setItem('dashboard.chartType', 'pie');
-    expect(loadChartType()).toBe('line');
+    expect(loadChartType()).toBeNull();
+  });
+
+  it('clearChartType: löscht die gemerkte Wahl', () => {
+    saveChartType('bar');
+    clearChartType();
+    expect(loadChartType()).toBeNull();
   });
 
   it('loadGranularity: null wenn nicht gesetzt, sonst gespeicherter Wert', () => {
@@ -85,6 +70,12 @@ describe('localStorage-Helfer', () => {
 
   it('loadGranularity: ungültiger Wert → null', () => {
     window.localStorage.setItem('dashboard.granularity', 'decade');
+    expect(loadGranularity()).toBeNull();
+  });
+
+  it('clearGranularity: löscht die gemerkte Wahl', () => {
+    saveGranularity('week');
+    clearGranularity();
     expect(loadGranularity()).toBeNull();
   });
 });

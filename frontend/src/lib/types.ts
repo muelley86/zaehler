@@ -285,13 +285,41 @@ export interface ConsumptionPoint {
   unit: string;
 }
 
-// Gebündelter Dashboard-Endpoint: Verbrauch + Ablesungen + Bestand je Messstelle
-// in einer Antwort (statt drei Requests pro MP).
+/** Register-Stammdaten einer Messstelle im Dashboard-Kontext. */
+export interface DashboardRegister {
+  obis_code: string;
+  label: string;
+  unit: string;
+}
+
+/** Summe (aktuell/vorherige Periode) je (Zählerart, Einheit, Richtung)-Bucket. */
+export interface DashboardTotal {
+  obis_code: string; // bei virtuellen Items 'virtual'
+  unit: string;
+  direction: FlowDirection;
+  current: string | null; // Decimal-String; null = kein Intervall deckt den Zeitraum
+  previous: string | null;
+}
+
+// Gebündelter Dashboard-Endpoint: Stammdaten + Verbrauch + Summen je Messstelle
+// in einer Antwort (statt mehrerer Requests pro MP).
 export interface DashboardMeasuringPoint {
-  measuring_point_id: number;
+  id: number;
+  name: string;
+  type: MeterType;
+  heating_source: HeatingSource | null;
+  main_location_id: number | null;
+  main_location_name: string | null;
+  location_id: number | null;
+  location_name: string | null;
+  current_owner_id: number | null;
+  current_owner_name: string | null;
+  kostenstelle: number | null;
+  installation_location: string | null;
+  registers: DashboardRegister[];
+  last_reading_at: string | null; // ISO-DateTime
   consumption: ConsumptionPoint[];
-  readings: ReadingRead[];
-  state: RegisterStateRead[];
+  totals: DashboardTotal[];
 }
 
 /** Verrechnete Messstelle im Dashboard: Netto-Reihe, kann negative Buckets enthalten. */
@@ -300,12 +328,21 @@ export interface DashboardVirtualMeasuringPoint {
   name: string;
   type: MeterType;
   consumption: ConsumptionPoint[];
+  totals: DashboardTotal[];
 }
+
+export type DashboardGranularity = 'day' | 'week' | 'month' | 'year';
 
 export interface DashboardResponse {
   items: DashboardMeasuringPoint[];
-  /** Optional — ältere Backend-Stände liefern das Feld nicht. */
+  /** Optional — ältere Backend-Stände liefern das Feld nicht; Hook normalisiert `?? []`. */
   virtual_items?: DashboardVirtualMeasuringPoint[];
+  from_date: string | null;
+  to_date: string | null;
+  previous_from_date: string | null;
+  previous_to_date: string | null;
+  granularity: DashboardGranularity | null;
+  partial: boolean;
 }
 
 // Virtuelle (verrechnete) Messstellen: +/− Kombination echter Messstellen.

@@ -14,9 +14,8 @@
  */
 
 import type {
-  ConsumptionPoint,
+  DashboardMeasuringPoint,
   DashboardVirtualMeasuringPoint,
-  MeasuringPointRead,
   MeterType,
 } from '@/lib/types';
 import { TYPE_ORDER } from '@/lib/meterLabels';
@@ -35,7 +34,7 @@ export interface ComparisonGroup {
 }
 
 /** Nur diese Felder der Messstelle werden gebraucht — hält den Helper testbar. */
-type MpLike = Pick<MeasuringPointRead, 'id' | 'name' | 'type'>;
+export type ItemLike = Pick<DashboardMeasuringPoint, 'id' | 'name' | 'type' | 'consumption'>;
 type Flow = 'draw' | 'feed';
 
 /** Einspeisung = OBIS 2.8.x; alles andere (1.8.x, Gas, Wasser, Wärme) = Bezug. */
@@ -51,21 +50,20 @@ interface GroupAcc {
 }
 
 export function buildComparisonGroups(input: {
-  filteredPoints: MpLike[];
-  consumptions: Record<number, ConsumptionPoint[]>;
+  items: ItemLike[];
   /** Verrechnete Messstellen: Netto-Serien (Key `vmp-<id>`, kein draw/feed-Split). */
   virtualItems?: DashboardVirtualMeasuringPoint[];
 }): ComparisonGroup[] {
-  const { filteredPoints, consumptions, virtualItems = [] } = input;
+  const { items, virtualItems = [] } = input;
 
   const groups = new Map<string, GroupAcc>();
   const flowsByMp = new Map<number, Set<Flow>>();
   const nameById = new Map<number, string>();
   const virtualNameByKey = new Map<string, string>();
 
-  for (const point of filteredPoints) {
+  for (const point of items) {
     nameById.set(point.id, point.name);
-    for (const p of consumptions[point.id] ?? []) {
+    for (const p of point.consumption) {
       const flow = classifyFlow(p.obis_code);
       let flows = flowsByMp.get(point.id);
       if (!flows) {
