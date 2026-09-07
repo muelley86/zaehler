@@ -1,7 +1,8 @@
 /**
  * Hinweise-Karte: nie/lange nicht abgelesene Messstellen und auffällige
  * Verbrauchs-Abweichungen ggü. der Vorperiode (`dashboardMetrics.ts::selectInsights`).
- * Mehr als `MAX_VISIBLE` Einträge werden standardmäßig eingeklappt.
+ * Mehr als `MAX_VISIBLE` Einträge werden standardmäßig eingeklappt — ein
+ * Toggle blendet den Rest ein und wieder aus.
  */
 
 import { useState } from 'react';
@@ -71,6 +72,7 @@ export function InsightsCard({ insights }: InsightsCardProps) {
 
   if (insights.length === 0) return null;
 
+  const hasMore = insights.length > MAX_VISIBLE;
   const visible = expanded ? insights : insights.slice(0, MAX_VISIBLE);
   const remaining = insights.length - MAX_VISIBLE;
 
@@ -85,13 +87,13 @@ export function InsightsCard({ insights }: InsightsCardProps) {
           ),
         )}
       </ul>
-      {!expanded && remaining > 0 ? (
+      {hasMore ? (
         <button
           type="button"
-          onClick={() => setExpanded(true)}
+          onClick={() => setExpanded((prev) => !prev)}
           className="w-full border-t border-separator p-3 text-center text-caption font-semibold text-primary"
         >
-          +{remaining} weitere
+          {expanded ? 'weniger anzeigen' : `+${remaining} weitere`}
         </button>
       ) : null}
     </Section>

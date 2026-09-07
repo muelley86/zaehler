@@ -58,6 +58,21 @@ describe('useDashboardData', () => {
     expect(result.current.refreshing).toBe(false);
   });
 
+  it('ruft api.getWithMeta mit den Query-Parametern und einem AbortSignal auf', async () => {
+    server.use(http.get('/api/v1/dashboard', () => HttpResponse.json(dashboardResponse())));
+
+    const { result } = renderHook(() => useDashboardData('2026-08-01', '2026-09-30', 'week'));
+    await waitFor(() => expect(result.current.data).not.toBeNull());
+
+    expect(api.getWithMeta).toHaveBeenCalledTimes(1);
+    const [path, signal] = at(vi.mocked(api.getWithMeta).mock.calls, 0);
+    expect(path).toContain('/dashboard?');
+    expect(path).toContain('granularity=week');
+    expect(path).toContain('from_at=2026-08-01');
+    expect(path).toContain('to_at=2026-09-30');
+    expect(signal).toBeInstanceOf(AbortSignal);
+  });
+
   it('zeigt bei Remount mit demselben Key sofort die gecachten Daten (refreshing=true) und aktualisiert im Hintergrund', async () => {
     let call = 0;
     server.use(

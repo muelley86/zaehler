@@ -1,6 +1,7 @@
 /**
- * Smoke-Test für InsightsCard: stale-/deviation-Zeilen, das
- * "+n weitere"-Toggle ab neun Einträgen und der Leerzustand.
+ * Smoke-Test für InsightsCard: stale-/deviation-Zeilen, das beidseitige
+ * "+n weitere"/"weniger anzeigen"-Toggle ab neun Einträgen und der
+ * Leerzustand.
  */
 
 import { describe, expect, it } from 'vitest';
@@ -58,7 +59,7 @@ describe('InsightsCard', () => {
     ).toBeInTheDocument();
   });
 
-  it('zeigt ab 9 Einträgen ein Toggle, das den Rest einblendet', () => {
+  it('zeigt ab 9 Einträgen ein Toggle, das den Rest ein- und wieder ausblendet', () => {
     const insights = Array.from({ length: 9 }, (_, i) =>
       stale({ mpId: i + 1, name: `MP ${i + 1}` }),
     );
@@ -66,12 +67,18 @@ describe('InsightsCard', () => {
     expect(
       screen.queryByText('MP 9: letzte Ablesung vor 60 Tagen (01.06.2026)'),
     ).not.toBeInTheDocument();
-    const toggle = screen.getByRole('button', { name: '+1 weitere' });
 
-    fireEvent.click(toggle);
+    fireEvent.click(screen.getByRole('button', { name: '+1 weitere' }));
 
     expect(screen.getByText('MP 9: letzte Ablesung vor 60 Tagen (01.06.2026)')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: '+1 weitere' })).not.toBeInTheDocument();
+    const collapse = screen.getByRole('button', { name: 'weniger anzeigen' });
+
+    fireEvent.click(collapse);
+
+    expect(
+      screen.queryByText('MP 9: letzte Ablesung vor 60 Tagen (01.06.2026)'),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '+1 weitere' })).toBeInTheDocument();
   });
 
   it('rendert nichts, wenn keine Hinweise vorhanden sind', () => {

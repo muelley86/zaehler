@@ -4,7 +4,7 @@
  * `useFilterPrefs`), gleiche Keys/Codecs wie zuvor in `DashboardPage.tsx`.
  */
 
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 
 import { useFilterPrefs } from '@/features/prefs/filter-prefs-context';
 import { setCodec, useStickyState } from '@/lib/useStickyState';
@@ -66,14 +66,13 @@ export function useDashboardFilters(): DashboardFiltersState {
     ID_CODEC,
   );
 
-  const filters: DashboardFilters = {
-    mainLocation,
-    owner,
-    location,
-    type,
-    measuringPoint,
-    virtual,
-  };
+  // Memoisiert auf die sechs Sets: `DashboardFilters` ist Prop/Dep für
+  // nachgelagerte `useMemo`s (z. B. `selectFilteredItems`) — ohne stabile
+  // Identität würde jeder Render dort neu rechnen.
+  const filters: DashboardFilters = useMemo(
+    () => ({ mainLocation, owner, location, type, measuringPoint, virtual }),
+    [mainLocation, owner, location, type, measuringPoint, virtual],
+  );
 
   const setFilters = useCallback(
     (next: DashboardFilters) => {

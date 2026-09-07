@@ -30,7 +30,7 @@ function KpiSkeleton() {
   );
 }
 
-function ChartSkeleton({ compact }: { compact: boolean }) {
+export function ChartSkeleton({ compact }: { compact: boolean }) {
   return (
     <div
       aria-hidden

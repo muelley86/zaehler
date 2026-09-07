@@ -9,11 +9,18 @@ import { formatDe } from '@/lib/format';
 import { TYPE_LABELS } from '@/lib/meterLabels';
 import type { TopConsumerGroup } from './dashboardMetrics';
 
-function GroupFooter({ group }: { group: TopConsumerGroup }) {
-  if (!group.others) return null;
+/** Nimmt `others` direkt entgegen (statt es erneut auf `null` zu prüfen) — die
+ *  Aufrufstelle spread't die Prop bereits nur, wenn `group.others` gesetzt ist. */
+function OthersFooter({
+  others,
+  unit,
+}: {
+  others: NonNullable<TopConsumerGroup['others']>;
+  unit: string;
+}) {
   return (
     <>
-      Weitere {group.others.count}: {formatDe(group.others.value)} {group.unit}
+      Weitere {others.count}: {formatDe(others.value)} {unit}
     </>
   );
 }
@@ -60,7 +67,9 @@ export function TopConsumers({ groups }: TopConsumersProps) {
         <Section
           key={`${group.type}::${group.unit}`}
           header={`Top-Verbraucher · ${TYPE_LABELS[group.type]} · ${group.unit}`}
-          {...(group.others ? { footer: <GroupFooter group={group} /> } : {})}
+          {...(group.others
+            ? { footer: <OthersFooter others={group.others} unit={group.unit} /> }
+            : {})}
         >
           <ul className="divide-y divide-separator">
             {group.entries.map((entry, index) => (
