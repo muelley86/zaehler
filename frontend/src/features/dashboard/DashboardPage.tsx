@@ -44,6 +44,13 @@ function comparePeriodLabel(from: string | null, to: string | null): string | nu
   return `${formatDateDe(from)} – ${formatDateDe(to)}`;
 }
 
+// Gleicher Sachverhalt/Wortlaut wie bei `/reports/aggregate` (siehe
+// ReportsPage.tsx): `partial` heißt „nur Messstellen mit Zugriff einbezogen",
+// nicht „Zeitraum unvollständig durch Ablesungen gedeckt" — der Hinweis
+// qualifiziert die KPI-Summen und die Top-Verbraucher direkt darunter.
+const PARTIAL_HINT =
+  'Als Erfasser werden nur Messstellen mit Zugriff einbezogen — die Summen können unvollständig sein.';
+
 export function DashboardPage() {
   const { dateRange } = useFilterPrefs();
   const { from, to } = dateRange;
@@ -152,6 +159,14 @@ export function DashboardPage() {
       {showContent ? (
         <>
           <KpiTiles tiles={tiles} {...(compareLabel ? { compareLabel } : {})} />
+          {data?.partial ? (
+            <div
+              role="note"
+              className="bg-fill/60 rounded-card border-hairline border-border px-4 py-3 text-caption text-secondary"
+            >
+              {PARTIAL_HINT}
+            </div>
+          ) : null}
           {/* Mobile (Spalte): Hinweise → Chart → Top-Verbraucher — die
               Handlungsaufforderung steht vor dem Diagramm. Ab `lg` wird daraus
               ein 2-Spalten-Raster: Chart über die volle Breite, darunter
@@ -167,7 +182,6 @@ export function DashboardPage() {
                 groups={groups}
                 prefs={prefs}
                 refreshing={refreshing}
-                partial={data?.partial ?? false}
                 compact={!isDesktop}
               />
             </div>

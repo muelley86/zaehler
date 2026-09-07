@@ -27,20 +27,16 @@ const ComparisonChart = lazy(() =>
 // werden sonst unleserlich.
 const MAX_SERIES_HINT = 25;
 
-const PARTIAL_FOOTER = 'Zeitraum nur teilweise durch Ablesungen abgedeckt';
-
 export interface ChartSectionProps {
   groups: ComparisonGroup[];
   prefs: ChartPrefs;
   /** Ein Refetch läuft — die (noch alten) Charts bleiben stehen. */
   refreshing: boolean;
-  /** Backend meldet: der Zeitraum ist nur teilweise durch Ablesungen gedeckt. */
-  partial: boolean;
   /** Mobile-Darstellung; wird an Chart und Skeleton durchgereicht. */
   compact: boolean;
 }
 
-export function ChartSection({ groups, prefs, refreshing, partial, compact }: ChartSectionProps) {
+export function ChartSection({ groups, prefs, refreshing, compact }: ChartSectionProps) {
   const totalSeries = groups.reduce((n, g) => n + g.seriesKeys.length, 0);
 
   return (
@@ -97,10 +93,6 @@ export function ChartSection({ groups, prefs, refreshing, partial, compact }: Ch
           </Section>
         );
       })}
-
-      {partial && groups.length > 0 ? (
-        <div className="px-1 text-caption text-tertiary">{PARTIAL_FOOTER}</div>
-      ) : null}
     </div>
   );
 }

@@ -34,6 +34,23 @@ function accumulate<B extends { current: number; previous: number }>(
   map.set(key, bucket);
 }
 
+/**
+ * Wie `accumulate`, aber „like-for-like": ein Total ohne aktuellen Wert (kein
+ * Intervall deckt die laufende Periode ab, z. B. ein quartalsweise abgelesener
+ * Zähler) trägt weder zu `current` noch zu `previous` bei — sonst zöge sein
+ * `previous` das aggregierte Δ der Kachel Richtung -100 %.
+ */
+function accumulateLikeForLike<B extends { current: number; previous: number }>(
+  map: Map<string, B>,
+  key: string,
+  seed: () => B,
+  current: string | null,
+  previous: string | null,
+): void {
+  if (current === null) return;
+  accumulate(map, key, seed, current, previous);
+}
+
 // --- KPI ----------------------------------------------------------------
 
 export type Sentiment = 'good' | 'bad' | 'neutral';
@@ -106,7 +123,7 @@ export function selectKpiTiles(
   for (const item of items) {
     for (const t of item.totals) {
       const key = `${item.type}::${t.unit}::${t.direction}`;
-      accumulate(
+      accumulateLikeForLike(
         buckets,
         key,
         () => ({ type: item.type, unit: t.unit, direction: t.direction, current: 0, previous: 0 }),
@@ -123,7 +140,7 @@ export function selectKpiTiles(
       // mit `obis_code='virtual'`, ein Eintrag je Einheit — keine Bezug-/
       // Einspeisung-Aufteilung für die Netto-Serie einer vmp.
       const key = `vmp::${v.id}::${t.unit}`;
-      accumulate(
+      accumulateLikeForLike(
         vmpBuckets,
         key,
         () => ({

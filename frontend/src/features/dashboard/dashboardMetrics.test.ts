@@ -157,6 +157,18 @@ describe('selectKpiTiles', () => {
     expect(at(tiles, 0).sentiment).toBe('neutral');
   });
 
+  it('like-for-like: eine MP ohne aktuellen Wert trägt weder current noch previous bei', () => {
+    const items = [
+      dashboardItem({ id: 1, totals: [total({ current: '100', previous: '100' })] }),
+      dashboardItem({ id: 2, totals: [total({ current: null, previous: '50' })] }),
+    ];
+    const tiles = selectKpiTiles(items, []);
+    expect(tiles).toHaveLength(1);
+    expect(at(tiles, 0).current).toBe(100);
+    expect(at(tiles, 0).previous).toBe(100);
+    expect(at(tiles, 0).deltaPct).toBe(0);
+  });
+
   it('vmp mit negativem current: deltaPct null, vmpId gesetzt', () => {
     const tiles = selectKpiTiles(
       [],

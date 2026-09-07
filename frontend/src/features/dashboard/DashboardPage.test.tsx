@@ -61,13 +61,16 @@ const VMP = virtualItem({
 function mockEndpoints(
   items: DashboardMeasuringPoint[] = [MP],
   virtualItems: DashboardVirtualMeasuringPoint[] = [],
+  opts: { partial?: boolean } = {},
 ): { granularityCalls: string[] } {
   const granularityCalls: string[] = [];
   server.use(
     http.get('/api/v1/dashboard', ({ request }) => {
       const g = new URL(request.url).searchParams.get('granularity');
       if (g) granularityCalls.push(g);
-      return HttpResponse.json(dashboardResponse({ items, virtual_items: virtualItems }));
+      return HttpResponse.json(
+        dashboardResponse({ items, virtual_items: virtualItems, partial: opts.partial ?? false }),
+      );
     }),
   );
   return { granularityCalls };
@@ -437,5 +440,25 @@ describe('DashboardPage — KPI, Hinweise, Top-Verbraucher', () => {
     expect(await screen.findByText('Top-Verbraucher · Wasser · m³')).toBeInTheDocument();
     expect(screen.getByText('75 %')).toBeInTheDocument();
     expect(screen.getByText('25 %')).toBeInTheDocument();
+  });
+});
+
+describe('DashboardPage — partial (Recorder-Scope)', () => {
+  const PARTIAL_HINT =
+    'Als Erfasser werden nur Messstellen mit Zugriff einbezogen — die Summen können unvollständig sein.';
+
+  it('zeigt den Hinweis unter den KPI-Kacheln, wenn die Antwort partial ist', async () => {
+    mockEndpoints([MP], [], { partial: true });
+    renderWithRouter(<DashboardPage />);
+
+    expect(await screen.findByText(PARTIAL_HINT)).toBeInTheDocument();
+  });
+
+  it('zeigt den Hinweis nicht, wenn die Antwort nicht partial ist', async () => {
+    mockEndpoints([MP], [], { partial: false });
+    renderWithRouter(<DashboardPage />);
+
+    await screen.findByText(/Kein Verbrauch im gewählten Zeitraum/);
+    expect(screen.queryByText(PARTIAL_HINT)).toBeNull();
   });
 });

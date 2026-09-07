@@ -47,24 +47,14 @@ function wideGroup(count: number): ComparisonGroup {
 function Harness({
   groups = [group()],
   refreshing = false,
-  partial = false,
   compact = false,
 }: {
   groups?: ComparisonGroup[];
   refreshing?: boolean;
-  partial?: boolean;
   compact?: boolean;
 }) {
   const prefs = useChartPrefs(FROM, TO);
-  return (
-    <ChartSection
-      groups={groups}
-      prefs={prefs}
-      refreshing={refreshing}
-      partial={partial}
-      compact={compact}
-    />
-  );
+  return <ChartSection groups={groups} prefs={prefs} refreshing={refreshing} compact={compact} />;
 }
 
 function openSettings(): void {
@@ -143,15 +133,7 @@ describe('ChartSection — Diagramme', () => {
 
     function FreshHarness() {
       const prefs = useChartPrefs(FROM, TO);
-      return (
-        <FreshChartSection
-          groups={[group()]}
-          prefs={prefs}
-          refreshing={false}
-          partial={false}
-          compact
-        />
-      );
+      return <FreshChartSection groups={[group()]} prefs={prefs} refreshing={false} compact />;
     }
 
     const { container } = render(<FreshHarness />);
@@ -167,15 +149,6 @@ describe('ChartSection — Diagramme', () => {
     render(<Harness refreshing />);
 
     expect(screen.getByRole('status')).toHaveTextContent('Aktualisiere…');
-  });
-
-  it('weist auf eine nur teilweise abgedeckte Periode hin', async () => {
-    render(<Harness partial />);
-    await screen.findByTestId('comparison-chart');
-
-    expect(
-      screen.getByText('Zeitraum nur teilweise durch Ablesungen abgedeckt'),
-    ).toBeInTheDocument();
   });
 
   it('zeigt einen Leerzustand, wenn es keine Verbrauchs-Gruppen gibt', () => {
