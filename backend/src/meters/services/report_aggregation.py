@@ -4,7 +4,7 @@ Summiert Verbrauchsmengen ueber MEHRERE Messstellen, gruppiert nach EINER
 Dimension (Kostenstelle | Eigentuemer | Standort | Hauptstandort | Zaehlerart)
 ueber einen Zeitraum, optional je Bucket (Tag/Woche/Monat/Jahr) oder als Gesamt-
 Summe. Baut auf der bestehenden Single-MP-Pipeline auf
-(:func:`consumption_for_measuring_point` + :func:`aggregate_consumption`).
+(:func:`points_for_measuring_point` + :func:`aggregate_consumption`).
 
 Invarianten:
 - Einheiten werden NIE gemischt: Ergebniszeile = ``(group_key, meter_type, unit,
@@ -36,13 +36,16 @@ from meters.models import Location, MeasuringPoint, MeterType, ReportDimension, 
 from meters.services.access import restrict_mp_query
 from meters.services.consumption import (
     Granularity,
-    PointsCache,
     aggregate_consumption,
     clip_consumption_to_range,
-    consumption_for_measuring_point,
     direction_of,
 )
-from meters.services.monthly_consumption import monthly_points_for_measuring_point
+from meters.services.consumption_source import (
+    SourceCache,
+    points_for_measuring_point,
+    prime_source_cache,
+    source_for,
+)
 from meters.services.owner_assignment import current_assignments_bulk
 from meters.services.virtual_measuring_point import (
     consumption_for_virtual_mp,
@@ -147,8 +150,12 @@ def aggregate_report(
 
     owners = current_assignments_bulk(db, [mp.id for mp in mps])
     # Request-Cache: dieselbe MP-Historie braucht die Real-Schleife UND
-    # _virtual_rows (Komponenten virtueller MPs) — nur einmal laden.
-    points_cache: PointsCache = {}
+    # _virtual_rows (Komponenten virtueller MPs) — nur einmal laden. Bulk-
+    # vorwärmen in wenigen Queries statt einer Query je MP.
+    points_cache = SourceCache()
+    prime_source_cache(
+        db, [mp.id for mp in mps], source=source_for(granularity), cache=points_cache
+    )
 
     # (group_key, group_label, meter_type, unit, direction, period_start, period_end) -> Decimal
     sums: dict[
@@ -176,14 +183,7 @@ def aggregate_report(
 
         group_key, group_label = _group_of(mp, dimension, (owner_id, owner_name))
 
-        # Monats-Granularität aus der materialisierten Tabelle (schnell, kein
-        # Readings-Laden); sonst on-the-fly. Gleiche Interpolation -> gleiche Werte.
-        if granularity == "month":
-            points = monthly_points_for_measuring_point(db, mp.id)
-        else:
-            points = consumption_for_measuring_point(
-                db, measuring_point_id=mp.id, cache=points_cache
-            )
+        points = points_for_measuring_point(db, mp.id, granularity=granularity, cache=points_cache)
         if granularity is None:
             # Gesamt-Modus: Intervalle taggenau auf den Zeitraum clippen (anteiliger
             # Verbrauch) statt sie ueber period_end ganz/gar-nicht zu zaehlen —
@@ -252,7 +252,7 @@ def _virtual_rows(
     from_date: date | None,
     to_date: date | None,
     filters: ReportFilter,
-    cache: PointsCache | None = None,
+    cache: SourceCache | None = None,
 ) -> list[GroupBucketRow]:
     """Zeilen fuer virtuelle (verrechnete) Messstellen.
 

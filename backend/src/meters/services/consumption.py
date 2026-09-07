@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Iterator
+from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
@@ -106,6 +106,34 @@ def consumption_for_register(
     return out
 
 
+# selectinload-Kette fuer eine MeasuringPoint samt aller fuer die Verbrauchs-
+# Berechnung noetigen Kind-Objekte (physical_meters -> registers -> readings,
+# deliveries). Gemeinsam genutzt vom Single- (``consumption_for_measuring_point``)
+# und dem Bulk-Loader (``consumption_for_measuring_points``), damit beide exakt
+# dieselben Daten laden.
+_MP_LOAD_OPTIONS = (
+    selectinload(MeasuringPoint.physical_meters)
+    .selectinload(PhysicalMeter.registers)
+    .selectinload(Register.readings),
+    selectinload(MeasuringPoint.physical_meters)
+    .selectinload(PhysicalMeter.registers)
+    .selectinload(Register.deliveries),
+)
+
+
+def _points_for_loaded_mp(mp: MeasuringPoint) -> list[ConsumptionPoint]:
+    """Verbrauchspunkte einer bereits (mit ``_MP_LOAD_OPTIONS``) geladenen
+    MeasuringPoint — Schleifenkörper von ``consumption_for_measuring_point``,
+    ausgelagert damit der Bulk-Loader ihn wiederverwenden kann."""
+    out: list[ConsumptionPoint] = []
+    factor = mp.transformer_factor
+    for meter in mp.physical_meters:
+        for register in meter.registers:
+            out.extend(consumption_for_register(register, transformer_factor=factor))
+    out.sort(key=lambda p: (p.period_end, p.obis_code))
+    return out
+
+
 def consumption_for_measuring_point(
     db: DbSession,
     *,
@@ -124,26 +152,35 @@ def consumption_for_measuring_point(
     mp = db.scalar(
         select(MeasuringPoint)
         .where(MeasuringPoint.id == measuring_point_id)
-        .options(
-            selectinload(MeasuringPoint.physical_meters)
-            .selectinload(PhysicalMeter.registers)
-            .selectinload(Register.readings),
-            selectinload(MeasuringPoint.physical_meters)
-            .selectinload(PhysicalMeter.registers)
-            .selectinload(Register.deliveries),
-        )
+        .options(*_MP_LOAD_OPTIONS)
     )
     if mp is None:
         return []
-    out: list[ConsumptionPoint] = []
-    factor = mp.transformer_factor
-    for meter in mp.physical_meters:
-        for register in meter.registers:
-            out.extend(consumption_for_register(register, transformer_factor=factor))
-    out.sort(key=lambda p: (p.period_end, p.obis_code))
+    out = _points_for_loaded_mp(mp)
     if cache is not None:
         cache[measuring_point_id] = out
     return out
+
+
+def consumption_for_measuring_points(
+    db: DbSession,
+    measuring_point_ids: Iterable[int],
+    *,
+    cache: PointsCache,
+) -> None:
+    """Bulk-Pendant zu ``consumption_for_measuring_point``: füllt ``cache`` für
+    ALLE noch fehlenden IDs mit EINER Query (statt einer Query je Messstelle) —
+    damit die Query-Zahl nicht mit der Anzahl Messstellen skaliert. IDs, die
+    bereits im ``cache`` stehen, werden nicht erneut geladen; IDs ohne
+    passende MeasuringPoint bleiben unverändert (kein Eintrag)."""
+    missing = [mp_id for mp_id in measuring_point_ids if mp_id not in cache]
+    if not missing:
+        return
+    mps = db.scalars(
+        select(MeasuringPoint).where(MeasuringPoint.id.in_(missing)).options(*_MP_LOAD_OPTIONS)
+    )
+    for mp in mps:
+        cache[mp.id] = _points_for_loaded_mp(mp)
 
 
 Granularity = Literal["day", "week", "month", "year"]

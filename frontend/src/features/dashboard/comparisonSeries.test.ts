@@ -1,28 +1,18 @@
 import { describe, expect, it } from 'vitest';
 
-import type { ConsumptionPoint, MeasuringPointRead, MeterType } from '@/lib/types';
+import type { ConsumptionPoint, MeterType } from '@/lib/types';
 
-import { buildComparisonGroups } from './comparisonSeries';
+import { buildComparisonGroups, type ItemLike } from './comparisonSeries';
+import { cp } from './testFixtures';
 
-/** Minimale Messstelle — der Helper nutzt nur id/name/type. */
-function mp(
+/** Minimale Messstelle — der Helper nutzt nur id/name/type/consumption. */
+function item(
   id: number,
   name: string,
   type: MeterType,
-): Pick<MeasuringPointRead, 'id' | 'name' | 'type'> {
-  return { id, name, type };
-}
-
-/** Ein Verbrauchspunkt (period_start = period_end, der Helper bucket't nicht selbst). */
-function cp(obis: string, periodEnd: string, consumption: string, unit: string): ConsumptionPoint {
-  return {
-    period_start: periodEnd,
-    period_end: periodEnd,
-    register_id: 0,
-    obis_code: obis,
-    consumption,
-    unit,
-  };
+  consumption: ConsumptionPoint[],
+): ItemLike {
+  return { id, name, type, consumption };
 }
 
 /** Index-Zugriff mit Narrowing (tsconfig: noUncheckedIndexedAccess). */
@@ -35,11 +25,10 @@ function at<T>(arr: T[], i: number): T {
 describe('buildComparisonGroups', () => {
   it('gruppiert nach (Zählerart, Einheit) und sortiert nach TYPE_ORDER', () => {
     const groups = buildComparisonGroups({
-      filteredPoints: [mp(2, 'Wasser B', 'water'), mp(1, 'Strom A', 'electricity')],
-      consumptions: {
-        1: [cp('1.8.0', '2024-01-31', '100', 'kWh')],
-        2: [cp('water', '2024-01-31', '5', 'm³')],
-      },
+      items: [
+        item(2, 'Wasser B', 'water', [cp('2024-01-31', '5', 'm³', 'water')]),
+        item(1, 'Strom A', 'electricity', [cp('2024-01-31', '100', 'kWh', '1.8.0')]),
+      ],
     });
 
     expect(groups.map((g) => [g.type, g.unit])).toEqual([
@@ -50,10 +39,12 @@ describe('buildComparisonGroups', () => {
 
   it('summiert HT + NT desselben Zählers zu EINER Bezugs-Serie', () => {
     const groups = buildComparisonGroups({
-      filteredPoints: [mp(1, 'Strom HT/NT', 'electricity')],
-      consumptions: {
-        1: [cp('1.8.1', '2024-01-31', '60', 'kWh'), cp('1.8.2', '2024-01-31', '40', 'kWh')],
-      },
+      items: [
+        item(1, 'Strom HT/NT', 'electricity', [
+          cp('2024-01-31', '60', 'kWh', '1.8.1'),
+          cp('2024-01-31', '40', 'kWh', '1.8.2'),
+        ]),
+      ],
     });
 
     expect(groups).toHaveLength(1);
@@ -65,10 +56,12 @@ describe('buildComparisonGroups', () => {
 
   it('bidirektional: Bezug (1.8.x) und Einspeisung (2.8.x) als getrennte Serien mit Suffix-Label', () => {
     const groups = buildComparisonGroups({
-      filteredPoints: [mp(1, 'Strom', 'electricity')],
-      consumptions: {
-        1: [cp('1.8.0', '2024-01-31', '100', 'kWh'), cp('2.8.0', '2024-01-31', '30', 'kWh')],
-      },
+      items: [
+        item(1, 'Strom', 'electricity', [
+          cp('2024-01-31', '100', 'kWh', '1.8.0'),
+          cp('2024-01-31', '30', 'kWh', '2.8.0'),
+        ]),
+      ],
     });
 
     expect(groups).toHaveLength(1);
@@ -82,11 +75,13 @@ describe('buildComparisonGroups', () => {
 
   it('führt mehrere Messstellen je period_end in einer Zeile zusammen', () => {
     const groups = buildComparisonGroups({
-      filteredPoints: [mp(1, 'A', 'water'), mp(2, 'B', 'water')],
-      consumptions: {
-        1: [cp('water', '2024-01-31', '5', 'm³'), cp('water', '2024-02-29', '6', 'm³')],
-        2: [cp('water', '2024-02-29', '7', 'm³')],
-      },
+      items: [
+        item(1, 'A', 'water', [
+          cp('2024-01-31', '5', 'm³', 'water'),
+          cp('2024-02-29', '6', 'm³', 'water'),
+        ]),
+        item(2, 'B', 'water', [cp('2024-02-29', '7', 'm³', 'water')]),
+      ],
     });
 
     expect(groups).toHaveLength(1);
@@ -100,27 +95,23 @@ describe('buildComparisonGroups', () => {
 
   it('Single-Flow-Messstelle: Label ohne Suffix (nur Name)', () => {
     const groups = buildComparisonGroups({
-      filteredPoints: [mp(7, 'Hauptzähler', 'electricity')],
-      consumptions: { 7: [cp('1.8.0', '2024-01-31', '12', 'kWh')] },
+      items: [item(7, 'Hauptzähler', 'electricity', [cp('2024-01-31', '12', 'kWh', '1.8.0')])],
     });
 
     expect(at(groups, 0).labelOf['mp-7::draw']).toBe('Hauptzähler');
   });
 
   it('leere Eingabe → keine Gruppen; Messstelle ohne Verbrauch erzeugt keine Gruppe', () => {
-    expect(buildComparisonGroups({ filteredPoints: [], consumptions: {} })).toEqual([]);
-    expect(
-      buildComparisonGroups({ filteredPoints: [mp(1, 'A', 'water')], consumptions: {} }),
-    ).toEqual([]);
+    expect(buildComparisonGroups({ items: [] })).toEqual([]);
+    expect(buildComparisonGroups({ items: [item(1, 'A', 'water', [])] })).toEqual([]);
   });
 
   it('seriesKeys sind deterministisch nach Label sortiert', () => {
     const groups = buildComparisonGroups({
-      filteredPoints: [mp(1, 'Zeta', 'water'), mp(2, 'Alpha', 'water')],
-      consumptions: {
-        1: [cp('water', '2024-01-31', '1', 'm³')],
-        2: [cp('water', '2024-01-31', '2', 'm³')],
-      },
+      items: [
+        item(1, 'Zeta', 'water', [cp('2024-01-31', '1', 'm³', 'water')]),
+        item(2, 'Alpha', 'water', [cp('2024-01-31', '2', 'm³', 'water')]),
+      ],
     });
 
     expect(at(groups, 0).seriesKeys).toEqual(['mp-2::draw', 'mp-1::draw']); // Alpha vor Zeta
@@ -130,14 +121,14 @@ describe('buildComparisonGroups', () => {
 describe('buildComparisonGroups — verrechnete Messstellen', () => {
   it('fügt eine Netto-Serie im vmp-Namensraum mit "(verrechnet)"-Label hinzu', () => {
     const groups = buildComparisonGroups({
-      filteredPoints: [mp(3, 'Strom A', 'electricity')],
-      consumptions: { 3: [cp('1.8.0', '2024-01-31', '100', 'kWh')] },
+      items: [item(3, 'Strom A', 'electricity', [cp('2024-01-31', '100', 'kWh', '1.8.0')])],
       virtualItems: [
         {
           id: 3, // gleiche ID wie die echte MP — darf nicht kollidieren
           name: 'Biogas real',
           type: 'electricity',
-          consumption: [cp('virtual', '2024-01-31', '380', 'kWh')],
+          consumption: [cp('2024-01-31', '380', 'kWh', 'virtual')],
+          totals: [],
         },
       ],
     });
@@ -153,14 +144,14 @@ describe('buildComparisonGroups — verrechnete Messstellen', () => {
 
   it('behält negative Netto-Buckets bei', () => {
     const groups = buildComparisonGroups({
-      filteredPoints: [],
-      consumptions: {},
+      items: [],
       virtualItems: [
         {
           id: 1,
           name: 'Netto',
           type: 'electricity',
-          consumption: [cp('virtual', '2024-01-31', '-200', 'kWh')],
+          consumption: [cp('2024-01-31', '-200', 'kWh', 'virtual')],
+          totals: [],
         },
       ],
     });
@@ -171,8 +162,7 @@ describe('buildComparisonGroups — verrechnete Messstellen', () => {
 
   it('ohne virtualItems unverändert (Regression)', () => {
     const groups = buildComparisonGroups({
-      filteredPoints: [mp(1, 'Strom A', 'electricity')],
-      consumptions: { 1: [cp('1.8.0', '2024-01-31', '100', 'kWh')] },
+      items: [item(1, 'Strom A', 'electricity', [cp('2024-01-31', '100', 'kWh', '1.8.0')])],
     });
     expect(at(groups, 0).seriesKeys).toEqual(['mp-1::draw']);
   });

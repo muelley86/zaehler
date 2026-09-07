@@ -12,6 +12,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 
 import { ApiError, NetworkError, api } from '@/lib/api';
+import { clearDashboardCache } from '@/features/dashboard/useDashboardData';
 import { clearAll as clearOfflineData } from '@/lib/offline/outbox';
 import type { LoginResponse, Me } from '@/lib/types';
 import { AuthContext } from './auth-context';
@@ -33,6 +34,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // ungültig und darf keinen Offline-Kaltstart mehr ermöglichen.
         setMe(null);
         clearMeSnapshot();
+        // Dashboard-Cache mitpurgen — sonst kann ein späterer Login als
+        // anderer User (MP-Zugriffsfilter!) im ersten Frame noch die
+        // Aggregate des vorherigen Users sehen (siehe `logout` unten).
+        clearDashboardCache();
       } else if (err instanceof NetworkError) {
         // Server nicht erreichbar (unterwegs, Server nur im Heimnetz):
         // letzten bekannten User wiederherstellen, damit die App mit
@@ -82,6 +87,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Offline-Snapshot mit entfernen — nach explizitem Logout darf kein
       // Offline-Kaltstart mehr in den Account des vorherigen Users führen.
       clearMeSnapshot();
+      // Modul-weiter Dashboard-Cache mitpurgen: er überlebt sonst einen
+      // User-Wechsel im selben Tab — der nächste Login (z. B. ein
+      // MP-Zugriffsgefilterter Recorder) würde im ersten Frame sonst
+      // synchron die Aggregate des vorherigen Users sehen.
+      clearDashboardCache();
       // Offline-Queue + Stammdaten-Snapshot ebenfalls purgen (die UI hat
       // bei offenen Einträgen vorher einen Confirm gezeigt).
       try {

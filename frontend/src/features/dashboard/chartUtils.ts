@@ -1,7 +1,6 @@
 /**
- * Reine Helfer für die Dashboard-Charts: Diagrammtyp/Granularität, Bucketing
- * (spiegelt die Backend-Aggregation in `services/consumption.py`) und
- * localStorage-Persistenz der globalen View-Controls.
+ * Reine Helfer für die Dashboard-Charts: Diagrammtyp/Granularität-Defaults
+ * und localStorage-Persistenz der globalen View-Controls.
  */
 
 export type ChartType = 'line' | 'bar' | 'area';
@@ -18,41 +17,9 @@ function isGranularity(v: string | null): v is Granularity {
   return v === 'day' || v === 'week' || v === 'month' || v === 'year';
 }
 
-function pad(n: number): string {
-  return String(n).padStart(2, '0');
-}
-
-function toIso(d: Date): string {
-  return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`;
-}
-
 function parseUtc(dateIso: string): Date {
   const parts = dateIso.slice(0, 10).split('-');
   return new Date(Date.UTC(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2])));
-}
-
-/**
- * Enddatum (ISO `YYYY-MM-DD`) des Buckets, in den `dateIso` fällt — passend zur
- * Backend-Aggregation, damit Verbrauchs- und Stand-Serien dieselbe X-Achse teilen.
- * Woche = ISO-Woche (Montag bis Sonntag).
- */
-export function bucketEndIso(dateIso: string, granularity: Granularity): string {
-  // Lokale Kalenderkomponenten des Instants (Browser-Zeitzone), dann TZ-neutral
-  // weiterrechnen — so bucket't z. B. ein Reading um lokale Mitternacht auf den
-  // lokalen Tag statt auf den UTC-Vortag.
-  const src = new Date(dateIso);
-  const d = new Date(Date.UTC(src.getFullYear(), src.getMonth(), src.getDate()));
-  if (granularity === 'day') return toIso(d);
-  if (granularity === 'week') {
-    const dow = (d.getUTCDay() + 6) % 7; // Montag=0 … Sonntag=6
-    const sunday = new Date(d);
-    sunday.setUTCDate(d.getUTCDate() - dow + 6);
-    return toIso(sunday);
-  }
-  if (granularity === 'month') {
-    return toIso(new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)));
-  }
-  return `${d.getUTCFullYear()}-12-31`;
 }
 
 /** Default-Granularität abhängig von der gewählten Zeitspanne. */
@@ -70,12 +37,22 @@ export function defaultGranularity(fromIso: string, toIso: string): Granularity 
   return 'year';
 }
 
-export function loadChartType(): ChartType {
+/**
+ * Default-Diagrammtyp abhängig von der Granularität: Tag/Woche sind ein
+ * fortlaufender Zeitverlauf → Linie; Monat/Jahr sind diskrete, vergleichbare
+ * Perioden → Balken.
+ */
+export function defaultChartType(granularity: Granularity): ChartType {
+  return granularity === 'day' || granularity === 'week' ? 'line' : 'bar';
+}
+
+/** Gespeicherter Diagrammtyp oder `null`, wenn der Nutzer noch nichts gewählt hat. */
+export function loadChartType(): ChartType | null {
   try {
     const raw = window.localStorage.getItem(CHART_TYPE_KEY);
-    return isChartType(raw) ? raw : 'line';
+    return isChartType(raw) ? raw : null;
   } catch {
-    return 'line';
+    return null;
   }
 }
 
@@ -84,6 +61,15 @@ export function saveChartType(value: ChartType): void {
     window.localStorage.setItem(CHART_TYPE_KEY, value);
   } catch {
     /* QuotaExceeded / SecurityError ignorieren — non-fatal UX-State */
+  }
+}
+
+/** Löscht die gemerkte Wahl — z. B. wenn der Nutzer sie explizit zurücksetzt. */
+export function clearChartType(): void {
+  try {
+    window.localStorage.removeItem(CHART_TYPE_KEY);
+  } catch {
+    /* non-fatal */
   }
 }
 
@@ -100,6 +86,15 @@ export function loadGranularity(): Granularity | null {
 export function saveGranularity(value: Granularity): void {
   try {
     window.localStorage.setItem(GRANULARITY_KEY, value);
+  } catch {
+    /* non-fatal */
+  }
+}
+
+/** Löscht die gemerkte Wahl — z. B. wenn der Nutzer sie explizit zurücksetzt. */
+export function clearGranularity(): void {
+  try {
+    window.localStorage.removeItem(GRANULARITY_KEY);
   } catch {
     /* non-fatal */
   }

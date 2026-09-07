@@ -34,13 +34,11 @@ from meters.services.access import accessible_mp_ids
 from meters.services.consumption import (
     ConsumptionPoint,
     Granularity,
-    PointsCache,
     aggregate_consumption,
     clip_consumption_to_range,
-    consumption_for_measuring_point,
     direction_of,
 )
-from meters.services.monthly_consumption import monthly_points_for_measuring_point
+from meters.services.consumption_source import SourceCache, points_for_measuring_point
 
 # Sentinel-Werte fuer verrechnete Punkte: es gibt kein einzelnes Quell-Register.
 VIRTUAL_REGISTER_ID = 0
@@ -80,17 +78,14 @@ def _component_points(
     granularity: Granularity | None,
     from_date: date | None,
     to_date: date | None,
-    cache: PointsCache | None = None,
+    cache: SourceCache | None = None,
 ) -> list[ConsumptionPoint]:
     """Richtungsgefilterte, auf den Zeitraum zugeschnittene Punkte EINER
     Komponente — ohne Vorzeichen. ``granularity is None`` = Gesamt-Modus
     (taggenau geclippt)."""
-    if granularity == "month":
-        points = monthly_points_for_measuring_point(db, comp.measuring_point_id)
-    else:
-        points = consumption_for_measuring_point(
-            db, measuring_point_id=comp.measuring_point_id, cache=cache
-        )
+    points = points_for_measuring_point(
+        db, comp.measuring_point_id, granularity=granularity, cache=cache
+    )
     points = [p for p in points if direction_of(p.obis_code) == comp.direction.value]
     if granularity is None:
         return clip_consumption_to_range(points, from_date=from_date, to_date=to_date)
@@ -106,7 +101,7 @@ def consumption_for_virtual_mp(
     granularity: Granularity | None,
     from_date: date | None,
     to_date: date | None,
-    cache: PointsCache | None = None,
+    cache: SourceCache | None = None,
 ) -> list[ConsumptionPoint]:
     """Netto-Verbrauchsreihe der virtuellen MP.
 
