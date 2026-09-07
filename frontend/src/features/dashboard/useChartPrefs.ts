@@ -28,18 +28,26 @@ export interface ChartPrefs {
   granularityMode: PrefMode;
   chartType: ChartType;
   chartTypeMode: PrefMode;
+  /** Der Wert, der im Auto-Modus gälte — auch bei manueller Wahl bekannt (UI-Beschriftung). */
+  autoGranularity: Granularity;
+  /** Der Wert, der im Auto-Modus gälte — abgeleitet aus der AKTUELLEN Granularität. */
+  autoChartType: ChartType;
   /** `null` = „Automatisch" — löscht die gemerkte Wahl (`clearGranularity`). */
-  setGranularity(g: Granularity | null): void;
+  setGranularity: (g: Granularity | null) => void;
   /** `null` = „Automatisch" — löscht die gemerkte Wahl (`clearChartType`). */
-  setChartType(t: ChartType | null): void;
+  setChartType: (t: ChartType | null) => void;
 }
 
 export function useChartPrefs(from: string, to: string): ChartPrefs {
   const [storedGranularity, setStoredGranularity] = useState<Granularity | null>(loadGranularity);
   const [storedChartType, setStoredChartType] = useState<ChartType | null>(loadChartType);
 
-  const granularity = storedGranularity ?? defaultGranularity(from, to);
-  const chartType = storedChartType ?? defaultChartType(granularity);
+  const autoGranularity = defaultGranularity(from, to);
+  const granularity = storedGranularity ?? autoGranularity;
+  // Bewusst aus der EFFEKTIVEN Granularität abgeleitet: der Auto-Diagrammtyp
+  // soll zu dem passen, was gerade im Chart steht.
+  const autoChartType = defaultChartType(granularity);
+  const chartType = storedChartType ?? autoChartType;
 
   const setGranularity = useCallback((g: Granularity | null) => {
     if (g === null) {
@@ -66,6 +74,8 @@ export function useChartPrefs(from: string, to: string): ChartPrefs {
     granularityMode: storedGranularity !== null ? 'manual' : 'auto',
     chartType,
     chartTypeMode: storedChartType !== null ? 'manual' : 'auto',
+    autoGranularity,
+    autoChartType,
     setGranularity,
     setChartType,
   };

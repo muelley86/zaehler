@@ -58,7 +58,7 @@ export interface DashboardData {
   loading: boolean;
   refreshing: boolean;
   error: string | null;
-  retry(): void;
+  retry: () => void;
 }
 
 export function useDashboardData(

@@ -82,6 +82,9 @@ function mockDesktop(): void {
       addEventListener: () => {},
       removeEventListener: () => {},
     };
+    // Partial-Mock: `useMediaQuery` liest nur `matches` und meldet sich per
+    // add/removeEventListener an — der Rest der MediaQueryList-Schnittstelle
+    // wird nie berührt, daher der Doppel-Cast über `unknown`.
     return mql as unknown as MediaQueryList;
   });
 }
@@ -315,6 +318,37 @@ describe('DashboardPage — Vergleichs-Charts', () => {
 
     await waitFor(() => expect(screen.queryByText('Strom · kWh')).toBeNull());
     expect(screen.getByText('Wasser · m³')).toBeInTheDocument();
+  });
+
+  it('stellt die Hinweise auf Mobile vor den Chart, Top-Verbraucher danach', async () => {
+    // Die breakpointabhängige Reihenfolge steckt in CSS-`order-*`-Klassen —
+    // geprüft wird deshalb die DOM-Reihenfolge, die der Mobile-Ansicht
+    // entspricht (Hinweise → Chart → Top-Verbraucher).
+    const wasser = (id: number, name: string) =>
+      dashboardItem({
+        id,
+        name,
+        type: 'water',
+        consumption: [cp('2024-01-31', '5', 'm³')],
+        totals: [
+          {
+            obis_code: 'r',
+            unit: 'm³',
+            direction: 'bezug',
+            current: String(id * 10),
+            previous: null,
+          },
+        ],
+      });
+    mockEndpoints([wasser(1, 'Wasser Garten'), wasser(2, 'Wasser Haus')]);
+    renderWithRouter(<DashboardPage />);
+
+    const chart = await screen.findByTestId('comparison-chart');
+    const hinweise = screen.getByText('Hinweise');
+    const top = screen.getByText('Top-Verbraucher · Wasser · m³');
+
+    expect(hinweise.compareDocumentPosition(chart) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(chart.compareDocumentPosition(top) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it('reicht den gewählten Diagrammtyp an den Chart durch', async () => {

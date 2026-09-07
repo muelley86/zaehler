@@ -50,13 +50,12 @@ export function DashboardPage() {
   const isDesktop = useIsDesktop();
 
   const prefs = useChartPrefs(from, to);
-  // `retry`/`setFilters`/`reset` bleiben bewusst am Objekt (statt destrukturiert):
-  // die Hooks deklarieren sie in Methoden-Syntax, was beim Destrukturieren
-  // `@typescript-eslint/unbound-method` auslöst.
-  const dashboard = useDashboardData(from, to, prefs.granularity);
-  const { data, servedAt, loading, refreshing, error } = dashboard;
-  const dashboardFilters = useDashboardFilters();
-  const { filters, activeCount } = dashboardFilters;
+  const { data, servedAt, loading, refreshing, error, retry } = useDashboardData(
+    from,
+    to,
+    prefs.granularity,
+  );
+  const { filters, setFilters, reset, activeCount } = useDashboardFilters();
 
   const items = useMemo(() => data?.items ?? [], [data]);
   const virtualItems = useMemo(() => data?.virtual_items ?? [], [data]);
@@ -104,21 +103,25 @@ export function DashboardPage() {
       <LargeTitle title="Dashboard" />
       <StaleDataHint servedAt={servedAt} />
 
-      <DashboardFilters
-        filters={filters}
-        options={options}
-        virtualAvailable={virtualItems.length > 0}
-        activeCount={activeCount}
-        chips={chips}
-        onChange={(next) => dashboardFilters.setFilters(next)}
-        onReset={() => dashboardFilters.reset()}
-      />
+      {/* Erst mit Daten: vorher hätten die Dropdowns keine Optionen — der
+          `DashboardSkeleton` reserviert die Höhe der Leiste. */}
+      {data !== null ? (
+        <DashboardFilters
+          filters={filters}
+          options={options}
+          virtualAvailable={virtualItems.length > 0}
+          activeCount={activeCount}
+          chips={chips}
+          onChange={setFilters}
+          onReset={reset}
+        />
+      ) : null}
 
       {error !== null && data === null ? (
         <Card>
           <div className="space-y-3">
             <div className="text-danger">{error}</div>
-            <Button variant="tinted" size="sm" onClick={() => dashboard.retry()}>
+            <Button variant="tinted" size="sm" onClick={retry}>
               Erneut versuchen
             </Button>
           </div>
@@ -149,23 +152,31 @@ export function DashboardPage() {
       {showContent ? (
         <>
           <KpiTiles tiles={tiles} {...(compareLabel ? { compareLabel } : {})} />
-          <ChartSection
-            groups={groups}
-            prefs={prefs}
-            refreshing={refreshing}
-            partial={data?.partial ?? false}
-            compact={!isDesktop}
-          />
-          {insights.length > 0 || topGroups.length > 0 ? (
-            <div className="space-y-5 lg:grid lg:grid-cols-2 lg:items-start lg:gap-5 lg:space-y-0">
-              <div className="space-y-5">
+          {/* Mobile (Spalte): Hinweise → Chart → Top-Verbraucher — die
+              Handlungsaufforderung steht vor dem Diagramm. Ab `lg` wird daraus
+              ein 2-Spalten-Raster: Chart über die volle Breite, darunter
+              Hinweise und Top-Verbraucher nebeneinander. */}
+          <div className="flex flex-col gap-5 lg:grid lg:grid-cols-2 lg:items-start">
+            {insights.length > 0 ? (
+              <div className="order-1 lg:order-2">
                 <InsightsCard insights={insights} />
               </div>
-              <div className="space-y-5">
+            ) : null}
+            <div className="order-2 lg:order-1 lg:col-span-2">
+              <ChartSection
+                groups={groups}
+                prefs={prefs}
+                refreshing={refreshing}
+                partial={data?.partial ?? false}
+                compact={!isDesktop}
+              />
+            </div>
+            {topGroups.length > 0 ? (
+              <div className="order-3 flex flex-col gap-5">
                 <TopConsumers groups={topGroups} />
               </div>
-            </div>
-          ) : null}
+            ) : null}
+          </div>
         </>
       ) : null}
     </PageContainer>

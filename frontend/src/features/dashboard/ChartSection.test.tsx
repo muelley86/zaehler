@@ -119,11 +119,10 @@ describe('ChartSection — Einstellungs-Menü', () => {
     render(<Harness />);
     openSettings();
 
-    // Manuell gewählte Granularität → das Auto-Pill kennt seinen Wert nicht
-    // mehr und heißt schlicht „Automatisch".
-    fireEvent.click(screen.getByRole('button', { name: 'Automatisch' }));
+    // Die Auto-Pills nennen ihren Wert auch bei manueller Wahl: „Woche" folgt
+    // aus dem Zeitraum, „Linie" aus der aktuell gewählten Granularität „Tag".
+    fireEvent.click(screen.getByRole('button', { name: 'Automatisch (Woche)' }));
     expect(window.localStorage.getItem('dashboard.granularity')).toBeNull();
-    // Nach dem Zurücksetzen greift wieder der abgeleitete Wert (Woche).
     expect(screen.getByRole('button', { name: 'Automatisch (Woche)' })).toHaveAttribute(
       'aria-pressed',
       'true',

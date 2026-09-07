@@ -12,7 +12,7 @@ import type { ReactNode } from 'react';
 import { SlidersHorizontal } from 'lucide-react';
 
 import { Dropdown, Pill } from '@/components/ui';
-import { defaultChartType, type ChartType, type Granularity } from './chartUtils';
+import type { ChartType, Granularity } from './chartUtils';
 import type { ChartPrefs } from './useChartPrefs';
 
 const GRANULARITY_LABELS: Record<Granularity, string> = {
@@ -31,11 +31,6 @@ const CHART_TYPE_LABELS: Record<ChartType, string> = {
 const GRANULARITY_ORDER: Granularity[] = ['day', 'week', 'month', 'year'];
 const CHART_TYPE_ORDER: ChartType[] = ['line', 'bar', 'area'];
 
-/** „Automatisch (Woche)" — der abgeleitete Wert steht in Klammern, wenn er bekannt ist. */
-function autoLabel(value: string | null): string {
-  return value === null ? 'Automatisch' : `Automatisch (${value})`;
-}
-
 function OptionGroup({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div>
@@ -48,14 +43,6 @@ function OptionGroup({ label, children }: { label: string; children: ReactNode }
 }
 
 export function ChartSettingsMenu({ prefs }: { prefs: ChartPrefs }) {
-  // Die Auto-Granularität ergibt sich aus dem Zeitraum und ist hier nur
-  // bekannt, solange sie tatsächlich greift; bei manueller Wahl bleibt das
-  // Pill deshalb unbeschriftet. Der Auto-Diagrammtyp folgt dagegen der
-  // aktuellen Granularität und ist immer bestimmbar.
-  const autoGranularity =
-    prefs.granularityMode === 'auto' ? GRANULARITY_LABELS[prefs.granularity] : null;
-  const autoChartType = CHART_TYPE_LABELS[defaultChartType(prefs.granularity)];
-
   return (
     <Dropdown
       variant="pill"
@@ -75,7 +62,7 @@ export function ChartSettingsMenu({ prefs }: { prefs: ChartPrefs }) {
             active={prefs.granularityMode === 'auto'}
             onClick={() => prefs.setGranularity(null)}
           >
-            {autoLabel(autoGranularity)}
+            Automatisch ({GRANULARITY_LABELS[prefs.autoGranularity]})
           </Pill>
           {GRANULARITY_ORDER.map((g) => (
             <Pill
@@ -94,7 +81,7 @@ export function ChartSettingsMenu({ prefs }: { prefs: ChartPrefs }) {
             active={prefs.chartTypeMode === 'auto'}
             onClick={() => prefs.setChartType(null)}
           >
-            {autoLabel(autoChartType)}
+            Automatisch ({CHART_TYPE_LABELS[prefs.autoChartType]})
           </Pill>
           {CHART_TYPE_ORDER.map((t) => (
             <Pill

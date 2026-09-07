@@ -21,8 +21,8 @@ const TYPE_CODEC = setCodec<MeterType>(isMeterType);
 
 export interface DashboardFiltersState {
   filters: DashboardFilters;
-  setFilters(next: DashboardFilters): void;
-  reset(): void;
+  setFilters: (next: DashboardFilters) => void;
+  reset: () => void;
   activeCount: number;
 }
 

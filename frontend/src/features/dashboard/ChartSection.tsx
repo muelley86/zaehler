@@ -80,11 +80,7 @@ export function ChartSection({ groups, prefs, refreshing, partial, compact }: Ch
       {groups.map((g) => {
         const groupId = `${g.type}-${g.unit}`;
         return (
-          <Section
-            key={groupId}
-            header={`${TYPE_LABELS[g.type]} · ${g.unit}`}
-            {...(partial ? { footer: PARTIAL_FOOTER } : {})}
-          >
+          <Section key={groupId} header={`${TYPE_LABELS[g.type]} · ${g.unit}`}>
             <div className="p-5">
               <Suspense fallback={<ChartSkeleton compact={compact} />}>
                 <ComparisonChart
@@ -101,6 +97,10 @@ export function ChartSection({ groups, prefs, refreshing, partial, compact }: Ch
           </Section>
         );
       })}
+
+      {partial && groups.length > 0 ? (
+        <div className="px-1 text-caption text-tertiary">{PARTIAL_FOOTER}</div>
+      ) : null}
     </div>
   );
 }

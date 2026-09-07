@@ -34,6 +34,9 @@ function mockDesktop(): void {
       addEventListener: () => {},
       removeEventListener: () => {},
     };
+    // Partial-Mock: `useMediaQuery` liest nur `matches` und meldet sich per
+    // add/removeEventListener an — der Rest der MediaQueryList-Schnittstelle
+    // wird nie berührt, daher der Doppel-Cast über `unknown`.
     return mql as unknown as MediaQueryList;
   });
 }

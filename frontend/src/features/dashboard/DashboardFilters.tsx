@@ -40,8 +40,6 @@ export interface DashboardFiltersProps {
   virtualAvailable: boolean;
   activeCount: number;
   chips: FilterChip[];
-  // Bewusst Property- statt Methoden-Syntax: Methoden-Signaturen lösen beim
-  // Destrukturieren `@typescript-eslint/unbound-method` aus.
   onChange: (next: Filters) => void;
   onReset: () => void;
 }
