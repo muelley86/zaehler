@@ -24,6 +24,23 @@ Alle Endpoints unter `/api/v1`. Fehler im RFC-7807-Format
 - `DELETE /measuring-points/{id}`
 - `POST /measuring-points/{id}/replace-meter`
 
+## Dashboard
+- `GET /dashboard?granularity=day|week|month|year&from_at=YYYY-MM-DD&to_at=YYYY-MM-DD`
+  — ein Request für die ganze Dashboard-Seite. Je zugänglicher Messstelle:
+  Stammdaten-Minimum (Name, Typ, Standort, Hauptstandort, Eigentümer,
+  Kostenstelle), aktive Register, `last_reading_at`, Verbrauchsreihe
+  (`consumption[]`, Buckets der gewählten Granularität) und `totals[]`
+  (`current`/`previous` je OBIS-Code, Einheit und Richtung `bezug|einspeisung`;
+  `null` = kein Ablese-Intervall deckt den Zeitraum). Verrechnete Messstellen
+  unter `virtual_items[]` (Netto-Reihe, `obis_code: "virtual"`). Top-Level:
+  `from_date`, `to_date`, `previous_from_date`, `previous_to_date`,
+  `granularity`, `partial` (`true` für Nicht-Admins: nur zugeordnete
+  Messstellen enthalten). Vorperiode = gleich viele ganze Monate zurück, wenn
+  der Bereich monatsaligned ist, sonst gleiche Tageslänge endend am Tag vor
+  `from_at`. `granularity=month|year` liest die materialisierte Tabelle
+  `monthly_consumption`, `day|week` rechnet aus den Roh-Ablesungen.
+  `from_at > to_at` → 422.
+
 ## Readings
 - `GET /readings`
 - `POST /readings`

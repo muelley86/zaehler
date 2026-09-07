@@ -26,13 +26,22 @@ Die fachliche Spezifikation steht in [`CLAUDE.md`](./CLAUDE.md).
   aktivierbar — kompatibel mit Google Authenticator / Authy / 1Password /
   Bitwarden, plus 10 single-use Backup-Codes.
 - **Audit-Log** über alle Änderungen, inkl. 2FA-Events.
-- **Dashboard** mit Verbrauchs- und Stand-Diagrammen, Filter nach Standort,
-  Zählerart, Messstelle und Zeitraum, plus aggregierter Verbrauchs-Übersicht.
+- **Dashboard** in einem Request: Verbrauchs-Kacheln je Zählerart mit
+  Veränderung gegenüber dem gleich langen Vorzeitraum, Hinweise (Messstellen,
+  die nie oder seit über 45 Tagen nicht abgelesen wurden, Verbrauch mehr als
+  ±30 % vom Vorzeitraum abweichend — mit Direktlink zum Erfassen),
+  Top-Verbraucher je Zählerart, Vergleichsdiagramme pro Zählerart und Filter
+  nach Hauptstandort, Eigentümer, Zählerstandort, Zählerart, Messstelle und
+  verrechneter Messstelle. Auf dem Handy liegen die Filter in einem
+  Bottom-Sheet mit entfernbaren Chips, am Desktop inline. Aggregation
+  (Tag/Woche/Monat/Jahr) und Diagrammtyp folgen automatisch dem Zeitraum und
+  lassen sich über „Diagramm-Einstellungen" am Verlauf überschreiben.
   Der Zeitraum gilt app-weit (auch für Erfassungen und Auswertungen), startet
   standardmäßig mit dem letzten und dem laufenden Monat, lässt sich mit den
   Pfeilen monatsweise blättern und über „Datum zurücksetzen" jederzeit wieder
-  auf den Standard stellen.
-- **CSV-Export** auf Dashboard- und Erfassungs-Seite.
+  auf den Standard stellen. Zurückblättern zeigt bereits geladene Zeiträume
+  sofort aus dem Client-Cache.
+- **CSV-Export** auf der Erfassungs-Seite und in den Auswertungen.
 - **Offline-Erfassung (PWA)** — als App installierbar („Zum Home-Bildschirm");
   Zählerstände (inkl. Fotos) lassen sich ohne Serververbindung erfassen und
   synchronisieren automatisch, sobald die App den Server wieder erreicht —
