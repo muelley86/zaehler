@@ -552,6 +552,15 @@ def test_reports_include_virtual_rows(admin_client: TestClient) -> None:
     ).json()
     assert [r for r in filtered["rows"] if r["is_virtual"]] == []
 
+    # Auch der Messstellen-Filter zaehlt als kategorial: virtuelle Zeilen entfallen.
+    real_id = next(r["group_key"] for r in data["rows"] if not r["is_virtual"])
+    by_mp = admin_client.get(
+        "/api/v1/reports/aggregate?dimension=measuring_point&granularity=total"
+        f"&measuring_point_id={real_id}"
+    ).json()
+    assert [r for r in by_mp["rows"] if r["is_virtual"]] == []
+    assert {r["group_key"] for r in by_mp["rows"]} == {real_id}
+
     # meter_type-Filter wird respektiert.
     typed = admin_client.get(
         "/api/v1/reports/aggregate?dimension=measuring_point&granularity=total"

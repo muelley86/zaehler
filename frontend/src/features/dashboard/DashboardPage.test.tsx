@@ -1,14 +1,7 @@
 /**
- * Smoke-Tests für das Dashboard: Diagramm-Einstellungen (Granularität/
- * Diagrammtyp), die Filterleiste (mobil im Sheet, auf Desktop inline), die
- * KPI-Kacheln inkl. Vorperioden-Delta, Hinweise, Top-Verbraucher und der
- * Vergleichs-Chart pro (Zählerart, Einheit)-Gruppe.
- *
- * `ComparisonChart` ist gemockt: Recharts-Internals werden hier bewusst NICHT
- * geprüft (ResponsiveContainer hat in jsdom keine Maße und ist in der vollen
- * Suite spürbar langsam) — das Diagramm selbst deckt `ComparisonChart.test.tsx`
- * ab. Fokus liegt auf Steuer-State, localStorage-Persistenz, dem gebündelten
- * `/dashboard`-Refetch und der Gruppen-/Leerzustand-Logik.
+ * Smoke-Tests für das Dashboard: die Filterleiste (mobil im Sheet, auf
+ * Desktop inline), die KPI-Kacheln inkl. Vorperioden-Delta, Hinweise,
+ * Top-Verbraucher, Leerzustände und das Refetch-Feedback.
  *
  * Die Seite spricht ausschließlich `/api/v1/dashboard` an; der MSW-Server läuft
  * mit `onUnhandledRequest: 'error'` und schlägt bei jedem anderen Request an.
@@ -32,14 +25,6 @@ import { cp, dashboardItem, dashboardResponse, virtualItem } from './testFixture
 import { clearDashboardCache } from './useDashboardData';
 import { DashboardPage } from './DashboardPage';
 
-vi.mock('./ComparisonChart', () => ({
-  ComparisonChart: ({ groupId, chartType }: { groupId: string; chartType: string }) => (
-    <div data-testid="comparison-chart" data-chart-type={chartType}>
-      {groupId}
-    </div>
-  ),
-}));
-
 const MP = dashboardItem({ id: 1, name: 'Wasser Garten', type: 'water' });
 const STROM_MP = dashboardItem({ id: 2, name: 'Strom Haus', type: 'electricity' });
 
@@ -56,6 +41,18 @@ const VMP = virtualItem({
     { obis_code: 'virtual', unit: 'kWh', direction: 'bezug', current: '100', previous: '0' },
   ],
 });
+
+/** Wasser-Messstelle mit Bezugs-Total → erscheint als KPI-Kachel und Top-Verbraucher. */
+function wasserMitVerbrauch(id: number, name: string): DashboardMeasuringPoint {
+  return dashboardItem({
+    id,
+    name,
+    type: 'water',
+    totals: [
+      { obis_code: 'r', unit: 'm³', direction: 'bezug', current: String(id * 10), previous: null },
+    ],
+  });
+}
 
 /** Registriert den einzigen vom Dashboard genutzten Endpoint und protokolliert die Granularitäten. */
 function mockEndpoints(
@@ -92,10 +89,6 @@ function mockDesktop(): void {
   });
 }
 
-async function openChartSettings(): Promise<void> {
-  fireEvent.click(await screen.findByRole('button', { name: 'Diagramm-Einstellungen' }));
-}
-
 /** Öffnet die mobile Filter-Leiste und liefert den Sheet-Dialog. */
 async function openFilterSheet(): Promise<HTMLElement> {
   fireEvent.click(await screen.findByRole('button', { name: /^Filter( \(\d+ aktiv\))?$/ }));
@@ -115,55 +108,20 @@ afterEach(() => {
   window.sessionStorage.clear();
 });
 
-describe('DashboardPage — Diagramm-Einstellungen', () => {
-  it('Default-Granularität für den Standard-Bereich (letzter + laufender Monat) ist Woche', async () => {
-    mockEndpoints();
-    renderWithRouter(<DashboardPage />);
-    await openChartSettings();
-
-    expect(screen.getByRole('button', { name: 'Woche' })).toHaveAttribute('aria-pressed', 'true');
-  });
-
-  it('Default-Granularität für einen Jahres-Bereich ist Monat', async () => {
-    window.sessionStorage.setItem(
-      'app.dateRange',
-      JSON.stringify({ from: '2026-01-01', to: '2026-12-31' }),
-    );
-    mockEndpoints();
-    renderWithRouter(<DashboardPage />);
-    await openChartSettings();
-
-    expect(screen.getByRole('button', { name: 'Monat' })).toHaveAttribute('aria-pressed', 'true');
-  });
-
-  it('Granularität umschalten persistiert und löst /dashboard-Refetch mit dem Query-Param aus', async () => {
+describe('DashboardPage — Datenabruf', () => {
+  it('lädt /dashboard mit fester Monats-Granularität (keine Diagramm-Einstellungen mehr)', async () => {
     const { granularityCalls } = mockEndpoints();
     renderWithRouter(<DashboardPage />);
-    await openChartSettings();
-    const tag = screen.getByRole('button', { name: 'Tag' });
 
-    fireEvent.click(tag);
-
-    await waitFor(() => expect(granularityCalls).toContain('day'));
-    expect(window.localStorage.getItem('dashboard.granularity')).toBe('day');
-    expect(tag).toHaveAttribute('aria-pressed', 'true');
+    await screen.findByRole('button', { name: /^Filter/ });
+    expect(granularityCalls).toEqual(['month']);
+    expect(screen.queryByRole('button', { name: 'Diagramm-Einstellungen' })).toBeNull();
+    expect(screen.queryByText('Verbrauchsverlauf')).toBeNull();
   });
 
-  it('Diagrammtyp umschalten persistiert', async () => {
-    mockEndpoints();
-    renderWithRouter(<DashboardPage />);
-    await openChartSettings();
-    const balken = screen.getByRole('button', { name: 'Balken' });
-
-    fireEvent.click(balken);
-
-    await waitFor(() => expect(window.localStorage.getItem('dashboard.chartType')).toBe('bar'));
-    expect(balken).toHaveAttribute('aria-pressed', 'true');
-  });
-
-  it('zeigt während eines Refetch ein Lade-Feedback, das danach verschwindet', async () => {
-    // Den zweiten /dashboard-Request (nach dem Granularitäts-Klick) gaten, damit
-    // das „Aktualisiere…"-Feedback deterministisch sichtbar wird — kein Timing.
+  it('zeigt bei einem Cache-Hit die alten Daten und ein Lade-Feedback, bis der Refetch fertig ist', async () => {
+    // Den zweiten /dashboard-Request (Remount = Cache-Hit) gaten, damit das
+    // „Aktualisiere…"-Feedback deterministisch sichtbar wird — kein Timing.
     let calls = 0;
     let release: () => void = () => {};
     server.use(
@@ -174,16 +132,22 @@ describe('DashboardPage — Diagramm-Einstellungen', () => {
             release = resolve;
           });
         }
-        return HttpResponse.json(dashboardResponse({ items: [MP] }));
+        return HttpResponse.json(
+          dashboardResponse({
+            items: [wasserMitVerbrauch(1, 'Wasser Garten'), wasserMitVerbrauch(2, 'Wasser Haus')],
+          }),
+        );
       }),
     );
 
-    renderWithRouter(<DashboardPage />);
-    await openChartSettings();
-    await waitFor(() => expect(screen.queryByText('Aktualisiere…')).toBeNull());
+    const first = renderWithRouter(<DashboardPage />);
+    await screen.findByText('Top-Verbraucher · Wasser · m³');
+    expect(screen.queryByText('Aktualisiere…')).toBeNull();
+    first.unmount();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Tag' }));
+    renderWithRouter(<DashboardPage />);
     expect(await screen.findByText('Aktualisiere…')).toBeInTheDocument();
+    expect(screen.getByText('Top-Verbraucher · Wasser · m³')).toBeInTheDocument();
 
     release();
     await waitFor(() => expect(screen.queryByText('Aktualisiere…')).toBeNull());
@@ -236,6 +200,35 @@ describe('DashboardPage — Filter', () => {
     expect(screen.queryByRole('button', { name: /^Filter$/ })).toBeNull();
     expect(screen.queryByRole('dialog')).toBeNull();
   });
+
+  it('Filter ausschließlich auf eine verrechnete Messstelle blendet echte Messstellen aus', async () => {
+    mockEndpoints([wasserMitVerbrauch(1, 'Wasser Garten')], [VMP]);
+    renderWithRouter(<DashboardPage />);
+
+    // Ungefiltert: KPI-Kacheln der echten Wasser-MP und der verrechneten sichtbar.
+    expect(await screen.findByText('Wasser')).toBeInTheDocument();
+    expect(screen.getByText('PV-Saldo (verrechnet)')).toBeInTheDocument();
+
+    const dialog = await openFilterSheet();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Verrechnete Messstellen' }));
+    fireEvent.click(await screen.findByRole('checkbox', { name: 'PV-Saldo' }));
+
+    await waitFor(() => expect(screen.queryByText('Wasser')).toBeNull());
+    expect(screen.getByText('PV-Saldo (verrechnet)')).toBeInTheDocument();
+  });
+
+  it('Filter auf eine echte Messstelle blendet verrechnete Messstellen aus', async () => {
+    mockEndpoints([wasserMitVerbrauch(1, 'Wasser Garten')], [VMP]);
+    renderWithRouter(<DashboardPage />);
+    expect(await screen.findByText('PV-Saldo (verrechnet)')).toBeInTheDocument();
+
+    const dialog = await openFilterSheet();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Messstellen' }));
+    fireEvent.click(await screen.findByRole('checkbox', { name: 'Wasser Garten' }));
+
+    await waitFor(() => expect(screen.queryByText('PV-Saldo (verrechnet)')).toBeNull());
+    expect(screen.getByText('Wasser')).toBeInTheDocument();
+  });
 });
 
 describe('DashboardPage — Leerzustände', () => {
@@ -259,114 +252,6 @@ describe('DashboardPage — Leerzustände', () => {
     fireEvent.click(await screen.findByRole('checkbox', { name: 'Strom' }));
 
     expect(await screen.findByText('Keine Messstellen entsprechen dem Filter')).toBeInTheDocument();
-  });
-
-  it('zeigt einen Leerzustand, wenn es Messstellen, aber keinen Verbrauch im Zeitraum gibt', async () => {
-    mockEndpoints([MP]);
-    renderWithRouter(<DashboardPage />);
-
-    expect(await screen.findByText(/Kein Verbrauch im gewählten Zeitraum/)).toBeInTheDocument();
-  });
-});
-
-describe('DashboardPage — Vergleichs-Charts', () => {
-  const WASSER_MIT_VERBRAUCH = dashboardItem({
-    id: 1,
-    name: 'Wasser Garten',
-    type: 'water',
-    consumption: [cp('2024-01-31', '5', 'm³')],
-  });
-
-  it('rendert je (Zählerart, Einheit)-Gruppe eine Section mit Header', async () => {
-    mockEndpoints([
-      WASSER_MIT_VERBRAUCH,
-      dashboardItem({
-        id: 2,
-        name: 'Strom Haus',
-        type: 'electricity',
-        consumption: [cp('2024-01-31', '120', 'kWh', '1.8.0')],
-      }),
-    ]);
-    renderWithRouter(<DashboardPage />);
-
-    // Section-Header sind divs (keine heading-Rolle) → per Text prüfen.
-    expect(await screen.findByText('Strom · kWh')).toBeInTheDocument();
-    expect(screen.getByText('Wasser · m³')).toBeInTheDocument();
-  });
-
-  it('Filter ausschließlich auf eine verrechnete Messstelle blendet echte Messstellen aus', async () => {
-    mockEndpoints([WASSER_MIT_VERBRAUCH], [VMP]);
-    renderWithRouter(<DashboardPage />);
-
-    // Ungefiltert: beide Gruppen sichtbar (echte Wasser-MP + verrechnete Strom-vmp).
-    expect(await screen.findByText('Wasser · m³')).toBeInTheDocument();
-    expect(screen.getByText('Strom · kWh')).toBeInTheDocument();
-
-    const dialog = await openFilterSheet();
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Verrechnete Messstellen' }));
-    fireEvent.click(await screen.findByRole('checkbox', { name: 'PV-Saldo' }));
-
-    await waitFor(() => expect(screen.queryByText('Wasser · m³')).toBeNull());
-    expect(screen.getByText('Strom · kWh')).toBeInTheDocument();
-  });
-
-  it('Filter auf eine echte Messstelle blendet verrechnete Messstellen aus', async () => {
-    mockEndpoints([WASSER_MIT_VERBRAUCH], [VMP]);
-    renderWithRouter(<DashboardPage />);
-    expect(await screen.findByText('Strom · kWh')).toBeInTheDocument();
-
-    const dialog = await openFilterSheet();
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Messstellen' }));
-    fireEvent.click(await screen.findByRole('checkbox', { name: 'Wasser Garten' }));
-
-    await waitFor(() => expect(screen.queryByText('Strom · kWh')).toBeNull());
-    expect(screen.getByText('Wasser · m³')).toBeInTheDocument();
-  });
-
-  it('stellt die Hinweise auf Mobile vor den Chart, Top-Verbraucher danach', async () => {
-    // Die breakpointabhängige Reihenfolge steckt in CSS-`order-*`-Klassen —
-    // geprüft wird deshalb die DOM-Reihenfolge, die der Mobile-Ansicht
-    // entspricht (Hinweise → Chart → Top-Verbraucher).
-    const wasser = (id: number, name: string) =>
-      dashboardItem({
-        id,
-        name,
-        type: 'water',
-        consumption: [cp('2024-01-31', '5', 'm³')],
-        totals: [
-          {
-            obis_code: 'r',
-            unit: 'm³',
-            direction: 'bezug',
-            current: String(id * 10),
-            previous: null,
-          },
-        ],
-      });
-    mockEndpoints([wasser(1, 'Wasser Garten'), wasser(2, 'Wasser Haus')]);
-    renderWithRouter(<DashboardPage />);
-
-    const chart = await screen.findByTestId('comparison-chart');
-    const hinweise = screen.getByText('Hinweise');
-    const top = screen.getByText('Top-Verbraucher · Wasser · m³');
-
-    expect(hinweise.compareDocumentPosition(chart) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(chart.compareDocumentPosition(top) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-  });
-
-  it('reicht den gewählten Diagrammtyp an den Chart durch', async () => {
-    mockEndpoints([WASSER_MIT_VERBRAUCH]);
-    renderWithRouter(<DashboardPage />);
-    expect(await screen.findByTestId('comparison-chart')).toHaveAttribute(
-      'data-chart-type',
-      'line',
-    );
-
-    await openChartSettings();
-    fireEvent.click(screen.getByRole('button', { name: 'Balken' }));
-
-    expect(screen.getByTestId('comparison-chart')).toHaveAttribute('data-chart-type', 'bar');
-    expect(screen.getByText('Wasser · m³')).toBeInTheDocument();
   });
 });
 
@@ -441,6 +326,18 @@ describe('DashboardPage — KPI, Hinweise, Top-Verbraucher', () => {
     expect(screen.getByText('75 %')).toBeInTheDocument();
     expect(screen.getByText('25 %')).toBeInTheDocument();
   });
+
+  it('stellt die Hinweise vor die Top-Verbraucher (DOM-Reihenfolge = Mobile-Ansicht)', async () => {
+    // Die breakpointabhängige Anordnung steckt in CSS-Klassen — geprüft wird
+    // die DOM-Reihenfolge, die der Mobile-Spalte entspricht.
+    mockEndpoints([wasserMitVerbrauch(1, 'Wasser Garten'), wasserMitVerbrauch(2, 'Wasser Haus')]);
+    renderWithRouter(<DashboardPage />);
+
+    const top = await screen.findByText('Top-Verbraucher · Wasser · m³');
+    const hinweise = screen.getByText('Hinweise');
+
+    expect(hinweise.compareDocumentPosition(top) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
 });
 
 describe('DashboardPage — partial (Recorder-Scope)', () => {
@@ -458,7 +355,7 @@ describe('DashboardPage — partial (Recorder-Scope)', () => {
     mockEndpoints([MP], [], { partial: false });
     renderWithRouter(<DashboardPage />);
 
-    await screen.findByText(/Kein Verbrauch im gewählten Zeitraum/);
+    await screen.findByRole('button', { name: /^Filter/ });
     expect(screen.queryByText(PARTIAL_HINT)).toBeNull();
   });
 });

@@ -12,16 +12,22 @@ Aufruf:
     uv run python -m meters.cli recompute-monthly                   # Backfill monthly_consumption
     uv run python -m meters.cli relabel-register-unit --type heating --from kWh --to MWh
     uv run python -m meters.cli relabel-register-unit --type heating --from kWh --to MWh --apply
+    uv run python -m meters.cli seed-readings --year 2025             # Dry-Run (Testdaten planen)
+    uv run python -m meters.cli seed-readings --year 2025 --apply     # schreiben (+ Snapshot)
+    uv run python -m meters.cli seed-readings --year 2025 --remove --apply  # wieder entfernen
 """
 
 from __future__ import annotations
 
 import argparse
 import sys
+from datetime import datetime
+from pathlib import Path
 
 from sqlalchemy import func, inspect, select
 from sqlalchemy.orm import Session
 
+from meters.core.config import settings
 from meters.core.security import hash_password
 from meters.db import SessionLocal, engine
 from meters.models import (
@@ -34,9 +40,11 @@ from meters.models import (
     UserRole,
 )
 from meters.schemas.measuring_point import ALLOWED_HEATING_UNITS
+from meters.services.backup import snapshot_sqlite
 from meters.services.legacy_timestamp_repair import repair_legacy_timestamps
 from meters.services.midnight_repair import repair_midnight_readings
 from meters.services.monthly_consumption import recompute_all, recompute_register
+from meters.services.seed_readings import remove_seed, seed_note, seed_year
 
 
 def _ensure_schema_initialized() -> None:
@@ -278,6 +286,65 @@ def _cmd_relabel_register_unit(args: argparse.Namespace) -> int:
     return 0
 
 
+def _sqlite_path() -> Path | None:
+    """Dateipfad der SQLite-DB aus ``settings.database_url`` (None bei anderen URLs)."""
+    prefix = "sqlite:///"
+    if not settings.database_url.startswith(prefix):
+        return None
+    return Path(settings.database_url[len(prefix) :])
+
+
+def _cmd_seed_readings(args: argparse.Namespace) -> int:
+    """Synthetische Monatsstände für ein Jahr anlegen (``--apply``) bzw. mit
+    ``--remove`` wieder entfernen. Nur für Dev-/Test-Datenbanken gedacht: die
+    Ablesungen tragen die Notiz ``Testdaten <Jahr>`` und sind darüber jederzeit
+    restlos rückbaubar. Vor dem Schreiben wird ein SQLite-Snapshot gezogen."""
+    _ensure_schema_initialized()
+    year: int = args.year
+    with SessionLocal() as db:
+        if args.remove:
+            count, register_ids = remove_seed(db, year=year, apply=args.apply)
+            if not args.apply:
+                print(f"DRY-RUN: {count} Ablesungen mit Notiz '{seed_note(year)}' würden entfernt.")
+                print("Zum Entfernen: --remove --apply")
+                return 0
+            refreshed = _refresh_monthly_cache(db, register_ids)
+            print(
+                f"Entfernt: {count} Ablesungen '{seed_note(year)}'; "
+                f"Monats-Cache: {refreshed} Register."
+            )
+            return 0
+
+        user = db.scalar(select(User).where(User.username == args.user))
+        if user is None:
+            print(f"Benutzer '{args.user}' nicht gefunden (--user).", file=sys.stderr)
+            return 2
+
+        if args.apply:
+            db_path = _sqlite_path()
+            if db_path is not None and db_path.exists():
+                stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+                snapshot = db_path.with_name(f"{db_path.name}.pre-seed-{stamp}")
+                snapshot_sqlite(db_path, snapshot)
+                print(f"Snapshot vor dem Schreiben: {snapshot}")
+
+        report = seed_year(db, user_id=user.id, year=year, apply=args.apply)
+        mode = "Angewendet" if args.apply else "DRY-RUN"
+        print(
+            f"{mode}: {report.point_count} Ablesungen '{seed_note(year)}' für "
+            f"{len(report.planned)} Register; {len(report.skipped)} Register übersprungen."
+        )
+        for register_id, reason in sorted(report.skipped.items()):
+            print(f"  übersprungen: Register {register_id} — {reason}")
+        if not args.apply:
+            print("Zum Schreiben: --apply (legt vorher einen Snapshot der SQLite-Datei an).")
+            return 0
+        refreshed = _refresh_monthly_cache(db, report.register_ids)
+        print(f"Monats-Cache neu berechnet für {refreshed} Register.")
+        print(f"Rückbau: seed-readings --year {year} --remove --apply")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="meters.cli")
     sub = parser.add_subparsers(dest="cmd", required=True)
@@ -368,6 +435,26 @@ def main(argv: list[str] | None = None) -> int:
         help="Umbenennung tatsächlich schreiben (sonst nur Dry-Run-Anzeige).",
     )
     relabel.set_defaults(func=_cmd_relabel_register_unit)
+
+    seed = sub.add_parser(
+        "seed-readings",
+        help=(
+            "Synthetische Monatsstände für ein Jahr anlegen (Dev-/Testdaten, Notiz "
+            "'Testdaten <Jahr>'), mit --remove wieder entfernen. "
+            "Default: Dry-Run; --apply schreibt."
+        ),
+    )
+    seed.add_argument("--year", type=int, default=2025, help="Zieljahr (Default: 2025).")
+    seed.add_argument(
+        "--user", default="admin", help="Benutzername als created_by (Default: admin)."
+    )
+    seed.add_argument(
+        "--remove", action="store_true", help="Markierte Testdaten des Jahres entfernen."
+    )
+    seed.add_argument(
+        "--apply", action="store_true", help="Tatsächlich schreiben (sonst nur Dry-Run-Anzeige)."
+    )
+    seed.set_defaults(func=_cmd_seed_readings)
 
     args = parser.parse_args(argv)
     func = args.func

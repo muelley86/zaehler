@@ -35,6 +35,8 @@ def test_create_and_list(admin_client: TestClient, db: Session) -> None:
     assert body["dimension"] == "kostenstelle"
     assert body["filters"]["meter_types"] == ["electricity"]
     assert body["filters"]["owner_ids"] == []
+    # Alt-Configs ohne den Schluessel validieren zum leeren Filter.
+    assert body["filters"]["measuring_point_ids"] == []
 
     listed = admin_client.get("/api/v1/report-configs")
     assert listed.status_code == 200
@@ -144,3 +146,11 @@ def test_recorder_can_read_not_write(admin_client: TestClient, recorder_client: 
         == 403
     )
     assert recorder_client.delete(f"/api/v1/report-configs/{created['id']}").status_code == 403
+
+
+def test_filters_roundtrip_measuring_point_ids(admin_client: TestClient) -> None:
+    resp = _create(admin_client, filters={"measuring_point_ids": [3, 5]})
+    assert resp.status_code == 201, resp.text
+    assert resp.json()["filters"]["measuring_point_ids"] == [3, 5]
+    listed = admin_client.get("/api/v1/report-configs").json()
+    assert listed[0]["filters"]["measuring_point_ids"] == [3, 5]

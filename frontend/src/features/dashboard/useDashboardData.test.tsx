@@ -16,7 +16,6 @@ import { server } from '@/tests/server';
 import { api } from '@/lib/api';
 
 import { dashboardItem, dashboardResponse } from './testFixtures';
-import type { Granularity } from './chartUtils';
 import { clearDashboardCache, dashboardCacheKey, useDashboardData } from './useDashboardData';
 
 /** Index-Zugriff mit Narrowing (tsconfig: noUncheckedIndexedAccess). */
@@ -37,10 +36,8 @@ afterEach(() => {
 });
 
 describe('dashboardCacheKey', () => {
-  it('kombiniert from/to/granularity mit "|"', () => {
-    expect(dashboardCacheKey('2026-08-01', '2026-09-30', 'week')).toBe(
-      '2026-08-01|2026-09-30|week',
-    );
+  it('kombiniert from/to mit "|"', () => {
+    expect(dashboardCacheKey('2026-08-01', '2026-09-30')).toBe('2026-08-01|2026-09-30');
   });
 });
 
@@ -48,7 +45,7 @@ describe('useDashboardData', () => {
   it('lädt bei einem Cache-Miss: loading → data', async () => {
     server.use(http.get('/api/v1/dashboard', () => HttpResponse.json(dashboardResponse())));
 
-    const { result } = renderHook(() => useDashboardData('2026-08-01', '2026-09-30', 'week'));
+    const { result } = renderHook(() => useDashboardData('2026-08-01', '2026-09-30'));
     expect(result.current.loading).toBe(true);
     expect(result.current.data).toBeNull();
 
@@ -58,16 +55,18 @@ describe('useDashboardData', () => {
     expect(result.current.refreshing).toBe(false);
   });
 
-  it('ruft api.getWithMeta mit den Query-Parametern und einem AbortSignal auf', async () => {
+  it('ruft api.getWithMeta mit fester Monats-Granularität, Zeitraum und AbortSignal auf', async () => {
     server.use(http.get('/api/v1/dashboard', () => HttpResponse.json(dashboardResponse())));
 
-    const { result } = renderHook(() => useDashboardData('2026-08-01', '2026-09-30', 'week'));
+    const { result } = renderHook(() => useDashboardData('2026-08-01', '2026-09-30'));
     await waitFor(() => expect(result.current.data).not.toBeNull());
 
     expect(api.getWithMeta).toHaveBeenCalledTimes(1);
     const [path, signal] = at(vi.mocked(api.getWithMeta).mock.calls, 0);
     expect(path).toContain('/dashboard?');
-    expect(path).toContain('granularity=week');
+    // Ohne Diagramme ist die Granularität fix — die KPI-Totals hängen nicht
+    // davon ab, `month` ist der günstigste Backend-Pfad.
+    expect(path).toContain('granularity=month');
     expect(path).toContain('from_at=2026-08-01');
     expect(path).toContain('to_at=2026-09-30');
     expect(signal).toBeInstanceOf(AbortSignal);
@@ -84,11 +83,11 @@ describe('useDashboardData', () => {
       }),
     );
 
-    const first = renderHook(() => useDashboardData('2026-08-01', '2026-09-30', 'week'));
+    const first = renderHook(() => useDashboardData('2026-08-01', '2026-09-30'));
     await waitFor(() => expect(first.result.current.data).not.toBeNull());
     first.unmount();
 
-    const second = renderHook(() => useDashboardData('2026-08-01', '2026-09-30', 'week'));
+    const second = renderHook(() => useDashboardData('2026-08-01', '2026-09-30'));
     // Cache-Hit: Daten sofort da, Hintergrund-Refetch läuft.
     expect(second.result.current.data).not.toBeNull();
     expect(at(second.result.current.data?.items ?? [], 0).name).toBe('Item 1');
@@ -101,29 +100,29 @@ describe('useDashboardData', () => {
   it('bei Key-Wechsel während eines offenen Requests zählt nur das jüngste Ergebnis', async () => {
     server.use(
       http.get('/api/v1/dashboard', async ({ request }) => {
-        const g = new URL(request.url).searchParams.get('granularity');
-        if (g === 'week') {
+        const from = new URL(request.url).searchParams.get('from_at');
+        if (from === '2026-08-01') {
           await delay(50);
           return HttpResponse.json(
-            dashboardResponse({ items: [dashboardItem({ id: 1, name: 'week' })] }),
+            dashboardResponse({ items: [dashboardItem({ id: 1, name: 'august' })] }),
           );
         }
         return HttpResponse.json(
-          dashboardResponse({ items: [dashboardItem({ id: 2, name: 'month' })] }),
+          dashboardResponse({ items: [dashboardItem({ id: 2, name: 'september' })] }),
         );
       }),
     );
 
     const { result, rerender } = renderHook(
-      ({ g }: { g: Granularity }) => useDashboardData('2026-08-01', '2026-09-30', g),
-      { initialProps: { g: 'week' as Granularity } },
+      ({ from }: { from: string }) => useDashboardData(from, '2026-09-30'),
+      { initialProps: { from: '2026-08-01' } },
     );
-    rerender({ g: 'month' as Granularity });
+    rerender({ from: '2026-09-01' });
 
-    await waitFor(() => expect(at(result.current.data?.items ?? [], 0).name).toBe('month'));
-    // Die verzögerte "week"-Antwort darf das Ergebnis nicht mehr überschreiben.
+    await waitFor(() => expect(at(result.current.data?.items ?? [], 0).name).toBe('september'));
+    // Die verzögerte August-Antwort darf das Ergebnis nicht mehr überschreiben.
     await new Promise((resolve) => setTimeout(resolve, 80));
-    expect(at(result.current.data?.items ?? [], 0).name).toBe('month');
+    expect(at(result.current.data?.items ?? [], 0).name).toBe('september');
   });
 
   it('begrenzt den Cache auf 12 Einträge (LRU) — der älteste Key wird verdrängt', async () => {
@@ -131,13 +130,13 @@ describe('useDashboardData', () => {
 
     for (let i = 0; i < 13; i++) {
       const from = `2026-08-${String(i + 1).padStart(2, '0')}`;
-      const { result, unmount } = renderHook(() => useDashboardData(from, '2026-09-30', 'week'));
+      const { result, unmount } = renderHook(() => useDashboardData(from, '2026-09-30'));
       await waitFor(() => expect(result.current.data).not.toBeNull());
       unmount();
     }
 
     // Der zuerst eingefügte Key (Tag 01) wurde verdrängt -> erneuter Cache-Miss.
-    const { result } = renderHook(() => useDashboardData('2026-08-01', '2026-09-30', 'week'));
+    const { result } = renderHook(() => useDashboardData('2026-08-01', '2026-09-30'));
     expect(result.current.data).toBeNull();
     expect(result.current.loading).toBe(true);
   });
@@ -149,7 +148,7 @@ describe('useDashboardData', () => {
       ),
     );
 
-    const { result } = renderHook(() => useDashboardData('2026-08-01', '2026-09-30', 'week'));
+    const { result } = renderHook(() => useDashboardData('2026-08-01', '2026-09-30'));
     await waitFor(() => expect(result.current.error).not.toBeNull());
     expect(result.current.data).toBeNull();
     expect(result.current.refreshing).toBe(false);
@@ -158,7 +157,7 @@ describe('useDashboardData', () => {
 
   it('behält bei einem Fehler MIT gecachten Daten die Daten und setzt keinen Fehler', async () => {
     server.use(http.get('/api/v1/dashboard', () => HttpResponse.json(dashboardResponse())));
-    const first = renderHook(() => useDashboardData('2026-08-01', '2026-09-30', 'week'));
+    const first = renderHook(() => useDashboardData('2026-08-01', '2026-09-30'));
     await waitFor(() => expect(first.result.current.data).not.toBeNull());
     first.unmount();
 
@@ -167,7 +166,7 @@ describe('useDashboardData', () => {
         HttpResponse.json({ title: 'Serverfehler', status: 500 }, { status: 500 }),
       ),
     );
-    const second = renderHook(() => useDashboardData('2026-08-01', '2026-09-30', 'week'));
+    const second = renderHook(() => useDashboardData('2026-08-01', '2026-09-30'));
     expect(second.result.current.data).not.toBeNull();
 
     await waitFor(() => expect(second.result.current.refreshing).toBe(false));
@@ -186,7 +185,7 @@ describe('useDashboardData', () => {
       }),
     );
 
-    const { result } = renderHook(() => useDashboardData('2026-08-01', '2026-09-30', 'week'));
+    const { result } = renderHook(() => useDashboardData('2026-08-01', '2026-09-30'));
     await waitFor(() => expect(result.current.data).not.toBeNull());
     expect(at(result.current.data?.items ?? [], 0).name).toBe('Item 1');
 

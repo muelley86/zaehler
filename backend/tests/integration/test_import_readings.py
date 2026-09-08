@@ -206,9 +206,9 @@ def test_reading_at_is_local_end_of_day() -> None:
 
     from meters.core.config import settings
     from meters.services.consumption import _local_date
-    from meters.services.import_readings import _reading_at
+    from meters.services.import_readings import reading_at_for_date
 
-    dt = _reading_at(date(2024, 1, 31))  # naive UTC
+    dt = reading_at_for_date(date(2024, 1, 31))  # naive UTC
     local = dt.replace(tzinfo=UTC).astimezone(ZoneInfo(settings.timezone))
     assert (local.hour, local.minute, local.second) == (23, 59, 59)
     assert _local_date(dt) == date(2024, 1, 31)  # Datum bleibt stabil

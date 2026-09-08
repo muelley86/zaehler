@@ -4,6 +4,9 @@
  * für `/reports/aggregate`. Alles ohne Seiteneffekte → unit-testbar.
  */
 
+import { shiftRangeByMonths } from '@/lib/dateRange';
+import { formatDateDe } from '@/lib/format';
+import { TYPE_LABELS } from '@/lib/meterLabels';
 import type {
   MeterType,
   ReportDimension,
@@ -80,6 +83,91 @@ export function resolvePeriod(kind: ReportPeriodKind, today: Date): Period {
   }
 }
 
+export type CompareKind = 'previous_year' | 'previous_period' | 'custom';
+
+export const COMPARE_KIND_LABELS: Record<CompareKind, string> = {
+  previous_year: 'Vorjahr',
+  previous_period: 'Vorperiode',
+  custom: 'Benutzerdefiniert',
+};
+
+const OPEN_PERIOD: Period = { from: null, to: null };
+
+function parseLocal(isoDate: string): Date {
+  const [y, m, d] = isoDate.split('-').map(Number);
+  return new Date(y ?? 0, (m ?? 1) - 1, d ?? 1);
+}
+
+function lastDayOfMonth(d: Date): Date {
+  return new Date(d.getFullYear(), d.getMonth() + 1, 0);
+}
+
+function isMonthAligned(from: Date, to: Date): boolean {
+  return from.getDate() === 1 && to.getDate() === lastDayOfMonth(to).getDate();
+}
+
+/** Gleicher Bereich ein Jahr früher (Monatsende bleibt Monatsende). */
+export function previousYearRange(p: Period): Period {
+  if (!p.from || !p.to) return OPEN_PERIOD;
+  return shiftRangeByMonths({ from: p.from, to: p.to }, -12);
+}
+
+/**
+ * Die direkt vorangehende Periode — Regel wie im Backend (`services/dashboard.py::
+ * previous_range`): monatsaligned → gleich viele ganze Monate zurück, sonst
+ * gleiche Tageslänge endend am Tag vor `from`.
+ */
+export function previousPeriodRange(p: Period): Period {
+  if (!p.from || !p.to) return OPEN_PERIOD;
+  const from = parseLocal(p.from);
+  const to = parseLocal(p.to);
+  if (isMonthAligned(from, to)) {
+    const months =
+      (to.getFullYear() - from.getFullYear()) * 12 + (to.getMonth() - from.getMonth()) + 1;
+    const start = new Date(from.getFullYear(), from.getMonth() - months, 1);
+    const end = lastDayOfMonth(new Date(to.getFullYear(), to.getMonth() - months, 1));
+    return { from: iso(start), to: iso(end) };
+  }
+  const lengthDays = Math.round((to.getTime() - from.getTime()) / 86_400_000) + 1;
+  const end = new Date(from.getFullYear(), from.getMonth(), from.getDate() - 1);
+  const start = new Date(end.getFullYear(), end.getMonth(), end.getDate() - (lengthDays - 1));
+  return { from: iso(start), to: iso(end) };
+}
+
+/** Periode 2 des Vergleichs aus Art, Periode 1 und den freien Feldern. */
+export function resolveComparePeriod(
+  kind: CompareKind,
+  period: Period,
+  customFrom: string,
+  customTo: string,
+): Period {
+  switch (kind) {
+    case 'previous_year':
+      return previousYearRange(period);
+    case 'previous_period':
+      return previousPeriodRange(period);
+    case 'custom':
+      return { from: customFrom || null, to: customTo || null };
+  }
+}
+
+/**
+ * Lesbares Label eines ausgeführten Auswertungs-Zeitraums (Spaltenkopf im
+ * Perioden-Vergleich). Offene Enden und der Gesamtzeitraum sind abgedeckt.
+ */
+export function periodLabel(from: string | null, to: string | null): string {
+  if (from && to) return `${formatDateDe(from)} – ${formatDateDe(to)}`;
+  if (from) return `ab ${formatDateDe(from)}`;
+  if (to) return `bis ${formatDateDe(to)}`;
+  return PERIOD_KIND_LABELS.all;
+}
+
+/** Fertige Zeitraum-Labels des Vergleichs: A = Hauptzeitraum, B = Vergleichszeitraum. */
+export interface ComparisonPeriods {
+  a: string;
+  b: string;
+}
+
 const DIRECTION_LABELS = { bezug: 'Bezug', einspeisung: 'Einspeisung' } as const;
 
 interface DirectionRow {
@@ -130,7 +218,11 @@ export interface ComparisonRow {
   pct: number | null;
 }
 
-function rowKey(r: ReportRow): string {
+/**
+ * Stabile Zeilen-Identität je `(Gruppe, Zählerart, Einheit, Richtung)` — für den
+ * Perioden-Vergleich und als Serien-Schlüssel im Diagramm.
+ */
+export function rowKey(r: ReportRow): string {
   // `is_virtual` gehört in den Key: eine virtuelle Messstelle kann dieselbe
   // group_key-ID tragen wie eine echte.
   const ns = r.is_virtual ? 'v' : 'r';
@@ -176,6 +268,33 @@ export function diffRows(rowsA: ReportRow[], rowsB: ReportRow[]): ComparisonRow[
   return out;
 }
 
+/** Komma-Dezimal für deutsches Excel. */
+function csvNumber(n: number): string {
+  return String(n).replace('.', ',');
+}
+
+/**
+ * Zeilen der Vergleichs-CSV — Kopf wie die angezeigte Tabelle (Zeiträume als
+ * Spaltennamen), Werte mit Komma-Dezimal.
+ */
+export function comparisonCsvRows(
+  rows: readonly ComparisonRow[],
+  p: ComparisonPeriods,
+): string[][] {
+  return [
+    ['Gruppe', 'Zählerart', 'Richtung', 'Einheit', p.a, p.b, 'Differenz'],
+    ...rows.map((r) => [
+      r.group_label,
+      TYPE_LABELS[r.meter_type],
+      DIRECTION_LABELS[r.direction],
+      r.unit,
+      csvNumber(r.a),
+      csvNumber(r.b),
+      csvNumber(r.delta),
+    ]),
+  ];
+}
+
 export interface AggregateQuery {
   dimension: ReportDimension;
   granularity: ReportGranularity;
@@ -186,6 +305,7 @@ export interface AggregateQuery {
   ownerIds: number[];
   kostenstellen: number[];
   meterTypes: MeterType[];
+  measuringPointIds: number[];
 }
 
 /** Baut den Query-String für `/reports/aggregate(.csv)`. */
@@ -200,5 +320,37 @@ export function buildAggregateQuery(q: AggregateQuery): string {
   for (const id of q.ownerIds) p.append('owner_id', String(id));
   for (const k of q.kostenstellen) p.append('kostenstelle', String(k));
   for (const t of q.meterTypes) p.append('meter_type', t);
+  for (const id of q.measuringPointIds) p.append('measuring_point_id', String(id));
   return p.toString();
+}
+
+export interface RunGateInput {
+  periodKind: ReportPeriodKind;
+  customFrom: string;
+  customTo: string;
+  /** Aufgelöste Periode 1 (für Vorjahr/Vorperiode nötig). */
+  periodFrom: string | null;
+  periodTo: string | null;
+  compare: boolean;
+  compareKind: CompareKind;
+  compareFrom: string;
+  compareTo: string;
+}
+
+/**
+ * Warum gerade NICHT ausgewertet werden kann — `null`, wenn alles bereit ist.
+ * Alle anderen Filter haben Standardwerte; nur die freien Datumsfelder können
+ * unvollständig sein (sonst liefe die Auswertung stumm über den Gesamtzeitraum).
+ */
+export function runBlocker(g: RunGateInput): string | null {
+  if (g.periodKind === 'fixed' && !(g.customFrom && g.customTo)) {
+    return 'Für „Benutzerdefiniert" Von- und Bis-Datum angeben.';
+  }
+  if (g.compare && g.compareKind === 'custom' && !(g.compareFrom && g.compareTo)) {
+    return 'Für den Vergleich beide Vergleichsdaten angeben.';
+  }
+  if (g.compare && g.compareKind !== 'custom' && !(g.periodFrom && g.periodTo)) {
+    return 'Für Vorjahr/Vorperiode einen begrenzten Zeitraum wählen – oder Periode 2 benutzerdefiniert angeben.';
+  }
+  return null;
 }

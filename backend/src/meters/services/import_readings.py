@@ -169,7 +169,7 @@ def build_preview(db: Session, *, filename: str, content: bytes) -> ImportPrevie
     )
 
 
-def _reading_at(reading_date: date) -> datetime:
+def reading_at_for_date(reading_date: date) -> datetime:
     """Historischer Monatswert -> Zeitstempel am **Tagesende** (23:59:59 lokal),
     als naive UTC gespeichert (wie alle Readings). Einheitlich mit dem Erfassen-
     Toggle „Historischer Monatswert" und der App-„Periodenende"-Konvention. Nicht
@@ -208,7 +208,7 @@ def commit_readings(
                     )
                 )
                 continue
-            intended.append((row.register_id, _reading_at(cell.reading_date), cell.value))
+            intended.append((row.register_id, reading_at_for_date(cell.reading_date), cell.value))
 
     # Innerhalb der Datei doppelte (Register, Zeitpunkt) -> nur einmal anlegen.
     seen: set[tuple[int, datetime]] = set()
