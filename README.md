@@ -30,17 +30,26 @@ Die fachliche Spezifikation steht in [`CLAUDE.md`](./CLAUDE.md).
   Veränderung gegenüber dem gleich langen Vorzeitraum, Hinweise (Messstellen,
   die nie oder seit über 45 Tagen nicht abgelesen wurden, Verbrauch mehr als
   ±30 % vom Vorzeitraum abweichend — mit Direktlink zum Erfassen),
-  Top-Verbraucher je Zählerart, Vergleichsdiagramme pro Zählerart und Filter
-  nach Hauptstandort, Eigentümer, Zählerstandort, Zählerart, Messstelle und
-  verrechneter Messstelle. Auf dem Handy liegen die Filter in einem
-  Bottom-Sheet mit entfernbaren Chips, am Desktop inline. Aggregation
-  (Tag/Woche/Monat/Jahr) und Diagrammtyp folgen automatisch dem Zeitraum und
-  lassen sich über „Diagramm-Einstellungen" am Verlauf überschreiben.
+  Top-Verbraucher je Zählerart und Filter nach Hauptstandort, Eigentümer,
+  Zählerstandort, Zählerart, Messstelle und verrechneter Messstelle. Auf dem
+  Handy liegen die Filter in einem Bottom-Sheet mit entfernbaren Chips, am
+  Desktop inline. Verbrauchs-Diagramme gibt es auf dem Dashboard nicht mehr —
+  dafür in den Auswertungen.
   Der Zeitraum gilt app-weit (auch für Erfassungen und Auswertungen), startet
   standardmäßig mit dem letzten und dem laufenden Monat, lässt sich mit den
   Pfeilen monatsweise blättern und über „Datum zurücksetzen" jederzeit wieder
   auf den Standard stellen. Zurückblättern zeigt bereits geladene Zeiträume
   sofort aus dem Client-Cache.
+- **Auswertungen** mit explizitem „Auswerten"-Button: Gruppierung, Zeitraum,
+  Auflösung, Perioden-Vergleich und Filter einstellen (oder eine gespeicherte
+  Auswertung anklicken — sie steht immer ganz oben und übernimmt nur die
+  Filter), dann auswerten. Das Ergebnis lässt sich als Tabelle oder auf Wunsch
+  als Diagramm anzeigen (Balken je Gruppe bei „Gesamt"/Vergleich, Verlauf als
+  Linie oder Balken bei Tag/Woche/Monat/Jahr); das Diagramm wird erst beim
+  Umschalten geladen. Im Perioden-Vergleich stehen die beiden Zeiträume als
+  Spalten nebeneinander, beschriftet mit ihrem Datumsbereich; Periode 2 ist
+  wahlweise Vorjahr, Vorperiode oder frei wählbar. Filter nach einzelnen
+  Messstellen und „Filter zurücksetzen" für den Standardzustand.
 - **CSV-Export** auf der Erfassungs-Seite und in den Auswertungen.
 - **Offline-Erfassung (PWA)** — als App installierbar („Zum Home-Bildschirm");
   Zählerstände (inkl. Fotos) lassen sich ohne Serververbindung erfassen und
@@ -76,6 +85,8 @@ cd backend
 uv sync
 uv run alembic upgrade head
 uv run python -m meters.cli create-admin --username admin --password 'admin-pass-12345'
+# optional: synthetische Monatsstände 2025 für den Perioden-Vergleich (rückbaubar mit --remove --apply)
+uv run python -m meters.cli seed-readings --year 2025 --apply
 uv run uvicorn meters.main:app --reload
 
 # Frontend (zweites Terminal)
@@ -139,11 +150,11 @@ dem `install`-Wizard).
 
 **Wann ein Backup entsteht:**
 
-| Auslöser | Wann |
-|---|---|
-| systemd-Timer `zaehler-backup.timer` | täglich um die im Wizard gewählte Uhrzeit (Default 03:30) |
-| Vor jedem `upgrade-app` / `rollback` | automatisch — Sicherheitsnetz vor Code-Änderungen |
-| Manuell | `sudo bash /opt/zaehler/repo/deploy/lxc/zaehler.sh backup` |
+| Auslöser                             | Wann                                                       |
+| ------------------------------------ | ---------------------------------------------------------- |
+| systemd-Timer `zaehler-backup.timer` | täglich um die im Wizard gewählte Uhrzeit (Default 03:30)  |
+| Vor jedem `upgrade-app` / `rollback` | automatisch — Sicherheitsnetz vor Code-Änderungen          |
+| Manuell                              | `sudo bash /opt/zaehler/repo/deploy/lxc/zaehler.sh backup` |
 
 Snapshots laufen über SQLites Online-`.backup`-Befehl — kein
 Service-Stopp, kein Lock. Anschließend `gzip`. Ablage in
@@ -209,43 +220,43 @@ editieren, am besten geführt anpassen:
 
 **Kern / Secret**
 
-| Variable | Default | Bedeutung |
-|---|---|---|
-| `METERS_SECRET_KEY` | `change-me-in-production` | Server-Geheimnis für Session-Token-HMAC — **Pflicht in Produktion** (Boot bricht sonst ab) |
-| `METERS_DATABASE_URL` | `sqlite:///./data/meters.db` | SQLite-Pfad |
-| `METERS_DEBUG` | `False` | Nur Entwicklung. In Produktion `False` lassen (sonst `/docs` + Tracebacks offen) |
-| `METERS_MEDIA_DIR` | `…/data/media/photos` | Ablage der Reading-Fotos |
-| `METERS_PHOTO_MAX_UPLOAD_BYTES` | `20971520` (20 MB) | Max. Roh-Upload pro Foto |
+| Variable                        | Default                      | Bedeutung                                                                                  |
+| ------------------------------- | ---------------------------- | ------------------------------------------------------------------------------------------ |
+| `METERS_SECRET_KEY`             | `change-me-in-production`    | Server-Geheimnis für Session-Token-HMAC — **Pflicht in Produktion** (Boot bricht sonst ab) |
+| `METERS_DATABASE_URL`           | `sqlite:///./data/meters.db` | SQLite-Pfad                                                                                |
+| `METERS_DEBUG`                  | `False`                      | Nur Entwicklung. In Produktion `False` lassen (sonst `/docs` + Tracebacks offen)           |
+| `METERS_MEDIA_DIR`              | `…/data/media/photos`        | Ablage der Reading-Fotos                                                                   |
+| `METERS_PHOTO_MAX_UPLOAD_BYTES` | `20971520` (20 MB)           | Max. Roh-Upload pro Foto                                                                   |
 
 **Authentifizierung / Session**
 
-| Variable | Default | Bedeutung |
-|---|---|---|
-| `METERS_SESSION_LIFETIME_DAYS` | `30` | Cookie-Lebensdauer (Sliding) |
-| `METERS_BCRYPT_ROUNDS` | `12` | Bcrypt-Cost-Faktor |
-| `METERS_LOGIN_MAX_ATTEMPTS` | `5` | Login-Fehlversuche pro IP im Zeitfenster |
-| `METERS_LOGIN_WINDOW_SECONDS` | `60` | Zeitfenster für die Fehlversuch-Zählung |
-| `METERS_LOGIN_LOCKOUT_SECONDS` | `900` | Sperrdauer nach Überschreiten |
+| Variable                        | Default | Bedeutung                                                                                           |
+| ------------------------------- | ------- | --------------------------------------------------------------------------------------------------- |
+| `METERS_SESSION_LIFETIME_DAYS`  | `30`    | Cookie-Lebensdauer (Sliding)                                                                        |
+| `METERS_BCRYPT_ROUNDS`          | `12`    | Bcrypt-Cost-Faktor                                                                                  |
+| `METERS_LOGIN_MAX_ATTEMPTS`     | `5`     | Login-Fehlversuche pro IP im Zeitfenster                                                            |
+| `METERS_LOGIN_WINDOW_SECONDS`   | `60`    | Zeitfenster für die Fehlversuch-Zählung                                                             |
+| `METERS_LOGIN_LOCKOUT_SECONDS`  | `900`   | Sperrdauer nach Überschreiten                                                                       |
 | `METERS_REQUIRE_TOTP_FOR_ADMIN` | `False` | `True` ⇒ Admins müssen 2FA einrichten, bevor sie etwas anderes tun (Opt-in, für Internet empfohlen) |
 
 **Netzwerk & Reverse-Proxy** — i. d. R. via `configure-network` gesetzt
 
-| Variable | Default | Bedeutung |
-|---|---|---|
-| `METERS_BIND_HOST` | `0.0.0.0` | Auf `127.0.0.1`, sobald ein Proxy auf demselben Host davor steht |
-| `METERS_BIND_PORT` | `8000` | TCP-Port |
-| `METERS_COOKIE_SECURE` | `False` | **`True`, sobald HTTPS davor steht** — sonst geht das Session-Cookie im Klartext |
-| `METERS_COOKIE_SAMESITE` | `strict` | `strict` oder `lax` |
-| `METERS_TRUST_PROXY` | `False` | `True` **nur** mit vertrauenswürdigem Proxy davor (wertet `X-Forwarded-For` aus) |
-| `METERS_ALLOWED_ORIGINS` | (leer) | Komma-Liste erlaubter Origins für mutierende Requests (CSRF), z. B. `https://zaehler.example.com` |
+| Variable                 | Default   | Bedeutung                                                                                         |
+| ------------------------ | --------- | ------------------------------------------------------------------------------------------------- |
+| `METERS_BIND_HOST`       | `0.0.0.0` | Auf `127.0.0.1`, sobald ein Proxy auf demselben Host davor steht                                  |
+| `METERS_BIND_PORT`       | `8000`    | TCP-Port                                                                                          |
+| `METERS_COOKIE_SECURE`   | `False`   | **`True`, sobald HTTPS davor steht** — sonst geht das Session-Cookie im Klartext                  |
+| `METERS_COOKIE_SAMESITE` | `strict`  | `strict` oder `lax`                                                                               |
+| `METERS_TRUST_PROXY`     | `False`   | `True` **nur** mit vertrauenswürdigem Proxy davor (wertet `X-Forwarded-For` aus)                  |
+| `METERS_ALLOWED_ORIGINS` | (leer)    | Komma-Liste erlaubter Origins für mutierende Requests (CSRF), z. B. `https://zaehler.example.com` |
 
 **Internet-Härtung** — nur bei öffentlicher Erreichbarkeit nötig, alle Opt-in
 
-| Variable | Default | Bedeutung |
-|---|---|---|
-| `METERS_PUBLIC_FACING` | `False` | `True` ⇒ Boot **bricht ab**, wenn `cookie_secure=False` — verhindert versehentliches Klartext-Cookie online |
-| `METERS_TRUSTED_PROXY_IPS` | (leer) | Komma-Liste; `X-Forwarded-For` wird nur akzeptiert, wenn die direkte Verbindung von einer dieser Proxy-IPs kommt (Spoofing-Schutz) |
-| `METERS_PUBLIC_BASE_URL` | (leer) | Feste `https://…`-Basis für gedruckte QR-Links (sonst evtl. interne `http://`-URL auf den Etiketten) |
+| Variable                   | Default | Bedeutung                                                                                                                          |
+| -------------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `METERS_PUBLIC_FACING`     | `False` | `True` ⇒ Boot **bricht ab**, wenn `cookie_secure=False` — verhindert versehentliches Klartext-Cookie online                        |
+| `METERS_TRUSTED_PROXY_IPS` | (leer)  | Komma-Liste; `X-Forwarded-For` wird nur akzeptiert, wenn die direkte Verbindung von einer dieser Proxy-IPs kommt (Spoofing-Schutz) |
+| `METERS_PUBLIC_BASE_URL`   | (leer)  | Feste `https://…`-Basis für gedruckte QR-Links (sonst evtl. interne `http://`-URL auf den Etiketten)                               |
 
 ### Sichere Setups (Kurzrezepte)
 

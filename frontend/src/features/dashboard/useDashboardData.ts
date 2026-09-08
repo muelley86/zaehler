@@ -1,8 +1,8 @@
 /**
  * Daten-Hook für den gebündelten `/dashboard`-Load: Modul-weiter LRU-Cache
  * (Insertion-Order als Reihenfolge, `CACHE_MAX_ENTRIES` Einträge) macht einen
- * Zeitraum-/Granularitäts-Wechsel, zu dem schon einmal geladen wurde, sofort
- * sichtbar (kein Skeleton), während im Hintergrund neu geladen wird.
+ * Zeitraum-Wechsel, zu dem schon einmal geladen wurde, sofort sichtbar (kein
+ * Skeleton), während im Hintergrund neu geladen wird.
  *
  * AbortController: ein Key-Wechsel während eines offenen Requests bricht ihn
  * ab — nur die jüngste Antwort schreibt State/Cache.
@@ -11,8 +11,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { ApiError, api } from '@/lib/api';
-import type { DashboardResponse } from '@/lib/types';
-import type { Granularity } from './chartUtils';
+import type { DashboardGranularity, DashboardResponse } from '@/lib/types';
 
 interface CacheEntry {
   data: DashboardResponse;
@@ -20,14 +19,21 @@ interface CacheEntry {
   fetchedAt: number;
 }
 
+// Das Dashboard zeigt keine Verbrauchs-Diagramme mehr — die `totals[]` für
+// KPI/Hinweise/Top-Verbraucher sind taggenau und granularitätsunabhängig
+// (siehe services/dashboard.py). `month` ist der günstigste Backend-Pfad
+// (materialisierte `monthly_consumption`-Tabelle statt Roh-Ablesungen); die
+// mitgelieferte `consumption[]`-Reihe wird vom Frontend nicht ausgewertet.
+const DASHBOARD_GRANULARITY: DashboardGranularity = 'month';
+
 // Modul-Ebene (nicht per Hook-Instanz) — überlebt Remounts der Seite.
 // `Map`-Insertion-Order dient als LRU-Reihenfolge: ein Re-Set löscht den
 // alten Eintrag zuerst, damit er ans Ende (= "zuletzt benutzt") rückt.
 const cache = new Map<string, CacheEntry>();
 const CACHE_MAX_ENTRIES = 12;
 
-export function dashboardCacheKey(from: string, to: string, g: Granularity): string {
-  return `${from}|${to}|${g}`;
+export function dashboardCacheKey(from: string, to: string): string {
+  return `${from}|${to}`;
 }
 
 export function clearDashboardCache(): void {
@@ -61,12 +67,8 @@ export interface DashboardData {
   retry: () => void;
 }
 
-export function useDashboardData(
-  from: string,
-  to: string,
-  granularity: Granularity,
-): DashboardData {
-  const key = dashboardCacheKey(from, to, granularity);
+export function useDashboardData(from: string, to: string): DashboardData {
+  const key = dashboardCacheKey(from, to);
   const [data, setData] = useState<DashboardResponse | null>(() => cache.get(key)?.data ?? null);
   const [servedAt, setServedAt] = useState<Date | null>(() => cache.get(key)?.servedAt ?? null);
   const [refreshing, setRefreshing] = useState(false);
@@ -93,7 +95,7 @@ export function useDashboardData(
     setError(null);
 
     const controller = new AbortController();
-    const params = new URLSearchParams({ granularity });
+    const params = new URLSearchParams({ granularity: DASHBOARD_GRANULARITY });
     if (from) params.set('from_at', from);
     if (to) params.set('to_at', to);
 
@@ -114,7 +116,7 @@ export function useDashboardData(
       });
 
     return () => controller.abort();
-  }, [key, from, to, granularity, retryTick]);
+  }, [key, from, to, retryTick]);
 
   const loading = data === null && error === null;
   return { data, servedAt, loading, refreshing, error, retry };

@@ -92,7 +92,7 @@ export function dashboardResponse(input: DashboardResponseInput = {}): Dashboard
     to_date = '2026-09-30',
     previous_from_date = '2026-06-01',
     previous_to_date = '2026-07-31',
-    granularity = 'week',
+    granularity = 'month',
     partial = false,
   } = input;
   return {

@@ -18,6 +18,7 @@ class ReportFilterModel(BaseModel):
     owner_ids: list[int | None] = Field(default_factory=list)
     kostenstellen: list[int | None] = Field(default_factory=list)
     meter_types: list[MeterType] = Field(default_factory=list)
+    measuring_point_ids: list[int] = Field(default_factory=list)
 
 
 def validate_period(

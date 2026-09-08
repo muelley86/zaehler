@@ -1,8 +1,10 @@
 /**
- * Dashboard: reine Orchestrierung. Daten (`useDashboardData`), View-Controls
- * (`useChartPrefs`) und Filter (`useDashboardFilters`) kommen aus Hooks, die
- * Fachlogik aus `dashboardSelectors`/`dashboardMetrics`, die Darstellung aus
- * den Präsentationskomponenten dieses Ordners.
+ * Dashboard: reine Orchestrierung. Daten (`useDashboardData`) und Filter
+ * (`useDashboardFilters`) kommen aus Hooks, die Fachlogik aus
+ * `dashboardSelectors`/`dashboardMetrics`, die Darstellung aus den
+ * Präsentationskomponenten dieses Ordners (KPI-Kacheln, Hinweise,
+ * Top-Verbraucher — Verbrauchs-Diagramme gibt es hier bewusst nicht mehr,
+ * dafür ist die Auswertungen-Seite da).
  *
  * Die Seite spricht ausschließlich `GET /dashboard` an — Stammdaten für die
  * Filter kommen aus derselben Antwort (kein zusätzlicher `/measuring-points`-
@@ -11,22 +13,19 @@
 
 import { useMemo } from 'react';
 import type { ReactNode } from 'react';
-import { Filter, Plus } from 'lucide-react';
+import { Filter, Loader2, Plus } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 import { Button, Card, EmptyState, LargeTitle } from '@/components/ui';
 import { PageGlows } from '@/components/PageGlows';
 import { StaleDataHint } from '@/components/StaleDataHint';
 import { formatDateDe } from '@/lib/format';
-import { useIsDesktop } from '@/lib/useMediaQuery';
 import { useFilterPrefs } from '@/features/prefs/filter-prefs-context';
-import { ChartSection } from './ChartSection';
 import { DashboardFilters } from './DashboardFilters';
 import { DashboardSkeleton } from './DashboardSkeletons';
 import { InsightsCard } from './InsightsCard';
 import { KpiTiles } from './KpiTiles';
 import { TopConsumers } from './TopConsumers';
-import { buildComparisonGroups } from './comparisonSeries';
 import { selectInsights, selectKpiTiles, selectTopConsumers } from './dashboardMetrics';
 import {
   activeFilterChips,
@@ -34,7 +33,6 @@ import {
   selectFilteredItems,
   selectFilteredVirtual,
 } from './dashboardSelectors';
-import { useChartPrefs } from './useChartPrefs';
 import { useDashboardData } from './useDashboardData';
 import { useDashboardFilters } from './useDashboardFilters';
 
@@ -54,14 +52,8 @@ const PARTIAL_HINT =
 export function DashboardPage() {
   const { dateRange } = useFilterPrefs();
   const { from, to } = dateRange;
-  const isDesktop = useIsDesktop();
 
-  const prefs = useChartPrefs(from, to);
-  const { data, servedAt, loading, refreshing, error, retry } = useDashboardData(
-    from,
-    to,
-    prefs.granularity,
-  );
+  const { data, servedAt, loading, refreshing, error, retry } = useDashboardData(from, to);
   const { filters, setFilters, reset, activeCount } = useDashboardFilters();
 
   const items = useMemo(() => data?.items ?? [], [data]);
@@ -91,10 +83,6 @@ export function DashboardPage() {
     [filteredItems],
   );
   const topGroups = useMemo(() => selectTopConsumers(filteredItems), [filteredItems]);
-  const groups = useMemo(
-    () => buildComparisonGroups({ items: filteredItems, virtualItems: filteredVirtual }),
-    [filteredItems, filteredVirtual],
-  );
 
   const compareLabel = comparePeriodLabel(
     data?.previous_from_date ?? null,
@@ -109,6 +97,19 @@ export function DashboardPage() {
     <PageContainer>
       <LargeTitle title="Dashboard" />
       <StaleDataHint servedAt={servedAt} />
+
+      {/* Cache-Hit mit Hintergrund-Refetch (z. B. Monatswechsel per ◀/▶): die
+          alten Zahlen bleiben stehen, das Feedback zeigt, dass neue kommen. */}
+      {refreshing && data !== null ? (
+        <span
+          className="flex items-center gap-1.5 px-1 text-caption text-tertiary"
+          role="status"
+          aria-live="polite"
+        >
+          <Loader2 size={14} className="animate-spin" aria-hidden />
+          Aktualisiere…
+        </span>
+      ) : null}
 
       {/* Erst mit Daten: vorher hätten die Dropdowns keine Optionen — der
           `DashboardSkeleton` reserviert die Höhe der Leiste. */}
@@ -135,7 +136,7 @@ export function DashboardPage() {
         </Card>
       ) : null}
 
-      {loading ? <DashboardSkeleton compact={!isDesktop} /> : null}
+      {loading ? <DashboardSkeleton /> : null}
 
       {isEmptySetup ? (
         <EmptyState
@@ -167,26 +168,12 @@ export function DashboardPage() {
               {PARTIAL_HINT}
             </div>
           ) : null}
-          {/* Mobile (Spalte): Hinweise → Chart → Top-Verbraucher — die
-              Handlungsaufforderung steht vor dem Diagramm. Ab `lg` wird daraus
-              ein 2-Spalten-Raster: Chart über die volle Breite, darunter
-              Hinweise und Top-Verbraucher nebeneinander. */}
+          {/* Mobile (Spalte): Hinweise → Top-Verbraucher — die Handlungs-
+              aufforderung steht zuerst. Ab `lg` stehen beide nebeneinander. */}
           <div className="flex flex-col gap-5 lg:grid lg:grid-cols-2 lg:items-start">
-            {insights.length > 0 ? (
-              <div className="order-1 lg:order-2">
-                <InsightsCard insights={insights} />
-              </div>
-            ) : null}
-            <div className="order-2 lg:order-1 lg:col-span-2">
-              <ChartSection
-                groups={groups}
-                prefs={prefs}
-                refreshing={refreshing}
-                compact={!isDesktop}
-              />
-            </div>
+            {insights.length > 0 ? <InsightsCard insights={insights} /> : null}
             {topGroups.length > 0 ? (
-              <div className="order-3 flex flex-col gap-5">
+              <div className="flex flex-col gap-5">
                 <TopConsumers groups={topGroups} />
               </div>
             ) : null}

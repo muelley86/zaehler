@@ -4,60 +4,21 @@
  * die Seite hat per-Seite-Session-Memory fuer ihre Arbeits-Filter
  * (Dimension, Granularitaet, Periode, kategoriale Filter).
  *
- * Die Seite laedt den Report automatisch beim Mount → die wiederhergestellte
- * Dimension fliesst direkt in die /reports/aggregate-Query (End-to-End-Beleg).
+ * Der Report wird per „Auswerten" ausgefuehrt → die wiederhergestellte
+ * Dimension fliesst in die /reports/aggregate-Query (End-to-End-Beleg).
  */
 
-import { http, HttpResponse } from 'msw';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 
 import { renderWithRouter } from '@/tests/render';
-import { server } from '@/tests/server';
 
 import { ReportsPage } from './ReportsPage';
+import { mockEndpoints, runReport } from './reportsTestUtils';
 
 vi.mock('@/features/auth/auth-context', () => ({
   useAuth: () => ({ me: { id: 1, username: 'admin', role: 'admin', is_active: true } }),
 }));
-
-const MP = {
-  id: 1,
-  name: 'Strom Hauptzähler',
-  type: 'electricity',
-  location_id: 5,
-  location_name: 'Keller',
-  main_location_id: 2,
-  main_location_name: 'Haus',
-  contract_number: null,
-  market_location: null,
-  installation_location: null,
-  current_owner_id: 3,
-  current_owner_name: 'Müller',
-  current_supplier_id: null,
-  current_supplier_name: null,
-  kostenstelle: 100,
-  is_bidirectional: false,
-  has_dual_tariff: false,
-  tank_capacity: null,
-  transformer_factor: null,
-  heating_source: null,
-  physical_meters: [],
-};
-
-function mockEndpoints(): { dims: string[] } {
-  const dims: string[] = [];
-  server.use(
-    http.get('/api/v1/measuring-points', () => HttpResponse.json([MP])),
-    http.get('/api/v1/report-configs', () => HttpResponse.json([])),
-    http.get('/api/v1/reports/aggregate', ({ request }) => {
-      const d = new URL(request.url).searchParams.get('dimension');
-      if (d) dims.push(d);
-      return HttpResponse.json({ rows: [], partial: false });
-    }),
-  );
-  return { dims };
-}
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -69,12 +30,13 @@ describe('ReportsPage — Filter merken', () => {
   it('stellt die gemerkte Dimension wieder her (fließt in die /reports/aggregate-Query)', async () => {
     window.localStorage.setItem('filters.remember', '1');
     window.sessionStorage.setItem('filters.reports.dimension', 'owner');
-    const { dims } = mockEndpoints();
+    const { dimensionCalls } = mockEndpoints();
 
     renderWithRouter(<ReportsPage />);
+    await runReport();
 
-    await waitFor(() => expect(dims).toContain('owner'));
-    expect(dims).not.toContain('measuring_point');
+    await waitFor(() => expect(dimensionCalls).toContain('owner'));
+    expect(dimensionCalls).not.toContain('measuring_point');
   });
 
   it('merkt eine geänderte Dimension je Seite in sessionStorage', async () => {
@@ -87,6 +49,23 @@ describe('ReportsPage — Filter merken', () => {
     await waitFor(() =>
       expect(window.sessionStorage.getItem('filters.reports.dimension')).toBe('kostenstelle'),
     );
+  });
+
+  it('merkt den Messstellen-Filter und „Filter zurücksetzen" leert ihn auch im Speicher', async () => {
+    window.localStorage.setItem('filters.remember', '1');
+    window.sessionStorage.setItem('filters.reports.measuringPoint', JSON.stringify([1]));
+    const { urls } = mockEndpoints();
+
+    renderWithRouter(<ReportsPage />);
+    expect(await screen.findByText('1 aktiv')).toBeInTheDocument();
+    await runReport();
+    await waitFor(() => expect(urls.some((u) => u.includes('measuring_point_id=1'))).toBe(true));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Filter zurücksetzen' }));
+    await waitFor(() =>
+      expect(window.sessionStorage.getItem('filters.reports.measuringPoint')).toBe('[]'),
+    );
+    expect(screen.queryByText('1 aktiv')).toBeNull();
   });
 
   it('persistiert nichts, wenn „Filter merken" deaktiviert ist (Default)', async () => {

@@ -7,6 +7,7 @@ Einspeisung als eigene Zeilen, Gesamt vs. Monat, Recorder-Filter/partial und CSV
 
 from __future__ import annotations
 
+from decimal import Decimal
 from typing import Any, cast
 
 from fastapi.testclient import TestClient
@@ -379,3 +380,43 @@ def test_total_clips_partial_range_to_month_sum(admin_client: TestClient) -> Non
     # Plausibilität: Februar-Anteil = 15 Tage des 31-Tage-Intervalls (01-15..02-15)
     # + 14 Tage des 55-Tage-Intervalls (02-15..04-10) — deutlich unter 50.
     assert 0 < total_val < 50
+
+
+def test_measuring_point_id_filters_aggregate_and_csv(admin_client: TestClient) -> None:
+    a = _create_mp(admin_client, name="Filter-A", serial="SN-FA")
+    b = _create_mp(admin_client, name="Filter-B", serial="SN-FB")
+    c = _create_mp(admin_client, name="Filter-C", serial="SN-FC")
+    for mp, v in ((a, "10"), (b, "20"), (c, "30")):
+        reg = _registers(mp)["water"]
+        _add(admin_client, reg, "0", "2024-01-01T00:00:00Z")
+        _add(admin_client, reg, v, "2024-02-01T00:00:00Z")
+
+    data = _agg(
+        admin_client,
+        dimension="measuring_point",
+        granularity="total",
+        measuring_point_id=[a["id"], c["id"]],
+    )
+    labels = sorted(r["group_label"] for r in data["rows"])
+    assert labels == ["Filter-A", "Filter-C"]
+
+    # Der Filter greift unabhaengig von der Dimension: Summe nur ueber A + C.
+    by_type = _agg(
+        admin_client,
+        dimension="meter_type",
+        granularity="total",
+        measuring_point_id=[a["id"], c["id"]],
+    )
+    assert [Decimal(r["consumption"]) for r in by_type["rows"]] == [Decimal("40")]
+
+    csv_resp = admin_client.get(
+        "/api/v1/reports/aggregate.csv",
+        params={
+            "dimension": "measuring_point",
+            "granularity": "total",
+            "measuring_point_id": [b["id"]],
+        },
+    )
+    assert csv_resp.status_code == 200
+    assert "Filter-B" in csv_resp.text
+    assert "Filter-A" not in csv_resp.text

@@ -55,6 +55,7 @@ def _to_filter(
     owner_id: list[int],
     kostenstelle: list[int],
     meter_type: list[MeterType],
+    measuring_point_id: list[int],
 ) -> ReportFilter:
     """Wiederholbare Query-Parameter -> ReportFilter. Leere Liste = kein Filter.
     Der "ohne ..."-Bucket erscheint unverfiltert automatisch (NULL-im-Filter wird
@@ -65,6 +66,7 @@ def _to_filter(
         owner_ids=set(owner_id) if owner_id else None,
         kostenstellen=set(kostenstelle) if kostenstelle else None,
         meter_types=set(meter_type) if meter_type else None,
+        measuring_point_ids=set(measuring_point_id) if measuring_point_id else None,
     )
 
 
@@ -102,8 +104,11 @@ def aggregate(
     owner_id: list[int] = Query(default_factory=list),
     kostenstelle: list[int] = Query(default_factory=list),
     meter_type: list[MeterType] = Query(default_factory=list),
+    measuring_point_id: list[int] = Query(default_factory=list),
 ) -> ReportAggregateResponse:
-    filters = _to_filter(main_location_id, location_id, owner_id, kostenstelle, meter_type)
+    filters = _to_filter(
+        main_location_id, location_id, owner_id, kostenstelle, meter_type, measuring_point_id
+    )
     rows = _run(db, user, dimension, granularity, from_at, to_at, filters)
     return ReportAggregateResponse(
         dimension=dimension,
@@ -128,8 +133,11 @@ def aggregate_csv(
     owner_id: list[int] = Query(default_factory=list),
     kostenstelle: list[int] = Query(default_factory=list),
     meter_type: list[MeterType] = Query(default_factory=list),
+    measuring_point_id: list[int] = Query(default_factory=list),
 ) -> StreamingResponse:
-    filters = _to_filter(main_location_id, location_id, owner_id, kostenstelle, meter_type)
+    filters = _to_filter(
+        main_location_id, location_id, owner_id, kostenstelle, meter_type, measuring_point_id
+    )
     rows = _run(db, user, dimension, granularity, from_at, to_at, filters)
 
     buffer = io.StringIO()

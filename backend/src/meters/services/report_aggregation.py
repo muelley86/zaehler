@@ -72,6 +72,9 @@ class ReportFilter:
     owner_ids: set[int | None] | None = None
     kostenstellen: set[int | None] | None = None
     meter_types: set[MeterType] | None = None
+    # Explizite Messstellen-Auswahl (nur echte MPs; virtuelle haben einen
+    # eigenen Key-Namensraum und entfallen bei gesetztem Filter).
+    measuring_point_ids: set[int] | None = None
 
 
 ReportDirection = Literal["bezug", "einspeisung"]
@@ -170,6 +173,8 @@ def aggregate_report(
 
         # Kategoriale Filter (unabhaengig von der Gruppierungs-Dimension).
         main_id = mp.location.main_location_id if mp.location is not None else None
+        if filters.measuring_point_ids is not None and mp.id not in filters.measuring_point_ids:
+            continue
         if not _matches(mp.kostenstelle, filters.kostenstellen):
             continue
         if not _matches(mp.location_id, filters.location_ids):
@@ -258,8 +263,10 @@ def _virtual_rows(
 
     Nur in der Dimension MEASURING_POINT und nur ohne aktive kategoriale
     Filter — virtuelle MPs haben weder Standort noch Eigentuemer noch
-    Kostenstelle, ein gefiltertes Ergebnis waere semantisch falsch. Der
-    ``meter_type``-Filter greift (die vmp hat einen Typ). Richtung ist immer
+    Kostenstelle, ein gefiltertes Ergebnis waere semantisch falsch; auch die
+    explizite Messstellen-Auswahl zaehlt als kategorial (vmp-IDs leben in
+    einem eigenen Namensraum). Der ``meter_type``-Filter greift (die vmp hat
+    einen Typ). Richtung ist immer
     ``bezug``: die Zeile ist ein Netto-Wert, keine Einspeise-Reihe.
     """
     if dimension is not ReportDimension.MEASURING_POINT:
@@ -269,6 +276,7 @@ def _virtual_rows(
         or filters.location_ids is not None
         or filters.owner_ids is not None
         or filters.kostenstellen is not None
+        or filters.measuring_point_ids is not None
     )
     if has_categorical:
         return []

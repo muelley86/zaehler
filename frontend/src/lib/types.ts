@@ -472,6 +472,8 @@ export interface ReportFilter {
   owner_ids: (number | null)[];
   kostenstellen: (number | null)[];
   meter_types: MeterType[];
+  /** Explizite Messstellen-Auswahl (nur echte MPs); fehlt in Alt-Configs. */
+  measuring_point_ids?: number[];
 }
 
 export interface ReportRow {

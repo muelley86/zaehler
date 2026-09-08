@@ -1,8 +1,7 @@
 /**
- * Lade-Skeletons für die neue Dashboard-Seite: Filterleiste, KPI-Kacheln,
- * ein Chart-Slot und eine Liste (z. B. Hinweise/Top-Verbraucher). Stil wie
- * die bisherigen Skeletons in `DashboardPage.tsx` (`animate-pulse`,
- * `bg-fill`, `rounded-card`) — nur modularisiert für die neue Struktur.
+ * Lade-Skeletons für die Dashboard-Seite: Filterleiste, KPI-Kacheln und eine
+ * Liste (z. B. Hinweise/Top-Verbraucher). Stil wie die übrigen Skeletons
+ * (`animate-pulse`, `bg-fill`, `rounded-card`).
  */
 
 import { Section } from '@/components/ui';
@@ -30,16 +29,6 @@ function KpiSkeleton() {
   );
 }
 
-export function ChartSkeleton({ compact }: { compact: boolean }) {
-  return (
-    <div
-      aria-hidden
-      className="animate-pulse rounded-card border-hairline border-border bg-fill"
-      style={{ minHeight: compact ? 300 : 400 }}
-    />
-  );
-}
-
 function ListSkeleton() {
   return (
     <Section>
@@ -54,12 +43,11 @@ function ListSkeleton() {
   );
 }
 
-export function DashboardSkeleton({ compact }: { compact: boolean }) {
+export function DashboardSkeleton() {
   return (
     <div className="space-y-5">
       <FilterBarSkeleton />
       <KpiSkeleton />
-      <ChartSkeleton compact={compact} />
       <ListSkeleton />
       <span role="status" aria-live="polite" className="sr-only">
         Daten werden geladen

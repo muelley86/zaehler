@@ -1,8 +1,15 @@
+/**
+ * Recharts-Diagramm einer Auswertungs-Gruppe (Zählerart · Einheit).
+ * - `categorical`: Balken je Ergebnis-Zeile, X-Achse = Gruppen-Label.
+ * - `timeseries`: Linie oder Balken je Serie, X-Achse = Periodenende (Datum).
+ *
+ * Wird nur per `lazy()` aus `ReportResults` geladen — der einzige Pfad dieser
+ * Route zum Recharts-Chunk, damit die Seite ohne Diagramm leicht bleibt.
+ */
+
 import { memo, useCallback, useMemo } from 'react';
 import type { ReactNode } from 'react';
 import {
-  Area,
-  AreaChart,
   Bar,
   BarChart,
   CartesianGrid,
@@ -17,41 +24,33 @@ import {
 
 import { formatDateTickDe, formatDe } from '@/lib/format';
 import { useChartTheme } from '@/lib/useChartTheme';
-import type { ChartType } from './chartUtils';
-import type { ComparisonRow } from './comparisonSeries';
+import type { ReportChartGroup, ReportChartType } from './reportChartSeries';
 
 // Konstante Margins als Modul-Consts, damit Recharts nicht bei jedem Render
 // eine neue Object-Referenz sieht (Recharts vergleicht per ===).
 const CHART_MARGIN = { top: 10, right: 16, bottom: 8, left: 8 } as const;
-// Mobile: praktisch randlos — auf ~360 px Breite ist jeder Pixel Chart-Fläche
-// wertvoller als Luft um die Achsen.
 const COMPACT_CHART_MARGIN = { top: 8, right: 8, bottom: 0, left: 0 } as const;
 
 const CHART_HEIGHT = 320;
 const COMPACT_CHART_HEIGHT = 220;
 
-// Mindestabstand zweier X-Ticks. Mobile größer (weniger Datums-Labels, dafür
-// lesbar) und zusätzlich `interval="preserveStartEnd"`, damit Anfang und Ende
-// des Zeitraums immer beschriftet bleiben.
 const X_TICK_GAP = 12;
 const COMPACT_X_TICK_GAP = 28;
-
-// Feste Y-Achsen-Breite auf Mobile statt Achsen-Label: die Einheit steht
-// ohnehin im Section-Header, das Label würde nur Breite kosten.
 const COMPACT_Y_AXIS_WIDTH = 44;
 
-// Über dieser Serienzahl wird die Legende ausgeblendet — bei vielen Messstellen
-// würde sie den Chart erdrücken. Die Labels bleiben über den Tooltip erreichbar.
+// Über dieser Serienzahl wird die Legende ausgeblendet — die Labels bleiben
+// über den Tooltip erreichbar.
 const LEGEND_CAP = 12;
 const COMPACT_LEGEND_CAP = 4;
 
 const STROKE_WIDTH = 2;
 const COMPACT_STROKE_WIDTH = 1.5;
 
-// Linienstil je Serie — Serien sollen nicht NUR über Farbe unterscheidbar sein
-// (Barrierefreiheit, color-not-only). Greift nur im Linien-Modus. Kombiniert mit
-// der 6er-Farbpalette ergeben sich genügend unterscheidbare Serien-Stile für den
-// Mehr-Messstellen-Vergleich (Firmen-Skala), ohne fragiles OKLCH-Parsing.
+// Bei sehr kurzen Reihen (z. B. ein einzelner Monats-Bucket) gäbe es ohne
+// Punkte nichts zu sehen — eine Linie braucht mindestens zwei Stützstellen.
+const DOTS_UP_TO_POINTS = 2;
+
+// Linienstil je Serie — Serien sollen nicht NUR über Farbe unterscheidbar sein.
 const DASH = ['', '6 4', '2 3', '8 4 2 4', '4 2', '1 3'] as const;
 
 /** Stabile Modul-Funktion — sonst sähe Recharts bei jedem Render einen neuen Formatter. */
@@ -59,40 +58,34 @@ function formatYTick(value: number): string {
   return formatDe(value);
 }
 
-export interface ComparisonChartProps {
-  groupId: string;
-  series: ComparisonRow[];
-  seriesKeys: string[];
-  labelOf: Record<string, string>;
-  chartType: ChartType;
-  unit: string;
+function identity(value: string): string {
+  return value;
+}
+
+export interface ReportChartProps {
+  group: ReportChartGroup;
+  /** Nur im Zeitreihen-Modus relevant — kategorisch sind es immer Balken. */
+  chartType: ReportChartType;
   /** Mobile-Darstellung (kleinere Höhe, weniger Ticks, keine Achsen-Beschriftung). */
   compact: boolean;
 }
 
-/**
- * Vergleichs-Chart: eine Serie je Messstelle (bzw. je Bezug/Einspeisung) als
- * Linie, Balken oder Fläche. Die Serien-Schlüssel sind Messstellen
- * (`mp-<id>::draw|feed`), nicht OBIS-Codes, und es gibt KEINEN
- * `bar→line`-Downgrade — hier werden Verbrauchswerte verglichen, keine
- * absoluten Stände.
- *
- * `compact` wird vom Aufrufer durchgereicht (aus `useIsDesktop()`), nicht hier
- * gemessen — so gibt es genau eine Quelle für die Breakpoint-Entscheidung.
- */
-export const ComparisonChart = memo(function ComparisonChart({
-  groupId,
-  series,
-  seriesKeys,
-  labelOf,
+export const ReportChart = memo(function ReportChart({
+  group,
   chartType,
-  unit,
   compact,
-}: ComparisonChartProps) {
+}: ReportChartProps) {
   const theme = useChartTheme();
-  const showLegend = seriesKeys.length <= (compact ? COMPACT_LEGEND_CAP : LEGEND_CAP);
+  const { mode, seriesKeys, labelOf, data, unit } = group;
+  const isTimeseries = mode === 'timeseries';
+  const asBars = !isTimeseries || chartType === 'bar';
+  // Ein einzelner „Verbrauch"-Balken je Zeile braucht keine Legende.
+  const showLegend =
+    seriesKeys.length > 1 && seriesKeys.length <= (compact ? COMPACT_LEGEND_CAP : LEGEND_CAP);
   const margin = compact ? COMPACT_CHART_MARGIN : CHART_MARGIN;
   const strokeWidth = compact ? COMPACT_STROKE_WIDTH : STROKE_WIDTH;
+  const showDots = data.length <= DOTS_UP_TO_POINTS;
+  const xFormatter = isTimeseries ? formatDateTickDe : identity;
 
   const tooltipContentStyle = useMemo(
     () => ({
@@ -114,16 +107,15 @@ export const ComparisonChart = memo(function ComparisonChart({
   );
   const legendFormatter = useCallback((name: string) => labelOf[name] ?? name, [labelOf]);
 
-  // Achsen/Grid/Tooltip/Legende sind für alle drei Chart-Typen identisch.
   const axes = useMemo<ReactNode[]>(
     () => [
       <CartesianGrid key="grid" strokeDasharray="3 3" stroke={theme.grid} />,
       <XAxis
         key="x"
-        dataKey="date"
+        dataKey="x"
         tick={{ fontSize: 11, fill: theme.axis }}
         stroke={theme.axis}
-        tickFormatter={formatDateTickDe}
+        tickFormatter={xFormatter}
         minTickGap={compact ? COMPACT_X_TICK_GAP : X_TICK_GAP}
         {...(compact ? { interval: 'preserveStartEnd' as const } : {})}
       />,
@@ -151,7 +143,7 @@ export const ComparisonChart = memo(function ComparisonChart({
         contentStyle={tooltipContentStyle}
         labelStyle={tooltipLabelStyle}
         formatter={tooltipFormatter}
-        labelFormatter={formatDateTickDe}
+        labelFormatter={xFormatter}
       />,
       showLegend ? (
         <Legend key="lg" formatter={legendFormatter} wrapperStyle={legendWrapperStyle} />
@@ -162,6 +154,7 @@ export const ComparisonChart = memo(function ComparisonChart({
       unit,
       showLegend,
       compact,
+      xFormatter,
       tooltipContentStyle,
       tooltipLabelStyle,
       tooltipFormatter,
@@ -178,8 +171,8 @@ export const ComparisonChart = memo(function ComparisonChart({
   return (
     <div className="w-full" style={{ height: compact ? COMPACT_CHART_HEIGHT : CHART_HEIGHT }}>
       <ResponsiveContainer width="100%" height="100%">
-        {chartType === 'bar' ? (
-          <BarChart data={series} margin={margin}>
+        {asBars ? (
+          <BarChart data={data} margin={margin}>
             {axes}
             {seriesKeys.map((key, idx) => (
               <Bar
@@ -192,39 +185,8 @@ export const ComparisonChart = memo(function ComparisonChart({
               />
             ))}
           </BarChart>
-        ) : chartType === 'area' ? (
-          <AreaChart data={series} margin={margin}>
-            <defs>
-              {seriesKeys.map((key, idx) => (
-                <linearGradient
-                  id={`comp-grad-${groupId}-${key}`}
-                  key={`grad-${key}`}
-                  x1="0"
-                  y1="0"
-                  x2="0"
-                  y2="1"
-                >
-                  <stop offset="0%" stopColor={color(idx)} stopOpacity={0.4} />
-                  <stop offset="100%" stopColor={color(idx)} stopOpacity={0} />
-                </linearGradient>
-              ))}
-            </defs>
-            {axes}
-            {seriesKeys.map((key, idx) => (
-              <Area
-                key={key}
-                type="monotone"
-                dataKey={key}
-                name={key}
-                stroke={color(idx)}
-                fill={`url(#comp-grad-${groupId}-${key})`}
-                strokeWidth={strokeWidth}
-                isAnimationActive={false}
-              />
-            ))}
-          </AreaChart>
         ) : (
-          <LineChart data={series} margin={margin}>
+          <LineChart data={data} margin={margin}>
             {axes}
             {seriesKeys.map((key, idx) => (
               <Line
@@ -235,7 +197,7 @@ export const ComparisonChart = memo(function ComparisonChart({
                 stroke={color(idx)}
                 strokeWidth={strokeWidth}
                 strokeDasharray={DASH[idx % DASH.length] || undefined}
-                dot={false}
+                dot={showDots}
                 isAnimationActive={false}
                 connectNulls
               />

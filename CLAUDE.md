@@ -5,11 +5,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 # Zählerstand-App
 
 ## Zweck
+
 Self-hosted Webapp zur Erfassung und Historisierung von Strom-, Gas- und
 Wasserzählerständen für einen Privathaushalt. Läuft in einem LXC-Container
 auf eigener Hardware. Keine Cloud, keine externen Abhängigkeiten zur Laufzeit.
 
 ## Tech-Stack
+
 - Backend: Python 3.13, FastAPI, SQLAlchemy 2.x, Alembic, Pydantic v2, openpyxl (Excel-Import)
 - DB: SQLite (Datei unter ./data/meters.db)
 - Frontend: React 18 + Vite + TypeScript, Tailwind CSS
@@ -30,7 +32,7 @@ Repo-Root hat ein Makefile, das Backend- und Frontend-Checks bündelt:
 
 Backend (in `backend/`, via `uv`):
 
-- Erststart:   `uv sync && uv run alembic upgrade head`
+- Erststart: `uv sync && uv run alembic upgrade head`
 - Admin anlegen: `uv run python -m meters.cli create-admin --username admin --password '...'`
 - Server (dev): `uv run uvicorn meters.main:app --reload`
 - Einzelner Test: `uv run pytest tests/integration/test_readings.py::test_create_reading -x`
@@ -38,13 +40,14 @@ Backend (in `backend/`, via `uv`):
 
 Frontend (in `frontend/`, via `pnpm`):
 
-- Dev-Server:    `pnpm dev` (Port 5173, proxyt `/api/*` → `http://localhost:8000`)
+- Dev-Server: `pnpm dev` (Port 5173, proxyt `/api/*` → `http://localhost:8000`)
 - Einzelner Test: `pnpm exec vitest run src/features/readings/ReadingsList.test.tsx`
-- Build:         `pnpm build` (schreibt nach `backend/src/meters/static/`)
+- Build: `pnpm build` (schreibt nach `backend/src/meters/static/`)
 
 Windows-One-Shot-Setup: `scripts/dev-test.ps1` (idempotent, startet beide Server in eigenen Fenstern).
 
 ## Architektur
+
 - Monorepo: /backend, /frontend, /docs, /deploy
 - Frontend wird gebaut und vom FastAPI als Static Files ausgeliefert
 - Ein Prozess, ein Port (Standard 8000)
@@ -58,6 +61,7 @@ Windows-One-Shot-Setup: `scripts/dev-test.ps1` (idempotent, startet beide Server
 ## Code-Layout
 
 Backend (`backend/src/meters/`):
+
 - `main.py` — FastAPI-App-Factory, Static-Mount, SPA-Fallback (`/api/*` → 404, alles andere → `index.html`)
 - `api/v1/` — Router pro Ressource (auth, readings, measuring_points, qr_tokens, …); `api/deps.py` hält die Auth-/Session-Dependencies
 - `models/` — SQLAlchemy-2.x-Modelle (eine Datei pro Entität)
@@ -65,13 +69,15 @@ Backend (`backend/src/meters/`):
 - `services/` — Business-Logik (consumption, meter_replacement, access, audit, qr_token, totp, rate_limit)
 - `core/` — Config (`pydantic-settings`, Präfix `METERS_`), Logging, Middleware (Security-Header + Origin-Check), RFC-7807-Problem-Handler, OBIS-Konstanten, bcrypt-Helper
 - `db/` — Engine, `SessionLocal`, Type-Helper (Decimal-as-String etc.)
-- `cli.py` — `python -m meters.cli` für Admin-Anlage / Passwort-Reset
+- `cli.py` — `python -m meters.cli` für Admin-Anlage / Passwort-Reset, Reparaturen, `recompute-monthly`, `seed-readings` (Dev-Testdaten)
 - `static/` — kompiliertes Frontend (von `pnpm build` befüllt, nicht im Repo)
 
 Frontend (`frontend/src/`):
+
 - `App.tsx` + `main.tsx` — Router-Wiring, Layout-Shells (Bottom-Tab mobile / Sidebar desktop)
 - `features/{auth,dashboard,readings,scanner,offline,admin,export,more}` — vertikale Slices, jeweils Routes + Components + Tests beieinander
-- `features/dashboard/` — `DashboardPage.tsx` ist reine Komposition; Daten/State kommen aus Hooks (`useDashboardData` Cache/SWR, `useChartPrefs` Granularität+Diagrammtyp, `useDashboardFilters`), Fachlogik aus reinen Selektoren (`dashboardSelectors.ts` Filter/Optionen, `dashboardMetrics.ts` KPI/Hinweise/Top-Verbraucher), Darstellung aus `KpiTiles`/`InsightsCard`/`TopConsumers`/`ChartSection` (lazy `ComparisonChart`, einziger Pfad zum Recharts-Chunk)
+- `features/dashboard/` — `DashboardPage.tsx` ist reine Komposition; Daten/State kommen aus Hooks (`useDashboardData` Cache/SWR, `useDashboardFilters`), Fachlogik aus reinen Selektoren (`dashboardSelectors.ts` Filter/Optionen, `dashboardMetrics.ts` KPI/Hinweise/Top-Verbraucher), Darstellung aus `KpiTiles`/`InsightsCard`/`TopConsumers`. Keine Diagramme (seit v2.72: dafür die Auswertungen-Seite).
+- `features/reports/` — `ReportsPage.tsx` hält Filter-State + Konfig-Laden/-Speichern und komponiert `SavedReportsSection` (ganz oben), Filter-Sections, Aktionszeile („Auswerten"/CSV/Speichern) und `ReportResults` (Platzhalter, Stale-Hinweis, Umschalter Tabelle|Diagramm; `ReportTables.tsx`, lazy `ReportChart.tsx` — einziger Pfad dieser Route zum Recharts-Chunk). `useReportQuery.ts` trennt anstehende von ausgeführter Query, `reportChartSeries.ts` ist der reine Adapter `ReportRow[]` → Chart-Gruppen, `reportUtils.ts` hält Labels/Perioden/Diff/Query-Builder/`runBlocker`.
 - `components/` — geteilte UI-Bausteine
 - `lib/` — API-Client, Hooks, Utilities; `lib/offline/` hält Outbox, Sync-Engine und Stammdaten-Snapshot des Offline-Modus (IndexedDB, kein React)
 - `styles/` — Tailwind-Layer + OKLCH-Tokens (Light/Dark)
@@ -115,6 +121,7 @@ Erfassung erfolgt oft nachträglich.
 ## Auth & Benutzer
 
 Rollen:
+
 - admin: alle Rechte (User-Verwaltung, MeasuringPoints/PhysicalMeter
   anlegen/bearbeiten/löschen, Zählerwechsel durchführen, Readings
   erfassen/bearbeiten/löschen, Export)
@@ -129,23 +136,27 @@ User an. Beim Anlegen wird ein initiales Passwort gesetzt
 werden muss (force_password_change Flag).
 
 Login:
+
 - Endpoint: POST /api/v1/auth/login (username, password)
 - Bei Erfolg: Session-Cookie setzen, Session-Eintrag in DB
 - Rate-Limit: 5 Fehlversuche pro Minute pro IP, danach 15 min Sperre
 - Logout: POST /api/v1/auth/logout (invalidiert Session in DB)
 
 Session:
+
 - Server-seitig in DB (nicht JWT) – ermöglicht zentrales Invalidieren
 - Default-Lebensdauer: 30 Tage Sliding-Expiration
 - "Abmelden auf allen Geräten" für admin und für eigene User möglich
 
 Passwort-Policy:
+
 - Mindestens 12 Zeichen, kein anderes Komplexitätskriterium erzwingen
 - bcrypt mit cost-factor 12
 - Passwort-Änderung erfordert aktuelles Passwort
 - Admin kann Passwort eines Users zurücksetzen (force_password_change=true)
 
 Audit:
+
 - Reading.created_by_user_id wird IMMER gesetzt
 - Änderungen an Readings (update/delete) als AuditLog-Eintrag:
   AuditLog: id, user_id, action, entity_type, entity_id,
@@ -157,6 +168,7 @@ Audit:
   token_unassigned/token_deleted, entity_type=qr_token)
 
 Per-Recorder MP-Zugriff:
+
 - Tabelle UserMeasuringPointAccess (Composite-PK user_id + mp_id, Cascade)
   steuert, welche MeasuringPoints ein Recorder lesen und bebuchen darf.
 - Default für neue Recorder: keine Zuordnung (least privilege). Admin
@@ -194,6 +206,7 @@ auf DB-Ebene behandelt:
 ## OBIS-Register pro Messstellentyp
 
 Strom (je nach Konfiguration der MeasuringPoint):
+
 - Wenn !has_dual_tariff: 1.8.0 (Bezug)
 - Wenn !has_dual_tariff und is_bidirectional: zusätzlich 2.8.0 (Einspeisung)
 - Wenn has_dual_tariff: 1.8.1 (HT) und 1.8.2 (NT) statt 1.8.0
@@ -238,6 +251,7 @@ aktuell gültigen PhysicalMeter abgefragt.
 Endpoint: POST /api/v1/measuring-points/{id}/replace-meter
 
 Pflichtfelder:
+
 - final_readings: Endstände aller aktiven Register des alten Zählers
 - removed_at: Datum
 - new_serial_number
@@ -245,12 +259,14 @@ Pflichtfelder:
 - initial_readings: Startstände des neuen Zählers pro OBIS-Code
 
 Atomar in einer Transaktion:
+
 1. final_readings als Reading am alten PhysicalMeter speichern
 2. removed_at am alten setzen, alle alten Register is_active=false
 3. neuen PhysicalMeter mit Registern anlegen
 4. initial_readings als erstes Reading am neuen PhysicalMeter
 
 ## API-Konventionen
+
 - Routen: /api/v1/{ressource} (kebab-case bei Mehrwort-Ressourcen)
 - JSON in/out, Datumsangaben als ISO-8601 (UTC)
 - Decimal-Werte als String serialisieren (Pydantic-Konfiguration)
@@ -258,6 +274,7 @@ Atomar in einer Transaktion:
 - Validierungsfehler mit feldbezogenen Details
 
 ## UI-Anforderungen
+
 - Mobile-first (Erfassung am Zählerschrank mit dem Handy)
 - Eingabe großer Touch-Targets, numerische Tastatur bei Zahlenfeldern
 - Foto-Upload optional (vom Zählerstand zur Beweissicherung), bis zu 6 Fotos je Erfassung
@@ -270,10 +287,42 @@ Atomar in einer Transaktion:
   (nie/lange nicht abgelesen ab 45 Tagen, Abweichung > ±30 % ggü. Vorperiode),
   Top-Verbraucher (Top 5, nur Bezug, reale Messstellen). Filter inline
   (Desktop) bzw. Bottom-Sheet mit Chips (Mobile, `DashboardFilters.tsx`).
-  ⋯-Menü „Diagramm-Einstellungen" (Aggregation/Diagrammtyp); Diagrammtyp
-  folgt standardmäßig der Granularität (Tag/Woche → Linie, Monat/Jahr →
-  Balken), manuell überschreibbar (localStorage `dashboard.chartType`). Kein
+  **Keine Diagramme** (seit v2.72 entfernt — Verläufe gibt es in den
+  Auswertungen): das Frontend sendet fest `granularity=month` (günstigster
+  Backend-Pfad über `monthly_consumption`; die `totals[]` für KPI/Hinweise/
+  Top-Verbraucher sind granularitätsunabhängig, `consumption[]` wird nicht
+  ausgewertet). Cache-Hit mit Hintergrund-Refetch zeigt „Aktualisiere…". Kein
   CSV-Export auf dieser Seite (dafür der Export-Bereich).
+- Auswertungen (`features/reports/`, Route `/auswertungen`): **kein Auto-Load**
+  — Filter setzen (Gruppierung, Zeitraum, Auflösung, Vergleich, kategoriale
+  Filter inkl. expliziter **Messstellen**-Mehrfachauswahl → Query-Param
+  `measuring_point_id`, in Report-Configs als `measuring_point_ids`; alle
+  haben Standardwerte) und explizit **„Auswerten"** drücken, erst dann
+  `GET /reports/aggregate` (`useReportQuery`: anstehende vs. ausgeführte
+  Query, Abort des Vorgängers). **„Filter zurücksetzen"** (Aktionszeile)
+  stellt die ganze Seite auf Standard und ist im Standardzustand deaktiviert.
+  **Vergleich** (`ComparePeriodFields.tsx`): Periode 1 = der gewählte
+  Zeitraum, Periode 2 = Vorjahr (Default, `previousYearRange`) | Vorperiode
+  (`previousPeriodRange`, Regel wie `services/dashboard.py::previous_range`) |
+  Benutzerdefiniert (von/bis); die aufgelösten Daten werden angezeigt. Gate
+  (`runBlocker`): Button deaktiviert + Hinweis nur bei „Benutzerdefiniert"
+  ohne Von/Bis, Periode 2 „Benutzerdefiniert" ohne Daten bzw. Vorjahr/
+  Vorperiode bei offenem Zeitraum. **Gespeicherte Auswertungen** stehen immer ganz oben
+  (auch leer); ein Klick übernimmt nur die Filter, ausgewertet wird erst per
+  Button. Nach einer Filteränderung bleibt der letzte Lauf stehen mit Hinweis
+  „Filter geändert – erneut auswerten"; Tabelle/CSV/partial-Hinweis leiten
+  sich ausschließlich aus dem ausgeführten Lauf ab (CSV = das Angezeigte,
+  „Speichern" = die aktuellen Filter). Ergebnis als **Tabelle | Diagramm**
+  umschaltbar (Default Tabelle; Recharts-Chunk lädt erst beim Umschalten):
+  Auflösung „Gesamt" oder Vergleich → Balken je Zeile (Vergleich: beide
+  Perioden nebeneinander), Tag/Woche/Monat/Jahr → Verlauf je Gruppe(+Richtung)
+  über `period_end`, Linie mit Umschalter auf Balken; ein Chart je (Zählerart,
+  Einheit), Lesbarkeits-Hinweis ab 25 Serien. **Vergleichstabelle**:
+  Messstelle | Zählerart | Zeitraum A | Zeitraum B | Δ | Δ % — die beiden
+  Perioden-Köpfe zeigen den vom Backend zurückgemeldeten Datumsbereich des
+  ausgeführten Laufs (`periodLabel`: „01.01.2025 – 31.12.2025", offene Enden
+  „ab …"/„bis …", sonst „Gesamter Zeitraum"); dieselben Labels tragen die
+  Vergleichs-CSV und die Diagramm-Legende.
 - Globaler Datumsbereich (`components/GlobalDateRange.tsx`, State in
   `features/prefs/FilterPrefsProvider.tsx`, Helfer in `lib/dateRange.ts`):
   app-weiter Zeitraum-Filter (Dashboard, Erfassungen, Auswertungen — dort per
@@ -283,13 +332,7 @@ Atomar in einer Transaktion:
   diesen Standard wieder her. Die ◀/▶-Pfeile verschieben monatsweise
   (`shiftRangeByMonths`); ein Monatsende bleibt dabei Monatsende
   (30.06. +1 → 31.07., Stepping invertierbar), andere Tage werden aufs
-  Zielmonatsende geclampt. Die Dashboard-Default-Granularität folgt dem
-  Bereich (`defaultGranularity` in `chartUtils.ts`: ≤45 Tage → Tag,
-  ≤182 → Woche, ≤1096 → Monat, sonst Jahr) — beim 2-Monats-Standard also
-  „Woche"; eine manuell gewählte Granularität bleibt erhalten
-  (localStorage `dashboard.granularity`). Der Diagrammtyp folgt wiederum der
-  (effektiven) Granularität (`defaultChartType`: Tag/Woche → Linie, Monat/Jahr
-  → Balken), ebenfalls manuell überschreibbar (localStorage `dashboard.chartType`).
+  Zielmonatsende geclampt.
 - Export als CSV (alle Readings) und JSON (vollständiger Dump); CSV im
   deutschen Excel-Format (`;`-Delimiter, Komma-Dezimal, UTF-8-BOM)
 - Login-Seite, "Passwort ändern"-Dialog, erzwungene Änderung beim
@@ -347,12 +390,14 @@ Atomar in einer Transaktion:
 - **Zählerstand-Import** (`api/v1/imports.py`, `services/import_readings.py`, Dep `openpyxl`): admin-only Import historischer Stände aus Excel/CSV (Layout: je Zeile eine Messstelle = erste Spalte MP-Name, je Spalte ein Monat = Datums-Überschrift). `POST /imports/readings/preview` parst + matcht MP-Namen automatisch (casefold) → `POST /imports/readings/commit` legt Readings an, **idempotent** (dedupe über `UNIQUE(register_id, reading_at)`, bestehende übersprungen). UI: Admin ▸ Import (Mapping je Zeile auf MP + Register). `reading_at` = Datum @ 23:59:59 lokal.
 - **Bis zu 6 Fotos je Erfassung** (`models/reading_photo.py`): Fotos liegen in der Kind-Tabelle `reading_photo` (1→N, `sort_index`) statt der früheren Einzelspalten am Reading. Endpoints: `POST /readings/{id}/photos` (max. 6 → sonst 409), `GET`/`DELETE /readings/{id}/photos/{photo_id}`. Frontend: Mehrfach-Picker (Kamera/Galerie) + Carousel-Lightbox; GPS-Extraktion pro Foto wie zuvor.
 - **Voll-Backup + GUI-Restore** (`services/backup.py`, `services/restore.py`, `api/v1/restore.py`): `GET /export/backup.zip` (admin-only, ersetzt das frühere `backup.db.gz`) liefert ein ZIP aus SQLite-Snapshot (Online-Backup-API, WAL-sicher) + **allen Ablese-Fotos** aus `media_dir` + `manifest.json` (App-Version, Alembic-Revision, SHA-256). Restore in der GUI (Admin ▸ System ▸ Wiederherstellung), Zwei-Schritt ohne Doppel-Upload: `POST /restore/upload` validiert vollständig (Whitelist-Extraktion ohne `extractall` → Zip-Slip-sicher, SQLite-Magic, `integrity_check`, Revisions-Check) und staged unter `<media_dir>/../restore-tmp/` (gleiches FS → atomare Renames, TTL 30 min), `POST /restore/{token}/commit` macht den **Full-Replace**: Safety-Snapshot → Foto-Verzeichnis-Swap (`.bak`) → DB-Swap per Backup-API in die Live-Datei (kein Datei-Rename → kein Stale-WAL) → ggf. `alembic upgrade head` + `recompute_all` → Session-Reinsert (Admin bleibt eingeloggt, wenn sein Username im Backup existiert) → Audit `RESTORE_PERFORMED` in die restaurierte DB. Jeder Fehlschritt rollt komplett zurück. Während des Restores antwortet `get_session` mit 503 (`core/maintenance.py`-Gate); Backups NEUERER Versionen werden abgelehnt. Upload-Limit `METERS_BACKUP_MAX_UPLOAD_BYTES` (Default 1 GiB; Reverse-Proxy-Body-Limit beachten, deploy/lxc/README.md).
+- **Testdaten (Dev)** (`services/seed_readings.py`, CLI `seed-readings --year 2025 [--apply]`): erzeugt für alle aktiven Register synthetische Monatsstände (31.12. des Vorjahres + alle Monatsenden des Jahres), **rückwärts** von der frühesten echten Ablesung abgeleitet (Tagesrate aus den echten Daten oder Fallback je Register-Art, saisonaler Verlauf, deterministisches Rauschen je Register-ID, monoton, nie negativ). Jede Ablesung trägt die Notiz `Testdaten <Jahr>` und ist darüber restlos rückbaubar (`--remove --apply`). `--apply` zieht vorher einen Snapshot `meters.db.pre-seed-<Zeitstempel>` und frischt den Monats-Cache auf. Nur für Dev-/Test-Datenbanken; vor einem echten Deploy entfernen.
 - **CSV-Exporte im deutschen Excel-Format** (`schemas/common.py::format_decimal_de` + `csv_guard_formula`): alle Backend-CSV-Exporte (Auswertung, Erfassungen) nutzen `;`-Delimiter, Komma-Dezimal, vorangestellte UTF-8-BOM und Formel-Injection-Schutz (`'`-Präfix bei führendem `= + - @`). Die Frontend-CSVs (Erfassungen/Reports-Vergleich) ebenso.
 - **Offline-Modus (PWA, v2.69.0; Härtung v2.70.0)** (`frontend/src/lib/offline/{connectivity,db,outbox,syncEngine,syncScheduler,masterData,pendingAge}.ts`, `frontend/src/lib/pwaInstall.ts`, `frontend/src/features/offline/`): Rein additiv — greift NUR bei Netzfehlern, das Online-Verhalten und beide Deployment-Varianten bleiben unverändert; Backend ohne Änderungen (Replay-Idempotenz über `UNIQUE(register_id, reading_at)` + 409-`existing`-Payload). Bausteine: fetch-Rejections werden in `lib/api.ts` zum typisierten `NetworkError`; Workbox-`api-get`-Cache 200 Einträge/30 Tage (NetworkFirst — die TTL bestimmt nur das Offline-Fallback-Alter); Offline-Kaltstart über localStorage-Me-Snapshot `offline.me` (401 und Logout löschen ihn); IndexedDB `zaehler-offline` mit **Outbox** (ein Item je Register-POST, gruppiert je Submit, Fotos als komprimierte Blobs an der Gruppe) und **aktivem Stammdaten-Snapshot** (Messstellen + letzte Stände je User, refresht nach jedem erfolgreichen Sync und beim App-Start, wenn älter als 1 h → Erfassung offline GARANTIERT möglich). **Sync-Engine handgerollt** (kein Background-Sync-API — iOS Safari kann das nicht): strikt sequenziell nach `reading_at`, Trigger App-Start/Login, `online`-Event, `visibilitychange`, manuell, plus automatischer Retry mit Backoff (30 s → 5 min Cap, `syncScheduler.ts`) solange offene Einträge warten — Konflikte und 401 lösen bewusst keinen Auto-Retry aus; wertgleiche 409 werden automatisch als Erfolg aufgelöst, 400-Plausibilität und abweichende 409 bleiben als Konflikt liegen — Nutzer entscheidet auf `/sync` (`PendingSyncPage`); 401 pausiert bis zur Anmeldung; Foto-Uploads einzeln crash-sicher (`uploadedPhotoIds`-Dedupe); Doppel-Sync-Schutz via Web Locks + Modul-Flag. Logout purgt Queue + Snapshots nach Confirm. **Datensicherheit (v2.70.0):** iOS-Install-Hinweis gegen die 7-Tage-Storage-Eviction (`pwaInstall.ts` + `IosInstallHintCard`, dismissible via localStorage `offline.iosInstallHintDismissed` — auf `/sync` bewusst nicht dismissible), Alters-Warnung für offene Einträge (`pendingAge.ts`: gelb ab 3, rot ab 5 Tagen — Banner auf `/sync`, färbt auch die Sync-Badges) und Speicher-Anzeige auf `/sync` (`StorageSummary`: `storage.estimate()`/`persisted()`, Warnung ab 80 % Belegung). Grenzen: Offline-Einträge erscheinen bis zum Sync als Pending-Sektion in der Erfassungsliste und als „letzter Stand (ausstehend)" beim Erfassen (inkl. Offline-Plausibilität gegen den Outbox-Wert) — Dashboard/Verbrauch bleiben rein serverseitig; Offline-**Kaltstart** braucht Secure Context (HTTPS) — bei Direkt-HTTP fangen Queue/Snapshot nur Netzabbrüche in geöffneter App ab; auf iOS PWA installieren („Zum Home-Bildschirm"), sonst droht 7-Tage-Storage-Eviction.
-- **Metering / Monats-Statistik** (`services/consumption.py::split_across_buckets`, `services/monthly_consumption.py`, Tabelle `monthly_consumption`): Der Verbrauch zwischen zwei Ablesungen wird **taggenau** (lineare Interpolation) über Monatsgrenzen verteilt — Ablesungen mitten im Monat landen so anteilig in beiden Monaten; Stände genau auf der Monatsgrenze (digitale Monatsend-Werte) bleiben ungeteilt. Die Monats-Werte werden in `monthly_consumption` **materialisiert** (Cache; `Reading` bleibt die Wahrheit), gepflegt von einem zentralen SQLAlchemy-Session-Hook (`register_monthly_consumption_hooks`, in `create_app` registriert) nach jeder Ablese-Änderung. `granularity=month` **und `year`** (consumption-Endpoint + report_aggregation + Dashboard) lesen aus der Tabelle (s. `consumption_source.py`), andere Granularitäten on-the-fly. **Deploy-Schritt:** nach Migrationen, die die Tabelle (neu) anlegen/leeren, einmalig `uv run python -m meters.cli recompute-monthly` (Backfill) ausführen, sonst sind die Monats- **und Jahres**-Diagramme leer bis zur nächsten Änderung je MP. Erfassen-Toggle „Aktueller Stand" vs „Historischer Monatswert" (Monats-Picker → `reading_at` = Monatsende 23:59:59 lokal, App-Periodenende-Konvention).
+- **Metering / Monats-Statistik** (`services/consumption.py::split_across_buckets`, `services/monthly_consumption.py`, Tabelle `monthly_consumption`): Der Verbrauch zwischen zwei Ablesungen wird **taggenau** (lineare Interpolation) über Monatsgrenzen verteilt — Ablesungen mitten im Monat landen so anteilig in beiden Monaten; Stände genau auf der Monatsgrenze (digitale Monatsend-Werte) bleiben ungeteilt. Die Monats-Werte werden in `monthly_consumption` **materialisiert** (Cache; `Reading` bleibt die Wahrheit), gepflegt von einem zentralen SQLAlchemy-Session-Hook (`register_monthly_consumption_hooks`, in `create_app` registriert) nach jeder Ablese-Änderung. `granularity=month` **und `year`** (consumption-Endpoint + report_aggregation + Dashboard) lesen aus der Tabelle (s. `consumption_source.py`), andere Granularitäten on-the-fly. **Deploy-Schritt:** nach Migrationen, die die Tabelle (neu) anlegen/leeren, einmalig `uv run python -m meters.cli recompute-monthly` (Backfill) ausführen, sonst sind die Dashboard-KPIs (feste `granularity=month`) sowie die Monats- **und Jahres**-Auswertungen leer bis zur nächsten Änderung je MP. Erfassen-Toggle „Aktueller Stand" vs „Historischer Monatswert" (Monats-Picker → `reading_at` = Monatsende 23:59:59 lokal, App-Periodenende-Konvention).
 - **Dashboard-Endpoint** (`api/v1/dashboard.py`, `services/dashboard.py`): ein Request liefert für alle zugänglichen Messstellen das Stammdaten-Minimum, die aktiven Register, `last_reading_at`, die Verbrauchsreihe (`consumption[]`) und Perioden-`totals[]` (aktueller Zeitraum vs. Vorperiode je `(obis_code, unit)`, mit `direction`) — Totals sind taggenau und granularitätsunabhängig (Monats-Buckets werden bei monatsaligniertem Bereich ungeklippt summiert, sonst taggenauer Clip auf den Roh-Intervallen, s. `services/dashboard.py::range_total`). Vorperioden-Regel (`previous_range`): monatsalignierter Bereich → um dieselbe Anzahl ganzer Monate zurück, sonst gleiche Tageslänge endend am Tag vor `from_date`; ohne Zeitraum keine Vorperiode. `partial=true` für Nicht-Admin (Recorder sieht nur zugewiesene Messstellen, wie bei `/reports/aggregate`). Antwort bewusst ohne `readings`/`state` — wer Details braucht, holt sie über die Einzel-Endpoints. Hinweise/Ranking rechnet das Frontend clientseitig aus den Totals (`dashboardMetrics.ts`).
 
 ## Konventionen
+
 - Python: ruff (lint+format), mypy strict, type hints überall
 - TypeScript: strict mode, kein `any`, kein `as` ohne Begründung
 - Commits: Conventional Commits (feat:, fix:, chore:, refactor:, test:)

@@ -5,12 +5,110 @@ import type { ReportRow } from '@/lib/types';
 import {
   PERIOD_KIND_LABELS,
   buildAggregateQuery,
+  comparisonCsvRows,
   diffRows,
   directionSuffix,
   displayGroupLabel,
   groupsWithEinspeisung,
+  periodLabel,
+  previousPeriodRange,
+  previousYearRange,
+  resolveComparePeriod,
   resolvePeriod,
+  rowKey,
+  runBlocker,
 } from './reportUtils';
+
+describe('Vergleichsperioden', () => {
+  it('previousYearRange verschiebt um ein Jahr, Monatsende bleibt Monatsende', () => {
+    expect(previousYearRange({ from: '2026-08-01', to: '2026-09-30' })).toEqual({
+      from: '2025-08-01',
+      to: '2025-09-30',
+    });
+    expect(previousYearRange({ from: '2028-02-01', to: '2028-02-29' })).toEqual({
+      from: '2027-02-01',
+      to: '2027-02-28',
+    });
+    expect(previousYearRange({ from: null, to: null })).toEqual({ from: null, to: null });
+  });
+
+  it('previousPeriodRange: monatsaligned → gleich viele ganze Monate zurück', () => {
+    expect(previousPeriodRange({ from: '2026-08-01', to: '2026-09-30' })).toEqual({
+      from: '2026-06-01',
+      to: '2026-07-31',
+    });
+    expect(previousPeriodRange({ from: '2026-03-01', to: '2026-03-31' })).toEqual({
+      from: '2026-02-01',
+      to: '2026-02-28',
+    });
+  });
+
+  it('previousPeriodRange: sonst gleiche Tageslänge endend am Vortag', () => {
+    expect(previousPeriodRange({ from: '2026-03-10', to: '2026-03-19' })).toEqual({
+      from: '2026-02-28',
+      to: '2026-03-09',
+    });
+    expect(previousPeriodRange({ from: '2026-01-01', to: null })).toEqual({ from: null, to: null });
+  });
+
+  it('resolveComparePeriod: benutzerdefiniert nimmt die freien Felder', () => {
+    const p = { from: '2026-08-01', to: '2026-09-30' };
+    expect(resolveComparePeriod('custom', p, '2024-01-01', '')).toEqual({
+      from: '2024-01-01',
+      to: null,
+    });
+    expect(resolveComparePeriod('previous_year', p, '', '')).toEqual(previousYearRange(p));
+    expect(resolveComparePeriod('previous_period', p, '', '')).toEqual(previousPeriodRange(p));
+  });
+});
+
+describe('comparisonCsvRows', () => {
+  it('Kopf trägt die Zeitraum-Labels, Werte mit Komma-Dezimal', () => {
+    const rows = diffRows(
+      [
+        {
+          group_key: 1,
+          group_label: 'Halle',
+          meter_type: 'electricity',
+          unit: 'kWh',
+          direction: 'einspeisung',
+          period_start: null,
+          period_end: null,
+          consumption: '120.5',
+        },
+      ],
+      [],
+    );
+    const csv = comparisonCsvRows(rows, { a: '01.01.2026 – 31.12.2026', b: 'Gesamter Zeitraum' });
+    expect(csv).toEqual([
+      [
+        'Gruppe',
+        'Zählerart',
+        'Richtung',
+        'Einheit',
+        '01.01.2026 – 31.12.2026',
+        'Gesamter Zeitraum',
+        'Differenz',
+      ],
+      ['Halle', 'Strom', 'Einspeisung', 'kWh', '120,5', '0', '120,5'],
+    ]);
+  });
+});
+
+describe('periodLabel', () => {
+  it('beide Daten → deutscher Datumsbereich', () => {
+    expect(periodLabel('2025-01-01', '2025-12-31')).toBe('01.01.2025 – 31.12.2025');
+  });
+  it('nur Von → „ab"', () => {
+    expect(periodLabel('2025-01-01', null)).toBe('ab 01.01.2025');
+  });
+  it('nur Bis → „bis"', () => {
+    expect(periodLabel(null, '2025-12-31')).toBe('bis 31.12.2025');
+  });
+  it('ohne Grenzen → Gesamter Zeitraum', () => {
+    expect(periodLabel(null, null)).toBe('Gesamter Zeitraum');
+  });
+});
 
 describe('resolvePeriod', () => {
   const today = new Date(2024, 5, 15); // 15. Juni 2024 (lokal)
@@ -146,8 +244,10 @@ describe('buildAggregateQuery', () => {
       ownerIds: [],
       kostenstellen: [],
       meterTypes: [],
+      measuringPointIds: [],
     });
     const p = new URLSearchParams(qs);
+    expect(p.has('measuring_point_id')).toBe(false);
     expect(p.get('dimension')).toBe('kostenstelle');
     expect(p.get('granularity')).toBe('total');
     expect(p.has('from_at')).toBe(false);
@@ -165,8 +265,10 @@ describe('buildAggregateQuery', () => {
       ownerIds: [7, 8],
       kostenstellen: [10001],
       meterTypes: ['electricity', 'water'],
+      measuringPointIds: [3, 5],
     });
     const p = new URLSearchParams(qs);
+    expect(p.getAll('measuring_point_id')).toEqual(['3', '5']);
     expect(p.get('from_at')).toBe('2024-01-01');
     expect(p.getAll('owner_id')).toEqual(['7', '8']);
     expect(p.getAll('kostenstelle')).toEqual(['10001']);
@@ -189,5 +291,92 @@ describe('verrechnete Messstellen (is_virtual)', () => {
     const v = rows.find((r) => r.is_virtual);
     expect(v?.a).toBe(40);
     expect(rows.find((r) => !r.is_virtual)?.a).toBe(100);
+  });
+});
+
+describe('runBlocker', () => {
+  const ready = {
+    periodKind: 'shared_range' as const,
+    customFrom: '',
+    customTo: '',
+    periodFrom: '2026-08-01',
+    periodTo: '2026-09-30',
+    compare: false,
+    compareKind: 'previous_year' as const,
+    compareFrom: '',
+    compareTo: '',
+  };
+
+  it('ist null, wenn alle Filter Standardwerte haben', () => {
+    expect(runBlocker(ready)).toBeNull();
+  });
+
+  it('blockiert „Benutzerdefiniert" ohne beide Daten', () => {
+    expect(runBlocker({ ...ready, periodKind: 'fixed' })).toMatch(/Von- und Bis-Datum/);
+    expect(runBlocker({ ...ready, periodKind: 'fixed', customFrom: '2026-01-01' })).toMatch(
+      /Von- und Bis-Datum/,
+    );
+    expect(
+      runBlocker({
+        ...ready,
+        periodKind: 'fixed',
+        customFrom: '2026-01-01',
+        customTo: '2026-01-31',
+      }),
+    ).toBeNull();
+  });
+
+  it('blockiert den benutzerdefinierten Vergleich ohne beide Vergleichsdaten', () => {
+    const custom = { ...ready, compare: true, compareKind: 'custom' as const };
+    expect(runBlocker(custom)).toMatch(/Vergleichsdaten/);
+    expect(runBlocker({ ...custom, compareTo: '2025-12-31' })).toMatch(/Vergleichsdaten/);
+    expect(
+      runBlocker({ ...custom, compareFrom: '2025-01-01', compareTo: '2025-12-31' }),
+    ).toBeNull();
+  });
+
+  it('Vorjahr/Vorperiode brauchen eine begrenzte Periode 1', () => {
+    expect(runBlocker({ ...ready, compare: true })).toBeNull();
+    expect(runBlocker({ ...ready, compare: true, periodFrom: null, periodTo: null })).toMatch(
+      /begrenzten Zeitraum/,
+    );
+    expect(
+      runBlocker({
+        ...ready,
+        compare: true,
+        compareKind: 'previous_period',
+        periodFrom: null,
+        periodTo: null,
+      }),
+    ).toMatch(/begrenzten Zeitraum/);
+    // Benutzerdefiniert kommt ohne Periode 1 aus.
+    expect(
+      runBlocker({
+        ...ready,
+        compare: true,
+        compareKind: 'custom',
+        periodFrom: null,
+        periodTo: null,
+        compareFrom: '2025-01-01',
+        compareTo: '2025-12-31',
+      }),
+    ).toBeNull();
+  });
+});
+
+describe('rowKey', () => {
+  it('trennt virtuelle von echten Zeilen mit gleicher ID', () => {
+    const base: ReportRow = {
+      group_key: 1,
+      group_label: 'A',
+      meter_type: 'electricity',
+      unit: 'kWh',
+      direction: 'bezug',
+      period_start: null,
+      period_end: null,
+      consumption: '1',
+    };
+    expect(rowKey(base)).not.toBe(rowKey({ ...base, is_virtual: true }));
+    expect(rowKey(base)).not.toBe(rowKey({ ...base, direction: 'einspeisung' }));
   });
 });
