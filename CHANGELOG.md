@@ -10,6 +10,14 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.72.0](https://github.com/muelley86/zaehler/compare/v2.71.1...v2.72.0) (2026-09-08)
+
+
+### Funktionen
+
+* **dashboard:** Dashboard v3 — ein Request, KPI-Vergleich, Hinweise, Top-Verbraucher, responsiv ([#336](https://github.com/muelley86/zaehler/issues/336)) ([86f1fce](https://github.com/muelley86/zaehler/commit/86f1fce492eff6fec3158fbbdfee03802c3e2fdb))
+* **reports:** Auswerten-Button, Perioden-Vergleich mit Zeitraum-Spalten, Messstellen-Filter, Testdaten-Seed; Dashboard ohne Diagramme ([#338](https://github.com/muelley86/zaehler/issues/338)) ([ac3fd60](https://github.com/muelley86/zaehler/commit/ac3fd606fd6cf83fad4c98fdb20d663a95358e3c))
+
 ## [2.71.1](https://github.com/muelley86/zaehler/compare/v2.71.0...v2.71.1) (2026-07-13)
 
 
