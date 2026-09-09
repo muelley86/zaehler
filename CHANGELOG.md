@@ -10,6 +10,13 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.73.0](https://github.com/muelley86/zaehler/compare/v2.72.0...v2.73.0) (2026-09-09)
+
+
+### Funktionen
+
+* **virtual-mps:** Standort für verrechnete Messstellen, Hauptstandort in den Stammdaten ([#339](https://github.com/muelley86/zaehler/issues/339)) ([c567284](https://github.com/muelley86/zaehler/commit/c5672842f462c2a2cb82419b744627e5eca1b6b6))
+
 ## [2.72.0](https://github.com/muelley86/zaehler/compare/v2.71.1...v2.72.0) (2026-09-08)
 
 
