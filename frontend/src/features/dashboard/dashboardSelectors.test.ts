@@ -171,4 +171,52 @@ describe('buildFilterOptions — Kaskade der Messstellen-Optionen', () => {
       { value: null, label: 'ohne Hauptstandort' },
     ]);
   });
+
+  it('bietet Standorte/Hauptstandorte an, die nur an verrechneten Messstellen hängen', () => {
+    const items = [dashboardItem({ id: 1, location_id: 1, location_name: 'Garage' })];
+    const virtuals = [
+      virtualItem({
+        id: 10,
+        location_id: 5,
+        location_name: 'Keller',
+        main_location_id: 2,
+        main_location_name: 'Hof',
+      }),
+    ];
+    const options = buildFilterOptions(items, virtuals, emptyFilters());
+    expect(options.locations.map((o) => o.label)).toEqual([
+      'Garage',
+      'Keller',
+      'ohne Zählerstandort',
+    ]);
+    expect(options.mainLocations.map((o) => o.label)).toEqual(['Hof', 'ohne Hauptstandort']);
+  });
+});
+
+describe('selectFilteredVirtual — Standort-/Hauptstandort-Filter', () => {
+  it('Standort-Filter lässt nur vmp mit passendem Standort durch', () => {
+    const virtuals = [
+      virtualItem({ id: 10, location_id: 5, location_name: 'Keller' }),
+      virtualItem({ id: 11 }),
+    ];
+    const f: DashboardFilters = { ...emptyFilters(), location: new Set<number | null>([5]) };
+    expect(selectFilteredVirtual(virtuals, f).map((v) => v.id)).toEqual([10]);
+  });
+
+  it('Hauptstandort-Filter greift auf main_location_id; „ohne …" (null) trifft vmp ohne Standort', () => {
+    const virtuals = [
+      virtualItem({ id: 10, main_location_id: 2, main_location_name: 'Hof' }),
+      virtualItem({ id: 11 }),
+    ];
+    const withMain: DashboardFilters = {
+      ...emptyFilters(),
+      mainLocation: new Set<number | null>([2]),
+    };
+    expect(selectFilteredVirtual(virtuals, withMain).map((v) => v.id)).toEqual([10]);
+    const without: DashboardFilters = {
+      ...emptyFilters(),
+      mainLocation: new Set<number | null>([null]),
+    };
+    expect(selectFilteredVirtual(virtuals, without).map((v) => v.id)).toEqual([11]);
+  });
 });

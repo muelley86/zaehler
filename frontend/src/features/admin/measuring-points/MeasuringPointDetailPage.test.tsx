@@ -208,6 +208,34 @@ describe('MeasuringPointDetailPage Stammdaten-Card', () => {
     expect(editButtons.length).toBeGreaterThanOrEqual(1);
   });
 
+  it('zeigt neben dem Standort auch den Hauptstandort', async () => {
+    _mockMp({
+      ..._strom,
+      location_id: 5,
+      location_name: 'Keller',
+      main_location_id: 2,
+      main_location_name: 'Hof',
+    });
+    renderWithRouter(<MeasuringPointDetailPage />, {
+      initialEntries: ['/admin/messstellen/1'],
+    });
+    expect(await screen.findByText('Hauptstandort')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Hof' })).toHaveAttribute(
+      'href',
+      '/admin/hauptstandorte',
+    );
+    expect(screen.getByRole('link', { name: 'Keller' })).toBeInTheDocument();
+  });
+
+  it('zeigt „—" als Hauptstandort, wenn keiner zugeordnet ist', async () => {
+    _mockMp(_strom);
+    renderWithRouter(<MeasuringPointDetailPage />, {
+      initialEntries: ['/admin/messstellen/1'],
+    });
+    const label = await screen.findByText('Hauptstandort');
+    expect(label.nextElementSibling).toHaveTextContent('—');
+  });
+
   it('öffnet das Edit-Formular bei Klick auf "Bearbeiten"', async () => {
     _mockMp(_strom);
     renderWithRouter(<MeasuringPointDetailPage />, {

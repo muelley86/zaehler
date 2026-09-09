@@ -211,6 +211,14 @@ def _build_virtual_items(
             id=vmp.id,
             name=vmp.name,
             type=vmp.type,
+            location_id=vmp.location_id,
+            location_name=vmp.location.name if vmp.location is not None else None,
+            main_location_id=(vmp.location.main_location_id if vmp.location is not None else None),
+            main_location_name=(
+                vmp.location.main_location.name
+                if vmp.location is not None and vmp.location.main_location is not None
+                else None
+            ),
             consumption=[
                 _to_point(p)
                 for p in consumption_for_virtual_mp(

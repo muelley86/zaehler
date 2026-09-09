@@ -29,6 +29,7 @@ class VirtualMeasuringPointCreate(BaseModel):
     name: str = Field(min_length=1, max_length=120)
     note: str | None = Field(default=None, max_length=500)
     type: MeterType
+    location_id: int | None = None
     components: list[VirtualMpComponentIn] = Field(min_length=1, max_length=MAX_COMPONENTS)
 
 
@@ -38,6 +39,10 @@ class VirtualMeasuringPointUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=120)
     note: str | None = Field(default=None, max_length=500)
     type: MeterType | None = None
+    # Standort setzen bzw. mit ``clear_location`` explizit entfernen (wie
+    # ``MeasuringPointUpdate``; ``None`` allein bedeutet "nicht angefasst").
+    location_id: int | None = None
+    clear_location: bool = False
     components: list[VirtualMpComponentIn] | None = Field(
         default=None, min_length=1, max_length=MAX_COMPONENTS
     )
@@ -56,6 +61,11 @@ class VirtualMeasuringPointRead(APIModel):
     name: str
     note: str | None
     type: MeterType
+    location_id: int | None = None
+    location_name: str | None = None
+    # Abgeleitet ueber Location.main_location — nie direkt gespeichert.
+    main_location_id: int | None = None
+    main_location_name: str | None = None
     components: list[VirtualMpComponentRead]
 
 

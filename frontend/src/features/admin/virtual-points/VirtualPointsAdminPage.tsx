@@ -28,6 +28,7 @@ import { ApiError, api } from '@/lib/api';
 import { TYPE_LABELS } from '@/lib/meterLabels';
 import type {
   FlowDirection,
+  LocationRead,
   MeasuringPointRead,
   MeterType,
   VirtualMeasuringPointRead,
@@ -36,6 +37,7 @@ import type {
 export function VirtualPointsAdminPage() {
   const [vmps, setVmps] = useState<VirtualMeasuringPointRead[] | null>(null);
   const [points, setPoints] = useState<MeasuringPointRead[]>([]);
+  const [locations, setLocations] = useState<LocationRead[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
   const [editing, setEditing] = useState<VirtualMeasuringPointRead | null>(null);
@@ -52,6 +54,12 @@ export function VirtualPointsAdminPage() {
       .then(setPoints)
       .catch(() => {
         /* Formular zeigt dann eine leere Auswahl */
+      });
+    api
+      .get<LocationRead[]>('/locations')
+      .then(setLocations)
+      .catch(() => {
+        /* Standort-Auswahl bleibt dann leer („kein Standort" ist weiterhin möglich) */
       });
   }, [tick]);
 
@@ -73,7 +81,7 @@ export function VirtualPointsAdminPage() {
 
       <Section header="Neue verrechnete Messstelle">
         <div className="p-5">
-          <VmpForm points={points} initial={null} onSaved={refresh} />
+          <VmpForm points={points} locations={locations} initial={null} onSaved={refresh} />
         </div>
       </Section>
 
@@ -99,6 +107,7 @@ export function VirtualPointsAdminPage() {
         {editing ? (
           <VmpForm
             points={points}
+            locations={locations}
             initial={editing}
             onSaved={() => {
               setEditing(null);
@@ -152,6 +161,13 @@ function VmpCard({
               </Link>
             </div>
             <div className="text-caption text-tertiary">{TYPE_LABELS[vmp.type]}</div>
+            {vmp.location_name ? (
+              <div className="truncate text-caption text-tertiary">
+                {vmp.main_location_name
+                  ? `${vmp.location_name} · ${vmp.main_location_name}`
+                  : vmp.location_name}
+              </div>
+            ) : null}
             {vmp.note ? (
               <div className="mt-0.5 truncate text-caption text-tertiary">{vmp.note}</div>
             ) : null}
@@ -217,11 +233,13 @@ const EMPTY_COMPONENT: ComponentDraft = { measuring_point_id: '', direction: 'be
 /** Formular für Anlegen (initial=null) und Bearbeiten (Komponenten vorbefüllt). */
 function VmpForm({
   points,
+  locations,
   initial,
   onSaved,
   onCancel,
 }: {
   points: MeasuringPointRead[];
+  locations: LocationRead[];
   initial: VirtualMeasuringPointRead | null;
   onSaved: () => void;
   onCancel?: () => void;
@@ -229,6 +247,7 @@ function VmpForm({
   const [name, setName] = useState(initial?.name ?? '');
   const [note, setNote] = useState(initial?.note ?? '');
   const [type, setType] = useState<MeterType>(initial?.type ?? 'electricity');
+  const [locationId, setLocationId] = useState<number | null>(initial?.location_id ?? null);
   const [components, setComponents] = useState<ComponentDraft[]>(
     initial
       ? initial.components.map((c) => ({
@@ -261,23 +280,33 @@ function VmpForm({
     }
     setError(null);
     setBusy(true);
-    const body = {
-      name,
-      note: note || null,
-      type,
-      components: components.map((c) => ({
-        measuring_point_id: c.measuring_point_id,
-        direction: c.direction,
-        sign: c.sign,
-      })),
-    };
+    const componentsPayload = components.map((c) => ({
+      measuring_point_id: c.measuring_point_id,
+      direction: c.direction,
+      sign: c.sign,
+    }));
+    const stammdaten = { name, note: note || null, type, location_id: locationId };
     try {
       if (initial) {
-        await api.patch(`/virtual-measuring-points/${initial.id}`, body);
+        // PATCH: ``location_id: null`` allein heißt „nicht angefasst" — das
+        // Entfernen des Standorts braucht das explizite ``clear_location``.
+        // ``components`` nur mitschicken, wenn es welche gibt: das Backend
+        // verlangt bei gesendeter Liste ≥ 1 Eintrag, eine leere Liste gibt es
+        // nur bei verwaisten Verrechnungen (Komponenten-MPs gelöscht) — deren
+        // Stammdaten müssen trotzdem speicherbar bleiben.
+        await api.patch(`/virtual-measuring-points/${initial.id}`, {
+          ...stammdaten,
+          ...(componentsPayload.length > 0 ? { components: componentsPayload } : {}),
+          clear_location: locationId === null,
+        });
       } else {
-        await api.post('/virtual-measuring-points', body);
+        await api.post('/virtual-measuring-points', {
+          ...stammdaten,
+          components: componentsPayload,
+        });
         setName('');
         setNote('');
+        setLocationId(null);
         setComponents([{ ...EMPTY_COMPONENT }]);
       }
       onSaved();
@@ -304,9 +333,27 @@ function VmpForm({
           </option>
         ))}
       </Select>
+      <Select
+        label="Standort"
+        value={locationId ?? ''}
+        onChange={(e) => setLocationId(e.target.value ? Number(e.target.value) : null)}
+      >
+        <option value="">— kein Standort —</option>
+        {locations.map((loc) => (
+          <option key={loc.id} value={loc.id}>
+            {loc.name}
+          </option>
+        ))}
+      </Select>
 
       <div className="space-y-2">
         <div className="text-caption-bold uppercase text-tertiary">Komponenten</div>
+        {components.length === 0 ? (
+          <div className="text-caption text-tertiary">
+            Diese Verrechnung hat keine Komponenten — sie liefert keine Werte, bis Komponenten
+            ergänzt sind.
+          </div>
+        ) : null}
         {components.map((c, idx) => (
           <div key={idx} className="flex items-end gap-2">
             <button

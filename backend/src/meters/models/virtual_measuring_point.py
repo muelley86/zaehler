@@ -24,6 +24,7 @@ from meters.db import Base, TimestampMixin
 from meters.models._enums import FlowDirection, MeterType
 
 if TYPE_CHECKING:  # pragma: no cover
+    from meters.models.location import Location
     from meters.models.measuring_point import MeasuringPoint
 
 
@@ -39,6 +40,14 @@ class VirtualMeasuringPoint(Base, TimestampMixin):
         SAEnum(MeterType, name="meter_type", native_enum=False, length=16),
         nullable=False,
     )
+    # Optionaler Zaehlerstandort — wie bei MeasuringPoint. Der Hauptstandort
+    # haengt am Standort (``Location.main_location``) und wird nicht dupliziert.
+    location_id: Mapped[int | None] = mapped_column(
+        ForeignKey("location.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    # ``lazy="joined"``: jede Serialisierung braucht Standort + Hauptstandort
+    # (Location laedt main_location selbst schon joined) — kein N+1.
+    location: Mapped[Location | None] = relationship(lazy="joined")
     components: Mapped[list[VirtualMpComponent]] = relationship(
         cascade="all, delete-orphan",
         order_by="VirtualMpComponent.sort_index",

@@ -441,6 +441,22 @@ function StammdatenReadView({
           )
         }
       />
+      {/* Hauptstandort hängt am Standort (Location.main_location) — nur lesbar. */}
+      <FieldRow
+        k="Hauptstandort"
+        v={
+          mp.main_location_name ? (
+            <Link
+              to="/admin/hauptstandorte"
+              className="font-semibold text-primary-deep underline-offset-2 hover:underline"
+            >
+              {mp.main_location_name}
+            </Link>
+          ) : (
+            '—'
+          )
+        }
+      />
       {mp.type === 'electricity' ? (
         <>
           <FieldRow k="Doppeltarif" v={mp.has_dual_tariff ? 'Ja' : 'Nein'} />

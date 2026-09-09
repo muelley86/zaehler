@@ -261,28 +261,32 @@ def _virtual_rows(
 ) -> list[GroupBucketRow]:
     """Zeilen fuer virtuelle (verrechnete) Messstellen.
 
-    Nur in der Dimension MEASURING_POINT und nur ohne aktive kategoriale
-    Filter — virtuelle MPs haben weder Standort noch Eigentuemer noch
-    Kostenstelle, ein gefiltertes Ergebnis waere semantisch falsch; auch die
-    explizite Messstellen-Auswahl zaehlt als kategorial (vmp-IDs leben in
-    einem eigenen Namensraum). Der ``meter_type``-Filter greift (die vmp hat
-    einen Typ). Richtung ist immer
-    ``bezug``: die Zeile ist ein Netto-Wert, keine Einspeise-Reihe.
+    Nur in der Dimension MEASURING_POINT — in Standort-/Eigentuemer-Gruppen
+    wuerden die Komponenten doppelt zaehlen. Standort-, Hauptstandort- und
+    ``meter_type``-Filter greifen wie bei echten MPs (vmp hat Standort und Typ;
+    ohne Standort faellt sie in den "ohne ..."-Bucket). Eigentuemer und
+    Kostenstelle hat eine vmp nicht — bei diesen Filtern entfallen die Zeilen;
+    ebenso bei der expliziten Messstellen-Auswahl (vmp-IDs leben in einem
+    eigenen Namensraum). Richtung ist immer ``bezug``: die Zeile ist ein
+    Netto-Wert, keine Einspeise-Reihe.
     """
     if dimension is not ReportDimension.MEASURING_POINT:
         return []
-    has_categorical = (
-        filters.main_location_ids is not None
-        or filters.location_ids is not None
-        or filters.owner_ids is not None
+    has_unsupported_filter = (
+        filters.owner_ids is not None
         or filters.kostenstellen is not None
         or filters.measuring_point_ids is not None
     )
-    if has_categorical:
+    if has_unsupported_filter:
         return []
     rows: list[GroupBucketRow] = []
     for vmp in visible_virtual_mps(db, user):
         if filters.meter_types is not None and vmp.type not in filters.meter_types:
+            continue
+        main_id = vmp.location.main_location_id if vmp.location is not None else None
+        if not _matches(vmp.location_id, filters.location_ids):
+            continue
+        if not _matches(main_id, filters.main_location_ids):
             continue
         points = consumption_for_virtual_mp(
             db, vmp, granularity=granularity, from_date=from_date, to_date=to_date, cache=cache

@@ -587,3 +587,185 @@ def test_reports_csv_marks_virtual_group_id(admin_client: TestClient) -> None:
     )
     assert resp.status_code == 200
     assert f"V{vmp['id']}" in resp.text
+
+
+# ---------------------------------------------------------------------------
+# Standort / Hauptstandort
+# ---------------------------------------------------------------------------
+
+
+def _create_location_with_main(
+    client: TestClient, *, main_name: str, location_name: str
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    main = client.post("/api/v1/main-locations", json={"name": main_name}).json()
+    loc = client.post(
+        "/api/v1/locations", json={"name": location_name, "main_location_id": main["id"]}
+    ).json()
+    return main, loc
+
+
+def test_vmp_with_location_exposes_location_and_main_location(admin_client: TestClient) -> None:
+    mps = _setup_biogas_scenario(admin_client)
+    main, loc = _create_location_with_main(
+        admin_client, main_name="Hof", location_name="Biogas-Keller"
+    )
+    resp = admin_client.post(
+        "/api/v1/virtual-measuring-points",
+        json={
+            "name": "Loc-vmp",
+            "type": "electricity",
+            "components": _biogas_components(mps),
+            "location_id": loc["id"],
+        },
+    )
+    assert resp.status_code == 201, resp.text
+    body = resp.json()
+    assert body["location_id"] == loc["id"]
+    assert body["location_name"] == "Biogas-Keller"
+    assert body["main_location_id"] == main["id"]
+    assert body["main_location_name"] == "Hof"
+    listing = admin_client.get("/api/v1/virtual-measuring-points").json()
+    assert listing[0]["main_location_name"] == "Hof"
+    detail = admin_client.get(f"/api/v1/virtual-measuring-points/{body['id']}").json()
+    assert detail["location_name"] == "Biogas-Keller"
+
+
+def test_vmp_without_location_has_null_location_fields(admin_client: TestClient) -> None:
+    mps = _setup_biogas_scenario(admin_client)
+    vmp = _create_vmp(admin_client, "NoLoc-vmp", _biogas_components(mps))
+    assert vmp["location_id"] is None
+    assert vmp["location_name"] is None
+    assert vmp["main_location_id"] is None
+    assert vmp["main_location_name"] is None
+
+
+def test_vmp_unknown_location_404(admin_client: TestClient) -> None:
+    mps = _setup_biogas_scenario(admin_client)
+    resp = admin_client.post(
+        "/api/v1/virtual-measuring-points",
+        json={
+            "name": "Bad-loc",
+            "type": "electricity",
+            "components": _biogas_components(mps),
+            "location_id": 99999,
+        },
+    )
+    assert resp.status_code == 404
+    vmp = _create_vmp(admin_client, "Patch-bad-loc", _biogas_components(mps))
+    patched = admin_client.patch(
+        f"/api/v1/virtual-measuring-points/{vmp['id']}", json={"location_id": 99999}
+    )
+    assert patched.status_code == 404
+
+
+def test_vmp_patch_and_clear_location_with_audit(admin_client: TestClient) -> None:
+    mps = _setup_biogas_scenario(admin_client)
+    _, loc = _create_location_with_main(
+        admin_client, main_name="Hof-Patch", location_name="Keller-Patch"
+    )
+    vmp = _create_vmp(admin_client, "Patch-loc", _biogas_components(mps))
+    patched = admin_client.patch(
+        f"/api/v1/virtual-measuring-points/{vmp['id']}", json={"location_id": loc["id"]}
+    )
+    assert patched.status_code == 200, patched.text
+    assert patched.json()["location_name"] == "Keller-Patch"
+    assert patched.json()["main_location_name"] == "Hof-Patch"
+    cleared = admin_client.patch(
+        f"/api/v1/virtual-measuring-points/{vmp['id']}", json={"clear_location": True}
+    )
+    assert cleared.status_code == 200, cleared.text
+    assert cleared.json()["location_id"] is None
+    assert cleared.json()["main_location_name"] is None
+    with SessionLocal() as db:
+        logs = (
+            db.query(AuditLog)
+            .filter(
+                AuditLog.entity_type == AuditEntityType.VIRTUAL_MEASURING_POINT,
+                AuditLog.action == AuditAction.UPDATE,
+            )
+            .order_by(AuditLog.id)
+            .all()
+        )
+        assert len(logs) == 2
+        assert logs[0].diff is not None
+        assert logs[0].diff["location_id"] == {"from": None, "to": loc["id"]}
+        assert logs[1].diff is not None
+        assert logs[1].diff["location_id"] == {"from": loc["id"], "to": None}
+
+
+def test_delete_location_keeps_vmp_with_null_location(admin_client: TestClient) -> None:
+    mps = _setup_biogas_scenario(admin_client)
+    _, loc = _create_location_with_main(
+        admin_client, main_name="Hof-Del", location_name="Keller-Del"
+    )
+    resp = admin_client.post(
+        "/api/v1/virtual-measuring-points",
+        json={
+            "name": "Del-loc",
+            "type": "electricity",
+            "components": _biogas_components(mps),
+            "location_id": loc["id"],
+        },
+    )
+    assert resp.status_code == 201, resp.text
+    assert admin_client.delete(f"/api/v1/locations/{loc['id']}").status_code == 204
+    after = admin_client.get(f"/api/v1/virtual-measuring-points/{resp.json()['id']}")
+    assert after.status_code == 200
+    assert after.json()["location_id"] is None
+    assert after.json()["location_name"] is None
+
+
+def test_reports_location_filters_apply_to_virtual_rows(admin_client: TestClient) -> None:
+    mps = _setup_biogas_scenario(admin_client)
+    main, loc = _create_location_with_main(
+        admin_client, main_name="Hof-Report", location_name="Keller-Report"
+    )
+    with_loc = admin_client.post(
+        "/api/v1/virtual-measuring-points",
+        json={
+            "name": "vmp-mit-Standort",
+            "type": "electricity",
+            "components": _biogas_components(mps),
+            "location_id": loc["id"],
+        },
+    ).json()
+    _create_vmp(admin_client, "vmp-ohne-Standort", _biogas_components(mps))
+    base = "/api/v1/reports/aggregate?dimension=measuring_point&granularity=total"
+
+    by_location = admin_client.get(f"{base}&location_id={loc['id']}").json()
+    assert [r["group_key"] for r in by_location["rows"] if r["is_virtual"]] == [with_loc["id"]]
+
+    by_main = admin_client.get(f"{base}&main_location_id={main['id']}").json()
+    assert [r["group_key"] for r in by_main["rows"] if r["is_virtual"]] == [with_loc["id"]]
+
+    # Fremder Standort: keine virtuelle Zeile.
+    other = admin_client.get(f"{base}&location_id=99999").json()
+    assert [r for r in other["rows"] if r["is_virtual"]] == []
+
+    # Eigentuemer-/Kostenstellen-Filter blenden virtuelle Zeilen weiterhin aus.
+    by_owner = admin_client.get(f"{base}&owner_id=99999").json()
+    assert [r for r in by_owner["rows"] if r["is_virtual"]] == []
+    by_kst = admin_client.get(f"{base}&kostenstelle=4711").json()
+    assert [r for r in by_kst["rows"] if r["is_virtual"]] == []
+
+
+def test_dashboard_virtual_items_expose_location(admin_client: TestClient) -> None:
+    mps = _setup_biogas_scenario(admin_client)
+    main, loc = _create_location_with_main(
+        admin_client, main_name="Hof-Dash", location_name="Keller-Dash"
+    )
+    admin_client.post(
+        "/api/v1/virtual-measuring-points",
+        json={
+            "name": "Dash-loc-vmp",
+            "type": "electricity",
+            "components": _biogas_components(mps),
+            "location_id": loc["id"],
+        },
+    )
+    data = admin_client.get("/api/v1/dashboard?granularity=month").json()
+    item = data["virtual_items"][0]
+    assert item["location_id"] == loc["id"]
+    assert item["location_name"] == "Keller-Dash"
+    assert item["main_location_id"] == main["id"]
+    assert item["main_location_name"] == "Hof-Dash"

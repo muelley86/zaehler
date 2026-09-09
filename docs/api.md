@@ -36,7 +36,9 @@ Alle Endpoints unter `/api/v1`. Fehler im RFC-7807-Format
   (`consumption[]`, Buckets der gewählten Granularität) und `totals[]`
   (`current`/`previous` je OBIS-Code, Einheit und Richtung `bezug|einspeisung`;
   `null` = kein Ablese-Intervall deckt den Zeitraum). Verrechnete Messstellen
-  unter `virtual_items[]` (Netto-Reihe, `obis_code: "virtual"`). Top-Level:
+  unter `virtual_items[]` (Netto-Reihe, `obis_code: "virtual"`, plus
+  `location_id`/`location_name`/`main_location_id`/`main_location_name` wie
+  bei echten Messstellen). Top-Level:
   `from_date`, `to_date`, `previous_from_date`, `previous_to_date`,
   `granularity`, `partial` (`true` für Nicht-Admins: nur zugeordnete
   Messstellen enthalten). Vorperiode = gleich viele ganze Monate zurück, wenn
@@ -53,8 +55,11 @@ Alle Endpoints unter `/api/v1`. Fehler im RFC-7807-Format
   und `GET /reports/aggregate.csv` (gleiche Parameter). Kategoriale Filter als
   wiederholbare Query-Params: `main_location_id`, `location_id`, `owner_id`,
   `kostenstelle`, `meter_type`, `measuring_point_id` (explizite Messstellen-
-  Auswahl; bei gesetztem Filter entfallen verrechnete/virtuelle Zeilen wie bei
-  den anderen kategorialen Filtern). Der Response echot `from_date`/`to_date`.
+  Auswahl). Verrechnete/virtuelle Zeilen (nur `dimension=measuring_point`)
+  respektieren `main_location_id`, `location_id` und `meter_type` wie echte
+  Messstellen; bei `owner_id`, `kostenstelle` oder `measuring_point_id`
+  entfallen sie (keine solchen Attribute bzw. eigener ID-Namensraum). Der
+  Response echot `from_date`/`to_date`.
 - `GET|POST /report-configs`, `PATCH|DELETE /report-configs/{id}`: `filters`
   enthält u. a. `measuring_point_ids` (fehlt in Alt-Configs → leer).
 

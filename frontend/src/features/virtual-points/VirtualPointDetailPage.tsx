@@ -95,10 +95,12 @@ export function VirtualPointDetailPage() {
         {vmp ? (
           <>
             <LargeTitle title={`${vmp.name} (verrechnet)`} />
-            <p className="text-body-sm text-secondary">
-              {TYPE_LABELS[vmp.type]}
-              {vmp.note ? ` · ${vmp.note}` : ''}
-            </p>
+            <dl className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+              <StammdatenRow k="Zählerart" v={TYPE_LABELS[vmp.type]} />
+              <StammdatenRow k="Standort" v={vmp.location_name ?? '—'} />
+              <StammdatenRow k="Hauptstandort" v={vmp.main_location_name ?? '—'} />
+            </dl>
+            {vmp.note ? <p className="text-body-sm text-secondary">{vmp.note}</p> : null}
           </>
         ) : !error ? (
           <div className="text-tertiary">Lade…</div>
@@ -216,6 +218,16 @@ export function VirtualPointDetailPage() {
           ) : null}
         </Section>
       </div>
+    </div>
+  );
+}
+
+/** Eine Stammdaten-Zeile (Label + Wert), Hauptstandort wird über den Standort abgeleitet. */
+function StammdatenRow({ k, v }: { k: string; v: string }) {
+  return (
+    <div>
+      <dt className="text-caption text-tertiary">{k}</dt>
+      <dd className="mt-0.5 text-body font-semibold text-label">{v}</dd>
     </div>
   );
 }
