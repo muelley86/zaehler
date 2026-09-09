@@ -13,9 +13,21 @@ nur ohne Periodisierung: die Standort-Zuordnung ist ein direkter FK
 from __future__ import annotations
 
 from sqlalchemy import Select, select
+from sqlalchemy.orm import Session as DbSession
 from sqlalchemy.orm import selectinload
 
+from meters.core.problem import ProblemError
 from meters.models import Location, MeasuringPoint, PhysicalMeter
+
+
+def ensure_location_exists(db: DbSession, location_id: int | None) -> None:
+    """404, wenn eine angegebene ``location_id`` auf keinen Standort zeigt.
+    ``None`` (kein Standort) ist immer gueltig. Gemeinsamer Pre-Check fuer
+    echte und verrechnete Messstellen."""
+    if location_id is None:
+        return
+    if db.get(Location, location_id) is None:
+        raise ProblemError(status_code=404, title="Location not found")
 
 
 def _with_eager_state(stmt: Select[tuple[MeasuringPoint]]) -> Select[tuple[MeasuringPoint]]:

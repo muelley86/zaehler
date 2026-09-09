@@ -68,11 +68,16 @@ class DashboardMeasuringPoint(APIModel):
 
 class DashboardVirtualMeasuringPoint(APIModel):
     """Verrechnete Messstelle im Dashboard: Netto-Verbrauchsreihe und -Totals
-    (beide koennen negativ sein), keine Stammdaten (abgeleitete Werte)."""
+    (beide koennen negativ sein). Stammdaten nur Standort/Hauptstandort —
+    Eigentuemer/Kostenstelle gibt es bei abgeleiteten Werten nicht."""
 
     id: int
     name: str
     type: MeterType
+    location_id: int | None
+    location_name: str | None
+    main_location_id: int | None
+    main_location_name: str | None
     consumption: list[ConsumptionPoint]
     totals: list[DashboardTotal]
 

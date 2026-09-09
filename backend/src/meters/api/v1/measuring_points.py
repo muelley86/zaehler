@@ -25,7 +25,6 @@ from meters.core.problem import ProblemError
 from meters.models import (
     AuditAction,
     AuditEntityType,
-    Location,
     MeasuringPoint,
     MeterType,
     MieterAssignment,
@@ -61,6 +60,7 @@ from meters.schemas import (
 )
 from meters.services.access import assert_can_access_mp, restrict_mp_query
 from meters.services.audit import record
+from meters.services.location_queries import ensure_location_exists
 from meters.services.meter_replacement import install_first_meter, replace_meter
 
 # Mieter-Service mit Aliassen — strukturgleich zum Owner-/Supplier-Service.
@@ -232,13 +232,6 @@ def measuring_points_with_state(
     ]
 
 
-def _ensure_location(db: DbSession, location_id: int | None) -> None:
-    if location_id is None:
-        return
-    if db.get(Location, location_id) is None:
-        raise ProblemError(status_code=404, title="Location not found")
-
-
 @router.get("", response_model=list[MeasuringPointRead])
 def list_measuring_points(db: DbDep, user: CurrentUser) -> list[MeasuringPointRead]:
     stmt = (
@@ -293,7 +286,7 @@ def create_measuring_point(
     db: DbDep,
     admin: AdminUser,
 ) -> MeasuringPointRead:
-    _ensure_location(db, payload.location_id)
+    ensure_location_exists(db, payload.location_id)
     mp = MeasuringPoint(
         name=payload.name,
         type=payload.type,
@@ -417,7 +410,7 @@ def update_measuring_point(
             diff["location_id"] = {"from": mp.location_id, "to": None}
             mp.location_id = None
     elif payload.location_id is not None and payload.location_id != mp.location_id:
-        _ensure_location(db, payload.location_id)
+        ensure_location_exists(db, payload.location_id)
         diff["location_id"] = {"from": mp.location_id, "to": payload.location_id}
         mp.location_id = payload.location_id
     if payload.is_bidirectional is not None and payload.is_bidirectional != mp.is_bidirectional:

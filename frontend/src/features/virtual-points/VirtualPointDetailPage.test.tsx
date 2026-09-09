@@ -26,6 +26,10 @@ const VMP: VirtualMeasuringPointRead = {
   name: 'Biogasanlage real',
   note: 'Realverbrauch',
   type: 'electricity',
+  location_id: 5,
+  location_name: 'Keller',
+  main_location_id: 2,
+  main_location_name: 'Hof',
   components: [],
 };
 
@@ -115,6 +119,35 @@ describe('VirtualPointDetailPage', () => {
     // Netto-Zeile.
     expect(screen.getByText('Netto')).toBeInTheDocument();
     expect(screen.getByText(`${formatDe('380')} kWh`)).toBeInTheDocument();
+  });
+
+  it('zeigt Standort und Hauptstandort in den Stammdaten', async () => {
+    mockEndpoints();
+    renderPage();
+    await screen.findByText('Biogasanlage real (verrechnet)');
+    expect(screen.getByText('Standort')).toBeInTheDocument();
+    expect(screen.getByText('Keller')).toBeInTheDocument();
+    expect(screen.getByText('Hauptstandort')).toBeInTheDocument();
+    expect(screen.getByText('Hof')).toBeInTheDocument();
+  });
+
+  it('zeigt „—" ohne Standort', async () => {
+    server.use(
+      http.get('/api/v1/virtual-measuring-points/9', () =>
+        HttpResponse.json({
+          ...VMP,
+          location_id: null,
+          location_name: null,
+          main_location_id: null,
+          main_location_name: null,
+        }),
+      ),
+      http.get('/api/v1/virtual-measuring-points/9/breakdown', () => HttpResponse.json(BREAKDOWN)),
+    );
+    renderPage();
+    await screen.findByText('Biogasanlage real (verrechnet)');
+    expect(screen.getByText('Hauptstandort')).toBeInTheDocument();
+    expect(screen.getAllByText('—').length).toBeGreaterThanOrEqual(2);
   });
 
   it('Zurück-Link führt Admins zur Übersicht der verrechneten Messstellen', async () => {

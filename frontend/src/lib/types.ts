@@ -322,11 +322,19 @@ export interface DashboardMeasuringPoint {
   totals: DashboardTotal[];
 }
 
-/** Verrechnete Messstelle im Dashboard: Netto-Reihe, kann negative Buckets enthalten. */
+/**
+ * Verrechnete Messstelle im Dashboard: Netto-Reihe, kann negative Buckets
+ * enthalten. Standort/Hauptstandort wie bei echten Messstellen (Filter),
+ * Eigentümer/Kostenstelle gibt es bei abgeleiteten Werten nicht.
+ */
 export interface DashboardVirtualMeasuringPoint {
   id: number;
   name: string;
   type: MeterType;
+  location_id: number | null;
+  location_name: string | null;
+  main_location_id: number | null;
+  main_location_name: string | null;
   consumption: ConsumptionPoint[];
   totals: DashboardTotal[];
 }
@@ -361,6 +369,11 @@ export interface VirtualMeasuringPointRead {
   name: string;
   note: string | null;
   type: MeterType;
+  location_id: number | null;
+  location_name: string | null;
+  /** Abgeleitet über den Standort — nicht direkt gesetzt. */
+  main_location_id: number | null;
+  main_location_name: string | null;
   components: VirtualMpComponentRead[];
 }
 

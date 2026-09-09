@@ -37,6 +37,7 @@ from meters.schemas import (
     VirtualMpComponentRead,
 )
 from meters.services.audit import record
+from meters.services.location_queries import ensure_location_exists
 from meters.services.virtual_measuring_point import (
     assert_can_access_virtual_mp,
     breakdown_for_virtual_mp,
@@ -49,11 +50,19 @@ router = APIRouter(prefix="/virtual-measuring-points", tags=["virtual-measuring-
 
 
 def _to_read(vmp: VirtualMeasuringPoint) -> VirtualMeasuringPointRead:
+    # Standort/Hauptstandort zweistufig ableiten — dieselbe Regel wie
+    # ``to_measuring_point_read`` fuer echte Messstellen.
+    location = vmp.location
+    main_loc = location.main_location if location is not None else None
     return VirtualMeasuringPointRead(
         id=vmp.id,
         name=vmp.name,
         note=vmp.note,
         type=vmp.type,
+        location_id=vmp.location_id,
+        location_name=location.name if location is not None else None,
+        main_location_id=main_loc.id if main_loc is not None else None,
+        main_location_name=main_loc.name if main_loc is not None else None,
         components=[
             VirtualMpComponentRead(
                 id=c.id,
@@ -150,10 +159,12 @@ def create_virtual_mp(
     admin: AdminUser,
 ) -> VirtualMeasuringPointRead:
     _validate_components(db, payload.type, payload.components)
+    ensure_location_exists(db, payload.location_id)
     vmp = VirtualMeasuringPoint(
         name=payload.name,
         note=payload.note,
         type=payload.type,
+        location_id=payload.location_id,
         components=_build_components(payload.components),
     )
     db.add(vmp)
@@ -173,6 +184,7 @@ def create_virtual_mp(
         diff={
             "name": vmp.name,
             "type": vmp.type.value,
+            "location_id": vmp.location_id,
             "components": _components_diff(payload.components),
         },
         ip_address=client_ip(request),
@@ -239,6 +251,14 @@ def update_virtual_mp(
     if payload.type is not None and payload.type is not vmp.type:
         diff["type"] = {"from": vmp.type.value, "to": payload.type.value}
         vmp.type = payload.type
+    if payload.clear_location:
+        if vmp.location_id is not None:
+            diff["location_id"] = {"from": vmp.location_id, "to": None}
+            vmp.location_id = None
+    elif payload.location_id is not None and payload.location_id != vmp.location_id:
+        ensure_location_exists(db, payload.location_id)
+        diff["location_id"] = {"from": vmp.location_id, "to": payload.location_id}
+        vmp.location_id = payload.location_id
     if diff:
         record(
             db,

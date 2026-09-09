@@ -20,11 +20,20 @@ const _mps = [
   { id: 4, name: 'Wasser-Haupt', type: 'water' },
 ];
 
+const _locations = [
+  { id: 5, name: 'Keller', main_location_id: 2, main_location_name: 'Hof' },
+  { id: 6, name: 'Garage', main_location_id: null, main_location_name: null },
+];
+
 const _vmp = {
   id: 7,
   name: 'Biogasanlage real',
   note: null,
   type: 'electricity',
+  location_id: 5,
+  location_name: 'Keller',
+  main_location_id: 2,
+  main_location_name: 'Hof',
   components: [
     {
       id: 70,
@@ -47,6 +56,7 @@ function mockLists(vmps: unknown[] = [_vmp]) {
   server.use(
     http.get('/api/v1/virtual-measuring-points', () => HttpResponse.json(vmps)),
     http.get('/api/v1/measuring-points', () => HttpResponse.json(_mps)),
+    http.get('/api/v1/locations', () => HttpResponse.json(_locations)),
   );
 }
 
@@ -99,11 +109,83 @@ describe('VirtualPointsAdminPage', () => {
       name: 'Biogasanlage real',
       note: null,
       type: 'electricity',
+      location_id: null,
       components: [
         { measuring_point_id: 1, direction: 'bezug', sign: 1 },
         { measuring_point_id: 3, direction: 'einspeisung', sign: -1 },
       ],
     });
+  });
+
+  it('zeigt Standort und Hauptstandort auf der Karte', async () => {
+    mockLists();
+    renderWithRouter(<VirtualPointsAdminPage />, { initialEntries: ['/admin/verrechnung'] });
+    expect(await screen.findByText('Biogasanlage real')).toBeInTheDocument();
+    expect(screen.getByText(/Keller · Hof/)).toBeInTheDocument();
+  });
+
+  it('sendet den gewählten Standort als location_id', async () => {
+    mockLists([]);
+    let postBody: unknown = null;
+    server.use(
+      http.post('/api/v1/virtual-measuring-points', async ({ request }) => {
+        postBody = await request.json();
+        return HttpResponse.json(_vmp, { status: 201 });
+      }),
+    );
+    renderWithRouter(<VirtualPointsAdminPage />, { initialEntries: ['/admin/verrechnung'] });
+    fireEvent.change(await screen.findByLabelText(/^Name$/), { target: { value: 'Mit Ort' } });
+    // Standort-Optionen kommen asynchron von /locations.
+    expect(await screen.findByRole('option', { name: 'Keller' })).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Standort'), { target: { value: '5' } });
+    fireEvent.change(screen.getByLabelText('Messstelle 1'), { target: { value: '1' } });
+    fireEvent.click(screen.getByRole('button', { name: /^Anlegen$/ }));
+    await waitFor(() => expect(postBody).not.toBeNull());
+    expect(postBody).toMatchObject({ name: 'Mit Ort', location_id: 5 });
+  });
+
+  it('Bearbeiten sendet clear_location, wenn der Standort entfernt wurde', async () => {
+    mockLists();
+    let patchBody: unknown = null;
+    server.use(
+      http.patch('/api/v1/virtual-measuring-points/7', async ({ request }) => {
+        patchBody = await request.json();
+        return HttpResponse.json({ ..._vmp, location_id: null, location_name: null });
+      }),
+    );
+    renderWithRouter(<VirtualPointsAdminPage />, { initialEntries: ['/admin/verrechnung'] });
+    fireEvent.click(await screen.findByRole('button', { name: /Bearbeiten/i }));
+    // Im Sheet gibt es ein zweites Standort-Select (das Anlege-Formular hat das erste).
+    const selects = await screen.findAllByLabelText('Standort');
+    const editSelect = selects[selects.length - 1]!;
+    await waitFor(() => expect((editSelect as HTMLSelectElement).value).toBe('5'));
+    fireEvent.change(editSelect, { target: { value: '' } });
+    fireEvent.click(screen.getByRole('button', { name: /^Speichern$/ }));
+    await waitFor(() => expect(patchBody).not.toBeNull());
+    expect(patchBody).toMatchObject({ location_id: null, clear_location: true });
+  });
+
+  it('Bearbeiten einer Verrechnung ohne Komponenten sendet keine components-Liste', async () => {
+    // Verwaiste Verrechnung (Komponenten-MPs gelöscht → Cascade): das Backend
+    // verlangt bei gesendetem ``components`` mindestens einen Eintrag — die
+    // leere Liste darf deshalb gar nicht erst mitgehen.
+    mockLists([{ ..._vmp, location_id: null, location_name: null, components: [] }]);
+    let patchBody: Record<string, unknown> | null = null;
+    server.use(
+      http.patch('/api/v1/virtual-measuring-points/7', async ({ request }) => {
+        patchBody = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json(_vmp);
+      }),
+    );
+    renderWithRouter(<VirtualPointsAdminPage />, { initialEntries: ['/admin/verrechnung'] });
+    fireEvent.click(await screen.findByRole('button', { name: /Bearbeiten/i }));
+    expect(await screen.findByText(/hat keine Komponenten/i)).toBeInTheDocument();
+    const selects = await screen.findAllByLabelText('Standort');
+    fireEvent.change(selects[selects.length - 1]!, { target: { value: '5' } });
+    fireEvent.click(screen.getByRole('button', { name: /^Speichern$/ }));
+    await waitFor(() => expect(patchBody).not.toBeNull());
+    expect(patchBody).toMatchObject({ location_id: 5, clear_location: false });
+    expect(patchBody).not.toHaveProperty('components');
   });
 
   it('löscht nach Bestätigung per DELETE', async () => {

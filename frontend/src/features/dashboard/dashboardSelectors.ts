@@ -35,11 +35,23 @@ export function emptyFilters(): DashboardFilters {
   };
 }
 
+/** Gemeinsame Standort-Attribute realer und verrechneter Messstellen. */
+type Located = Pick<
+  DashboardVirtualMeasuringPoint,
+  'location_id' | 'location_name' | 'main_location_id' | 'main_location_name'
+>;
+
+/** Hauptstandort-/Standort-Filter — gelten für reale UND verrechnete Messstellen. */
+function matchesLocationFilters(item: Located, f: DashboardFilters): boolean {
+  if (f.mainLocation.size > 0 && !f.mainLocation.has(item.main_location_id)) return false;
+  if (f.location.size > 0 && !f.location.has(item.location_id)) return false;
+  return true;
+}
+
 /** Die vier kategorialen Basis-Filter (Hauptstandort/Eigentümer/Standort/Typ). */
 export function matchesBaseFilters(item: DashboardMeasuringPoint, f: DashboardFilters): boolean {
-  if (f.mainLocation.size > 0 && !f.mainLocation.has(item.main_location_id)) return false;
+  if (!matchesLocationFilters(item, f)) return false;
   if (f.owner.size > 0 && !f.owner.has(item.current_owner_id)) return false;
-  if (f.location.size > 0 && !f.location.has(item.location_id)) return false;
   if (f.type.size > 0 && !f.type.has(item.type)) return false;
   return true;
 }
@@ -64,10 +76,10 @@ export function selectFilteredItems(
 }
 
 /**
- * Verrechnete Messstellen: respektieren den Zählerart-Filter und die
- * gemeinsame Messstellen-/vmp-Auswahl. Die übrigen kategorialen Filter
- * (Standort/Eigentümer) greifen nicht — virtuelle Messstellen haben diese
- * Attribute nicht.
+ * Verrechnete Messstellen: respektieren Hauptstandort-/Standort-Filter (wie
+ * reale Messstellen — ohne Standort zählen sie zu „ohne …"), den Zählerart-
+ * Filter und die gemeinsame Messstellen-/vmp-Auswahl. Der Eigentümer-Filter
+ * greift nicht — virtuelle Messstellen haben keinen Eigentümer.
  */
 export function selectFilteredVirtual(
   virtualItems: DashboardVirtualMeasuringPoint[],
@@ -75,7 +87,10 @@ export function selectFilteredVirtual(
 ): DashboardVirtualMeasuringPoint[] {
   const selectionActive = isMpSelectionActive(f);
   return virtualItems.filter(
-    (v) => (f.type.size === 0 || f.type.has(v.type)) && (!selectionActive || f.virtual.has(v.id)),
+    (v) =>
+      matchesLocationFilters(v, f) &&
+      (f.type.size === 0 || f.type.has(v.type)) &&
+      (!selectionActive || f.virtual.has(v.id)),
   );
 }
 
@@ -100,10 +115,10 @@ export interface FilterOptions {
 }
 
 /** Distinkte (id, name)-Paare aus den Items plus eine „ohne …"-Option (value null) am Ende. */
-function collectIdOptions(
-  items: DashboardMeasuringPoint[],
-  idOf: (item: DashboardMeasuringPoint) => number | null,
-  nameOf: (item: DashboardMeasuringPoint) => string | null,
+function collectIdOptions<T>(
+  items: T[],
+  idOf: (item: T) => number | null,
+  nameOf: (item: T) => string | null,
   noneLabel: string,
 ): DropdownOption<number | null>[] {
   const map = new Map<number, string>();
@@ -123,16 +138,19 @@ function collectIdOptions(
  * Optionen für alle sechs Filter-Dropdowns. `measuringPoints` kaskadiert über
  * `matchesBaseFilters` — nur Messstellen, die zu den vier Basis-Filtern
  * passen, stehen zur Wahl. `virtual` bleibt unfiltriert (Auswahl-Liste
- * zeigt immer alle verrechneten Messstellen).
+ * zeigt immer alle verrechneten Messstellen). Hauptstandort-/Standort-
+ * Optionen sammeln über reale UND verrechnete Messstellen — ein Standort,
+ * der nur an einer Verrechnung hängt, muss wählbar sein.
  */
 export function buildFilterOptions(
   items: DashboardMeasuringPoint[],
   virtualItems: DashboardVirtualMeasuringPoint[],
   f: DashboardFilters,
 ): FilterOptions {
+  const located: Located[] = [...items, ...virtualItems];
   return {
     mainLocations: collectIdOptions(
-      items,
+      located,
       (i) => i.main_location_id,
       (i) => i.main_location_name,
       'ohne Hauptstandort',
@@ -144,7 +162,7 @@ export function buildFilterOptions(
       'ohne Eigentümer',
     ),
     locations: collectIdOptions(
-      items,
+      located,
       (i) => i.location_id,
       (i) => i.location_name,
       'ohne Zählerstandort',
