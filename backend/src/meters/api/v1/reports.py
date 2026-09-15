@@ -13,6 +13,7 @@ from __future__ import annotations
 import csv
 import io
 from datetime import date
+from decimal import Decimal
 from typing import Literal
 
 from fastapi import APIRouter, Query
@@ -29,6 +30,7 @@ from meters.services.report_aggregation import (
     ReportFilter,
     aggregate_report,
 )
+from meters.services.report_meter_readings import meter_columns_for_rows
 
 router = APIRouter(prefix="/reports", tags=["reports"])
 
@@ -47,6 +49,11 @@ _DIMENSION_LABELS: dict[ReportDimension, str] = {
 def _de_date(d: date | None) -> str:
     """Datum als TT.MM.JJJJ fuer das deutsche Excel-CSV; ``None`` -> Leerstring."""
     return d.strftime("%d.%m.%Y") if d else ""
+
+
+def _de_decimal(value: Decimal | None) -> str:
+    """Decimal im deutschen Excel-Format; ``None`` -> Leerstring."""
+    return format_decimal_de(value) if value is not None else ""
 
 
 def _to_filter(
@@ -139,6 +146,11 @@ def aggregate_csv(
         main_location_id, location_id, owner_id, kostenstelle, meter_type, measuring_point_id
     )
     rows = _run(db, user, dimension, granularity, from_at, to_at, filters)
+    # Nur im Export: Seriennummer + Staende an den Periodengrenzen, damit sich
+    # der Verbrauch nachrechnen laesst (befuellt nur bei Dimension Messstelle).
+    meter_cols = meter_columns_for_rows(
+        db, rows, dimension=dimension, from_date=from_at, to_date=to_at
+    )
 
     buffer = io.StringIO()
     # Semikolon-Delimiter + Komma-Dezimal + deutsche Daten + UTF-8-BOM: das CSV
@@ -149,16 +161,20 @@ def aggregate_csv(
             "Dimension",
             "Gruppe",
             "Gruppen_ID",
+            "Seriennummer",
             "Zählerart",
             "Richtung",
             "Einheit",
             "Periode_von",
             "Periode_bis",
+            "Wandlerfaktor",
+            "Zählerstand_Beginn",
+            "Zählerstand_Ende",
             "Verbrauch",
         ]
     )
     dim_label = _DIMENSION_LABELS[dimension]
-    for r in rows:
+    for r, m in zip(rows, meter_cols, strict=True):
         writer.writerow(
             [
                 dim_label,
@@ -171,6 +187,7 @@ def aggregate_csv(
                 (f"V{r.group_key}" if r.is_virtual else str(r.group_key))
                 if r.group_key is not None
                 else "",
+                csv_guard_formula(m.serial_number),
                 METER_TYPE_LABELS[r.meter_type],
                 # Einspeisung (2.8.x) ist eine eigene Zeile, nie mit Bezug summiert.
                 "Einspeisung" if r.direction == "einspeisung" else "Bezug",
@@ -180,6 +197,10 @@ def aggregate_csv(
                 # zurueckfallen, sonst blieben die Perioden-Spalten leer.
                 _de_date(r.period_start or from_at),
                 _de_date(r.period_end or to_at),
+                # Staende wie am Display; Verbrauch = (Ende - Beginn) x Faktor.
+                str(m.transformer_factor) if m.transformer_factor is not None else "",
+                _de_decimal(m.start_value),
+                _de_decimal(m.end_value),
                 format_decimal_de(r.consumption),
             ]
         )

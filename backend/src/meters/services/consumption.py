@@ -42,7 +42,7 @@ def _pairwise(readings: list[Reading]) -> Iterator[tuple[Reading, Reading]]:
         prev = cur
 
 
-def _local_date(dt: datetime) -> date:
+def local_date(dt: datetime) -> date:
     """Lokales Kalenderdatum (App-Zeitzone ``METERS_TIMEZONE``) eines in der DB
     als naive-UTC gespeicherten Zeitstempels — fuer Verbrauchs-Perioden, damit
     die Chart-X-Achse und CSV-Perioden den lokalen Tagen entsprechen.
@@ -76,8 +76,8 @@ def consumption_for_register(
             delta = prev.value + refilled - cur.value
             out.append(
                 ConsumptionPoint(
-                    period_start=_local_date(prev.reading_at),
-                    period_end=_local_date(cur.reading_at),
+                    period_start=local_date(prev.reading_at),
+                    period_end=local_date(cur.reading_at),
                     register_id=register.id,
                     obis_code=register.obis_code,
                     consumption=delta,
@@ -95,8 +95,8 @@ def consumption_for_register(
             delta = delta * transformer_factor
         out.append(
             ConsumptionPoint(
-                period_start=_local_date(prev.reading_at),
-                period_end=_local_date(cur.reading_at),
+                period_start=local_date(prev.reading_at),
+                period_end=local_date(cur.reading_at),
                 register_id=register.id,
                 obis_code=register.obis_code,
                 consumption=delta,

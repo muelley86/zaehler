@@ -6,6 +6,8 @@ Netzbezug am Biogas-Trafo + Solar-Produktion - Solar-Einspeisung.
 
 from __future__ import annotations
 
+import csv
+import io
 from decimal import Decimal
 from typing import Any
 
@@ -587,6 +589,16 @@ def test_reports_csv_marks_virtual_group_id(admin_client: TestClient) -> None:
     )
     assert resp.status_code == 200
     assert f"V{vmp['id']}" in resp.text
+    # Verrechnete Messstelle hat kein Geraet: Seriennummer, Wandlerfaktor und
+    # Zaehlerstaende bleiben leer (Netto-Wert, kein ablesbarer Stand).
+    rows = list(csv.DictReader(io.StringIO(resp.text.lstrip("﻿")), delimiter=";"))
+    vrow = next(r for r in rows if r["Gruppen_ID"] == f"V{vmp['id']}")
+    assert vrow["Seriennummer"] == ""
+    assert vrow["Wandlerfaktor"] == ""
+    assert vrow["Zählerstand_Beginn"] == ""
+    assert vrow["Zählerstand_Ende"] == ""
+    # Echte Komponenten derselben Auswertung tragen ihre Seriennummer.
+    assert any(r["Seriennummer"] for r in rows if not r["Gruppen_ID"].startswith("V"))
 
 
 # ---------------------------------------------------------------------------

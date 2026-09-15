@@ -205,13 +205,13 @@ def test_reading_at_is_local_end_of_day() -> None:
     from zoneinfo import ZoneInfo
 
     from meters.core.config import settings
-    from meters.services.consumption import _local_date
+    from meters.services.consumption import local_date
     from meters.services.import_readings import reading_at_for_date
 
     dt = reading_at_for_date(date(2024, 1, 31))  # naive UTC
     local = dt.replace(tzinfo=UTC).astimezone(ZoneInfo(settings.timezone))
     assert (local.hour, local.minute, local.second) == (23, 59, 59)
-    assert _local_date(dt) == date(2024, 1, 31)  # Datum bleibt stabil
+    assert local_date(dt) == date(2024, 1, 31)  # Datum bleibt stabil
 
 
 def test_import_is_admin_only(recorder_client: TestClient) -> None:
