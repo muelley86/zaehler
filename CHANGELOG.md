@@ -10,6 +10,13 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.74.0](https://github.com/muelley86/zaehler/compare/v2.73.0...v2.74.0) (2026-09-15)
+
+
+### Funktionen
+
+* **reports:** Zählerstand Beginn/Ende und Seriennummer im Auswertungs-CSV ([#341](https://github.com/muelley86/zaehler/issues/341)) ([cf5e37b](https://github.com/muelley86/zaehler/commit/cf5e37bca32ed1da87cbf5a5eff9d41dfac7936f))
+
 ## [2.73.0](https://github.com/muelley86/zaehler/compare/v2.72.0...v2.73.0) (2026-09-09)
 
 
