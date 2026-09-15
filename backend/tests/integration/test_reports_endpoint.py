@@ -7,6 +7,8 @@ Einspeisung als eigene Zeilen, Gesamt vs. Monat, Recorder-Filter/partial und CSV
 
 from __future__ import annotations
 
+import csv
+import io
 from decimal import Decimal
 from typing import Any, cast
 
@@ -68,6 +70,22 @@ def _agg(client: TestClient, **params: Any) -> dict[str, Any]:
     resp = client.get("/api/v1/reports/aggregate", params=params)
     assert resp.status_code == 200, resp.text
     return cast(dict[str, Any], resp.json())
+
+
+_CSV_HEADER = (
+    "Dimension;Gruppe;Gruppen_ID;Seriennummer;Zählerart;Richtung;Einheit;"
+    "Periode_von;Periode_bis;Wandlerfaktor;Zählerstand_Beginn;Zählerstand_Ende;Verbrauch"
+)
+
+
+def _csv_rows(client: TestClient, **params: Any) -> list[dict[str, str]]:
+    resp = client.get("/api/v1/reports/aggregate.csv", params=params)
+    assert resp.status_code == 200, resp.text
+    return list(csv.DictReader(io.StringIO(resp.text.lstrip("﻿")), delimiter=";"))
+
+
+def _de(value: str) -> Decimal:
+    return Decimal(value.replace(",", "."))
 
 
 def test_total_sum_by_kostenstelle(admin_client: TestClient) -> None:
@@ -237,10 +255,11 @@ def test_csv_export(admin_client: TestClient) -> None:
     text = resp.text
     # Deutsches Excel-CSV: Semikolon-Delimiter + UTF-8-BOM.
     assert text.startswith("﻿")
-    assert "Dimension;Gruppe;Gruppen_ID;Zählerart;Richtung;Einheit" in text
-    # Zeile: Kostenstelle;80008;80008;Wasser;Bezug;m³;;;42 (Gesamt-Modus -> keine
-    # Perioden; group_key der Kostenstelle == die Kostenstellen-Nummer).
-    assert "Kostenstelle;80008;80008;Wasser;Bezug;m³;;;" in text
+    assert text.splitlines()[0] == "﻿" + _CSV_HEADER
+    # Zeile: Kostenstelle;80008;80008;;Wasser;Bezug;m³;;;;;;42 (Gesamt-Modus ->
+    # keine Perioden; group_key der Kostenstelle == die Kostenstellen-Nummer;
+    # Seriennummer/Zaehlerstaende nur bei Dimension Messstelle).
+    assert "Kostenstelle;80008;80008;;Wasser;Bezug;m³;;;;;;" in text
     data_line = next(line for line in text.splitlines() if line.startswith("Kostenstelle;80008"))
     assert float(data_line.rsplit(";", 1)[1]) == 42.0
 
@@ -256,8 +275,8 @@ def test_csv_export_dimension_measuring_point(admin_client: TestClient) -> None:
     assert resp.status_code == 200, resp.text
     assert resp.headers["content-type"].startswith("text/csv")
     # Gruppen_ID-Spalte traegt bei Dimension Messstelle die MP-ID (stabiler
-    # Match-Key fuer externe Import-Blaetter), zwischen Name und Zaehlerart.
-    assert f"Messstelle;Halle Nord;{a['id']};Wasser;Bezug;m³;;;" in resp.text
+    # Match-Key fuer externe Import-Blaetter), zwischen Name und Seriennummer.
+    assert f"Messstelle;Halle Nord;{a['id']};W-N;Wasser;Bezug;m³;;;" in resp.text
 
 
 def test_csv_export_total_with_range_fills_period(admin_client: TestClient) -> None:
@@ -281,10 +300,10 @@ def test_csv_export_total_with_range_fills_period(admin_client: TestClient) -> N
     prefix = f"Messstelle;Halle Nord;{a['id']}"
     data_line = next(line for line in resp.text.splitlines() if line.startswith(prefix))
     cols = data_line.split(";")
-    # Spalten: Dimension;Gruppe;Gruppen_ID;Zählerart;Richtung;Einheit;
-    #          Periode_von;Periode_bis;Verbrauch
-    assert cols[6] == "01.05.2024", cols  # Periode_von = from_at
-    assert cols[7] == "31.05.2024", cols  # Periode_bis = to_at
+    # Spalten: Dimension;Gruppe;Gruppen_ID;Seriennummer;Zählerart;Richtung;Einheit;
+    #          Periode_von;Periode_bis;...
+    assert cols[7] == "01.05.2024", cols  # Periode_von = from_at
+    assert cols[8] == "31.05.2024", cols  # Periode_bis = to_at
 
 
 def test_csv_export_german_number_and_date_format(admin_client: TestClient) -> None:
@@ -312,9 +331,9 @@ def test_csv_export_german_number_and_date_format(admin_client: TestClient) -> N
     )
     cols = feb.split(";")
     assert cols[-1] == "2,5"  # Komma-Dezimal, kein Punkt
-    # Spalten: Dimension;Gruppe;Gruppen_ID;Zählerart;Richtung;Einheit;
-    #          Periode_von;Periode_bis;Verbrauch
-    assert cols[7] == "29.02.2024", cols  # Periode_bis
+    # Spalten: Dimension;Gruppe;Gruppen_ID;Seriennummer;Zählerart;Richtung;Einheit;
+    #          Periode_von;Periode_bis;...
+    assert cols[8] == "29.02.2024", cols  # Periode_bis
 
 
 def test_csv_export_escapes_formula_injection(admin_client: TestClient) -> None:
@@ -327,7 +346,167 @@ def test_csv_export_escapes_formula_injection(admin_client: TestClient) -> None:
         params={"dimension": "measuring_point", "granularity": "total"},
     )
     assert resp.status_code == 200, resp.text
-    assert f"Messstelle;'=Tricky;{a['id']};Wasser;Bezug;m³;;;" in resp.text
+    assert f"Messstelle;'=Tricky;{a['id']};W-T;Wasser;Bezug;m³;;;" in resp.text
+
+
+def test_csv_meter_readings_month_by_measuring_point(admin_client: TestClient) -> None:
+    # Monatsend-Staende liegen genau auf der Periodengrenze -> echte Ablesewerte,
+    # Ende - Beginn = Verbrauch.
+    a = _create_mp(admin_client, name="Halle Nord", serial="W-N")
+    reg = _registers(a)["water"]
+    _add(admin_client, reg, "10", "2024-01-31T12:00:00Z")
+    _add(admin_client, reg, "12.5", "2024-02-29T12:00:00Z")
+
+    rows = _csv_rows(
+        admin_client,
+        dimension="measuring_point",
+        granularity="month",
+        from_at="2024-02-01",
+        to_at="2024-02-29",
+    )
+    assert len(rows) == 1
+    row = rows[0]
+    assert row["Gruppen_ID"] == str(a["id"])
+    assert row["Seriennummer"] == "W-N"
+    assert row["Wandlerfaktor"] == ""
+    assert row["Zählerstand_Beginn"] == "10"
+    assert row["Zählerstand_Ende"] == "12,5"
+    assert row["Verbrauch"] == "2,5"
+
+
+def test_csv_meter_readings_interpolated_add_up_to_consumption(admin_client: TestClient) -> None:
+    # Ablesungen mitten im Monat: Staende werden taggenau auf die Grenzen
+    # interpoliert, damit Ende - Beginn exakt den (geclippten) Verbrauch ergibt.
+    a = _create_mp(admin_client, name="Clip", serial="W-C", initial={})
+    reg = _registers(a)["water"]
+    _add(admin_client, reg, "10", "2024-01-15T12:00:00Z")
+    _add(admin_client, reg, "31", "2024-02-15T12:00:00Z")
+    _add(admin_client, reg, "60", "2024-04-10T12:00:00Z")
+
+    rows = _csv_rows(
+        admin_client,
+        dimension="measuring_point",
+        granularity="total",
+        from_at="2024-02-01",
+        to_at="2024-02-29",
+    )
+    row = next(r for r in rows if r["Gruppe"] == "Clip")
+    start, end = _de(row["Zählerstand_Beginn"]), _de(row["Zählerstand_Ende"])
+    # Beginn = Stand Ende 31.01.: 10 + 21 * 16/31 = 20,84 (Tagesrate 21/31).
+    assert abs(start - Decimal("20.8387")) < Decimal("0.001")
+    assert abs((end - start) - _de(row["Verbrauch"])) < Decimal("0.000001")
+
+
+def test_csv_meter_readings_transformer_factor_raw_values(admin_client: TestClient) -> None:
+    mp = _create_mp(
+        admin_client,
+        name="Wandler",
+        serial="E-W",
+        mtype="electricity",
+        transformer_factor=40,
+    )
+    reg = _registers(mp)["1.8.0"]
+    _add(admin_client, reg, "10", "2024-01-31T12:00:00Z")
+    _add(admin_client, reg, "12", "2024-02-29T12:00:00Z")
+
+    rows = _csv_rows(
+        admin_client,
+        dimension="measuring_point",
+        granularity="month",
+        from_at="2024-02-01",
+        to_at="2024-02-29",
+    )
+    row = rows[0]
+    # Staende wie am Display, Verbrauch = (Ende - Beginn) x Wandlerfaktor.
+    assert row["Wandlerfaktor"] == "40"
+    assert (row["Zählerstand_Beginn"], row["Zählerstand_Ende"]) == ("10", "12")
+    assert row["Verbrauch"] == "80"
+
+
+def test_csv_meter_readings_feed_in_uses_own_register(admin_client: TestClient) -> None:
+    mp = _create_mp(
+        admin_client,
+        name="PV",
+        serial="E-PV",
+        mtype="electricity",
+        bidirectional=True,
+        initial={"1.8.0": "0", "2.8.0": "0"},
+    )
+    regs = _registers(mp)
+    _add(admin_client, regs["1.8.0"], "100", "2024-01-31T12:00:00Z")
+    _add(admin_client, regs["2.8.0"], "30", "2024-01-31T12:00:00Z")
+    _add(admin_client, regs["1.8.0"], "150", "2024-02-29T12:00:00Z")
+    _add(admin_client, regs["2.8.0"], "45", "2024-02-29T12:00:00Z")
+
+    rows = _csv_rows(
+        admin_client,
+        dimension="measuring_point",
+        granularity="month",
+        from_at="2024-02-01",
+        to_at="2024-02-29",
+    )
+    by_dir = {r["Richtung"]: r for r in rows}
+    assert (by_dir["Bezug"]["Zählerstand_Beginn"], by_dir["Bezug"]["Zählerstand_Ende"]) == (
+        "100",
+        "150",
+    )
+    assert (
+        by_dir["Einspeisung"]["Zählerstand_Beginn"],
+        by_dir["Einspeisung"]["Zählerstand_Ende"],
+    ) == ("30", "45")
+
+
+def test_csv_meter_readings_across_meter_change(admin_client: TestClient) -> None:
+    a = _create_mp(admin_client, name="Tausch", serial="W-ALT")
+    reg = _registers(a)["water"]
+    _add(admin_client, reg, "400", "2024-05-31T12:00:00Z")
+    resp = admin_client.post(
+        f"/api/v1/measuring-points/{a['id']}/replace-meter",
+        json={
+            "final_readings": {"water": "500"},
+            "removed_at": "2024-06-20",
+            "new_serial_number": "W-NEU",
+            "installed_at": "2024-06-20",
+            "initial_readings": {"water": "0"},
+        },
+    )
+    assert resp.status_code == 200, resp.text
+    new_reg = next(
+        r["id"]
+        for pm in resp.json()["physical_meters"]
+        if pm["serial_number"] == "W-NEU"
+        for r in pm["registers"]
+    )
+    _add(admin_client, new_reg, "30", "2024-06-30T12:00:00Z")
+
+    rows = _csv_rows(
+        admin_client,
+        dimension="measuring_point",
+        granularity="month",
+        from_at="2024-06-01",
+        to_at="2024-06-30",
+    )
+    row = rows[0]
+    # Beide Geraete haben im Juni beigetragen: Beginn vom alten, Ende vom neuen.
+    assert row["Seriennummer"] == "W-ALT / W-NEU"
+    assert (row["Zählerstand_Beginn"], row["Zählerstand_Ende"]) == ("400", "30")
+    assert row["Verbrauch"] == "130"
+
+
+def test_csv_meter_columns_empty_for_other_dimensions(admin_client: TestClient) -> None:
+    a = _create_mp(admin_client, name="A", serial="SN-A", kostenstelle=11011)
+    reg = _registers(a)["water"]
+    _add(admin_client, reg, "10", "2024-01-31T12:00:00Z")
+    _add(admin_client, reg, "12", "2024-02-29T12:00:00Z")
+
+    rows = _csv_rows(admin_client, dimension="kostenstelle", granularity="month")
+    assert rows
+    for row in rows:
+        # Eine Gruppe summiert mehrere Zaehler -> kein ablesbarer Stand.
+        assert row["Seriennummer"] == ""
+        assert row["Wandlerfaktor"] == ""
+        assert row["Zählerstand_Beginn"] == ""
+        assert row["Zählerstand_Ende"] == ""
 
 
 def test_all_dimensions_have_csv_label() -> None:

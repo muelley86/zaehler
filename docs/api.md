@@ -60,6 +60,19 @@ Alle Endpoints unter `/api/v1`. Fehler im RFC-7807-Format
   Messstellen; bei `owner_id`, `kostenstelle` oder `measuring_point_id`
   entfallen sie (keine solchen Attribute bzw. eigener ID-Namensraum). Der
   Response echot `from_date`/`to_date`.
+  CSV-Spalten: `Dimension;Gruppe;Gruppen_ID;Seriennummer;Zählerart;Richtung;
+  Einheit;Periode_von;Periode_bis;Wandlerfaktor;Zählerstand_Beginn;
+  Zählerstand_Ende;Verbrauch`. Seriennummer, Wandlerfaktor und Zählerstände
+  gibt es **nur im CSV** und nur bei `dimension=measuring_point` für echte
+  Messstellen (sonst leer): Beginn = Stand am Ende des Tages vor
+  `Periode_von`, Ende = Stand am Ende von `Periode_bis`, taggenau zwischen
+  Ablesungen interpoliert wie der Verbrauch (Ablesung auf der Grenze = echter
+  Wert; offener Zeitraum = erste/letzte Ablesung). Stände wie am Display,
+  daher `Verbrauch = (Ende − Beginn) × Wandlerfaktor`; bei Überlauf eines
+  mechanischen Zählers in der Periode ist Ende < Beginn und es gilt
+  `Verbrauch = (Ende − Beginn + Maximalwert) × Wandlerfaktor`. HT/NT-Register
+  einer Zeile summiert. Bei Zählerwechsel im Zeitraum: Seriennummern `alt / neu`,
+  Beginn vom alten, Ende vom neuen Gerät (Differenz geht dann nicht auf).
 - `GET|POST /report-configs`, `PATCH|DELETE /report-configs/{id}`: `filters`
   enthält u. a. `measuring_point_ids` (fehlt in Alt-Configs → leer).
 

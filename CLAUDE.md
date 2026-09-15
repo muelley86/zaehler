@@ -322,7 +322,14 @@ Atomar in einer Transaktion:
   Perioden-Köpfe zeigen den vom Backend zurückgemeldeten Datumsbereich des
   ausgeführten Laufs (`periodLabel`: „01.01.2025 – 31.12.2025", offene Enden
   „ab …"/„bis …", sonst „Gesamter Zeitraum"); dieselben Labels tragen die
-  Vergleichs-CSV und die Diagramm-Legende.
+  Vergleichs-CSV und die Diagramm-Legende. **Nur im CSV-Export**
+  (`/reports/aggregate.csv`, nicht Tabelle/JSON/Vergleichs-CSV) stehen
+  zusätzlich `Seriennummer` (nach `Gruppen_ID`) sowie `Wandlerfaktor`,
+  `Zählerstand_Beginn`, `Zählerstand_Ende` (vor `Verbrauch`) — befüllt nur
+  bei Gruppierung „Messstelle" für echte Messstellen
+  (`services/report_meter_readings.py`: taggenau interpolierte Stände an den
+  Periodengrenzen, Rohwert wie am Display, HT/NT summiert, Zählerwechsel →
+  „alt / neu").
 - Globaler Datumsbereich (`components/GlobalDateRange.tsx`, State in
   `features/prefs/FilterPrefsProvider.tsx`, Helfer in `lib/dateRange.ts`):
   app-weiter Zeitraum-Filter (Dashboard, Erfassungen, Auswertungen — dort per

@@ -174,7 +174,7 @@ def reading_at_for_date(reading_date: date) -> datetime:
     als naive UTC gespeichert (wie alle Readings). Einheitlich mit dem Erfassen-
     Toggle „Historischer Monatswert" und der App-„Periodenende"-Konvention. Nicht
     Mitternacht -> kein Mitternacht-Shift; das lokale Kalenderdatum bleibt über
-    consumption._local_date stabil."""
+    consumption.local_date stabil."""
     local_eod = datetime.combine(reading_date, time(23, 59, 59), tzinfo=ZoneInfo(settings.timezone))
     return local_eod.astimezone(UTC).replace(tzinfo=None)
 
