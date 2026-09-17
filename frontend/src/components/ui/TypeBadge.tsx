@@ -60,5 +60,3 @@ export function TypeBadge({
     </div>
   );
 }
-
-export const TYPE_META = META;

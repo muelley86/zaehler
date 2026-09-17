@@ -26,7 +26,6 @@ from sqlalchemy.orm import Session as DbSession
 
 from meters.core.problem import ProblemError
 from meters.models import (
-    MeasuringPoint,
     PhysicalMeter,
     Register,
     User,
@@ -123,41 +122,3 @@ def restrict_mp_query(
         UserMeasuringPointAccess.user_id == user.id
     )
     return query.where(mp_id_column.in_(subq))
-
-
-def grant_access(
-    db: DbSession,
-    *,
-    user: User,
-    mp: MeasuringPoint,
-    granted_by: User,
-) -> UserMeasuringPointAccess | None:
-    """Idempotent: legt einen Access-Eintrag an, falls noch nicht vorhanden.
-
-    Liefert das Objekt, wenn ein neuer Eintrag entstanden ist — ``None``,
-    wenn der User schon Zugriff hatte. Audit-Log wird vom Caller
-    geschrieben (er kennt den Request-Kontext für die IP-Adresse).
-    """
-    existing = db.get(UserMeasuringPointAccess, (user.id, mp.id))
-    if existing is not None:
-        return None
-    entry = UserMeasuringPointAccess(
-        user_id=user.id,
-        measuring_point_id=mp.id,
-        granted_by_user_id=granted_by.id,
-    )
-    db.add(entry)
-    db.flush()
-    return entry
-
-
-def revoke_access(db: DbSession, *, user: User, mp_id: int) -> bool:
-    """Entfernt den Access-Eintrag. Liefert True, wenn etwas entfernt
-    wurde, False wenn er nicht existierte (idempotent).
-    """
-    existing = db.get(UserMeasuringPointAccess, (user.id, mp_id))
-    if existing is None:
-        return False
-    db.delete(existing)
-    db.flush()
-    return True

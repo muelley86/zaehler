@@ -1,30 +1,12 @@
 """Unit-Tests für ``meters.services.qr``.
 
 Reine Helper-Funktionen ohne DB-Abhängigkeit — daher hier kein Fixture-Setup
-nötig. Wir prüfen nur die Bytes/URL-Formate.
+nötig. Wir prüfen nur die Bytes-Formate.
 """
 
 from __future__ import annotations
 
-from starlette.requests import Request
-
-from meters.services.qr import build_measuring_point_url, qr_png_bytes, qr_svg_bytes
-
-
-def _make_request(*, scheme: str = "http", host: str = "zaehler.example") -> Request:
-    """Minimaler ASGI-Scope für eine Starlette-``Request``-Instanz."""
-    scope = {
-        "type": "http",
-        "method": "GET",
-        "scheme": scheme,
-        "server": ("zaehler.example", 80 if scheme == "http" else 443),
-        "path": "/api/v1/measuring-points/1/qr",
-        "raw_path": b"/api/v1/measuring-points/1/qr",
-        "query_string": b"",
-        "headers": [(b"host", host.encode("ascii"))],
-        "root_path": "",
-    }
-    return Request(scope)
+from meters.services.qr import qr_png_bytes, qr_svg_bytes
 
 
 def test_qr_png_bytes_returns_png_signature() -> None:
@@ -45,15 +27,3 @@ def test_qr_png_box_size_changes_image_size() -> None:
     small = qr_png_bytes("payload", box_size=4)
     large = qr_png_bytes("payload", box_size=12)
     assert len(large) > len(small)
-
-
-def test_build_url_uses_host_header() -> None:
-    request = _make_request(host="zaehler.intern.local:8000")
-    url = build_measuring_point_url(request, 42)
-    assert url == "http://zaehler.intern.local:8000/erfassen?mp=42"
-
-
-def test_build_url_respects_https_scheme() -> None:
-    request = _make_request(scheme="https", host="zaehler.example.com")
-    url = build_measuring_point_url(request, 7)
-    assert url == "https://zaehler.example.com/erfassen?mp=7"

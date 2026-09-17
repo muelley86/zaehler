@@ -14,6 +14,5 @@ export { Sheet } from './Sheet';
 export { SingleSelectDropdown } from './SingleSelectDropdown';
 export { Switch } from './Switch';
 export { TextField } from './TextField';
-export { TypeBadge, TYPE_META } from './TypeBadge';
-export type { MeterType } from './TypeBadge';
+export { TypeBadge } from './TypeBadge';
 export { cx } from './cx';

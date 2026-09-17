@@ -27,9 +27,7 @@ from meters.services.access import (
     accessible_mp_ids,
     assert_can_access_mp,
     assert_can_access_register,
-    grant_access,
     restrict_mp_query,
-    revoke_access,
 )
 
 
@@ -80,6 +78,18 @@ def _mk_register(db: Session, *, mp: MeasuringPoint, obis: str = "water") -> Reg
     return register
 
 
+def _grant(db: Session, *, user: User, mp: MeasuringPoint, granted_by: User) -> None:
+    """Legt einen Access-Eintrag direkt an (wie ``PUT /users/{id}/access``)."""
+    db.add(
+        UserMeasuringPointAccess(
+            user_id=user.id,
+            measuring_point_id=mp.id,
+            granted_by_user_id=granted_by.id,
+        )
+    )
+    db.flush()
+
+
 # ---------------------------------------------------------------------------
 # accessible_mp_ids
 # ---------------------------------------------------------------------------
@@ -104,8 +114,8 @@ def test_accessible_mp_ids_recorder_with_entries(db: Session) -> None:
     mp_a = _mk_mp(db, name="A")
     mp_b = _mk_mp(db, name="B")
     _mk_mp(db, name="C")  # nicht zugewiesen
-    grant_access(db, user=rec, mp=mp_a, granted_by=admin)
-    grant_access(db, user=rec, mp=mp_b, granted_by=admin)
+    _grant(db, user=rec, mp=mp_a, granted_by=admin)
+    _grant(db, user=rec, mp=mp_b, granted_by=admin)
     assert accessible_mp_ids(db, rec) == {mp_a.id, mp_b.id}
 
 
@@ -124,7 +134,7 @@ def test_assert_can_access_mp_recorder_with_grant(db: Session) -> None:
     admin = _mk_user(db, username="admin1", role=UserRole.ADMIN)
     rec = _mk_user(db, username="rec1", role=UserRole.RECORDER)
     mp = _mk_mp(db, name="A")
-    grant_access(db, user=rec, mp=mp, granted_by=admin)
+    _grant(db, user=rec, mp=mp, granted_by=admin)
     assert_can_access_mp(db, rec, mp.id)
 
 
@@ -166,7 +176,7 @@ def test_assert_can_access_register_recorder_with_grant(db: Session) -> None:
     rec = _mk_user(db, username="rec1", role=UserRole.RECORDER)
     mp = _mk_mp(db, name="A")
     reg = _mk_register(db, mp=mp)
-    grant_access(db, user=rec, mp=mp, granted_by=admin)
+    _grant(db, user=rec, mp=mp, granted_by=admin)
     assert_can_access_register(db, rec, reg.id)
 
 
@@ -212,7 +222,7 @@ def test_restrict_mp_query_recorder_filters(db: Session) -> None:
     rec = _mk_user(db, username="rec1", role=UserRole.RECORDER)
     mp_a = _mk_mp(db, name="A")
     _mk_mp(db, name="B")  # nicht zugewiesen
-    grant_access(db, user=rec, mp=mp_a, granted_by=admin)
+    _grant(db, user=rec, mp=mp_a, granted_by=admin)
     base = select(MeasuringPoint)
     restricted = restrict_mp_query(base, rec, mp_id_column=MeasuringPoint.id)
     rows = list(db.scalars(restricted))
@@ -228,35 +238,11 @@ def test_restrict_mp_query_recorder_without_grants_returns_empty(db: Session) ->
     assert rows == []
 
 
-# ---------------------------------------------------------------------------
-# grant_access / revoke_access
-# ---------------------------------------------------------------------------
-
-
-def test_grant_access_idempotent(db: Session) -> None:
-    admin = _mk_user(db, username="admin1", role=UserRole.ADMIN)
-    rec = _mk_user(db, username="rec1", role=UserRole.RECORDER)
-    mp = _mk_mp(db, name="A")
-    first = grant_access(db, user=rec, mp=mp, granted_by=admin)
-    second = grant_access(db, user=rec, mp=mp, granted_by=admin)
-    assert first is not None
-    assert second is None  # zweite Vergabe ist No-op
-
-
-def test_revoke_access_returns_true_when_existed(db: Session) -> None:
-    admin = _mk_user(db, username="admin1", role=UserRole.ADMIN)
-    rec = _mk_user(db, username="rec1", role=UserRole.RECORDER)
-    mp = _mk_mp(db, name="A")
-    grant_access(db, user=rec, mp=mp, granted_by=admin)
-    assert revoke_access(db, user=rec, mp_id=mp.id) is True
-    assert revoke_access(db, user=rec, mp_id=mp.id) is False  # idempotent
-
-
 def test_mp_delete_cascades_access_entries(db: Session) -> None:
     admin = _mk_user(db, username="admin1", role=UserRole.ADMIN)
     rec = _mk_user(db, username="rec1", role=UserRole.RECORDER)
     mp = _mk_mp(db, name="A")
-    grant_access(db, user=rec, mp=mp, granted_by=admin)
+    _grant(db, user=rec, mp=mp, granted_by=admin)
     db.commit()
     db.delete(mp)
     db.commit()
@@ -272,7 +258,7 @@ def test_user_delete_cascades_access_entries(db: Session) -> None:
     admin = _mk_user(db, username="admin1", role=UserRole.ADMIN)
     rec = _mk_user(db, username="rec1", role=UserRole.RECORDER)
     mp = _mk_mp(db, name="A")
-    grant_access(db, user=rec, mp=mp, granted_by=admin)
+    _grant(db, user=rec, mp=mp, granted_by=admin)
     db.commit()
     db.delete(rec)
     db.commit()
