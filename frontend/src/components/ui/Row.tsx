@@ -96,10 +96,6 @@ export function Row(props: RowProps) {
   return <div className={wrapClass}>{inner}</div>;
 }
 
-export function RowSeparator() {
-  return <div className="ml-12 h-px bg-separator" />;
-}
-
 export function RowGroup({ children }: { children: ReactNode }) {
   return <div className="divide-y divide-separator">{children}</div>;
 }

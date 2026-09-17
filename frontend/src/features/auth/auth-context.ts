@@ -7,7 +7,7 @@
 
 import { createContext, useContext } from 'react';
 
-import type { LoginResponse, Me } from '@/lib/types';
+import type { Me } from '@/lib/types';
 
 export type LoginResult = { kind: 'ok'; me: Me } | { kind: 'totp'; challengeToken: string };
 
@@ -29,6 +29,3 @@ export function useAuth(): AuthState {
   }
   return ctx;
 }
-
-// Re-Export für Imports, die das LoginResponse-Typ-Stück brauchen.
-export type { LoginResponse };

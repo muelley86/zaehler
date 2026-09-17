@@ -190,11 +190,6 @@ export async function latestPendingByRegister(
   return map;
 }
 
-export async function getItem(id: string): Promise<OutboxReading | undefined> {
-  const db = await getOfflineDb();
-  return db.get('outbox-readings', id);
-}
-
 /** Fotos einer Gruppe (für Sync-Upload und Anzeige). */
 export async function getGroupPhotos(groupId: string): Promise<OutboxPhoto[]> {
   const db = await getOfflineDb();
