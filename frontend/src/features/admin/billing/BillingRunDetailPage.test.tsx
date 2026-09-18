@@ -154,6 +154,10 @@ describe('BillingRunDetailPage', () => {
     expect(await screen.findByText(/0,25 €\/kWh/)).toBeInTheDocument();
     expect(screen.getByText('±2 T')).toBeInTheDocument();
     expect(screen.getByText(/Kein festgeschriebener Lauf/)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Monats-JSON für Excel/ })).toHaveAttribute(
+      'href',
+      '/api/v1/billing-circles/1/runs/7/monats-json',
+    );
 
     fireEvent.click(screen.getByLabelText('Zeile Stall A manuell ändern'));
     fireEvent.change(screen.getByLabelText(/^Stand neu/), { target: { value: '160' } });

@@ -669,3 +669,36 @@ def test_monatsuebersicht_zeitraum(admin_client: TestClient, admin_user: User, d
         ).status_code
         == 422
     )
+
+
+def _audit_lauf(client: TestClient, run_id: int) -> list[tuple[str, dict[str, Any]]]:
+    eintraege = _ok(client.get("/api/v1/audit-log", params={"limit": 500}))
+    return [
+        (e["action"], e["diff"] or {})
+        for e in sorted(cast(list[dict[str, Any]], eintraege), key=lambda e: e["id"])
+        if e["entity_type"] == "billing_run" and e["entity_id"] == run_id
+    ]
+
+
+def test_lebenszyklus_wird_protokolliert(
+    admin_client: TestClient, admin_user: User, db: Session
+) -> None:
+    """Abnahme: jede Aktion am Lauf steht im Audit-Log, die neue Version mit Begruendung."""
+    cid, _ = _setup(admin_client, db, admin_user)
+    v1 = _ok(admin_client.post(f"{BASE}/{cid}/runs", json={"monat": "2026-08"}), 201)
+    url = f"{BASE}/{cid}/runs/{v1['id']}/lines/{_zeile(v1, 'Pumpe')['id']}"
+    _ok(admin_client.patch(url, json={"manual_stand_neu": "210", "manual_note": "Foto"}))
+    _ok(admin_client.post(f"{BASE}/{cid}/runs/{v1['id']}/finalize"))
+    body = {"monat": "2026-08", "begruendung": "Ablesefehler"}
+    v2 = _ok(admin_client.post(f"{BASE}/{cid}/runs", json=body), 201)
+    _ok(admin_client.post(f"{BASE}/{cid}/runs/{v2['id']}/finalize"))
+
+    erster = _audit_lauf(admin_client, v1["id"])
+    assert [a for a, _ in erster] == ["create", "update", "billing_run_finalized"]
+    felder = erster[1][1]["felder"]
+    assert felder["manual_stand_neu"] == {"from": None, "to": "210"}
+    assert felder["manual_note"] == {"from": None, "to": "Foto"}
+    zweiter = _audit_lauf(admin_client, v2["id"])
+    assert [a for a, _ in zweiter] == ["create", "billing_run_finalized"]
+    assert (zweiter[0][1]["version"], zweiter[0][1]["begruendung"]) == (2, "Ablesefehler")
+    assert zweiter[1][1]["ersetzt_run_id"] == v1["id"]

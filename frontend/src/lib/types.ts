@@ -544,6 +544,39 @@ export interface BillingRunRead extends BillingRunSummary {
   lines: BillingRunLineRead[];
 }
 
+/** Übernahme eines Monats-JSON (Excel-Weg) in einen Entwurf: Vorschau bzw. Ergebnis. */
+export type ExcelImportStatus =
+  | 'gleich'
+  | 'abweichend'
+  | 'unbekannt'
+  | 'nicht_uebernehmbar'
+  | 'fehlt_in_datei'
+  | 'rest';
+
+export interface ExcelImportLine {
+  label: string;
+  status: ExcelImportStatus;
+  hinweis: string | null;
+  app_stand_alt: string | null;
+  app_stand_neu: string | null;
+  app_korrektur: string | null;
+  excel_stand_alt: string | null;
+  excel_stand_neu: string | null;
+  excel_korrektur: string | null;
+}
+
+export interface ExcelImportParameter {
+  feld: 'zusatzkosten' | 'aufschlag_prozent' | 'aufschlag_ct';
+  app: string;
+  excel: string;
+}
+
+export interface BillingExcelImportRead {
+  uebernommen: boolean;
+  zeilen: ExcelImportLine[];
+  parameter: ExcelImportParameter[];
+}
+
 export interface BillingInvoicePositionRead {
   id: number;
   sort_order: number;

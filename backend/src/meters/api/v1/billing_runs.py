@@ -7,13 +7,14 @@ Befunde; vorige Version wird ``ersetzt``). Festgeschriebene Laeufe sind unveraen
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Annotated, Any
 
-from fastapi import APIRouter, Request, status
+from fastapi import APIRouter, File, Request, Response, UploadFile, status
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
 from meters.api.deps import BillingUser, DbDep, client_ip
+from meters.api.uploads import read_limited
 from meters.core.problem import ProblemError
 from meters.models import (
     AuditAction,
@@ -23,6 +24,7 @@ from meters.models import (
     BillingRunLine,
 )
 from meters.schemas.billing_attachment import BillingAttachmentRead
+from meters.schemas.billing_excel import BillingExcelImportRead
 from meters.schemas.billing_history import BillingRunDiff
 from meters.schemas.billing_run import (
     BillingRunCreate,
@@ -34,6 +36,8 @@ from meters.schemas.billing_run import (
 from meters.schemas.billing_transfer import BillingTransferCreate, BillingTransferView
 from meters.services.audit import record
 from meters.services.billing_attachment import attachment
+from meters.services.billing_excel import dateiname, dumps, monats_json
+from meters.services.billing_excel_import import MAX_JSON_BYTES, excel_import, lies_monats_json
 from meters.services.billing_history import compare_runs, other_version
 from meters.services.billing_invoice_helper import invoice_of_run
 from meters.services.billing_run import (
@@ -379,6 +383,24 @@ def anhang(circle_id: int, run_id: int, db: DbDep, _user: BillingUser) -> Billin
     return attachment(run, _circle(db, circle_id), invoice_of_run(db, run))
 
 
+@router.get("/{circle_id}/runs/{run_id}/monats-json")
+def monats_json_export(circle_id: int, run_id: int, db: DbDep, _user: BillingUser) -> Response:
+    """Lauf als Monats-JSON fuer den Excel-Generator der Stromabrechnung (Plan Phase 6)."""
+    run = _run(db, circle_id, run_id)
+    circle = _circle(db, circle_id)
+    inhalt = dumps(monats_json(circle, run, invoice_of_run(db, run))) + "\n"
+    return Response(
+        content=inhalt.encode("utf-8"),
+        media_type="application/json",
+        headers={
+            # Name nur aus Monat und geprueftem Kreis-Kuerzel (siehe ``dateiname``).
+            "Content-Disposition": f'attachment; filename="{dateiname(circle, run)}"',
+            "Cache-Control": "private, no-store",
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
+
+
 @router.get("/{circle_id}/runs/{run_id}/vergleich", response_model=BillingRunDiff)
 def vergleich(
     circle_id: int, run_id: int, db: DbDep, _user: BillingUser, mit: int | None = None
@@ -386,3 +408,59 @@ def vergleich(
     """Zwei Versionen desselben Monats gegenueberstellen (Standard: die naechstaeltere)."""
     run = _run(db, circle_id, run_id)
     return compare_runs(other_version(db, run, mit), run)
+
+
+@router.post("/{circle_id}/runs/{run_id}/excel-import", response_model=BillingExcelImportRead)
+def excel_import_upload(
+    circle_id: int,
+    run_id: int,
+    request: Request,
+    db: DbDep,
+    user: BillingUser,
+    file: Annotated[UploadFile, File()],
+    uebernehmen: bool = False,
+) -> BillingExcelImportRead:
+    """Monats-JSON der Stromabrechnung in den Entwurf uebernehmen (Plan Phase 6, Excel-Weg).
+
+    Ohne ``uebernehmen`` nur Vorschau; mit ``uebernehmen=true`` werden abweichende Staende als
+    manuelle Werte gesetzt, Aufschlaege/Zusatzkosten uebernommen und der Lauf neu gerechnet.
+    """
+    run = _run(db, circle_id, run_id)
+    assert_entwurf(run)
+    daten = read_limited(file, MAX_JSON_BYTES)
+    felder = (*_MANUELL, "manual_note")
+    vorher = {z.id: {f: getattr(z, f) for f in felder} for z in run.lines}
+    bericht = excel_import(
+        run, invoice_of_run(db, run), lies_monats_json(daten), uebernehmen=uebernehmen
+    )
+    if not uebernehmen:
+        db.rollback()  # Vorschau: nichts festhalten
+        return bericht
+    # Je Zeile vorher/nachher wie beim manuellen Bearbeiten - auch ersetzte Begruendungen.
+    geaendert = {
+        z.label: diff
+        for z in run.lines
+        if (
+            diff := {
+                f: {"from": _json(alt), "to": _json(getattr(z, f))}
+                for f, alt in vorher[z.id].items()
+                if alt != getattr(z, f)
+            }
+        )
+    }
+    berechne_lauf(db, run)
+    _audit(
+        db,
+        request,
+        user,
+        run,
+        AuditAction.UPDATE,
+        {
+            "excel_import": {
+                "zeilen": geaendert,
+                "parameter": {p.feld: _json(p.excel) for p in bericht.parameter},
+            }
+        },
+    )
+    _commit(db)
+    return bericht

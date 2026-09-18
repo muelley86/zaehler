@@ -26,8 +26,12 @@ def test_recorder_ohne_merkmal_wird_abgewiesen(recorder_client: TestClient) -> N
         f"{BASE}/1/readings?monat=2026-08",
         f"{BASE}/1/invoices",
         f"{BASE}/1/runs",
+        f"{BASE}/1/runs/1/monats-json",
     ):
         assert recorder_client.get(pfad).status_code == 403, pfad
+    datei = {"file": ("x.json", b"{}", "application/json")}
+    antwort = recorder_client.post(f"{BASE}/1/runs/1/excel-import", files=datei)
+    assert antwort.status_code == 403
 
 
 def test_stammdaten_import_bleibt_admin_vorbehalten(

@@ -6,7 +6,7 @@
 import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, FileText, Pencil } from 'lucide-react';
+import { ArrowLeft, Download, FileText, Pencil } from 'lucide-react';
 
 import { Button, LargeTitle, Section, Sheet, TextField } from '@/components/ui';
 import { api } from '@/lib/api';
@@ -14,6 +14,7 @@ import { formatDateTimeDe, formatDe, parseDe } from '@/lib/format';
 import type { BillingRunLineRead, BillingRunRead } from '@/lib/types';
 
 import { errorText } from './circleForm';
+import { ExcelImportSection } from './ExcelImportSection';
 import { RunDiffSection } from './RunDiffSection';
 import { TransferSection } from './TransferSection';
 import {
@@ -180,16 +181,24 @@ export function BillingRunDetailPage() {
         </div>
       ) : null}
 
-      {r !== null ? (
-        <div className="mb-4">
+      <div className="mb-4 flex flex-wrap gap-x-5 gap-y-2">
+        {r !== null ? (
           <Link
             to={`/admin/abrechnungskreise/${circleId}/laeufe/${run.id}/anhang`}
             className="inline-flex items-center gap-1 text-body text-primary"
           >
             <FileText size={16} /> Rechnungsanhang (Druckansicht)
           </Link>
-        </div>
-      ) : null}
+        ) : null}
+        {/* Eingabe für den Excel-Generator der Stromabrechnung (generate.py --excel). */}
+        <a
+          href={`/api/v1${base}/monats-json`}
+          download
+          className="inline-flex items-center gap-1 text-body text-primary"
+        >
+          <Download size={16} /> Monats-JSON für Excel
+        </a>
+      </div>
 
       <ParameterSection
         key={`${run.id}-${run.zusatzkosten}-${run.aufschlag_prozent}-${run.aufschlag_ct}`}
@@ -356,6 +365,15 @@ export function BillingRunDetailPage() {
           </table>
         </div>
       </Section>
+
+      {entwurf ? (
+        <ExcelImportSection
+          base={base}
+          onApplied={() =>
+            void aktion(() => api.get<BillingRunRead>(base), 'Neu laden fehlgeschlagen.')
+          }
+        />
+      ) : null}
 
       {run.version > 1 ? <RunDiffSection circleId={circleId} runId={run.id} /> : null}
 

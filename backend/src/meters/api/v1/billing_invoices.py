@@ -17,6 +17,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.exc import IntegrityError
 
 from meters.api.deps import BillingUser, DbDep, client_ip
+from meters.api.uploads import read_limited
 from meters.billing.invoice_pdf import MAX_PDF_BYTES, InvoiceParseError, read_invoice_pdf
 from meters.core.problem import ProblemError
 from meters.models import (
@@ -32,8 +33,6 @@ from meters.schemas.billing_invoice import BillingInvoiceRead
 from meters.services.audit import record
 
 router = APIRouter(prefix="/billing-circles", tags=["billing"])
-
-_ZU_GROSS = f"Maximal {MAX_PDF_BYTES // (1024 * 1024)} MB."
 
 
 def _circle(db: DbDep, circle_id: int) -> BillingCircle:
@@ -55,16 +54,6 @@ def _dateiname(roh: str | None) -> str:
     name = re.split(r"[\\/]", roh or "")[-1]
     name = "".join(c for c in name if unicodedata.category(c)[0] != "C").strip()
     return name[:255] or "rechnung.pdf"
-
-
-def _lies_upload(upload: UploadFile) -> bytes:
-    if upload.size is not None and upload.size > MAX_PDF_BYTES:
-        raise ProblemError(status_code=413, title="Datei zu groß", detail=_ZU_GROSS)
-    upload.file.seek(0)
-    daten = upload.file.read(MAX_PDF_BYTES + 1)
-    if len(daten) > MAX_PDF_BYTES:
-        raise ProblemError(status_code=413, title="Datei zu groß", detail=_ZU_GROSS)
-    return daten
 
 
 def _konflikt(detail: str) -> ProblemError:
@@ -95,7 +84,7 @@ def upload_invoice(
     file: Annotated[UploadFile, File()],
 ) -> BillingInvoiceRead:
     circle = _circle(db, circle_id)
-    daten = _lies_upload(file)
+    daten = read_limited(file, MAX_PDF_BYTES)
     try:
         gelesen = read_invoice_pdf(daten)
     except InvoiceParseError as exc:
