@@ -80,7 +80,7 @@ def create_owner(
         action=AuditAction.CREATE,
         entity_type=AuditEntityType.OWNER,
         entity_id=obj.id,
-        diff={"name": obj.name},
+        diff={"name": obj.name, "internal_allocation": obj.internal_allocation},
         ip_address=client_ip(request),
     )
     db.commit()
@@ -110,6 +110,7 @@ def update_owner(
         "vat_id",
         "tax_id",
         "note",
+        "internal_allocation",
     ):
         new_value = getattr(payload, field_name)
         if new_value is not None and new_value != getattr(obj, field_name):

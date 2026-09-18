@@ -25,6 +25,7 @@ const OWNER: OwnerRead = {
   vat_id: 'DE123456789',
   tax_id: null,
   note: null,
+  internal_allocation: false,
 };
 
 function renderPage() {

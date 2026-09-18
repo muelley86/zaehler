@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
 import { User } from 'lucide-react';
 
-import { Button, EmptyState, LargeTitle, Section, Sheet, TextField } from '@/components/ui';
+import { Button, EmptyState, LargeTitle, Section, Sheet, Switch, TextField } from '@/components/ui';
 import { ApiError, api } from '@/lib/api';
 import type { MeasuringPointRead, OwnerRead } from '@/lib/types';
 
@@ -118,6 +118,7 @@ interface OwnerFormState {
   vat_id: string;
   tax_id: string;
   note: string;
+  internal_allocation: boolean;
 }
 
 function emptyFormState(): OwnerFormState {
@@ -131,6 +132,7 @@ function emptyFormState(): OwnerFormState {
     vat_id: '',
     tax_id: '',
     note: '',
+    internal_allocation: false,
   };
 }
 
@@ -145,6 +147,7 @@ function fromOwner(o: OwnerRead): OwnerFormState {
     vat_id: o.vat_id ?? '',
     tax_id: o.tax_id ?? '',
     note: o.note ?? '',
+    internal_allocation: o.internal_allocation,
   };
 }
 
@@ -159,6 +162,7 @@ function toBody(s: OwnerFormState): Record<string, unknown> {
     vat_id: s.vat_id || null,
     tax_id: s.tax_id || null,
     note: s.note || null,
+    internal_allocation: s.internal_allocation,
   };
 }
 
@@ -309,6 +313,19 @@ function FormFields({
         />
       </div>
       <TextField label="Notiz" value={state.note} onChange={(e) => set('note', e.target.value)} />
+      <div className="flex items-center justify-between gap-3 rounded-pill border-hairline border-border bg-fill px-3.5 py-2.5">
+        <span className="text-body text-label">
+          Interne Umlage
+          <span className="block text-caption text-tertiary">
+            Stromabrechnung: keine Rechnung, Umlage per KOST-Stapel
+          </span>
+        </span>
+        <Switch
+          checked={state.internal_allocation}
+          onChange={(v) => onChange({ ...state, internal_allocation: v })}
+          ariaLabel="Interne Umlage"
+        />
+      </div>
     </>
   );
 }
