@@ -10,6 +10,13 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.75.0](https://github.com/muelley86/zaehler/compare/v2.74.1...v2.75.0) (2026-09-18)
+
+
+### Funktionen
+
+* **billing:** Abrechnungsmodul Strom mit Excel-Brücke ([#346](https://github.com/muelley86/zaehler/issues/346)) ([38bb850](https://github.com/muelley86/zaehler/commit/38bb85098ddd339e187c6c17c9875e45249b125e))
+
 ## [2.74.1](https://github.com/muelley86/zaehler/compare/v2.74.0...v2.74.1) (2026-09-17)
 
 
