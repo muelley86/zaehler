@@ -1,4 +1,4 @@
-"""Abrechnungskreise und -positionen (admin-only, Vorstufe des Abrechnungsmoduls)."""
+"""Abrechnungskreise und -positionen des Abrechnungsmoduls (Admin oder ``can_billing``)."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ from pydantic import ValidationError
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 
-from meters.api.deps import AdminUser, DbDep, client_ip
+from meters.api.deps import AdminUser, BillingUser, DbDep, client_ip
 from meters.core.problem import ProblemError
 from meters.models import (
     AuditAction,
@@ -96,14 +96,14 @@ def _commit_delete(db: DbDep, detail: str) -> None:
 
 
 @router.get("", response_model=list[BillingCircleRead])
-def list_circles(db: DbDep, _admin: AdminUser) -> list[BillingCircleRead]:
+def list_circles(db: DbDep, _user: BillingUser) -> list[BillingCircleRead]:
     rows = db.scalars(select(BillingCircle).order_by(BillingCircle.code))
     return [BillingCircleRead.model_validate(c) for c in rows]
 
 
 @router.post("", response_model=BillingCircleRead, status_code=status.HTTP_201_CREATED)
 def create_circle(
-    payload: BillingCircleCreate, request: Request, db: DbDep, admin: AdminUser
+    payload: BillingCircleCreate, request: Request, db: DbDep, user: BillingUser
 ) -> BillingCircleRead:
     circle = BillingCircle(**payload.model_dump())
     db.add(circle)
@@ -114,7 +114,7 @@ def create_circle(
         raise ProblemError(status_code=409, title="Billing circle code already exists") from exc
     record(
         db,
-        user_id=admin.id,
+        user_id=user.id,
         action=AuditAction.CREATE,
         entity_type=AuditEntityType.BILLING_CIRCLE,
         entity_id=circle.id,
@@ -149,14 +149,18 @@ def import_stammdaten(
     payload: Annotated[StammdatenImport, Depends(_import_payload)],
     request: Request,
     db: DbDep,
-    admin: AdminUser,
+    user: AdminUser,
     apply: bool = False,
 ) -> ImportReport:
-    """Stammdaten-Import (Datei aus ``stromabrechnung.export_app``).
+    """Stammdaten-Import (Datei aus ``stromabrechnung.export_app``) - **nur Admin**.
 
     ``apply=false`` (Vorschau) fuehrt den Import vollstaendig aus und rollt zurueck - die Vorschau
-    zeigt damit exakt, was ``apply=true`` schreibt."""
-    entries = run_import(db, payload, user_id=admin.id, ip_address=client_ip(request))
+    zeigt damit exakt, was ``apply=true`` schreibt.
+
+    Bewusst strenger als der Rest des Moduls: der Import legt Eigentuemer- und
+    Kostenstellen-Zuordnungen beliebiger Messstellen an und kann ``internal_allocation`` setzen.
+    Das ist Stammdatenpflege, nicht Abrechnung - das Merkmal ``can_billing`` oeffnet sie nicht."""
+    entries = run_import(db, payload, user_id=user.id, ip_address=client_ip(request))
     counts = {
         level: sum(1 for e in entries if e.level == level)
         for level in ("aktion", "hinweis", "fehler")
@@ -164,7 +168,7 @@ def import_stammdaten(
     if apply:
         record(
             db,
-            user_id=admin.id,
+            user_id=user.id,
             action=AuditAction.BILLING_IMPORT,
             entity_type=AuditEntityType.SYSTEM,
             entity_id=None,
@@ -186,7 +190,7 @@ def import_stammdaten(
 @router.get("/unassigned-meters", response_model=list[UnassignedMeterRead])
 def unassigned(
     db: DbDep,
-    _admin: AdminUser,
+    _user: BillingUser,
     stichtag: date | None = None,
 ) -> list[UnassignedMeterRead]:
     """Strom-Messstellen, die zum Stichtag (Standard heute) in keinem Kreis abgerechnet werden."""
@@ -199,7 +203,7 @@ _MONAT = r"^(19|20)\d{2}-(0[1-9]|1[0-2])$"
 @router.get("/overview", response_model=BillingMonthOverview)
 def month_overview(
     db: DbDep,
-    _admin: AdminUser,
+    _user: BillingUser,
     von: Annotated[str | None, Query(pattern=_MONAT)] = None,
     bis: Annotated[str | None, Query(pattern=_MONAT)] = None,
 ) -> BillingMonthOverview:
@@ -208,7 +212,7 @@ def month_overview(
 
 
 @router.get("/{circle_id}", response_model=BillingCircleRead)
-def get_circle(circle_id: int, db: DbDep, _admin: AdminUser) -> BillingCircleRead:
+def get_circle(circle_id: int, db: DbDep, _user: BillingUser) -> BillingCircleRead:
     return BillingCircleRead.model_validate(_circle(db, circle_id))
 
 
@@ -218,7 +222,7 @@ def update_circle(
     payload: BillingCircleUpdate,
     request: Request,
     db: DbDep,
-    admin: AdminUser,
+    user: BillingUser,
 ) -> BillingCircleRead:
     circle = _circle(db, circle_id)
     diff: dict[str, object] = {}
@@ -234,7 +238,7 @@ def update_circle(
     if diff:
         record(
             db,
-            user_id=admin.id,
+            user_id=user.id,
             action=AuditAction.UPDATE,
             entity_type=AuditEntityType.BILLING_CIRCLE,
             entity_id=circle.id,
@@ -246,7 +250,7 @@ def update_circle(
 
 
 @router.delete("/{circle_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_circle(circle_id: int, request: Request, db: DbDep, admin: AdminUser) -> None:
+def delete_circle(circle_id: int, request: Request, db: DbDep, user: BillingUser) -> None:
     circle = _circle(db, circle_id)
     anzahl = db.scalar(
         select(func.count(BillingPosition.id)).where(BillingPosition.circle_id == circle_id)
@@ -268,7 +272,7 @@ def delete_circle(circle_id: int, request: Request, db: DbDep, admin: AdminUser)
         )
     record(
         db,
-        user_id=admin.id,
+        user_id=user.id,
         action=AuditAction.DELETE,
         entity_type=AuditEntityType.BILLING_CIRCLE,
         entity_id=circle.id,
@@ -281,7 +285,7 @@ def delete_circle(circle_id: int, request: Request, db: DbDep, admin: AdminUser)
 
 @router.get("/{circle_id}/positions", response_model=list[BillingPositionRead])
 def list_positions(
-    circle_id: int, db: DbDep, _admin: AdminUser, stichtag: date | None = None
+    circle_id: int, db: DbDep, _user: BillingUser, stichtag: date | None = None
 ) -> list[BillingPositionRead]:
     _circle(db, circle_id)
     return [_position_read(p) for p in positions_at(db, circle_id, stichtag)]
@@ -297,7 +301,7 @@ def create_position(
     payload: BillingPositionCreate,
     request: Request,
     db: DbDep,
-    admin: AdminUser,
+    user: BillingUser,
 ) -> BillingPositionRead:
     circle = _circle(db, circle_id)
     validate_position(db, circle, PositionData(**payload.model_dump()), None)
@@ -306,7 +310,7 @@ def create_position(
     db.flush()
     record(
         db,
-        user_id=admin.id,
+        user_id=user.id,
         action=AuditAction.CREATE,
         entity_type=AuditEntityType.BILLING_POSITION,
         entity_id=position.id,
@@ -325,7 +329,7 @@ def update_position(
     payload: BillingPositionUpdate,
     request: Request,
     db: DbDep,
-    admin: AdminUser,
+    user: BillingUser,
 ) -> BillingPositionRead:
     circle = _circle(db, circle_id)
     position = _position(db, circle_id, position_id)
@@ -358,7 +362,7 @@ def update_position(
     if diff:
         record(
             db,
-            user_id=admin.id,
+            user_id=user.id,
             action=AuditAction.UPDATE,
             entity_type=AuditEntityType.BILLING_POSITION,
             entity_id=position.id,
@@ -372,7 +376,7 @@ def update_position(
 
 @router.delete("/{circle_id}/positions/{position_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_position(
-    circle_id: int, position_id: int, request: Request, db: DbDep, admin: AdminUser
+    circle_id: int, position_id: int, request: Request, db: DbDep, user: BillingUser
 ) -> None:
     position = _position(db, circle_id, position_id)
     unter = db.scalar(
@@ -388,7 +392,7 @@ def delete_position(
         )
     record(
         db,
-        user_id=admin.id,
+        user_id=user.id,
         action=AuditAction.DELETE,
         entity_type=AuditEntityType.BILLING_POSITION,
         entity_id=position.id,
@@ -400,7 +404,7 @@ def delete_position(
 
 
 @router.get("/{circle_id}/check", response_model=BillingCheckRead)
-def check(circle_id: int, stichtag: date, db: DbDep, _admin: AdminUser) -> BillingCheckRead:
+def check(circle_id: int, stichtag: date, db: DbDep, _user: BillingUser) -> BillingCheckRead:
     """Pruefbericht zum Stichtag (in der Regel Monatsende)."""
     return check_circle(db, _circle(db, circle_id), stichtag)
 
@@ -409,7 +413,7 @@ def check(circle_id: int, stichtag: date, db: DbDep, _admin: AdminUser) -> Billi
 def month_end_readings(
     circle_id: int,
     db: DbDep,
-    _admin: AdminUser,
+    _user: BillingUser,
     monat: Annotated[str, Query(pattern=r"^(19|20)\d{2}-(0[1-9]|1[0-2])$")],
 ) -> BillingReadingsRead:
     """Zaehlerstaende zum Monatsende (Stand alt/neu, interpoliert gekennzeichnet) je Position."""

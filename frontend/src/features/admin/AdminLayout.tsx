@@ -15,7 +15,9 @@ import { NavLink, Outlet } from 'react-router-dom';
 
 import { PageGlows } from '@/components/PageGlows';
 import { cx } from '@/components/ui/cx';
-import { ADMIN_SECTIONS } from './adminNav';
+import { useAuth } from '@/features/auth/auth-context';
+
+import { sectionsFor } from './adminNav';
 
 const subNavLink = ({ isActive }: { isActive: boolean }) =>
   cx(
@@ -32,6 +34,9 @@ const chipLink = ({ isActive }: { isActive: boolean }) =>
   );
 
 export function AdminLayout() {
+  const { me } = useAuth();
+  const sichtbar = sectionsFor(me);
+
   return (
     <div className="relative min-h-full overflow-hidden bg-bg">
       <PageGlows accent="electricity" />
@@ -47,7 +52,7 @@ export function AdminLayout() {
               <LayoutGrid size={18} className="shrink-0 opacity-70" />
               Übersicht
             </NavLink>
-            {ADMIN_SECTIONS.map((s) => (
+            {sichtbar.map((s) => (
               <NavLink key={s.to} to={s.to} className={subNavLink}>
                 <span className="shrink-0 opacity-70">{s.icon}</span>
                 {s.label}
@@ -65,7 +70,7 @@ export function AdminLayout() {
             <NavLink to="/admin" end className={chipLink}>
               Übersicht
             </NavLink>
-            {ADMIN_SECTIONS.map((s) => (
+            {sichtbar.map((s) => (
               <NavLink key={s.to} to={s.to} className={chipLink}>
                 {s.short ?? s.label}
               </NavLink>

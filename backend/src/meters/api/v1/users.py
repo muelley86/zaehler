@@ -65,6 +65,7 @@ def create_user(
         is_active=True,
         force_password_change=True,
         can_assign_qr_tokens=payload.can_assign_qr_tokens,
+        can_billing=payload.can_billing,
     )
     db.add(user)
     db.flush()
@@ -130,6 +131,9 @@ def update_user(
             "to": payload.can_assign_qr_tokens,
         }
         user.can_assign_qr_tokens = payload.can_assign_qr_tokens
+    if payload.can_billing is not None and payload.can_billing != user.can_billing:
+        diff["can_billing"] = {"from": user.can_billing, "to": payload.can_billing}
+        user.can_billing = payload.can_billing
 
     if diff:
         record(

@@ -26,6 +26,7 @@ const _RECORDER: UserRead = {
   force_password_change: false,
   totp_enabled: false,
   can_assign_qr_tokens: false,
+  can_billing: false,
   last_login_at: null,
   created_at: '2024-01-01T00:00:00Z',
 };
@@ -39,6 +40,7 @@ const _ADMIN_ME: Me = {
   force_password_change: false,
   totp_enabled: false,
   can_assign_qr_tokens: false,
+  can_billing: false,
   last_login_at: null,
 };
 

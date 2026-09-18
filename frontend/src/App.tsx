@@ -257,6 +257,26 @@ export function App() {
           <Route path="/passwort-aendern" element={<ChangePasswordPage />} />
           <Route path="/2fa-einrichten" element={<TwoFactorSetupPage />} />
 
+          {/* Abrechnungsmodul: Admins und Benutzer mit dem Merkmal „darf abrechnen". Eigener
+              Block, damit das Merkmal nicht die uebrige Verwaltung oeffnet. */}
+          <Route
+            path="/admin"
+            element={
+              <BillingOnly>
+                <AdminLayout />
+              </BillingOnly>
+            }
+          >
+            <Route path="abrechnungskreise" element={<BillingCirclesAdminPage />} />
+            <Route path="abrechnungskreise/:id" element={<BillingCircleDetailPage />} />
+            <Route path="abrechnungskreise/:id/assistent" element={<BillingAssistantPage />} />
+            <Route path="abrechnungskreise/:id/laeufe/:runId" element={<BillingRunDetailPage />} />
+            <Route
+              path="abrechnungskreise/:id/laeufe/:runId/anhang"
+              element={<BillingAttachmentPage />}
+            />
+          </Route>
+
           {/* Admin-Bereich. Sub-Pages rendern unter dem AdminLayout-Outlet. */}
           <Route
             path="/admin"
@@ -280,14 +300,6 @@ export function App() {
             <Route path="mieter" element={<MietersAdminPage />} />
             <Route path="mieter/:id" element={<MieterDetailPage />} />
             <Route path="verrechnung" element={<VirtualPointsAdminPage />} />
-            <Route path="abrechnungskreise" element={<BillingCirclesAdminPage />} />
-            <Route path="abrechnungskreise/:id" element={<BillingCircleDetailPage />} />
-            <Route path="abrechnungskreise/:id/assistent" element={<BillingAssistantPage />} />
-            <Route path="abrechnungskreise/:id/laeufe/:runId" element={<BillingRunDetailPage />} />
-            <Route
-              path="abrechnungskreise/:id/laeufe/:runId/anhang"
-              element={<BillingAttachmentPage />}
-            />
             <Route path="benutzer" element={<UsersAdminPage />} />
             <Route path="qr-codes" element={<QrCodesAdminPage />} />
             <Route path="import" element={<ImportReadingsPage />} />
@@ -310,6 +322,15 @@ export function App() {
       </Suspense>
     </AppShell>
   );
+}
+
+/** Abrechnungsmodul: Admin oder Benutzer mit dem Merkmal ``can_billing``. */
+function BillingOnly({ children }: { children: ReactNode }) {
+  const { me } = useAuth();
+  if (me?.role !== 'admin' && !me?.can_billing) {
+    return <Navigate to="/" replace />;
+  }
+  return <>{children}</>;
 }
 
 function AdminOnly({ children }: { children: ReactNode }) {

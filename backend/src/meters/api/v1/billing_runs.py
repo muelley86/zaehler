@@ -1,4 +1,4 @@
-"""Abrechnungslaeufe je Kreis und Monat (admin-only, Plan Phase 4c).
+"""Abrechnungslaeufe je Kreis und Monat (Admin oder ``can_billing``, Plan Phase 4c).
 
 Entwurf anlegen (Snapshot aus der App + Rechnung des Monats) -> Parameter/Zeilen anpassen (jede
 Aenderung rechnet neu) -> aus der App aktualisieren -> festschreiben (nur ohne blockierende
@@ -13,7 +13,7 @@ from fastapi import APIRouter, Request, status
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
-from meters.api.deps import AdminUser, DbDep, client_ip
+from meters.api.deps import BillingUser, DbDep, client_ip
 from meters.core.problem import ProblemError
 from meters.models import (
     AuditAction,
@@ -92,14 +92,14 @@ def _json(value: Any) -> Any:
 def _audit(
     db: DbDep,
     request: Request,
-    admin: AdminUser,
+    user: BillingUser,
     run: BillingRun,
     action: AuditAction,
     diff: dict[str, Any],
 ) -> None:
     record(
         db,
-        user_id=admin.id,
+        user_id=user.id,
         action=action,
         entity_type=AuditEntityType.BILLING_RUN,
         entity_id=run.id,
@@ -122,7 +122,7 @@ def _commit(db: DbDep) -> None:
 
 
 @router.get("/{circle_id}/runs", response_model=list[BillingRunSummary])
-def list_runs(circle_id: int, db: DbDep, _admin: AdminUser) -> list[BillingRunSummary]:
+def list_runs(circle_id: int, db: DbDep, _user: BillingUser) -> list[BillingRunSummary]:
     _circle(db, circle_id)
     rows = db.scalars(
         select(BillingRun)
@@ -136,7 +136,7 @@ def list_runs(circle_id: int, db: DbDep, _admin: AdminUser) -> list[BillingRunSu
     "/{circle_id}/runs", response_model=BillingRunRead, status_code=status.HTTP_201_CREATED
 )
 def create(
-    circle_id: int, payload: BillingRunCreate, request: Request, db: DbDep, admin: AdminUser
+    circle_id: int, payload: BillingRunCreate, request: Request, db: DbDep, user: BillingUser
 ) -> BillingRunRead:
     circle = _circle(db, circle_id)
     run = create_run(
@@ -147,7 +147,7 @@ def create(
         aufschlag_prozent=payload.aufschlag_prozent,
         aufschlag_ct=payload.aufschlag_ct,
         begruendung=payload.begruendung,
-        user_id=admin.id,
+        user_id=user.id,
     )
     try:
         db.flush()
@@ -159,13 +159,13 @@ def create(
             detail="Der Lauf wurde gleichzeitig angelegt - bitte neu laden.",
         ) from exc
     diff = {k: _json(v) for k, v in payload.model_dump().items()}
-    _audit(db, request, admin, run, AuditAction.CREATE, diff)
+    _audit(db, request, user, run, AuditAction.CREATE, diff)
     _commit(db)
     return _read(run)
 
 
 @router.get("/{circle_id}/runs/{run_id}", response_model=BillingRunRead)
-def get_run(circle_id: int, run_id: int, db: DbDep, _admin: AdminUser) -> BillingRunRead:
+def get_run(circle_id: int, run_id: int, db: DbDep, _user: BillingUser) -> BillingRunRead:
     return _read(_run(db, circle_id, run_id))
 
 
@@ -176,7 +176,7 @@ def update_run(
     payload: BillingRunUpdate,
     request: Request,
     db: DbDep,
-    admin: AdminUser,
+    user: BillingUser,
 ) -> BillingRunRead:
     run = _run(db, circle_id, run_id)
     assert_entwurf(run)
@@ -192,7 +192,7 @@ def update_run(
             setattr(run, name, neu)
     if diff:
         berechne_lauf(db, run)
-        _audit(db, request, admin, run, AuditAction.UPDATE, diff)
+        _audit(db, request, user, run, AuditAction.UPDATE, diff)
     _commit(db)
     return _read(run)
 
@@ -205,7 +205,7 @@ def update_line(
     payload: BillingRunLineUpdate,
     request: Request,
     db: DbDep,
-    admin: AdminUser,
+    user: BillingUser,
 ) -> BillingRunRead:
     run = _run(db, circle_id, run_id)
     assert_entwurf(run)
@@ -233,35 +233,35 @@ def update_line(
         setattr(line, f, v)
     if diff:
         berechne_lauf(db, run)
-        _audit(db, request, admin, run, AuditAction.UPDATE, {"line": line.label, "felder": diff})
+        _audit(db, request, user, run, AuditAction.UPDATE, {"line": line.label, "felder": diff})
     _commit(db)
     return _read(run)
 
 
 @router.post("/{circle_id}/runs/{run_id}/refresh", response_model=BillingRunRead)
 def refresh(
-    circle_id: int, run_id: int, request: Request, db: DbDep, admin: AdminUser
+    circle_id: int, run_id: int, request: Request, db: DbDep, user: BillingUser
 ) -> BillingRunRead:
     """Neuaufbau der Zeilen aus der App (Empfaenger, KST, Staende); manuelle Werte bleiben."""
     circle = _circle(db, circle_id)
     run = _run(db, circle_id, run_id)
     refresh_run(db, circle, run)
-    _audit(db, request, admin, run, AuditAction.UPDATE, {"refresh": True})
+    _audit(db, request, user, run, AuditAction.UPDATE, {"refresh": True})
     _commit(db)
     return _read(run)
 
 
 @router.post("/{circle_id}/runs/{run_id}/finalize", response_model=BillingRunRead)
 def finalize(
-    circle_id: int, run_id: int, request: Request, db: DbDep, admin: AdminUser
+    circle_id: int, run_id: int, request: Request, db: DbDep, user: BillingUser
 ) -> BillingRunRead:
     run = _run(db, circle_id, run_id)
-    ersetzt = finalize_run(db, run, admin.id)
+    ersetzt = finalize_run(db, run, user.id)
     result = run.result or {}
     _audit(
         db,
         request,
-        admin,
+        user,
         run,
         AuditAction.BILLING_RUN_FINALIZED,
         {
@@ -276,16 +276,16 @@ def finalize(
 
 
 @router.delete("/{circle_id}/runs/{run_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_run(circle_id: int, run_id: int, request: Request, db: DbDep, admin: AdminUser) -> None:
+def delete_run(circle_id: int, run_id: int, request: Request, db: DbDep, user: BillingUser) -> None:
     run = _run(db, circle_id, run_id)
     assert_entwurf(run)
-    _audit(db, request, admin, run, AuditAction.DELETE, {})
+    _audit(db, request, user, run, AuditAction.DELETE, {})
     db.delete(run)
     _commit(db)
 
 
 @router.get("/{circle_id}/runs/{run_id}/transfer", response_model=BillingTransferView)
-def transfer(circle_id: int, run_id: int, db: DbDep, _admin: AdminUser) -> BillingTransferView:
+def transfer(circle_id: int, run_id: int, db: DbDep, _user: BillingUser) -> BillingTransferView:
     """Zeilen des Agrarmonitor-Formulars je Empfaenger inkl. Uebertragungsstatus."""
     return transfer_view(db, _run(db, circle_id, run_id))
 
@@ -301,7 +301,7 @@ def mark_transfer(
     payload: BillingTransferCreate,
     request: Request,
     db: DbDep,
-    admin: AdminUser,
+    user: BillingUser,
 ) -> BillingTransferView:
     """Empfaenger als nach Agrarmonitor uebertragen markieren (nur festgeschriebene Laeufe)."""
     run = _run(db, circle_id, run_id)
@@ -311,7 +311,7 @@ def mark_transfer(
         payload.owner_name,
         belegnummer=payload.belegnummer,
         note=payload.note,
-        user_id=admin.id,
+        user_id=user.id,
     )
     try:
         db.flush()
@@ -325,7 +325,7 @@ def mark_transfer(
     _audit(
         db,
         request,
-        admin,
+        user,
         run,
         AuditAction.BILLING_TRANSFERRED,
         {
@@ -347,7 +347,7 @@ def unmark_transfer(
     transfer_id: int,
     request: Request,
     db: DbDep,
-    admin: AdminUser,
+    user: BillingUser,
 ) -> BillingTransferView:
     """Markierung zuruecknehmen (z. B. falsche Belegnummer)."""
     run = _run(db, circle_id, run_id)
@@ -355,7 +355,7 @@ def unmark_transfer(
     _audit(
         db,
         request,
-        admin,
+        user,
         run,
         AuditAction.BILLING_TRANSFERRED,
         {
@@ -371,7 +371,7 @@ def unmark_transfer(
 
 
 @router.get("/{circle_id}/runs/{run_id}/anhang", response_model=BillingAttachmentRead)
-def anhang(circle_id: int, run_id: int, db: DbDep, _admin: AdminUser) -> BillingAttachmentRead:
+def anhang(circle_id: int, run_id: int, db: DbDep, _user: BillingUser) -> BillingAttachmentRead:
     """Rechnungsanhang je Empfaenger (Preisermittlung, Zaehlertabelle, KST, Zusammensetzung)."""
     run = _run(db, circle_id, run_id)
     return attachment(run, _circle(db, circle_id), invoice_of_run(db, run))

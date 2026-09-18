@@ -7,7 +7,12 @@
  *    NavLink mit ``aria-current="page"``.
  */
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+
+// Die Sub-Navigation richtet sich nach den Rechten; hier als Admin (sieht alles).
+vi.mock('@/features/auth/auth-context', () => ({
+  useAuth: () => ({ me: { id: 1, username: 'admin', role: 'admin', can_billing: false } }),
+}));
 import { Route, Routes } from 'react-router-dom';
 import { screen } from '@testing-library/react';
 

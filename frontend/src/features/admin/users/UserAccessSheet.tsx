@@ -36,6 +36,7 @@ export function UserAccessSheet({ user, onClose, onSaved }: UserAccessSheetProps
   const [allMps, setAllMps] = useState<MeasuringPointRead[] | null>(null);
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [canAssignTokens, setCanAssignTokens] = useState<boolean>(user.can_assign_qr_tokens);
+  const [canBilling, setCanBilling] = useState<boolean>(user.can_billing);
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all');
   const [search, setSearch] = useState('');
   const [busy, setBusy] = useState(false);
@@ -112,8 +113,12 @@ export function UserAccessSheet({ user, onClose, onSaved }: UserAccessSheetProps
       const body: UserAccessUpdate = { measuring_point_ids: Array.from(selected) };
       await api.put<UserAccessRead>(`/users/${user.id}/measuring-points`, body);
       // Token-Assign-Flag separat patchen, falls geändert
-      if (canAssignTokens !== user.can_assign_qr_tokens) {
-        await api.patch(`/users/${user.id}`, { can_assign_qr_tokens: canAssignTokens });
+      const merkmale: Record<string, boolean> = {};
+      if (canAssignTokens !== user.can_assign_qr_tokens)
+        merkmale.can_assign_qr_tokens = canAssignTokens;
+      if (canBilling !== user.can_billing) merkmale.can_billing = canBilling;
+      if (Object.keys(merkmale).length > 0) {
+        await api.patch(`/users/${user.id}`, merkmale);
       }
       onSaved?.();
       onClose();
@@ -156,6 +161,24 @@ export function UserAccessSheet({ user, onClose, onSaved }: UserAccessSheetProps
                 <div className="text-caption text-tertiary">
                   Erlaubt diesem Recorder, einen frisch geklebten QR-Sticker selbst einer
                   zugänglichen Messstelle zuzuordnen — ohne Admin-Eingriff.
+                </div>
+              </div>
+            </label>
+          </div>
+
+          <div className="rounded-card border-hairline border-border bg-fill p-3">
+            <label className="flex cursor-pointer items-start gap-3">
+              <Switch
+                checked={canBilling}
+                onChange={() => setCanBilling((v) => !v)}
+                ariaLabel="Abrechnung"
+              />
+              <div className="min-w-0 flex-1">
+                <div className="text-body font-semibold text-label">Abrechnung</div>
+                <div className="text-caption text-tertiary">
+                  Öffnet das Modul Stromabrechnung: Rechnungen importieren, Läufe berechnen und
+                  festschreiben, nach Agrarmonitor übertragen. Die übrige Verwaltung bleibt
+                  Administratoren vorbehalten.
                 </div>
               </div>
             </label>

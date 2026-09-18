@@ -22,6 +22,8 @@ export interface Me {
   force_password_change: boolean;
   totp_enabled: boolean;
   can_assign_qr_tokens: boolean;
+  /** Darf das Abrechnungsmodul bedienen (Admins immer). */
+  can_billing: boolean;
   last_login_at: string | null;
   // Vom Backend berechnet: Admin ohne 2FA bei aktivem METERS_REQUIRE_TOTP_FOR_ADMIN.
   // Optional, weil nur die /auth/me-Antwort es führt (nicht die Admin-User-Liste).

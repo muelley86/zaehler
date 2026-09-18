@@ -28,6 +28,7 @@ const _RECORDER: UserRead = {
   force_password_change: false,
   totp_enabled: false,
   can_assign_qr_tokens: false,
+  can_billing: false,
   last_login_at: null,
   created_at: '2024-01-01T00:00:00Z',
 };
@@ -189,5 +190,28 @@ describe('UserAccessSheet', () => {
     expect(onClose).toHaveBeenCalled();
     expect(putBody).not.toBeNull();
     expect(new Set(putBody!.measuring_point_ids)).toEqual(new Set([1, 2]));
+  });
+
+  it('schaltet das Merkmal „Abrechnung" frei', async () => {
+    let patchBody: Record<string, boolean> | null = null;
+    _mockEndpoints({ mps: [_mp({ id: 1, name: 'Strom' })], initialAccessIds: [] });
+    server.use(
+      http.put('/api/v1/users/:userId/measuring-points', () =>
+        HttpResponse.json({ user_id: 5, measuring_point_ids: [] }),
+      ),
+      http.patch('/api/v1/users/:userId', async ({ request }) => {
+        patchBody = (await request.json()) as Record<string, boolean>;
+        return HttpResponse.json({ ..._RECORDER, can_billing: true });
+      }),
+    );
+
+    const user = userEvent.setup();
+    renderWithRouter(<UserAccessSheet user={_RECORDER} onClose={vi.fn()} onSaved={vi.fn()} />);
+
+    await screen.findByLabelText('Zugriff auf Strom');
+    await user.click(screen.getByLabelText('Abrechnung'));
+    await user.click(screen.getByRole('button', { name: /Speichern/ }));
+
+    await waitFor(() => expect(patchBody).toEqual({ can_billing: true }));
   });
 });

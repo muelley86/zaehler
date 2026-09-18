@@ -56,6 +56,15 @@ class User(Base, TimestampMixin):
         server_default="0",
     )
 
+    # Darf das Abrechnungsmodul der Stromabrechnung bedienen (Kreise, Rechnungen, Laeufe).
+    # Wie oben: Admins haben das Recht implizit, fuer alle anderen schaltet es der Admin frei.
+    can_billing: Mapped[bool] = mapped_column(
+        Boolean,
+        default=False,
+        nullable=False,
+        server_default="0",
+    )
+
     sessions: Mapped[list[Session]] = relationship(
         "Session",
         back_populates="user",

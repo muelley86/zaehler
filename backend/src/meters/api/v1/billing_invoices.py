@@ -1,4 +1,4 @@
-"""Eingangsrechnungen je Abrechnungskreis (admin-only, Plan Phase 4a).
+"""Eingangsrechnungen je Abrechnungskreis (Admin oder ``can_billing``, Plan Phase 4a).
 
 Upload der Monatsrechnung als PDF: Parser (``billing/invoice_pdf.py``) liest Kopf und Positionen,
 die Abnahmestelle muss zum Kreis passen. Gespeichert werden Kopf, Positionen und Original-PDF
@@ -16,7 +16,7 @@ from fastapi import APIRouter, File, Request, Response, UploadFile, status
 from sqlalchemy import delete, select
 from sqlalchemy.exc import IntegrityError
 
-from meters.api.deps import AdminUser, DbDep, client_ip
+from meters.api.deps import BillingUser, DbDep, client_ip
 from meters.billing.invoice_pdf import MAX_PDF_BYTES, InvoiceParseError, read_invoice_pdf
 from meters.core.problem import ProblemError
 from meters.models import (
@@ -72,7 +72,7 @@ def _konflikt(detail: str) -> ProblemError:
 
 
 @router.get("/{circle_id}/invoices", response_model=list[BillingInvoiceRead])
-def list_invoices(circle_id: int, db: DbDep, _admin: AdminUser) -> list[BillingInvoiceRead]:
+def list_invoices(circle_id: int, db: DbDep, _user: BillingUser) -> list[BillingInvoiceRead]:
     _circle(db, circle_id)
     rows = db.scalars(
         select(BillingInvoice)
@@ -91,7 +91,7 @@ def upload_invoice(
     circle_id: int,
     request: Request,
     db: DbDep,
-    admin: AdminUser,
+    user: BillingUser,
     file: Annotated[UploadFile, File()],
 ) -> BillingInvoiceRead:
     circle = _circle(db, circle_id)
@@ -144,7 +144,7 @@ def upload_invoice(
         pdf_sha256=sha,
         pdf_size=len(daten),
         pdf_filename=_dateiname(file.filename),
-        uploaded_by=admin.id,
+        uploaded_by=user.id,
         positions=[
             BillingInvoicePosition(
                 sort_order=i,
@@ -168,7 +168,7 @@ def upload_invoice(
     db.add(BillingInvoiceFile(invoice_id=invoice.id, data=daten))
     record(
         db,
-        user_id=admin.id,
+        user_id=user.id,
         action=AuditAction.CREATE,
         entity_type=AuditEntityType.BILLING_INVOICE,
         entity_id=invoice.id,
@@ -188,13 +188,13 @@ def upload_invoice(
 
 @router.get("/{circle_id}/invoices/{invoice_id}", response_model=BillingInvoiceRead)
 def get_invoice(
-    circle_id: int, invoice_id: int, db: DbDep, _admin: AdminUser
+    circle_id: int, invoice_id: int, db: DbDep, _user: BillingUser
 ) -> BillingInvoiceRead:
     return BillingInvoiceRead.model_validate(_invoice(db, circle_id, invoice_id))
 
 
 @router.get("/{circle_id}/invoices/{invoice_id}/pdf")
-def get_invoice_pdf(circle_id: int, invoice_id: int, db: DbDep, _admin: AdminUser) -> Response:
+def get_invoice_pdf(circle_id: int, invoice_id: int, db: DbDep, _user: BillingUser) -> Response:
     invoice = _invoice(db, circle_id, invoice_id)
     datei = db.get(BillingInvoiceFile, invoice.id)
     if datei is None:
@@ -213,7 +213,7 @@ def get_invoice_pdf(circle_id: int, invoice_id: int, db: DbDep, _admin: AdminUse
 
 @router.delete("/{circle_id}/invoices/{invoice_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_invoice(
-    circle_id: int, invoice_id: int, request: Request, db: DbDep, admin: AdminUser
+    circle_id: int, invoice_id: int, request: Request, db: DbDep, user: BillingUser
 ) -> None:
     invoice = _invoice(db, circle_id, invoice_id)
     if db.scalar(select(BillingRun.id).where(BillingRun.invoice_id == invoice.id)) is not None:
@@ -224,7 +224,7 @@ def delete_invoice(
         )
     record(
         db,
-        user_id=admin.id,
+        user_id=user.id,
         action=AuditAction.DELETE,
         entity_type=AuditEntityType.BILLING_INVOICE,
         entity_id=invoice.id,

@@ -96,6 +96,24 @@ def require_admin(user: CurrentUser) -> User:
 AdminUser = Annotated[User, Depends(require_admin)]
 
 
+def require_billing(user: CurrentUser) -> User:
+    """Abrechnungsmodul: Admin oder Benutzer mit dem Merkmal ``can_billing``.
+
+    Die kaufmaennische Abteilung soll abrechnen koennen, ohne Vollzugriff auf die Verwaltung zu
+    haben; Erfasser ohne das Merkmal sehen das Modul nicht.
+    """
+    if user.role is not UserRole.ADMIN and not user.can_billing:
+        raise ProblemError(
+            status_code=403,
+            title="Forbidden",
+            detail="Diese Aktion erfordert die Berechtigung fuer die Abrechnung.",
+        )
+    return user
+
+
+BillingUser = Annotated[User, Depends(require_billing)]
+
+
 def client_ip(request: Request) -> str | None:
     """Tatsächliche Client-IP — bei METERS_TRUST_PROXY aus X-Forwarded-For,
     sonst aus der direkten Verbindung.

@@ -31,6 +31,7 @@ function makeAuth(id: number): AuthState {
     force_password_change: false,
     totp_enabled: false,
     can_assign_qr_tokens: false,
+    can_billing: false,
     last_login_at: null,
   };
   return {
