@@ -1,0 +1,335 @@
+{
+  "quelle": "Synthetisch (Struktur Kreis SUED, Zufallswerte Seed 20260917), erwartet aus model.berechne",
+  "kreis": {
+    "gruppen": [
+      {
+        "name": "E1",
+        "intern": false
+      },
+      {
+        "name": "E2",
+        "intern": true
+      }
+    ],
+    "verbraucher": [
+      {
+        "name": "V01",
+        "gruppe": "E1",
+        "kst": "10002",
+        "faktor": "1",
+        "rest": false
+      },
+      {
+        "name": "V02",
+        "gruppe": "E1",
+        "kst": "10003",
+        "faktor": "1",
+        "rest": false
+      },
+      {
+        "name": "V03",
+        "gruppe": "E1",
+        "kst": "10001",
+        "faktor": "1",
+        "rest": true
+      },
+      {
+        "name": "V04",
+        "gruppe": "E2",
+        "kst": "10004",
+        "faktor": "1",
+        "rest": false
+      }
+    ],
+    "abzuege": []
+  },
+  "monatsdaten": {
+    "bezugsmenge": "48134.84",
+    "rechnungsbetrag": "12097.11",
+    "positionen": [
+      {
+        "name": "Energielieferung",
+        "betrag": "4680.87",
+        "menge": "48134.84",
+        "preis_ct": "9.7245",
+        "kategorie": null
+      },
+      {
+        "name": "Konzessionsabgabe",
+        "betrag": "59.74",
+        "menge": "48134.84",
+        "preis_ct": "0.1241",
+        "kategorie": null
+      },
+      {
+        "name": "Stromsteuer",
+        "betrag": "826.76",
+        "menge": "48134.84",
+        "preis_ct": "1.7176",
+        "kategorie": null
+      },
+      {
+        "name": "NEV-Umlage",
+        "betrag": "709.94",
+        "menge": "48134.84",
+        "preis_ct": "1.4749",
+        "kategorie": null
+      },
+      {
+        "name": "KWK-Umlage",
+        "betrag": "246.98",
+        "menge": "48134.84",
+        "preis_ct": "0.5131",
+        "kategorie": null
+      },
+      {
+        "name": "Offshore-Haftungsumlage",
+        "betrag": "433.07",
+        "menge": "48134.84",
+        "preis_ct": "0.8997",
+        "kategorie": null
+      },
+      {
+        "name": "Leistungsentgelt",
+        "betrag": "2807.96",
+        "menge": null,
+        "preis_ct": null,
+        "kategorie": null
+      },
+      {
+        "name": "Beschaffungsentgelte / -nebenkosten",
+        "betrag": "69.01",
+        "menge": null,
+        "preis_ct": null,
+        "kategorie": null
+      },
+      {
+        "name": "Wirkarbeit - Netznutzung",
+        "betrag": "1321.31",
+        "menge": null,
+        "preis_ct": null,
+        "kategorie": null
+      },
+      {
+        "name": "Leistung - Netznutzung",
+        "betrag": "908.39",
+        "menge": null,
+        "preis_ct": null,
+        "kategorie": null
+      },
+      {
+        "name": "Messstellenbetrieb",
+        "betrag": "30.84",
+        "menge": null,
+        "preis_ct": null,
+        "kategorie": null
+      },
+      {
+        "name": "Messstellendienstleistung",
+        "betrag": "2.24",
+        "menge": null,
+        "preis_ct": null,
+        "kategorie": null
+      }
+    ],
+    "verbraucher": {
+      "V01": {
+        "stand_alt": null,
+        "stand_neu": null,
+        "kwh": "13544.93",
+        "korrektur": null
+      },
+      "V02": {
+        "stand_alt": null,
+        "stand_neu": null,
+        "kwh": "10270.11",
+        "korrektur": null
+      },
+      "V04": {
+        "stand_alt": null,
+        "stand_neu": null,
+        "kwh": "18973.92",
+        "korrektur": null
+      },
+      "V03": {
+        "stand_alt": null,
+        "stand_neu": null,
+        "kwh": null,
+        "korrektur": null
+      }
+    },
+    "zusatzkosten": "9.48",
+    "aufschlag_prozent": "0",
+    "aufschlag_ct": "0"
+  },
+  "erwartet": {
+    "positionen_summe": "12097.11",
+    "positionen_kontrolle": "0.00",
+    "kategorien": {
+      "Energie": "7557.84",
+      "Abgaben/Umlagen": "2276.49",
+      "Netz": "2229.70",
+      "Messung": "33.08",
+      "Sonstige": "0.00"
+    },
+    "bezugsmenge": "48134.84",
+    "gesamtkosten": "12106.59",
+    "zaehlersumme": "48134.84",
+    "nicht_gemessen_kwh": null,
+    "einkaufspreis_ct": "25.13171332864095943811177102",
+    "umlagepreis_ct": "25.15140800301818807333731659",
+    "implizite_umlage": "0.000783658245647100836480779",
+    "preis_ct": "26.00",
+    "preis_eur": "0.26",
+    "gesamt_eur": "12515.06",
+    "saldo_eur": "-408.47",
+    "fehleranzahl": 0,
+    "zeilen": {
+      "V01": {
+        "kwh": "13544.93",
+        "eur": "3521.68",
+        "pruefung": "OK"
+      },
+      "V02": {
+        "kwh": "10270.11",
+        "eur": "2670.23",
+        "pruefung": "OK"
+      },
+      "V03": {
+        "kwh": "5345.88",
+        "eur": "1389.93",
+        "pruefung": "OK"
+      },
+      "V04": {
+        "kwh": "18973.92",
+        "eur": "4933.22",
+        "pruefung": "OK"
+      }
+    },
+    "gruppen": {
+      "E1": {
+        "kwh": "29160.92",
+        "eur": "7581.84",
+        "zusammensetzung": {
+          "betraege": [
+            "3088.96",
+            "36.19",
+            "500.87",
+            "430.09",
+            "149.62",
+            "262.36",
+            "1701.11",
+            "41.81",
+            "800.47",
+            "550.32",
+            "18.68",
+            "1.36"
+          ],
+          "sonstige": "0.00",
+          "zwischensummen": [
+            "3088.96",
+            "3122.05",
+            "1370.83"
+          ],
+          "energie_ct": "10.59280708564750357670471302",
+          "gesamt": "7581.84",
+          "cts": [
+            "10.59280708564750357670471302",
+            "0.1241",
+            "1.7176",
+            "1.4749",
+            "0.5131",
+            "0.8997",
+            "5.833526514252636748086137200",
+            "0.1433768207587414937525976547",
+            "2.745009416712504269412624842",
+            "1.887183257592695978041845045",
+            "0.06405833560806723519011060008",
+            "0.004663776039987764446389208571"
+          ],
+          "zwischen_cts": [
+            "10.59280708564750357670471302",
+            "10.70628087179691175724222693",
+            "4.700914785953255247090969695"
+          ],
+          "sonstige_ct": "0",
+          "gesamt_ct": "26.00000274339767058103790964"
+        },
+        "kostenstellen": [
+          [
+            "10001",
+            "5345.88",
+            "1389.93"
+          ],
+          [
+            "10002",
+            "13544.93",
+            "3521.68"
+          ],
+          [
+            "10003",
+            "10270.11",
+            "2670.23"
+          ]
+        ]
+      },
+      "E2": {
+        "kwh": "18973.92",
+        "eur": "4933.22",
+        "zusammensetzung": {
+          "betraege": [
+            "2009.85",
+            "23.55",
+            "325.90",
+            "279.85",
+            "97.36",
+            "170.71",
+            "1106.85",
+            "27.20",
+            "520.84",
+            "358.07",
+            "12.16",
+            "0.88"
+          ],
+          "sonstige": "0.00",
+          "zwischensummen": [
+            "2009.85",
+            "2031.42",
+            "891.95"
+          ],
+          "energie_ct": "10.59269776619696931366844595",
+          "gesamt": "4933.22",
+          "cts": [
+            "10.59269776619696931366844595",
+            "0.1241",
+            "1.7176",
+            "1.4749",
+            "0.5131",
+            "0.8997",
+            "5.833533608236990563889802424",
+            "0.1433546678809650298936645669",
+            "2.745031074232420079772656362",
+            "1.887169335593277509339134981",
+            "0.06408796917031377807010886522",
+            "0.004637945137325339202442088930"
+          ],
+          "zwischen_cts": [
+            "10.59269776619696931366844595",
+            "10.70638012598345518480103215",
+            "4.700926324133336706384342297"
+          ],
+          "sonstige_ct": "0",
+          "gesamt_ct": "26.00000421631376120485382040"
+        },
+        "kostenstellen": [
+          [
+            "10004",
+            "18973.92",
+            "4933.22"
+          ]
+        ]
+      }
+    }
+  },
+  "excel": null
+}

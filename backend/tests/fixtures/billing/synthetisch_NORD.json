@@ -1,0 +1,1536 @@
+{
+  "quelle": "Synthetisch (Struktur Kreis NORD, Zufallswerte Seed 20260917), erwartet aus model.berechne",
+  "kreis": {
+    "gruppen": [
+      {
+        "name": "E1",
+        "intern": false
+      },
+      {
+        "name": "E2",
+        "intern": false
+      },
+      {
+        "name": "E3",
+        "intern": false
+      },
+      {
+        "name": "E4",
+        "intern": true
+      }
+    ],
+    "verbraucher": [
+      {
+        "name": "V01",
+        "gruppe": "E1",
+        "kst": "10017",
+        "faktor": "1",
+        "rest": false
+      },
+      {
+        "name": "V02",
+        "gruppe": "E1",
+        "kst": "10014",
+        "faktor": "1",
+        "rest": false
+      },
+      {
+        "name": "V03",
+        "gruppe": "E1",
+        "kst": "10014",
+        "faktor": "60",
+        "rest": false
+      },
+      {
+        "name": "V04",
+        "gruppe": "E1",
+        "kst": "10005",
+        "faktor": "1",
+        "rest": false
+      },
+      {
+        "name": "V05",
+        "gruppe": "E1",
+        "kst": "10005",
+        "faktor": "80",
+        "rest": false
+      },
+      {
+        "name": "V06",
+        "gruppe": "E1",
+        "kst": "10015",
+        "faktor": "1",
+        "rest": false
+      },
+      {
+        "name": "V07",
+        "gruppe": "E1",
+        "kst": "10016",
+        "faktor": "1",
+        "rest": false
+      },
+      {
+        "name": "V08",
+        "gruppe": "E1",
+        "kst": "10005",
+        "faktor": "1",
+        "rest": false
+      },
+      {
+        "name": "V09",
+        "gruppe": "E1",
+        "kst": "10020",
+        "faktor": "1",
+        "rest": false
+      },
+      {
+        "name": "V10",
+        "gruppe": "E1",
+        "kst": "10004",
+        "faktor": "40",
+        "rest": false
+      },
+      {
+        "name": "V11",
+        "gruppe": "E1",
+        "kst": "10005",
+        "faktor": "1",
+        "rest": false
+      },
+      {
+        "name": "V12",
+        "gruppe": "E1",
+        "kst": "10020",
+        "faktor": "1",
+        "rest": false
+      },
+      {
+        "name": "V13",
+        "gruppe": "E1",
+        "kst": "10031",
+        "faktor": "1",
+        "rest": false
+      },
+      {
+        "name": "V14",
+        "gruppe": "E1",
+        "kst": "10031",
+        "faktor": "1",
+        "rest": false
+      },
+      {
+        "name": "V15",
+        "gruppe": "E1",
+        "kst": "10031",
+        "faktor": "1",
+        "rest": false
+      },
+      {
+        "name": "V16",
+        "gruppe": "E1",
+        "kst": "10031",
+        "faktor": "1",
+        "rest": false
+      },
+      {
+        "name": "V17",
+        "gruppe": "E1",
+        "kst": "10032",
+        "faktor": "1",
+        "rest": false
+      },
+      {
+        "name": "V18",
+        "gruppe": "E1",
+        "kst": "10031",
+        "faktor": "1",
+        "rest": false
+      },
+      {
+        "name": "V19",
+        "gruppe": "E1",
+        "kst": "10031",
+        "faktor": "1",
+        "rest": false
+      },
+      {
+        "name": "V20",
+        "gruppe": "E1",
+        "kst": "10028",
+        "faktor": "1",
+        "rest": false
+      },
+      {
+        "name": "V21",
+        "gruppe": "E1",
+        "kst": "10031",
+        "faktor": "1",
+        "rest": false
+      },
+      {
+        "name": "V22",
+        "gruppe": "E2",
+        "kst": "10029",
+        "faktor": "1",
+        "rest": false
+      },
+      {
+        "name": "V23",
+        "gruppe": "E2",
+        "kst": null,
+        "faktor": "1",
+        "rest": false
+      },
+      {
+        "name": "V24",
+        "gruppe": "E2",
+        "kst": null,
+        "faktor": "1",
+        "rest": false
+      },
+      {
+        "name": "V25",
+        "gruppe": "E2",
+        "kst": null,
+        "faktor": "1",
+        "rest": false
+      },
+      {
+        "name": "V26",
+        "gruppe": "E2",
+        "kst": null,
+        "faktor": "1",
+        "rest": false
+      },
+      {
+        "name": "V27",
+        "gruppe": "E2",
+        "kst": null,
+        "faktor": "1",
+        "rest": false
+      },
+      {
+        "name": "V28",
+        "gruppe": "E2",
+        "kst": "10008",
+        "faktor": "1",
+        "rest": false
+      },
+      {
+        "name": "V29",
+        "gruppe": "E2",
+        "kst": "10008",
+        "faktor": "1",
+        "rest": false
+      },
+      {
+        "name": "V30",
+        "gruppe": "E2",
+        "kst": "10010",
+        "faktor": "1",
+        "rest": false
+      },
+      {
+        "name": "V31",
+        "gruppe": "E2",
+        "kst": "10010",
+        "faktor": "1",
+        "rest": false
+      },
+      {
+        "name": "V32",
+        "gruppe": "E2",
+        "kst": "10011",
+        "faktor": "1",
+        "rest": false
+      },
+      {
+        "name": "V33",
+        "gruppe": "E2",
+        "kst": "10011",
+        "faktor": "1",
+        "rest": false
+      },
+      {
+        "name": "V34",
+        "gruppe": "E2",
+        "kst": "10012",
+        "faktor": "1",
+        "rest": false
+      },
+      {
+        "name": "V35",
+        "gruppe": "E2",
+        "kst": "10013",
+        "faktor": "1",
+        "rest": false
+      },
+      {
+        "name": "V36",
+        "gruppe": "E2",
+        "kst": "10025",
+        "faktor": "1",
+        "rest": false
+      },
+      {
+        "name": "V37",
+        "gruppe": "E3",
+        "kst": "10009",
+        "faktor": "1",
+        "rest": false
+      },
+      {
+        "name": "V38",
+        "gruppe": "E3",
+        "kst": "10006",
+        "faktor": "1",
+        "rest": false
+      },
+      {
+        "name": "V39",
+        "gruppe": "E3",
+        "kst": "10007",
+        "faktor": "1",
+        "rest": false
+      },
+      {
+        "name": "V40",
+        "gruppe": "E3",
+        "kst": "10002",
+        "faktor": "1",
+        "rest": false
+      },
+      {
+        "name": "V41",
+        "gruppe": "E3",
+        "kst": "10003",
+        "faktor": "1",
+        "rest": false
+      },
+      {
+        "name": "V42",
+        "gruppe": "E3",
+        "kst": "10023",
+        "faktor": "1",
+        "rest": false
+      },
+      {
+        "name": "V43",
+        "gruppe": "E3",
+        "kst": "10018",
+        "faktor": "1",
+        "rest": false
+      },
+      {
+        "name": "V44",
+        "gruppe": "E3",
+        "kst": "10001",
+        "faktor": "1",
+        "rest": false
+      },
+      {
+        "name": "V45",
+        "gruppe": "E4",
+        "kst": "10024",
+        "faktor": "1",
+        "rest": false
+      },
+      {
+        "name": "V46",
+        "gruppe": "E4",
+        "kst": "10027",
+        "faktor": "80",
+        "rest": false
+      },
+      {
+        "name": "V47",
+        "gruppe": "E4",
+        "kst": "10030",
+        "faktor": "1",
+        "rest": false
+      },
+      {
+        "name": "V48",
+        "gruppe": "E4",
+        "kst": "10026",
+        "faktor": "80",
+        "rest": false
+      },
+      {
+        "name": "V49",
+        "gruppe": "E4",
+        "kst": "10026",
+        "faktor": "1",
+        "rest": false
+      },
+      {
+        "name": "V50",
+        "gruppe": "E4",
+        "kst": "10026",
+        "faktor": "1",
+        "rest": false
+      },
+      {
+        "name": "V51",
+        "gruppe": "E4",
+        "kst": "10021",
+        "faktor": "1",
+        "rest": false
+      },
+      {
+        "name": "V52",
+        "gruppe": "E4",
+        "kst": "10022",
+        "faktor": "1",
+        "rest": false
+      },
+      {
+        "name": "V53",
+        "gruppe": "E4",
+        "kst": "10019",
+        "faktor": "1",
+        "rest": false
+      },
+      {
+        "name": "V54",
+        "gruppe": "E4",
+        "kst": null,
+        "faktor": "1",
+        "rest": false
+      },
+      {
+        "name": "V55",
+        "gruppe": "E4",
+        "kst": null,
+        "faktor": "1",
+        "rest": false
+      },
+      {
+        "name": "V56",
+        "gruppe": "E4",
+        "kst": null,
+        "faktor": "1",
+        "rest": false
+      }
+    ],
+    "abzuege": [
+      {
+        "haupt": "V01",
+        "unter": "V45"
+      }
+    ]
+  },
+  "monatsdaten": {
+    "bezugsmenge": "195095.26",
+    "rechnungsbetrag": "40931.42",
+    "positionen": [
+      {
+        "name": "Energielieferung",
+        "betrag": "17554.09",
+        "menge": "195095.26",
+        "preis_ct": "8.9977",
+        "kategorie": null
+      },
+      {
+        "name": "Konzessionsabgabe",
+        "betrag": "199.97",
+        "menge": "195095.26",
+        "preis_ct": "0.1025",
+        "kategorie": null
+      },
+      {
+        "name": "Stromsteuer",
+        "betrag": "4434.71",
+        "menge": "195095.26",
+        "preis_ct": "2.2731",
+        "kategorie": null
+      },
+      {
+        "name": "NEV-Umlage",
+        "betrag": "2704.61",
+        "menge": "195095.26",
+        "preis_ct": "1.3863",
+        "kategorie": null
+      },
+      {
+        "name": "KWK-Umlage",
+        "betrag": "878.12",
+        "menge": "195095.26",
+        "preis_ct": "0.4501",
+        "kategorie": null
+      },
+      {
+        "name": "Offshore-Haftungsumlage",
+        "betrag": "1655.77",
+        "menge": "195095.26",
+        "preis_ct": "0.8487",
+        "kategorie": null
+      },
+      {
+        "name": "Leistungsentgelt",
+        "betrag": "6863.21",
+        "menge": null,
+        "preis_ct": null,
+        "kategorie": null
+      },
+      {
+        "name": "Beschaffungsentgelte / -nebenkosten",
+        "betrag": "190.11",
+        "menge": null,
+        "preis_ct": null,
+        "kategorie": null
+      },
+      {
+        "name": "Wirkarbeit - Netznutzung",
+        "betrag": "2716.47",
+        "menge": null,
+        "preis_ct": null,
+        "kategorie": null
+      },
+      {
+        "name": "Leistung - Netznutzung",
+        "betrag": "3707.48",
+        "menge": null,
+        "preis_ct": null,
+        "kategorie": null
+      },
+      {
+        "name": "Messstellenbetrieb",
+        "betrag": "24.84",
+        "menge": null,
+        "preis_ct": null,
+        "kategorie": null
+      },
+      {
+        "name": "Messstellendienstleistung",
+        "betrag": "2.04",
+        "menge": null,
+        "preis_ct": null,
+        "kategorie": null
+      }
+    ],
+    "verbraucher": {
+      "V01": {
+        "stand_alt": "55537.8",
+        "stand_neu": "61403.02",
+        "kwh": null,
+        "korrektur": null
+      },
+      "V02": {
+        "stand_alt": "79728.8",
+        "stand_neu": "81146.96",
+        "kwh": null,
+        "korrektur": null
+      },
+      "V03": {
+        "stand_alt": "12954.8",
+        "stand_neu": "12987.63",
+        "kwh": null,
+        "korrektur": null
+      },
+      "V04": {
+        "stand_alt": "78288.3",
+        "stand_neu": "79541.33",
+        "kwh": null,
+        "korrektur": null
+      },
+      "V05": {
+        "stand_alt": "19324.9",
+        "stand_neu": "19392.22",
+        "kwh": null,
+        "korrektur": null
+      },
+      "V06": {
+        "stand_alt": "74221.0",
+        "stand_neu": "78560.20",
+        "kwh": null,
+        "korrektur": null
+      },
+      "V07": {
+        "stand_alt": "3866.9",
+        "stand_neu": "8500.68",
+        "kwh": null,
+        "korrektur": null
+      },
+      "V08": {
+        "stand_alt": "11194.7",
+        "stand_neu": "16419.15",
+        "kwh": null,
+        "korrektur": null
+      },
+      "V09": {
+        "stand_alt": "44668.7",
+        "stand_neu": "50557.99",
+        "kwh": null,
+        "korrektur": null
+      },
+      "V10": {
+        "stand_alt": "56168.0",
+        "stand_neu": "56288.42",
+        "kwh": null,
+        "korrektur": null
+      },
+      "V11": {
+        "stand_alt": "54993.2",
+        "stand_neu": "56203.94",
+        "kwh": null,
+        "korrektur": null
+      },
+      "V12": {
+        "stand_alt": "42076.2",
+        "stand_neu": "44374.01",
+        "kwh": null,
+        "korrektur": null
+      },
+      "V13": {
+        "stand_alt": "21836.7",
+        "stand_neu": "23675.03",
+        "kwh": null,
+        "korrektur": null
+      },
+      "V14": {
+        "stand_alt": "9823.2",
+        "stand_neu": "10437.84",
+        "kwh": null,
+        "korrektur": null
+      },
+      "V15": {
+        "stand_alt": "86370.7",
+        "stand_neu": "88003.97",
+        "kwh": null,
+        "korrektur": null
+      },
+      "V16": {
+        "stand_alt": "50354.6",
+        "stand_neu": "56330.70",
+        "kwh": null,
+        "korrektur": null
+      },
+      "V20": {
+        "stand_alt": "62057.5",
+        "stand_neu": "63864.37",
+        "kwh": null,
+        "korrektur": null
+      },
+      "V17": {
+        "stand_alt": "9965.5",
+        "stand_neu": "12253.71",
+        "kwh": null,
+        "korrektur": null
+      },
+      "V18": {
+        "stand_alt": "78470.9",
+        "stand_neu": "78741.37",
+        "kwh": null,
+        "korrektur": null
+      },
+      "V19": {
+        "stand_alt": "11310.6",
+        "stand_neu": "11717.84",
+        "kwh": null,
+        "korrektur": null
+      },
+      "V21": {
+        "stand_alt": "19376.3",
+        "stand_neu": "22910.91",
+        "kwh": null,
+        "korrektur": null
+      },
+      "V22": {
+        "stand_alt": "49622.3",
+        "stand_neu": "52728.65",
+        "kwh": null,
+        "korrektur": null
+      },
+      "V23": {
+        "stand_alt": "49843.7",
+        "stand_neu": "55509.01",
+        "kwh": null,
+        "korrektur": null
+      },
+      "V24": {
+        "stand_alt": "68159.3",
+        "stand_neu": "70499.46",
+        "kwh": null,
+        "korrektur": null
+      },
+      "V25": {
+        "stand_alt": "71356.3",
+        "stand_neu": "77172.84",
+        "kwh": null,
+        "korrektur": null
+      },
+      "V26": {
+        "stand_alt": "13097.0",
+        "stand_neu": "17224.52",
+        "kwh": null,
+        "korrektur": null
+      },
+      "V27": {
+        "stand_alt": "25951.2",
+        "stand_neu": "28120.34",
+        "kwh": null,
+        "korrektur": null
+      },
+      "V28": {
+        "stand_alt": "2582.2",
+        "stand_neu": "6031.72",
+        "kwh": null,
+        "korrektur": null
+      },
+      "V29": {
+        "stand_alt": "72090.0",
+        "stand_neu": "73591.71",
+        "kwh": null,
+        "korrektur": null
+      },
+      "V30": {
+        "stand_alt": "7447.4",
+        "stand_neu": "10005.18",
+        "kwh": null,
+        "korrektur": null
+      },
+      "V31": {
+        "stand_alt": "64244.6",
+        "stand_neu": "67705.20",
+        "kwh": null,
+        "korrektur": null
+      },
+      "V32": {
+        "stand_alt": "76854.7",
+        "stand_neu": "81730.17",
+        "kwh": null,
+        "korrektur": null
+      },
+      "V33": {
+        "stand_alt": "16073.1",
+        "stand_neu": "20504.70",
+        "kwh": null,
+        "korrektur": null
+      },
+      "V34": {
+        "stand_alt": "28429.8",
+        "stand_neu": "31057.43",
+        "kwh": null,
+        "korrektur": null
+      },
+      "V35": {
+        "stand_alt": "12867.5",
+        "stand_neu": "17039.60",
+        "kwh": null,
+        "korrektur": null
+      },
+      "V36": {
+        "stand_alt": "52338.7",
+        "stand_neu": "55925.52",
+        "kwh": null,
+        "korrektur": null
+      },
+      "V37": {
+        "stand_alt": "72634.0",
+        "stand_neu": "73059.73",
+        "kwh": null,
+        "korrektur": null
+      },
+      "V38": {
+        "stand_alt": "37828.4",
+        "stand_neu": "38236.48",
+        "kwh": null,
+        "korrektur": null
+      },
+      "V39": {
+        "stand_alt": "66612.3",
+        "stand_neu": "67257.63",
+        "kwh": null,
+        "korrektur": null
+      },
+      "V40": {
+        "stand_alt": "51163.4",
+        "stand_neu": "52529.70",
+        "kwh": null,
+        "korrektur": null
+      },
+      "V41": {
+        "stand_alt": "88013.9",
+        "stand_neu": "93647.65",
+        "kwh": null,
+        "korrektur": null
+      },
+      "V42": {
+        "stand_alt": "13124.6",
+        "stand_neu": "13866.76",
+        "kwh": null,
+        "korrektur": null
+      },
+      "V43": {
+        "stand_alt": "39023.7",
+        "stand_neu": "39851.14",
+        "kwh": null,
+        "korrektur": null
+      },
+      "V44": {
+        "stand_alt": "14902.6",
+        "stand_neu": "18134.68",
+        "kwh": null,
+        "korrektur": null
+      },
+      "V45": {
+        "stand_alt": "1414.4",
+        "stand_neu": "4655.14",
+        "kwh": null,
+        "korrektur": null
+      },
+      "V46": {
+        "stand_alt": "88548.7",
+        "stand_neu": "88606.00",
+        "kwh": null,
+        "korrektur": null
+      },
+      "V47": {
+        "stand_alt": "25684.7",
+        "stand_neu": "28596.06",
+        "kwh": null,
+        "korrektur": null
+      },
+      "V48": {
+        "stand_alt": "67961.8",
+        "stand_neu": "67975.88",
+        "kwh": null,
+        "korrektur": null
+      },
+      "V49": {
+        "stand_alt": "49988.2",
+        "stand_neu": "53141.38",
+        "kwh": null,
+        "korrektur": null
+      },
+      "V50": {
+        "stand_alt": "26603.4",
+        "stand_neu": "30842.06",
+        "kwh": null,
+        "korrektur": null
+      },
+      "V51": {
+        "stand_alt": "61849.3",
+        "stand_neu": "67062.28",
+        "kwh": null,
+        "korrektur": null
+      },
+      "V52": {
+        "stand_alt": "74080.6",
+        "stand_neu": "76441.96",
+        "kwh": null,
+        "korrektur": null
+      },
+      "V53": {
+        "stand_alt": "48663.0",
+        "stand_neu": "51404.54",
+        "kwh": null,
+        "korrektur": null
+      },
+      "V54": {
+        "stand_alt": "31674.8",
+        "stand_neu": "32931.33",
+        "kwh": null,
+        "korrektur": null
+      },
+      "V55": {
+        "stand_alt": "6433.1",
+        "stand_neu": "7496.05",
+        "kwh": null,
+        "korrektur": null
+      },
+      "V56": {
+        "stand_alt": "3496.8",
+        "stand_neu": "4900.08",
+        "kwh": null,
+        "korrektur": null
+      }
+    },
+    "zusatzkosten": "20.92",
+    "aufschlag_prozent": "0",
+    "aufschlag_ct": "0"
+  },
+  "erwartet": {
+    "positionen_summe": "40931.42",
+    "positionen_kontrolle": "0.00",
+    "kategorien": {
+      "Energie": "24607.41",
+      "Abgaben/Umlagen": "9873.18",
+      "Netz": "6423.95",
+      "Messung": "26.88",
+      "Sonstige": "0.00"
+    },
+    "bezugsmenge": "195095.26",
+    "gesamtkosten": "40952.34",
+    "zaehlersumme": "159894.98",
+    "nicht_gemessen_kwh": "35200.28",
+    "einkaufspreis_ct": "20.98022268711192675824107669",
+    "umlagepreis_ct": "25.61202359198518927861274944",
+    "implizite_umlage": "0.220769863787888233161753683",
+    "preis_ct": "26.00",
+    "preis_eur": "0.26",
+    "gesamt_eur": "41572.70",
+    "saldo_eur": "-620.36",
+    "fehleranzahl": 0,
+    "zeilen": {
+      "V01": {
+        "kwh": "2624.48",
+        "eur": "682.36",
+        "pruefung": "OK"
+      },
+      "V02": {
+        "kwh": "1418.16",
+        "eur": "368.72",
+        "pruefung": "OK"
+      },
+      "V03": {
+        "kwh": "1969.80",
+        "eur": "512.15",
+        "pruefung": "OK"
+      },
+      "V04": {
+        "kwh": "1253.03",
+        "eur": "325.79",
+        "pruefung": "OK"
+      },
+      "V05": {
+        "kwh": "5385.60",
+        "eur": "1400.26",
+        "pruefung": "OK"
+      },
+      "V06": {
+        "kwh": "4339.20",
+        "eur": "1128.19",
+        "pruefung": "OK"
+      },
+      "V07": {
+        "kwh": "4633.78",
+        "eur": "1204.78",
+        "pruefung": "OK"
+      },
+      "V08": {
+        "kwh": "5224.45",
+        "eur": "1358.36",
+        "pruefung": "OK"
+      },
+      "V09": {
+        "kwh": "5889.29",
+        "eur": "1531.22",
+        "pruefung": "OK"
+      },
+      "V10": {
+        "kwh": "4816.80",
+        "eur": "1252.37",
+        "pruefung": "OK"
+      },
+      "V11": {
+        "kwh": "1210.74",
+        "eur": "314.79",
+        "pruefung": "OK"
+      },
+      "V12": {
+        "kwh": "2297.81",
+        "eur": "597.43",
+        "pruefung": "OK"
+      },
+      "V13": {
+        "kwh": "1838.33",
+        "eur": "477.97",
+        "pruefung": "OK"
+      },
+      "V14": {
+        "kwh": "614.64",
+        "eur": "159.81",
+        "pruefung": "OK"
+      },
+      "V15": {
+        "kwh": "1633.27",
+        "eur": "424.65",
+        "pruefung": "OK"
+      },
+      "V16": {
+        "kwh": "5976.10",
+        "eur": "1553.79",
+        "pruefung": "OK"
+      },
+      "V17": {
+        "kwh": "2288.21",
+        "eur": "594.93",
+        "pruefung": "OK"
+      },
+      "V18": {
+        "kwh": "270.47",
+        "eur": "70.32",
+        "pruefung": "OK"
+      },
+      "V19": {
+        "kwh": "407.24",
+        "eur": "105.88",
+        "pruefung": "OK"
+      },
+      "V20": {
+        "kwh": "1806.87",
+        "eur": "469.79",
+        "pruefung": "OK"
+      },
+      "V21": {
+        "kwh": "3534.61",
+        "eur": "919.00",
+        "pruefung": "OK"
+      },
+      "V22": {
+        "kwh": "3106.35",
+        "eur": "807.65",
+        "pruefung": "OK"
+      },
+      "V23": {
+        "kwh": "5665.31",
+        "eur": "1472.98",
+        "pruefung": "OK"
+      },
+      "V24": {
+        "kwh": "2340.16",
+        "eur": "608.44",
+        "pruefung": "OK"
+      },
+      "V25": {
+        "kwh": "5816.54",
+        "eur": "1512.30",
+        "pruefung": "OK"
+      },
+      "V26": {
+        "kwh": "4127.52",
+        "eur": "1073.16",
+        "pruefung": "OK"
+      },
+      "V27": {
+        "kwh": "2169.14",
+        "eur": "563.98",
+        "pruefung": "OK"
+      },
+      "V28": {
+        "kwh": "3449.52",
+        "eur": "896.88",
+        "pruefung": "OK"
+      },
+      "V29": {
+        "kwh": "1501.71",
+        "eur": "390.44",
+        "pruefung": "OK"
+      },
+      "V30": {
+        "kwh": "2557.78",
+        "eur": "665.02",
+        "pruefung": "OK"
+      },
+      "V31": {
+        "kwh": "3460.60",
+        "eur": "899.76",
+        "pruefung": "OK"
+      },
+      "V32": {
+        "kwh": "4875.47",
+        "eur": "1267.62",
+        "pruefung": "OK"
+      },
+      "V33": {
+        "kwh": "4431.60",
+        "eur": "1152.22",
+        "pruefung": "OK"
+      },
+      "V34": {
+        "kwh": "2627.63",
+        "eur": "683.18",
+        "pruefung": "OK"
+      },
+      "V35": {
+        "kwh": "4172.10",
+        "eur": "1084.75",
+        "pruefung": "OK"
+      },
+      "V36": {
+        "kwh": "3586.82",
+        "eur": "932.57",
+        "pruefung": "OK"
+      },
+      "V37": {
+        "kwh": "425.73",
+        "eur": "110.69",
+        "pruefung": "OK"
+      },
+      "V38": {
+        "kwh": "408.08",
+        "eur": "106.10",
+        "pruefung": "OK"
+      },
+      "V39": {
+        "kwh": "645.33",
+        "eur": "167.79",
+        "pruefung": "OK"
+      },
+      "V40": {
+        "kwh": "1366.30",
+        "eur": "355.24",
+        "pruefung": "OK"
+      },
+      "V41": {
+        "kwh": "5633.75",
+        "eur": "1464.78",
+        "pruefung": "OK"
+      },
+      "V42": {
+        "kwh": "742.16",
+        "eur": "192.96",
+        "pruefung": "OK"
+      },
+      "V43": {
+        "kwh": "827.44",
+        "eur": "215.13",
+        "pruefung": "OK"
+      },
+      "V44": {
+        "kwh": "3232.08",
+        "eur": "840.34",
+        "pruefung": "OK"
+      },
+      "V45": {
+        "kwh": "3240.74",
+        "eur": "842.59",
+        "pruefung": "OK"
+      },
+      "V46": {
+        "kwh": "4584.00",
+        "eur": "1191.84",
+        "pruefung": "OK"
+      },
+      "V47": {
+        "kwh": "2911.36",
+        "eur": "756.95",
+        "pruefung": "OK"
+      },
+      "V48": {
+        "kwh": "1126.40",
+        "eur": "292.86",
+        "pruefung": "OK"
+      },
+      "V49": {
+        "kwh": "3153.18",
+        "eur": "819.83",
+        "pruefung": "OK"
+      },
+      "V50": {
+        "kwh": "4238.66",
+        "eur": "1102.05",
+        "pruefung": "OK"
+      },
+      "V51": {
+        "kwh": "5212.98",
+        "eur": "1355.37",
+        "pruefung": "OK"
+      },
+      "V52": {
+        "kwh": "2361.36",
+        "eur": "613.95",
+        "pruefung": "OK"
+      },
+      "V53": {
+        "kwh": "2741.54",
+        "eur": "712.80",
+        "pruefung": "OK"
+      },
+      "V54": {
+        "kwh": "1256.53",
+        "eur": "326.70",
+        "pruefung": "OK"
+      },
+      "V55": {
+        "kwh": "1062.95",
+        "eur": "276.37",
+        "pruefung": "OK"
+      },
+      "V56": {
+        "kwh": "1403.28",
+        "eur": "364.85",
+        "pruefung": "OK"
+      }
+    },
+    "gruppen": {
+      "E1": {
+        "kwh": "59432.88",
+        "eur": "15452.56",
+        "zusammensetzung": {
+          "betraege": [
+            "8330.99",
+            "60.92",
+            "1350.97",
+            "823.92",
+            "267.51",
+            "504.41",
+            "2090.78",
+            "57.91",
+            "827.53",
+            "1129.43",
+            "7.57",
+            "0.62"
+          ],
+          "sonstige": "0.00",
+          "zwischensummen": [
+            "8330.99",
+            "5156.42",
+            "1965.15"
+          ],
+          "energie_ct": "14.01747652141373596568094967",
+          "gesamt": "15452.56",
+          "cts": [
+            "14.01747652141373596568094967",
+            "0.1025",
+            "2.2731",
+            "1.3863",
+            "0.4501",
+            "0.8487",
+            "3.517884376459629753765928893",
+            "0.09743764730903163366809752447",
+            "1.392377418021808803477132523",
+            "1.900345398035565498424441151",
+            "0.01273705733257415760434291591",
+            "0.001043193599233286355969961409"
+          ],
+          "zwischen_cts": [
+            "14.01747652141373596568094967",
+            "8.676039256384681341371981301",
+            "3.306503066989181745861886552"
+          ],
+          "sonstige_ct": "0",
+          "gesamt_ct": "26.00001884478759905291481752"
+        },
+        "kostenstellen": [
+          [
+            "10004",
+            "4816.80",
+            "1252.37"
+          ],
+          [
+            "10005",
+            "13073.82",
+            "3399.20"
+          ],
+          [
+            "10014",
+            "3387.96",
+            "880.87"
+          ],
+          [
+            "10015",
+            "4339.20",
+            "1128.19"
+          ],
+          [
+            "10016",
+            "4633.78",
+            "1204.78"
+          ],
+          [
+            "10017",
+            "2624.48",
+            "682.36"
+          ],
+          [
+            "10020",
+            "8187.10",
+            "2128.65"
+          ],
+          [
+            "10028",
+            "1806.87",
+            "469.79"
+          ],
+          [
+            "10031",
+            "14274.66",
+            "3711.42"
+          ],
+          [
+            "10032",
+            "2288.21",
+            "594.93"
+          ]
+        ]
+      },
+      "E2": {
+        "kwh": "53888.25",
+        "eur": "14010.95",
+        "zusammensetzung": {
+          "betraege": [
+            "7553.79",
+            "55.24",
+            "1224.93",
+            "747.05",
+            "242.55",
+            "457.35",
+            "1895.72",
+            "52.51",
+            "750.33",
+            "1024.06",
+            "6.86",
+            "0.56"
+          ],
+          "sonstige": "0.00",
+          "zwischensummen": [
+            "7553.79",
+            "4675.35",
+            "1781.81"
+          ],
+          "energie_ct": "14.01750845499714687339076700",
+          "gesamt": "14010.95",
+          "cts": [
+            "14.01750845499714687339076700",
+            "0.1025",
+            "2.2731",
+            "1.3863",
+            "0.4501",
+            "0.8487",
+            "3.517872634572471735489647558",
+            "0.09744239235825991751448599648",
+            "1.392381456068809063200233817",
+            "1.900340055577978501806980186",
+            "0.01273004783046396941819413323",
+            "0.001039187577997058728015847611"
+          ],
+          "zwischen_cts": [
+            "14.01750845499714687339076700",
+            "8.676010076408122364337309154",
+            "3.306490747055248593153423984"
+          ],
+          "sonstige_ct": "0",
+          "gesamt_ct": "26.00000927846051783088150014"
+        },
+        "kostenstellen": [
+          [
+            "10008",
+            "4951.23",
+            "1287.32"
+          ],
+          [
+            "10010",
+            "6018.38",
+            "1564.78"
+          ],
+          [
+            "10011",
+            "9307.07",
+            "2419.84"
+          ],
+          [
+            "10012",
+            "2627.63",
+            "683.18"
+          ],
+          [
+            "10013",
+            "4172.10",
+            "1084.75"
+          ],
+          [
+            "10025",
+            "3586.82",
+            "932.57"
+          ],
+          [
+            "10029",
+            "3106.35",
+            "807.65"
+          ],
+          [
+            null,
+            "20118.67",
+            "5230.86"
+          ]
+        ]
+      },
+      "E3": {
+        "kwh": "13280.87",
+        "eur": "3453.03",
+        "zusammensetzung": {
+          "betraege": [
+            "1861.66",
+            "13.61",
+            "301.89",
+            "184.11",
+            "59.78",
+            "112.71",
+            "467.20",
+            "12.94",
+            "184.92",
+            "252.38",
+            "1.69",
+            "0.14"
+          ],
+          "sonstige": "0.00",
+          "zwischensummen": [
+            "1861.66",
+            "1152.24",
+            "439.13"
+          ],
+          "energie_ct": "14.01760577432050761734735751",
+          "gesamt": "3453.03",
+          "cts": [
+            "14.01760577432050761734735751",
+            "0.1025",
+            "2.2731",
+            "1.3863",
+            "0.4501",
+            "0.8487",
+            "3.517841828133247294793187494",
+            "0.09743337597612204622136953377",
+            "1.392378661940068685259324126",
+            "1.900327312894411284802878125",
+            "0.01272506996906076183262090511",
+            "0.001054147808087873761282205157"
+          ],
+          "zwischen_cts": [
+            "14.01760577432050761734735751",
+            "8.675937645651226162141486213",
+            "3.306485192611628605656105361"
+          ],
+          "sonstige_ct": "0",
+          "gesamt_ct": "26.00002861258336238514494909"
+        },
+        "kostenstellen": [
+          [
+            "10001",
+            "3232.08",
+            "840.34"
+          ],
+          [
+            "10002",
+            "1366.30",
+            "355.24"
+          ],
+          [
+            "10003",
+            "5633.75",
+            "1464.78"
+          ],
+          [
+            "10006",
+            "408.08",
+            "106.10"
+          ],
+          [
+            "10007",
+            "645.33",
+            "167.79"
+          ],
+          [
+            "10009",
+            "425.73",
+            "110.69"
+          ],
+          [
+            "10018",
+            "827.44",
+            "215.13"
+          ],
+          [
+            "10023",
+            "742.16",
+            "192.96"
+          ]
+        ]
+      },
+      "E4": {
+        "kwh": "33292.98",
+        "eur": "8656.16",
+        "zusammensetzung": {
+          "betraege": [
+            "4666.81",
+            "34.13",
+            "756.78",
+            "461.54",
+            "149.85",
+            "282.56",
+            "1171.21",
+            "32.44",
+            "463.57",
+            "632.68",
+            "4.24",
+            "0.35"
+          ],
+          "sonstige": "0.00",
+          "zwischensummen": [
+            "4666.81",
+            "2888.51",
+            "1100.84"
+          ],
+          "energie_ct": "14.01739946379086522143707172",
+          "gesamt": "8656.16",
+          "cts": [
+            "14.01739946379086522143707172",
+            "0.1025",
+            "2.2731",
+            "1.3863",
+            "0.4501",
+            "0.8487",
+            "3.517888756128168761102190312",
+            "0.09743795839242987560741033095",
+            "1.392395634154707689128458912",
+            "1.900340552272581186784721584",
+            "0.01273541749642116746533353277",
+            "0.001051272670695143540770456715"
+          ],
+          "zwischen_cts": [
+            "14.01739946379086522143707172",
+            "8.676033205798940197002491216",
+            "3.306522876594405186919284486"
+          ],
+          "sonstige_ct": "0",
+          "gesamt_ct": "25.99995554618421060535884742"
+        },
+        "kostenstellen": [
+          [
+            "10019",
+            "2741.54",
+            "712.80"
+          ],
+          [
+            "10021",
+            "5212.98",
+            "1355.37"
+          ],
+          [
+            "10022",
+            "2361.36",
+            "613.95"
+          ],
+          [
+            "10024",
+            "3240.74",
+            "842.59"
+          ],
+          [
+            "10026",
+            "8518.24",
+            "2214.74"
+          ],
+          [
+            "10027",
+            "4584.00",
+            "1191.84"
+          ],
+          [
+            "10030",
+            "2911.36",
+            "756.95"
+          ],
+          [
+            null,
+            "3722.76",
+            "967.92"
+          ]
+        ]
+      }
+    }
+  },
+  "excel": null
+}
