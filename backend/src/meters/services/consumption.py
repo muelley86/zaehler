@@ -126,10 +126,13 @@ def _points_for_loaded_mp(mp: MeasuringPoint) -> list[ConsumptionPoint]:
     MeasuringPoint — Schleifenkörper von ``consumption_for_measuring_point``,
     ausgelagert damit der Bulk-Loader ihn wiederverwenden kann."""
     out: list[ConsumptionPoint] = []
-    factor = mp.transformer_factor
-    for meter in mp.physical_meters:
+    for (
+        meter
+    ) in mp.physical_meters:  # Faktor je Geraet (seit 0035), nicht der aktuelle der Messstelle
         for register in meter.registers:
-            out.extend(consumption_for_register(register, transformer_factor=factor))
+            out.extend(
+                consumption_for_register(register, transformer_factor=meter.transformer_factor)
+            )
     out.sort(key=lambda p: (p.period_end, p.obis_code))
     return out
 

@@ -66,6 +66,7 @@ function _mp(overrides: Partial<MeasuringPointRead> & { id: number; name: string
         serial_number: `SN-${overrides.id}`,
         installed_at: '2024-01-01',
         removed_at: null,
+        transformer_factor: null,
         registers: [
           {
             id: overrides.id * 100,

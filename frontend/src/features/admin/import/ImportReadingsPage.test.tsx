@@ -48,6 +48,7 @@ const _waterMp: MeasuringPointRead = {
       serial_number: 'W-1',
       installed_at: '2023-12-01',
       removed_at: null,
+      transformer_factor: null,
       registers: [
         {
           id: 700,

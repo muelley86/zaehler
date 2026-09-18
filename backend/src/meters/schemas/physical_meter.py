@@ -31,6 +31,7 @@ class PhysicalMeterRead(APIModel):
     serial_number: str
     installed_at: date
     removed_at: date | None
+    transformer_factor: int | None = None
     registers: list[RegisterRead]
 
 
@@ -39,3 +40,6 @@ class PhysicalMeterUpdate(BaseModel):
     installed_at: date | None = None
     removed_at: date | None = None
     clear_removed_at: bool = False
+    # Wandlerfaktor des Geraets (nur Strom); Aenderung rechnet die Monatswerte des Geraets neu.
+    transformer_factor: int | None = Field(default=None, gt=0, le=10000)
+    clear_transformer_factor: bool = False

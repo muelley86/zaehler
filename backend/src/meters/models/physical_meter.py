@@ -11,7 +11,7 @@ from datetime import date
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
-from sqlalchemy import JSON, ForeignKey, Index, String, text
+from sqlalchemy import JSON, ForeignKey, Index, Integer, String, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from meters.db import Base, TimestampMixin
@@ -43,6 +43,10 @@ class PhysicalMeter(Base, TimestampMixin):
     installed_at: Mapped[date] = mapped_column(nullable=False)
     removed_at: Mapped[date | None] = mapped_column()
     initial_values: Mapped[dict[str, Decimal] | None] = mapped_column(JSON)
+    # Wandlerfaktor (nur Strom) gehoert zur Einbausituation des Geraets: der Verbrauch
+    # jeder Ablesung wird mit dem Faktor des Geraets gerechnet, an dem sie haengt.
+    # Seit Migration 0035 (vorher an der MeasuringPoint).
+    transformer_factor: Mapped[int | None] = mapped_column(Integer)
 
     measuring_point: Mapped[MeasuringPoint] = relationship(
         "MeasuringPoint", back_populates="physical_meters"

@@ -17,6 +17,7 @@ from meters.models import (
     AuditAction,
     AuditEntityType,
     Delivery,
+    MeterType,
     PhysicalMeter,
     Reading,
     Register,
@@ -31,6 +32,27 @@ from meters.schemas import (
 from meters.services.audit import record
 
 router = APIRouter(tags=["physical-meters"])
+
+
+def _apply_transformer_factor(
+    meter: PhysicalMeter, payload: PhysicalMeterUpdate, diff: dict[str, object]
+) -> None:
+    """Wandlerfaktor des Geraets setzen/entfernen (nur Strom).
+
+    Der Monats-Cache der Register des Geraets wird
+    ueber den Session-Hook neu berechnet (``monthly_consumption._touched_register_ids``)."""
+    if payload.transformer_factor is None and not payload.clear_transformer_factor:
+        return
+    if meter.measuring_point.type is not MeterType.ELECTRICITY:
+        raise ProblemError(
+            status_code=400,
+            title="Invalid field",
+            detail="transformer_factor ist nur für Zähler von Strom-Messstellen zulässig",
+        )
+    neu = None if payload.clear_transformer_factor else payload.transformer_factor
+    if neu != meter.transformer_factor:
+        diff["transformer_factor"] = {"from": meter.transformer_factor, "to": neu}
+        meter.transformer_factor = neu
 
 
 @router.patch("/physical-meters/{meter_id}", response_model=PhysicalMeterRead)
@@ -65,6 +87,8 @@ def update_physical_meter(
             "to": payload.removed_at.isoformat(),
         }
         meter.removed_at = payload.removed_at
+
+    _apply_transformer_factor(meter, payload, diff)
 
     if meter.removed_at is not None and meter.removed_at < meter.installed_at:
         raise ProblemError(

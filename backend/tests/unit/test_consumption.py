@@ -508,8 +508,8 @@ def test_consumption_with_transformer_factor_and_rollover(db: Session) -> None:
 
 
 def test_consumption_for_measuring_point_applies_transformer_factor(db: Session) -> None:
-    """consumption_for_measuring_point liest den Faktor aus dem MP und reicht ihn durch."""
-    mp = MeasuringPoint(name="Strom mit Wandler", type=MeterType.ELECTRICITY, transformer_factor=50)
+    """consumption_for_measuring_point nimmt den Faktor des Geraets und reicht ihn durch."""
+    mp = MeasuringPoint(name="Strom mit Wandler", type=MeterType.ELECTRICITY)
     db.add(mp)
     db.flush()
     install_first_meter(
@@ -520,6 +520,7 @@ def test_consumption_for_measuring_point_applies_transformer_factor(db: Session)
         initial_values={"1.8.0": Decimal("100.0")},
         user_id=_ensure_user(db),
         ip_address=None,
+        transformer_factor=50,  # seit 0035 am Geraet
     )
     db.commit()
     db.refresh(mp)

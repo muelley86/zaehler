@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from datetime import UTC, date, datetime, time
 from decimal import Decimal, InvalidOperation
+from typing import cast
 from zoneinfo import ZoneInfo
 
 from sqlalchemy.orm import Session as DbSession
@@ -28,6 +29,10 @@ from meters.models import (
     Register,
 )
 from meters.services.audit import record
+
+UNVERAENDERT = (
+    object()
+)  # Zaehlertausch ohne Angabe: neues Geraet uebernimmt den Wandlerfaktor des alten
 
 
 def _local_combine(d: date, t: time) -> datetime:
@@ -66,6 +71,7 @@ def install_first_meter(
     user_id: int | None,
     ip_address: str | None,
     register_defs: list[RegisterDef] | None = None,
+    transformer_factor: int | None = None,
 ) -> PhysicalMeter:
     """Legt den ersten PhysicalMeter einer MeasuringPoint an.
 
@@ -86,6 +92,7 @@ def install_first_meter(
         serial_number=serial_number,
         installed_at=installed_at,
         initial_values={k: format(v, "f") for k, v in initial.items()},
+        transformer_factor=transformer_factor,
     )
     measuring_point.physical_meters.append(meter)
     db.flush()
@@ -117,7 +124,11 @@ def install_first_meter(
         action=AuditAction.CREATE,
         entity_type=AuditEntityType.PHYSICAL_METER,
         entity_id=meter.id,
-        diff={"serial_number": serial_number, "initial_values": meter.initial_values},
+        diff={
+            "serial_number": serial_number,
+            "initial_values": meter.initial_values,
+            "transformer_factor": transformer_factor,
+        },
         ip_address=ip_address,
     )
     return meter
@@ -134,7 +145,12 @@ def replace_meter(
     initial_readings: dict[str, Decimal | str],
     user_id: int | None,
     ip_address: str | None,
+    new_transformer_factor: object = UNVERAENDERT,
 ) -> PhysicalMeter:
+    """``new_transformer_factor``: Faktor des neuen Geraets.
+
+    Ohne Angabe (``UNVERAENDERT``) uebernimmt es den
+    Faktor des alten Geraets, ``None`` entfernt ihn."""
     if installed_at < removed_at:
         raise ProblemError(
             status_code=400,
@@ -199,6 +215,11 @@ def replace_meter(
         user_id=user_id,
         ip_address=ip_address,
         register_defs=inherited_defs,
+        transformer_factor=(
+            active_meter.transformer_factor
+            if new_transformer_factor is UNVERAENDERT
+            else cast("int | None", new_transformer_factor)
+        ),
     )
 
     record(

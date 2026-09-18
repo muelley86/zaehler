@@ -66,6 +66,7 @@ class MeterSeries:
 
     serial_number: str
     registers: tuple[RegisterSeries, ...]
+    transformer_factor: int | None = None  # Faktor dieses Geraets (seit 0035)
 
     def span(self) -> tuple[date, date] | None:
         """Erster und letzter Ablesetag ueber alle Register, ``None`` ohne Stand."""
@@ -119,7 +120,6 @@ def meter_columns(
     *,
     start_day: date,
     end_day: date,
-    transformer_factor: int | None,
 ) -> MeterColumns:
     """Spalten einer Ergebniszeile. ``start_day``/``end_day`` sind die Tage, an
     deren Ende Beginn- bzw. Endstand gelten (``date.min``/``date.max`` = offen)."""
@@ -139,13 +139,14 @@ def meter_columns(
     serials = dict.fromkeys(m.serial_number for m in contributing)
     return MeterColumns(
         serial_number=SERIAL_SEPARATOR.join(serials),
-        transformer_factor=transformer_factor,
+        # Faktor des Geraets am Periodenende (seit 0035 je Geraet)
+        transformer_factor=contributing[-1].transformer_factor,
         start_value=_meter_total(contributing[0], start_day),
         end_value=_meter_total(contributing[-1], end_day),
     )
 
 
-def _register_series(register: Register) -> RegisterSeries:
+def register_series(register: Register) -> RegisterSeries:
     by_day: dict[date, Decimal] = {}
     for reading in sorted(register.readings, key=lambda r: (r.reading_at, r.id)):
         by_day[local_date(reading.reading_at)] = reading.value  # letzter Stand des Tages
@@ -159,13 +160,19 @@ def _meter_series(mp: MeasuringPoint, direction: ReportDirection, unit: str) -> 
     out: list[MeterSeries] = []
     for meter in mp.physical_meters:
         registers = tuple(
-            _register_series(reg)
+            register_series(reg)
             for reg in meter.registers
             if not reg.accepts_deliveries
             and reg.unit == unit
             and direction_of(reg.obis_code) == direction
         )
-        out.append(MeterSeries(serial_number=meter.serial_number, registers=registers))
+        out.append(
+            MeterSeries(
+                serial_number=meter.serial_number,
+                registers=registers,
+                transformer_factor=meter.transformer_factor,
+            )
+        )
     return out
 
 
@@ -220,7 +227,6 @@ def meter_columns_for_rows(
                 series_cache[key],
                 start_day=date.min if period_start is None else period_start - timedelta(days=1),
                 end_day=row.period_end or to_date or date.max,
-                transformer_factor=mp.transformer_factor,
             )
         )
     return out
