@@ -14,6 +14,7 @@ import { formatDateTimeDe, formatDe, parseDe } from '@/lib/format';
 import type { BillingRunLineRead, BillingRunRead } from '@/lib/types';
 
 import { errorText } from './circleForm';
+import { RunDiffSection } from './RunDiffSection';
 import { TransferSection } from './TransferSection';
 import {
   anteilZuProzent,
@@ -355,6 +356,8 @@ export function BillingRunDetailPage() {
           </table>
         </div>
       </Section>
+
+      {run.version > 1 ? <RunDiffSection circleId={circleId} runId={run.id} /> : null}
 
       <TransferSection circleId={circleId} runId={run.id} status={run.status} />
 

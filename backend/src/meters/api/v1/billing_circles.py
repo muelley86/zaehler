@@ -31,6 +31,7 @@ from meters.schemas.billing_circle import (
     BillingPositionUpdate,
     UnassignedMeterRead,
 )
+from meters.schemas.billing_history import BillingHistory
 from meters.schemas.billing_import import ImportReport, StammdatenImport
 from meters.schemas.billing_overview import BillingMonthOverview
 from meters.schemas.billing_readings import BillingReadingsRead
@@ -43,6 +44,7 @@ from meters.services.billing_circle import (
     unassigned_meters,
     validate_position,
 )
+from meters.services.billing_history import history
 from meters.services.billing_import import run_import
 from meters.services.billing_overview import overview
 from meters.services.billing_readings import readings_for_month
@@ -209,6 +211,19 @@ def month_overview(
 ) -> BillingMonthOverview:
     """Status je Kreis und Monat (Standard: die letzten zwoelf Monate)."""
     return overview(db, von, bis)
+
+
+@router.get("/{circle_id}/verlauf", response_model=BillingHistory)
+def verlauf(
+    circle_id: int,
+    db: DbDep,
+    _user: BillingUser,
+    von: Annotated[str | None, Query(pattern=_MONAT)] = None,
+    bis: Annotated[str | None, Query(pattern=_MONAT)] = None,
+) -> BillingHistory:
+    """Verbrauchsverlauf der festgeschriebenen Monate je Empfaenger und Position."""
+    _circle(db, circle_id)
+    return history(db, circle_id, von, bis)
 
 
 @router.get("/{circle_id}", response_model=BillingCircleRead)

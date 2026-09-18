@@ -21,6 +21,7 @@ import type {
 
 import { BillingRunsSection } from './BillingRunsSection';
 import { CircleFields } from './CircleFields';
+import { HistoryCard } from './HistoryCard';
 import { InvoicesSection } from './InvoicesSection';
 import { MonthReadingsSection } from './MonthReadingsSection';
 import { circleBody, circleFormState, errorText, lastDayOfPreviousMonth } from './circleForm';
@@ -209,6 +210,8 @@ export function BillingCircleDetailPage() {
       <BillingRunsSection circleId={circleId} />
 
       <InvoicesSection circleId={circleId} />
+
+      <HistoryCard circleId={circleId} />
 
       <MonthReadingsSection circleId={circleId} tick={tick} />
 

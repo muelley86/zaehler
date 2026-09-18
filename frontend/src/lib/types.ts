@@ -315,6 +315,60 @@ export interface BillingAttachmentRead {
   empfaenger: BillingAttachmentRecipient[];
 }
 
+/** Versionsvergleich zweier Abrechnungsläufe desselben Monats. */
+export type BillingDiffStatus = 'gleich' | 'geaendert' | 'neu' | 'entfallen';
+
+export interface BillingRunDiffLine {
+  label: string;
+  status: BillingDiffStatus;
+  felder: string[];
+  kwh_alt: string | null;
+  kwh_neu: string | null;
+  eur_alt: string | null;
+  eur_neu: string | null;
+  kwh_delta: string | null;
+  eur_delta: string | null;
+}
+
+export interface BillingRunDiffSide {
+  run_id: number;
+  version: number;
+  status: BillingRunStatus;
+  begruendung: string | null;
+  finalized_at: string | null;
+  preis_eur: string | null;
+  gesamt_eur: string | null;
+  saldo_eur: string | null;
+}
+
+export interface BillingRunDiff {
+  monat: string;
+  alt: BillingRunDiffSide;
+  neu: BillingRunDiffSide;
+  zeilen: BillingRunDiffLine[];
+  kwh_delta: string;
+  eur_delta: string;
+}
+
+export interface BillingHistoryPoint {
+  monat: string;
+  version: number;
+  kwh: string;
+  eur: string;
+}
+
+export interface BillingHistoryRow {
+  name: string;
+  internal_allocation: boolean;
+  punkte: BillingHistoryPoint[];
+}
+
+export interface BillingHistory {
+  monate: string[];
+  empfaenger: BillingHistoryRow[];
+  positionen: BillingHistoryRow[];
+}
+
 /** Monatsübersicht: Fortschritt eines Kreises in einem Monat. */
 export type BillingMonthStatus =
   | 'leer'

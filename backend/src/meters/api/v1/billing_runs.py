@@ -23,6 +23,7 @@ from meters.models import (
     BillingRunLine,
 )
 from meters.schemas.billing_attachment import BillingAttachmentRead
+from meters.schemas.billing_history import BillingRunDiff
 from meters.schemas.billing_run import (
     BillingRunCreate,
     BillingRunLineUpdate,
@@ -33,6 +34,7 @@ from meters.schemas.billing_run import (
 from meters.schemas.billing_transfer import BillingTransferCreate, BillingTransferView
 from meters.services.audit import record
 from meters.services.billing_attachment import attachment
+from meters.services.billing_history import compare_runs, other_version
 from meters.services.billing_invoice_helper import invoice_of_run
 from meters.services.billing_run import (
     assert_entwurf,
@@ -375,3 +377,12 @@ def anhang(circle_id: int, run_id: int, db: DbDep, _user: BillingUser) -> Billin
     """Rechnungsanhang je Empfaenger (Preisermittlung, Zaehlertabelle, KST, Zusammensetzung)."""
     run = _run(db, circle_id, run_id)
     return attachment(run, _circle(db, circle_id), invoice_of_run(db, run))
+
+
+@router.get("/{circle_id}/runs/{run_id}/vergleich", response_model=BillingRunDiff)
+def vergleich(
+    circle_id: int, run_id: int, db: DbDep, _user: BillingUser, mit: int | None = None
+) -> BillingRunDiff:
+    """Zwei Versionen desselben Monats gegenueberstellen (Standard: die naechstaeltere)."""
+    run = _run(db, circle_id, run_id)
+    return compare_runs(other_version(db, run, mit), run)
