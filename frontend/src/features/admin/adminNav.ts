@@ -21,6 +21,7 @@ import {
   KeyRound,
   MapPin,
   QrCode,
+  Receipt,
   ScrollText,
   Shield,
   Sigma,
@@ -101,6 +102,14 @@ export const ADMIN_SECTIONS: AdminNavItem[] = [
     short: 'Verrechn.',
     icon: createElement(Sigma, { size: 18 }),
     description: 'Virtuelle Messstellen aus +/− Komponenten',
+    color: 'electricity',
+  },
+  {
+    to: '/admin/abrechnungskreise',
+    label: 'Abrechnungskreise',
+    short: 'Abrechn.',
+    icon: createElement(Receipt, { size: 18 }),
+    description: 'Stromabrechnung: Kreise und abgerechnete Messstellen',
     color: 'electricity',
   },
   {
