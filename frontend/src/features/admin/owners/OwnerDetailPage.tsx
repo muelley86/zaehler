@@ -21,6 +21,7 @@ export function OwnerDetailPage() {
         { label: 'USt-IdNr.', value: owner.vat_id },
         { label: 'Steuer-Nr.', value: owner.tax_id },
         { label: 'Notiz', value: owner.note },
+        { label: 'Interne Umlage', value: owner.internal_allocation ? 'ja (KOST-Stapel)' : null },
       ]}
     />
   );

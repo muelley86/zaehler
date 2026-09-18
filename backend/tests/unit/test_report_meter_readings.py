@@ -81,12 +81,9 @@ def test_single_meter_start_end_match_consumption() -> None:
         "SN-1",
         _reg((date(2024, 1, 31), "100"), (date(2024, 2, 29), "129"), (date(2024, 3, 31), "150")),
     )
-    cols = meter_columns(
-        [meter], start_day=date(2024, 1, 31), end_day=date(2024, 2, 29), transformer_factor=None
-    )
+    cols = meter_columns([meter], start_day=date(2024, 1, 31), end_day=date(2024, 2, 29))
     assert cols == MeterColumns(
         serial_number="SN-1",
-        transformer_factor=None,
         start_value=Decimal("100"),
         end_value=Decimal("129"),
     )
@@ -99,17 +96,18 @@ def test_registers_are_summed_for_dual_tariff() -> None:
         [_meter("SN-HTNT", ht, nt)],
         start_day=date(2024, 1, 31),
         end_day=date(2024, 2, 29),
-        transformer_factor=None,
     )
     assert cols.start_value == Decimal("1500")
     assert cols.end_value == Decimal("1630")
 
 
 def test_transformer_factor_is_passed_through_values_stay_raw() -> None:
-    meter = _meter("SN-W", _reg((date(2024, 1, 31), "10"), (date(2024, 2, 29), "12")))
-    cols = meter_columns(
-        [meter], start_day=date(2024, 1, 31), end_day=date(2024, 2, 29), transformer_factor=40
+    meter = MeterSeries(
+        serial_number="SN-W",
+        registers=(_reg((date(2024, 1, 31), "10"), (date(2024, 2, 29), "12")),),
+        transformer_factor=40,  # seit 0035 am Geraet
     )
+    cols = meter_columns([meter], start_day=date(2024, 1, 31), end_day=date(2024, 2, 29))
     assert cols.transformer_factor == 40
     assert (cols.start_value, cols.end_value) == (Decimal("10"), Decimal("12"))
 
@@ -117,9 +115,7 @@ def test_transformer_factor_is_passed_through_values_stay_raw() -> None:
 def test_meter_change_inside_period_uses_old_start_and_new_end() -> None:
     old = _meter("ALT", _reg((date(2024, 5, 31), "400"), (date(2024, 6, 20), "500")))
     new = _meter("NEU", _reg((date(2024, 6, 20), "0"), (date(2024, 6, 30), "30")))
-    cols = meter_columns(
-        [old, new], start_day=date(2024, 5, 31), end_day=date(2024, 6, 30), transformer_factor=None
-    )
+    cols = meter_columns([old, new], start_day=date(2024, 5, 31), end_day=date(2024, 6, 30))
     assert cols.serial_number == "ALT / NEU"
     assert cols.start_value == Decimal("400")
     assert cols.end_value == Decimal("30")
@@ -130,15 +126,11 @@ def test_meter_change_on_period_end_keeps_old_meter() -> None:
     # Periode nichts bei -> Ende = Endstand des alten Zaehlers.
     old = _meter("ALT", _reg((date(2024, 5, 31), "400"), (date(2024, 6, 30), "500")))
     new = _meter("NEU", _reg((date(2024, 6, 30), "0"), (date(2024, 7, 31), "40")))
-    june = meter_columns(
-        [old, new], start_day=date(2024, 5, 31), end_day=date(2024, 6, 30), transformer_factor=None
-    )
+    june = meter_columns([old, new], start_day=date(2024, 5, 31), end_day=date(2024, 6, 30))
     assert june.serial_number == "ALT"
     assert june.end_value == Decimal("500")
 
-    july = meter_columns(
-        [old, new], start_day=date(2024, 6, 30), end_day=date(2024, 7, 31), transformer_factor=None
-    )
+    july = meter_columns([old, new], start_day=date(2024, 6, 30), end_day=date(2024, 7, 31))
     assert july.serial_number == "NEU"
     assert (july.start_value, july.end_value) == (Decimal("0"), Decimal("40"))
 
@@ -151,9 +143,7 @@ def test_rollover_in_period_shows_display_values_end_below_start() -> None:
         "SN-MECH",
         _reg((date(2024, 1, 1), "99990"), (date(2024, 1, 11), "10"), max_value=max_value),
     )
-    cols = meter_columns(
-        [meter], start_day=date(2024, 1, 1), end_day=date(2024, 1, 8), transformer_factor=None
-    )
+    cols = meter_columns([meter], start_day=date(2024, 1, 1), end_day=date(2024, 1, 8))
     assert (cols.start_value, cols.end_value) == (Decimal("99990"), Decimal("4"))
     assert cols.start_value is not None and cols.end_value is not None
     consumption_7_days = Decimal("20") * 7 / 10
@@ -162,15 +152,13 @@ def test_rollover_in_period_shows_display_values_end_below_start() -> None:
 
 def test_open_range_uses_first_and_last_reading() -> None:
     meter = _meter("SN-1", _reg((date(2024, 1, 15), "10"), (date(2024, 3, 15), "70")))
-    cols = meter_columns([meter], start_day=date.min, end_day=date.max, transformer_factor=None)
+    cols = meter_columns([meter], start_day=date.min, end_day=date.max)
     assert (cols.start_value, cols.end_value) == (Decimal("10"), Decimal("70"))
 
 
 def test_same_day_readings_zero_span_still_resolve() -> None:
     meter = _meter("SN-1", _reg((date(2024, 2, 10), "5")))
-    cols = meter_columns(
-        [meter], start_day=date(2024, 1, 31), end_day=date(2024, 2, 29), transformer_factor=None
-    )
+    cols = meter_columns([meter], start_day=date(2024, 1, 31), end_day=date(2024, 2, 29))
     assert cols.serial_number == "SN-1"
     assert (cols.start_value, cols.end_value) == (Decimal("5"), Decimal("5"))
 
@@ -181,11 +169,7 @@ def test_no_readings_gives_empty_columns() -> None:
             [_meter("SN-1")],
             start_day=date(2024, 1, 31),
             end_day=date(2024, 2, 29),
-            transformer_factor=None,
         )
         == EMPTY_METER_COLUMNS
     )
-    assert (
-        meter_columns([], start_day=date.min, end_day=date.max, transformer_factor=None)
-        == EMPTY_METER_COLUMNS
-    )
+    assert meter_columns([], start_day=date.min, end_day=date.max) == EMPTY_METER_COLUMNS

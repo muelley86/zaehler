@@ -341,7 +341,8 @@ export function ReadingsListPage() {
             mpType: mp.type,
             locationId: mp.location_id,
             locationName: mp.location_name,
-            transformerFactor: mp.transformer_factor,
+            // Faktor des Geräts, an dem das Register hängt (nicht der aktive der Messstelle).
+            transformerFactor: meter.transformer_factor ?? null,
           });
         }
       }

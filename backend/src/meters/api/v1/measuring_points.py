@@ -25,6 +25,7 @@ from meters.core.problem import ProblemError
 from meters.models import (
     AuditAction,
     AuditEntityType,
+    BillingPosition,
     MeasuringPoint,
     MeterType,
     MieterAssignment,
@@ -38,9 +39,13 @@ from meters.models import (
     UserRole,
 )
 from meters.schemas import (
+    ChangeKostenstelleRequest,
     ChangeMieterRequest,
     ChangeOwnerRequest,
     ChangeSupplierRequest,
+    KostenstelleAssignmentCreate,
+    KostenstelleAssignmentRead,
+    KostenstelleAssignmentUpdate,
     MeasuringPointCreate,
     MeasuringPointRead,
     MeasuringPointUpdate,
@@ -60,8 +65,24 @@ from meters.schemas import (
 )
 from meters.services.access import assert_can_access_mp, restrict_mp_query
 from meters.services.audit import record
+from meters.services.kostenstelle_assignment import assign_kostenstelle
+from meters.services.kostenstelle_assignment import (
+    create_assignment as create_kostenstelle_assignment,
+)
+from meters.services.kostenstelle_assignment import (
+    delete_assignment as delete_kostenstelle_assignment,
+)
+from meters.services.kostenstelle_assignment import (
+    list_history as list_kostenstelle_history_service,
+)
+from meters.services.kostenstelle_assignment import (
+    set_from_patch as set_kostenstelle_from_patch,
+)
+from meters.services.kostenstelle_assignment import (
+    update_assignment as update_kostenstelle_assignment,
+)
 from meters.services.location_queries import ensure_location_exists
-from meters.services.meter_replacement import install_first_meter, replace_meter
+from meters.services.meter_replacement import UNVERAENDERT, install_first_meter, replace_meter
 
 # Mieter-Service mit Aliassen — strukturgleich zum Owner-/Supplier-Service.
 from meters.services.mieter_assignment import (
@@ -294,12 +315,10 @@ def create_measuring_point(
         is_bidirectional=payload.is_bidirectional,
         has_dual_tariff=payload.has_dual_tariff,
         tank_capacity=payload.tank_capacity,
-        transformer_factor=payload.transformer_factor,
         heating_source=payload.heating_source,
         contract_number=payload.contract_number,
         market_location=payload.market_location,
         installation_location=payload.installation_location,
-        kostenstelle=payload.kostenstelle,
     )
     db.add(mp)
     db.flush()
@@ -334,6 +353,7 @@ def create_measuring_point(
         user_id=admin.id,
         ip_address=client_ip(request),
         register_defs=register_defs,
+        transformer_factor=payload.transformer_factor,
     )
 
     if payload.type is MeterType.HEATING and register_defs is not None:
@@ -380,6 +400,16 @@ def create_measuring_point(
             mp_id=mp.id,
             mieter_id=payload.mieter_id,
             valid_from=payload.mieter_valid_from or payload.installed_at,
+            user_id=admin.id,
+            ip_address=client_ip(request),
+        )
+    # Kostenstelle (seit 0036 periodisiert): gilt ab Einbau des ersten Zaehlers.
+    if payload.kostenstelle is not None:
+        assign_kostenstelle(
+            db,
+            mp_id=mp.id,
+            kostenstelle=payload.kostenstelle,
+            valid_from=payload.installed_at,
             user_id=admin.id,
             ip_address=client_ip(request),
         )
@@ -435,19 +465,34 @@ def update_measuring_point(
             title="Invalid field",
             detail="transformer_factor ist nur für Messstellen vom Typ 'electricity' zulässig",
         )
+    # Seit 0035 haengt der Faktor am Geraet: die Messstelle aendert den Faktor des aktiven Zaehlers,
+    # fruehere Geraete behalten ihren (Korrektur ueber PATCH /physical-meters/{id}).
+    aktiv = mp.active_meter
+    if aktiv is None and (
+        payload.clear_transformer_factor or payload.transformer_factor is not None
+    ):
+        raise ProblemError(
+            status_code=409,
+            title="No active meter",
+            detail=(
+                "Die Messstelle hat keinen aktiven Zähler — den Wandlerfaktor bitte am "
+                "jeweiligen Zähler ändern."
+            ),
+        )
     if payload.clear_transformer_factor:
-        if mp.transformer_factor is not None:
-            diff["transformer_factor"] = {"from": mp.transformer_factor, "to": None}
-            mp.transformer_factor = None
+        if aktiv is not None and aktiv.transformer_factor is not None:
+            diff["transformer_factor"] = {"from": aktiv.transformer_factor, "to": None}
+            aktiv.transformer_factor = None
     elif (
         payload.transformer_factor is not None
-        and payload.transformer_factor != mp.transformer_factor
+        and aktiv is not None
+        and payload.transformer_factor != aktiv.transformer_factor
     ):
         diff["transformer_factor"] = {
-            "from": mp.transformer_factor,
+            "from": aktiv.transformer_factor,
             "to": payload.transformer_factor,
         }
-        mp.transformer_factor = payload.transformer_factor
+        aktiv.transformer_factor = payload.transformer_factor
 
     # Vertragsnummer: nur fuer Strom + Wasser zulaessig.
     if payload.contract_number is not None and mp.type not in (
@@ -489,14 +534,17 @@ def update_measuring_point(
         }
         mp.installation_location = payload.installation_location
 
-    # Kostenstelle: Ganzzahl 0-99999, ohne Typ-Validation. ``clear_*`` -> NULL.
-    if payload.clear_kostenstelle:
-        if mp.kostenstelle is not None:
-            diff["kostenstelle"] = {"from": mp.kostenstelle, "to": None}
-            mp.kostenstelle = None
-    elif payload.kostenstelle is not None and payload.kostenstelle != mp.kostenstelle:
-        diff["kostenstelle"] = {"from": mp.kostenstelle, "to": payload.kostenstelle}
-        mp.kostenstelle = payload.kostenstelle
+    # Kostenstelle: seit 0036 periodisiert - Wechsel/Beenden zum Stichtag ueber den Service
+    # (eigener Audit-Eintrag KOSTENSTELLE_CHANGED, daher nicht im MP-Diff).
+    set_kostenstelle_from_patch(
+        db,
+        mp=mp,
+        kostenstelle=payload.kostenstelle,
+        clear=payload.clear_kostenstelle,
+        stichtag=payload.kostenstelle_valid_from,
+        user_id=admin.id,
+        ip_address=client_ip(request),
+    )
 
     # Marktlokation: nur fuer Strom zulaessig.
     if payload.market_location is not None and mp.type is not MeterType.ELECTRICITY:
@@ -549,6 +597,15 @@ def delete_measuring_point(
         .join(PhysicalMeter, PhysicalMeter.id == Register.physical_meter_id)
         .where(PhysicalMeter.measuring_point_id == mp_id)
     )
+    position_count = db.scalar(
+        select(func.count(BillingPosition.id)).where(BillingPosition.measuring_point_id == mp_id)
+    )
+    if position_count:
+        raise ProblemError(
+            status_code=409,
+            title="Cannot delete measuring point",
+            detail="Die Messstelle ist einer Abrechnungsposition zugeordnet.",
+        )
     if reading_count and reading_count > 0:
         raise ProblemError(
             status_code=409,
@@ -570,7 +627,16 @@ def delete_measuring_point(
         ip_address=client_ip(request),
     )
     db.delete(mp)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        # RESTRICT-FK: parallel wurde eine Abrechnungsposition auf die Messstelle angelegt.
+        db.rollback()
+        raise ProblemError(
+            status_code=409,
+            title="Cannot delete measuring point",
+            detail="Die Messstelle ist einer Abrechnungsposition zugeordnet.",
+        ) from exc
 
 
 @router.post("/{mp_id}/replace-meter", response_model=MeasuringPointRead)
@@ -585,6 +651,12 @@ def replace_meter_endpoint(
     if mp is None:
         raise ProblemError(status_code=404, title="Measuring point not found")
 
+    if payload.new_transformer_factor is not None and mp.type is not MeterType.ELECTRICITY:
+        raise ProblemError(
+            status_code=400,
+            title="Invalid field",
+            detail="new_transformer_factor ist nur für Strom-Messstellen zulässig",
+        )
     try:
         replace_meter(
             db,
@@ -596,6 +668,11 @@ def replace_meter_endpoint(
             initial_readings=dict(payload.initial_readings),
             user_id=admin.id,
             ip_address=client_ip(request),
+            new_transformer_factor=(
+                payload.new_transformer_factor
+                if "new_transformer_factor" in payload.model_fields_set
+                else UNVERAENDERT
+            ),
         )
         db.commit()
     except IntegrityError as exc:
@@ -1027,6 +1104,114 @@ def delete_mieter_period(
     admin: AdminUser,
 ) -> None:
     delete_mieter_assignment(
+        db,
+        mp_id=mp_id,
+        assignment_id=assignment_id,
+        user_id=admin.id,
+        ip_address=client_ip(request),
+    )
+    db.commit()
+
+
+# ---------------------------------------------------------------------------
+# Kostenstellen-Historie (seit 0036) - Muster wie Mieter, Wert statt Stammdatensatz.
+# ---------------------------------------------------------------------------
+
+
+@router.get("/{mp_id}/kostenstellen", response_model=list[KostenstelleAssignmentRead])
+def list_kostenstelle_history(
+    mp_id: int,
+    db: DbDep,
+    user: CurrentUser,
+) -> list[KostenstelleAssignmentRead]:
+    assert_can_access_mp(db, user, mp_id)
+    return [
+        KostenstelleAssignmentRead.model_validate(a)
+        for a in list_kostenstelle_history_service(db, mp_id)
+    ]
+
+
+@router.post("/{mp_id}/change-kostenstelle", response_model=MeasuringPointRead)
+def change_kostenstelle_endpoint(
+    mp_id: int,
+    payload: ChangeKostenstelleRequest,
+    request: Request,
+    db: DbDep,
+    admin: AdminUser,
+) -> MeasuringPointRead:
+    assign_kostenstelle(
+        db,
+        mp_id=mp_id,
+        kostenstelle=payload.kostenstelle,
+        valid_from=payload.valid_from,
+        user_id=admin.id,
+        ip_address=client_ip(request),
+    )
+    db.commit()
+    refreshed = _load_with_meters(db, mp_id)
+    assert refreshed is not None
+    return to_measuring_point_read(refreshed, db)
+
+
+@router.post(
+    "/{mp_id}/kostenstellen",
+    response_model=KostenstelleAssignmentRead,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_kostenstelle_period(
+    mp_id: int,
+    payload: KostenstelleAssignmentCreate,
+    request: Request,
+    db: DbDep,
+    admin: AdminUser,
+) -> KostenstelleAssignmentRead:
+    assignment = create_kostenstelle_assignment(
+        db,
+        mp_id=mp_id,
+        kostenstelle=payload.kostenstelle,
+        valid_from=payload.valid_from,
+        valid_to=payload.valid_to,
+        user_id=admin.id,
+        ip_address=client_ip(request),
+    )
+    db.commit()
+    db.refresh(assignment)
+    return KostenstelleAssignmentRead.model_validate(assignment)
+
+
+@router.patch("/{mp_id}/kostenstellen/{assignment_id}", response_model=KostenstelleAssignmentRead)
+def update_kostenstelle_period(
+    mp_id: int,
+    assignment_id: int,
+    payload: KostenstelleAssignmentUpdate,
+    request: Request,
+    db: DbDep,
+    admin: AdminUser,
+) -> KostenstelleAssignmentRead:
+    assignment = update_kostenstelle_assignment(
+        db,
+        mp_id=mp_id,
+        assignment_id=assignment_id,
+        kostenstelle=payload.kostenstelle,
+        valid_from=payload.valid_from,
+        valid_to=payload.valid_to,
+        user_id=admin.id,
+        ip_address=client_ip(request),
+    )
+    db.commit()
+    db.refresh(assignment)
+    return KostenstelleAssignmentRead.model_validate(assignment)
+
+
+@router.delete("/{mp_id}/kostenstellen/{assignment_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_kostenstelle_period(
+    mp_id: int,
+    assignment_id: int,
+    request: Request,
+    db: DbDep,
+    admin: AdminUser,
+) -> None:
+    delete_kostenstelle_assignment(
         db,
         mp_id=mp_id,
         assignment_id=assignment_id,

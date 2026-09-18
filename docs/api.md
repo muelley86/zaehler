@@ -60,6 +60,8 @@ Alle Endpoints unter `/api/v1`. Fehler im RFC-7807-Format
   Messstellen; bei `owner_id`, `kostenstelle` oder `measuring_point_id`
   entfallen sie (keine solchen Attribute bzw. eigener ID-Namensraum). Der
   Response echot `from_date`/`to_date`.
+  Kostenstelle und Eigentümer gruppieren/filtern nach dem **aktuellen** Wert
+  (offene Periode), nicht zeitraumgenau.
   CSV-Spalten: `Dimension;Gruppe;Gruppen_ID;Seriennummer;Zählerart;Richtung;
   Einheit;Periode_von;Periode_bis;Wandlerfaktor;Zählerstand_Beginn;
   Zählerstand_Ende;Verbrauch`. Seriennummer, Wandlerfaktor und Zählerstände

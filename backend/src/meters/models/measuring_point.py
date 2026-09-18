@@ -11,7 +11,7 @@ from __future__ import annotations
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Boolean, ForeignKey, Integer, String
+from sqlalchemy import Boolean, ForeignKey, String
 from sqlalchemy import Enum as SAEnum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -20,6 +20,7 @@ from meters.db.types import DecimalText
 from meters.models._enums import HeatingSource, MeterType
 
 if TYPE_CHECKING:
+    from meters.models.kostenstelle_assignment import KostenstelleAssignment
     from meters.models.location import Location
     from meters.models.mieter_assignment import MieterAssignment
     from meters.models.owner_assignment import OwnerAssignment
@@ -42,7 +43,8 @@ class MeasuringPoint(Base, TimestampMixin):
     is_bidirectional: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     has_dual_tariff: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     tank_capacity: Mapped[Decimal | None] = mapped_column(DecimalText(32))
-    transformer_factor: Mapped[int | None] = mapped_column(Integer)
+    # Wandlerfaktor: seit Migration 0035 am ``PhysicalMeter``
+    # (siehe Property ``transformer_factor``).
     heating_source: Mapped[HeatingSource | None] = mapped_column(
         SAEnum(HeatingSource, name="heating_source", native_enum=False, length=20),
         nullable=True,
@@ -56,9 +58,6 @@ class MeasuringPoint(Base, TimestampMixin):
     # „Heizungsraum links"). Hilft, einen MP physisch zu finden, ohne dass die
     # Location-Granularitaet uebertrieben werden muss.
     installation_location: Mapped[str | None] = mapped_column(String(200), nullable=True)
-    # Kostenstelle (5-stellige Ganzzahl 0-99999, optional) - fuer
-    # Kostenstellen-Auswertung; gilt fuer alle MP-Typen.
-    kostenstelle: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     location: Mapped[Location | None] = relationship("Location")
     physical_meters: Mapped[list[PhysicalMeter]] = relationship(
@@ -92,3 +91,35 @@ class MeasuringPoint(Base, TimestampMixin):
         cascade="all, delete-orphan",
         order_by="MieterAssignment.valid_from",
     )
+    # Periodisierte Kostenstelle (seit 0036). ``selectin``: Listen, Dashboard und
+    # Auswertungen lesen ``kostenstelle`` je MP — eine Query fuer alle statt N+1.
+    kostenstelle_assignments: Mapped[list[KostenstelleAssignment]] = relationship(
+        "KostenstelleAssignment",
+        back_populates="measuring_point",
+        cascade="all, delete-orphan",
+        order_by="KostenstelleAssignment.valid_from",
+        lazy="selectin",
+    )
+
+    @property
+    def kostenstelle(self) -> int | None:
+        """Aktuelle Kostenstelle (offene Periode); ``None`` ohne offene Periode.
+
+        Fuer einen Stichtag ``services.kostenstelle_assignment.kostenstellen_am`` nutzen."""
+        return next(
+            (a.kostenstelle for a in self.kostenstelle_assignments if a.valid_to is None), None
+        )
+
+    @property
+    def active_meter(self) -> PhysicalMeter | None:
+        """Aktives Geraet (``removed_at IS NULL``); ``None`` vor dem ersten Einbau."""
+        return next((m for m in self.physical_meters if m.removed_at is None), None)
+
+    @property
+    def transformer_factor(self) -> int | None:
+        """Wandlerfaktor des aktiven Geraets (API-kompatible Sicht).
+
+        Fruehere Geraete behalten ihren eigenen
+        Faktor; die Verbrauchsberechnung nutzt je Ablesung den Faktor ihres Geraets."""
+        meter = self.active_meter
+        return meter.transformer_factor if meter is not None else None

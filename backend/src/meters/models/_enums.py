@@ -80,11 +80,22 @@ class AuditAction(enum.StrEnum):
     MIETER_ASSIGNMENT_CREATED = "mieter_assignment_created"
     MIETER_ASSIGNMENT_UPDATED = "mieter_assignment_updated"
     MIETER_ASSIGNMENT_DELETED = "mieter_assignment_deleted"
+    # Kostenstelle mit Gueltigkeitszeitraum (seit 0036) — Muster wie MIETER_*.
+    KOSTENSTELLE_CHANGED = "kostenstelle_changed"
+    KOSTENSTELLE_ASSIGNMENT_CREATED = "kostenstelle_assignment_created"
+    KOSTENSTELLE_ASSIGNMENT_UPDATED = "kostenstelle_assignment_updated"
+    KOSTENSTELLE_ASSIGNMENT_DELETED = "kostenstelle_assignment_deleted"
     # Voll-Backup (ZIP mit DB-Snapshot + Fotos) heruntergeladen bzw. per
     # GUI-Restore eingespielt — entity_type=SYSTEM, entity_id=None. Der
     # Restore-Eintrag wird NACH dem Swap in die restaurierte DB geschrieben.
     BACKUP_DOWNLOADED = "backup_downloaded"
     RESTORE_PERFORMED = "restore_performed"
+    # Stammdaten-Import der Stromabrechnung uebernommen (entity_type=SYSTEM, Summen im diff).
+    BILLING_IMPORT = "billing_import"
+    # Abrechnungslauf festgeschrieben (entity_type=BILLING_RUN); vorher gueltige Version -> ersetzt.
+    BILLING_RUN_FINALIZED = "billing_run_finalized"
+    # Empfaenger nach Agrarmonitor uebertragen bzw. Markierung zurueckgenommen (Phase 5).
+    BILLING_TRANSFERRED = "billing_transferred"
 
 
 class AuditEntityType(enum.StrEnum):
@@ -103,8 +114,27 @@ class AuditEntityType(enum.StrEnum):
     SESSION = "session"
     QR_TOKEN = "qr_token"
     REPORT_CONFIG = "report_config"
+    BILLING_CIRCLE = "billing_circle"
+    BILLING_POSITION = "billing_position"
+    BILLING_INVOICE = "billing_invoice"
+    BILLING_RUN = "billing_run"
     # Systemweite Vorgänge ohne konkrete Entität (Backup-Download, Restore).
     SYSTEM = "system"
+
+
+class BillingPositionKind(enum.StrEnum):
+    """Art einer Abrechnungsposition: Strom-Messstelle oder Restmenge ohne Zaehler."""
+
+    METER = "meter"
+    REST = "rest"
+
+
+class BillingRunStatus(enum.StrEnum):
+    """Abrechnungslauf: Entwurf (aenderbar) -> festgeschrieben (unveraenderlich) -> ersetzt."""
+
+    ENTWURF = "entwurf"
+    FESTGESCHRIEBEN = "festgeschrieben"
+    ERSETZT = "ersetzt"
 
 
 class ReportDimension(enum.StrEnum):

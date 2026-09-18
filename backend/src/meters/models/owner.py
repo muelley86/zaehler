@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from sqlalchemy import String
+from sqlalchemy import Boolean, String, false
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from meters.db import Base, TimestampMixin
@@ -37,6 +37,10 @@ class Owner(Base, TimestampMixin):
     vat_id: Mapped[str | None] = mapped_column(String(32))
     tax_id: Mapped[str | None] = mapped_column(String(32))
     note: Mapped[str | None] = mapped_column(String(500))
+    # Interne Umlage (Musterhof Service GmbH): keine Rechnung, sondern DATEV-KOST-Stapel.
+    internal_allocation: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=false()
+    )
 
     assignments: Mapped[list[OwnerAssignment]] = relationship(
         back_populates="owner",

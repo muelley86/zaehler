@@ -124,6 +124,14 @@ class Settings(BaseSettings):
     # 413 ab, bevor Pillow den Decode startet.
     photo_max_upload_bytes: int = 20 * 1024 * 1024
 
+    # Stromabrechnung: Warnung, wenn ein interpolierter Monatsend-Stand weiter als so viele Tage
+    # von der naechsten Ablesung entfernt ist (Entscheidung des Nutzers: 3 Tage, einstellbar).
+    billing_max_reading_gap_days: int = 3
+
+    # Stromabrechnung: Hinweis, wenn der Verbrauch einer Zeile um mehr als so viel Prozent vom
+    # festgeschriebenen Vormonat abweicht (Plan Phase 4d: Plausibilitaet +/- 50 %).
+    billing_consumption_deviation_percent: int = 50
+
     # Max Upload-Größe für ein Restore-Backup (ZIP mit DB-Snapshot + Fotos).
     # DB plus Fotos können bei jahrelanger Nutzung mehrere hundert MB
     # erreichen; 1 GiB lässt Luft. Override via METERS_BACKUP_MAX_UPLOAD_BYTES.

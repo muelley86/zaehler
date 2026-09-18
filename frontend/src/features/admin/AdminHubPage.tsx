@@ -30,7 +30,9 @@ import type {
 } from '@/lib/types';
 import { cx } from '@/components/ui/cx';
 
-import { ADMIN_SECTIONS, type AdminNavItem, type AdminSectionColor } from './adminNav';
+import { useAuth } from '@/features/auth/auth-context';
+
+import { sectionsFor, type AdminNavItem, type AdminSectionColor } from './adminNav';
 
 interface Counts {
   '/admin/messstellen'?: number;
@@ -51,6 +53,8 @@ const COLOR_BG: Record<AdminSectionColor, string> = {
 };
 
 export function AdminHubPage() {
+  const { me } = useAuth();
+  const sichtbar = sectionsFor(me);
   const [counts, setCounts] = useState<Counts>({});
 
   useEffect(() => {
@@ -87,7 +91,7 @@ export function AdminHubPage() {
       <LargeTitle title="Verwaltung" subtitle="Konten, Daten, System" />
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3" data-testid="admin-hub-grid">
-        {ADMIN_SECTIONS.map((s) => (
+        {sichtbar.map((s) => (
           <HubCard key={s.to} section={s} counter={counts[s.to as keyof Counts]} />
         ))}
       </div>

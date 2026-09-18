@@ -21,6 +21,7 @@ import {
   KeyRound,
   MapPin,
   QrCode,
+  Receipt,
   ScrollText,
   Shield,
   Sigma,
@@ -45,6 +46,8 @@ export interface AdminNavItem {
   description: string;
   /** Farbton der Hub-Card-Icon-Box. */
   color: AdminSectionColor;
+  /** Auch fuer Benutzer mit dem Merkmal ``can_billing`` sichtbar (sonst nur Admins). */
+  billing?: true;
 }
 
 export const ADMIN_SECTIONS: AdminNavItem[] = [
@@ -104,6 +107,15 @@ export const ADMIN_SECTIONS: AdminNavItem[] = [
     color: 'electricity',
   },
   {
+    to: '/admin/abrechnungskreise',
+    label: 'Abrechnungskreise',
+    short: 'Abrechn.',
+    icon: createElement(Receipt, { size: 18 }),
+    description: 'Stromabrechnung: Kreise und abgerechnete Messstellen',
+    color: 'electricity',
+    billing: true,
+  },
+  {
     to: '/admin/benutzer',
     label: 'Benutzer',
     icon: createElement(Users, { size: 18 }),
@@ -146,3 +158,13 @@ export const ADMIN_SECTIONS: AdminNavItem[] = [
     color: 'water',
   },
 ];
+
+/**
+ * Sichtbare Bereiche fuer den angemeldeten Benutzer: Admins sehen alles, Benutzer mit dem Merkmal
+ * ``can_billing`` nur die Abrechnung.
+ */
+export function sectionsFor(me: { role: string; can_billing: boolean } | null): AdminNavItem[] {
+  if (me?.role === 'admin') return ADMIN_SECTIONS;
+  if (me?.can_billing) return ADMIN_SECTIONS.filter((s) => s.billing);
+  return [];
+}

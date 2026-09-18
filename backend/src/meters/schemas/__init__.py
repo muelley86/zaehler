@@ -24,6 +24,12 @@ from meters.schemas.common import (
     ProblemDetails,
 )
 from meters.schemas.delivery import DeliveryCreate, DeliveryRead, DeliveryUpdate
+from meters.schemas.kostenstelle_assignment import (
+    ChangeKostenstelleRequest,
+    KostenstelleAssignmentCreate,
+    KostenstelleAssignmentRead,
+    KostenstelleAssignmentUpdate,
+)
 from meters.schemas.location import LocationCreate, LocationRead, LocationUpdate
 from meters.schemas.main_location import (
     MainLocationCreate,
@@ -111,6 +117,7 @@ __all__ = [
     "BulkDeleteRequest",
     "BulkDeleteResult",
     "BulkDeleteSkipped",
+    "ChangeKostenstelleRequest",
     "ChangeMieterRequest",
     "ChangeOwnerRequest",
     "ChangePasswordRequest",
@@ -121,6 +128,9 @@ __all__ = [
     "DeliveryRead",
     "DeliveryUpdate",
     "HeatingRegisterCreate",
+    "KostenstelleAssignmentCreate",
+    "KostenstelleAssignmentRead",
+    "KostenstelleAssignmentUpdate",
     "LocationCreate",
     "LocationRead",
     "LocationUpdate",

@@ -23,6 +23,7 @@ class OwnerCreate(BaseModel):
     vat_id: str | None = Field(default=None, max_length=20, pattern=VAT_RE)
     tax_id: str | None = Field(default=None, max_length=32)
     note: str | None = Field(default=None, max_length=500)
+    internal_allocation: bool = False
 
     @field_validator("name")
     @classmethod
@@ -62,6 +63,7 @@ class OwnerUpdate(BaseModel):
     vat_id: str | None = Field(default=None, max_length=32)
     tax_id: str | None = Field(default=None, max_length=32)
     note: str | None = Field(default=None, max_length=500)
+    internal_allocation: bool | None = None
 
     @field_validator("name")
     @classmethod
@@ -82,3 +84,4 @@ class OwnerRead(APIModel):
     vat_id: str | None
     tax_id: str | None
     note: str | None
+    internal_allocation: bool = False

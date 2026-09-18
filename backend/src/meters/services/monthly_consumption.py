@@ -15,7 +15,7 @@ from collections.abc import Iterable
 from datetime import date
 from decimal import Decimal
 
-from sqlalchemy import delete, event, select
+from sqlalchemy import delete, event, inspect, select
 from sqlalchemy.orm import Session, selectinload
 
 from meters.db import SessionLocal
@@ -39,14 +39,15 @@ def recompute_register(db: Session, register_id: int) -> None:
         .options(
             selectinload(Register.readings),
             selectinload(Register.deliveries),
-            selectinload(Register.physical_meter).selectinload(PhysicalMeter.measuring_point),
+            selectinload(Register.physical_meter),
         )
     )
     db.execute(delete(MonthlyConsumption).where(MonthlyConsumption.register_id == register_id))
     if register is None:
         return
 
-    factor = register.physical_meter.measuring_point.transformer_factor
+    # Faktor des Geraets, an dem das Register haengt (seit 0035)
+    factor = register.physical_meter.transformer_factor
     totals: dict[tuple[date, date], Decimal] = {}
     for point in consumption_for_register(register, transformer_factor=factor):
         for part in split_across_buckets(point, "month"):
@@ -154,7 +155,16 @@ def _touched_register_ids(session: Session) -> set[int]:
             ids.add(obj.register_id)
         elif isinstance(obj, Register):
             ids.add(obj.id)
+        elif isinstance(obj, PhysicalMeter) and _factor_changed(obj):
+            # Geaenderter Wandlerfaktor veraendert alle Monatswerte des Geraets.
+            ids.update(
+                session.scalars(select(Register.id).where(Register.physical_meter_id == obj.id))
+            )
     return ids
+
+
+def _factor_changed(meter: PhysicalMeter) -> bool:
+    return bool(inspect(meter).attrs.transformer_factor.history.has_changes())
 
 
 def _after_flush(session: Session, _flush_context: object) -> None:

@@ -25,6 +25,7 @@ class MeResponse(APIModel):
     force_password_change: bool
     totp_enabled: bool
     can_assign_qr_tokens: bool
+    can_billing: bool
     last_login_at: UtcDateTime | None
 
     @computed_field  # type: ignore[prop-decorator]

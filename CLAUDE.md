@@ -64,6 +64,14 @@ in eigenen Fenstern).
   verhindert Existenz-Leaks. Nicht zu 403 „korrigieren".
 - Eigenverbrauch PV wird NICHT berechnet (aus Bezug+Einspeisung nicht ableitbar).
 - `monthly_consumption` ist ein Cache, `Reading` bleibt die Wahrheit.
+- `billing/calculation.py` spiegelt die Rechenregeln der Stromabrechnung (`model.py`) 1:1 — nur gemeinsam
+  mit dem Projekt Stromabrechnung ändern; Abnahme `tests/unit/test_billing_referenzfaelle.py` muss grün bleiben.
+  Echte Abrechnungsdaten nie ins Repo (öffentlich) — nur synthetische Fixtures.
+- Migrationen: unter SQLite **kein `batch_alter_table` für Spalten-Drops** an Tabellen mit
+  `ON DELETE CASCADE`-Kindern (`measuring_point`, `physical_meter`, …). Der Neuaufbau
+  löscht bei `foreign_keys=ON` alle Kinddaten; `PRAGMA foreign_keys=OFF` wirkt in der
+  Migrations-Transaktion nicht. Stattdessen `ALTER TABLE … DROP COLUMN` (SQLite ≥ 3.35),
+  siehe Migration 0035 und `test_0035_verschiebt_faktor_ohne_datenverlust`.
 
 ## API-Konventionen
 

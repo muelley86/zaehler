@@ -22,6 +22,8 @@ export interface Me {
   force_password_change: boolean;
   totp_enabled: boolean;
   can_assign_qr_tokens: boolean;
+  /** Darf das Abrechnungsmodul bedienen (Admins immer). */
+  can_billing: boolean;
   last_login_at: string | null;
   // Vom Backend berechnet: Admin ohne 2FA bei aktivem METERS_REQUIRE_TOTP_FOR_ADMIN.
   // Optional, weil nur die /auth/me-Antwort es führt (nicht die Admin-User-Liste).
@@ -93,6 +95,8 @@ export interface PhysicalMeterRead {
   serial_number: string;
   installed_at: string;
   removed_at: string | null;
+  /** Wandlerfaktor des Geräts (nur Strom); ``null`` = kein Wandler. */
+  transformer_factor: number | null;
   registers: RegisterRead[];
 }
 
@@ -132,6 +136,485 @@ export interface OwnerRead {
   vat_id: string | null;
   tax_id: string | null;
   note: string | null;
+  /** Interne Umlage: keine Rechnung, Stromabrechnung per KOST-Stapel. */
+  internal_allocation: boolean;
+}
+
+export type BillingPositionKind = 'meter' | 'rest';
+
+export interface BillingCircleRead {
+  id: number;
+  code: string;
+  name: string;
+  rechnungsleger: string;
+  abnahmestelle: string;
+  marktlokation: string | null;
+  note: string | null;
+}
+
+export interface BillingPositionRead {
+  id: number;
+  circle_id: number;
+  sort_order: number;
+  label: string;
+  kind: BillingPositionKind;
+  measuring_point_id: number | null;
+  measuring_point_name: string | null;
+  parent_position_id: number | null;
+  owner_id: number | null;
+  owner_name: string | null;
+  kostenstelle: number | null;
+  invoice_line: string | null;
+  note: string | null;
+  valid_from: string;
+  valid_to: string | null;
+}
+
+export interface BillingCheckRow {
+  position_id: number;
+  label: string;
+  kind: BillingPositionKind;
+  measuring_point_id: number | null;
+  measuring_point_name: string | null;
+  parent_position_id: number | null;
+  owner_id: number | null;
+  owner_name: string | null;
+  internal_allocation: boolean;
+  kostenstelle: number | null;
+  mieter_name: string | null;
+  invoice_line: string | null;
+}
+
+export interface BillingFinding {
+  position_id: number | null;
+  label: string;
+  code: string;
+  message: string;
+}
+
+export type BillingImportLevel = 'aktion' | 'hinweis' | 'fehler';
+
+export interface BillingImportEntry {
+  level: BillingImportLevel;
+  circle: string;
+  label: string | null;
+  message: string;
+}
+
+export interface BillingImportReport {
+  applied: boolean;
+  valid_from: string;
+  entries: BillingImportEntry[];
+  counts: Record<BillingImportLevel, number>;
+}
+
+export type BillingStandArt = 'abgelesen' | 'interpoliert' | 'nur_davor' | 'nur_danach';
+
+export interface BillingStandRead {
+  wert: string;
+  art: BillingStandArt;
+  ablesung_vor: string | null;
+  ablesung_nach: string | null;
+  abstand_tage: number;
+}
+
+export interface BillingReadingRow {
+  position_id: number;
+  label: string;
+  kind: BillingPositionKind;
+  measuring_point_id: number | null;
+  measuring_point_name: string | null;
+  serial_numbers: string;
+  transformer_factor: number | null;
+  stand_alt: BillingStandRead | null;
+  stand_neu: BillingStandRead | null;
+  korrektur_kwh: string | null;
+  korrektur_note: string | null;
+  kwh: string | null;
+}
+
+export interface BillingReadingsRead {
+  monat: string;
+  stichtag_alt: string;
+  stichtag_neu: string;
+  max_abstand_tage: number;
+  positions: BillingReadingRow[];
+  findings: BillingFinding[];
+}
+
+export interface BillingAttachmentHead {
+  circle_code: string;
+  circle_name: string;
+  rechnungsleger: string;
+  abnahmestelle: string;
+  marktlokation: string | null;
+  monat: string;
+  monatsname: string;
+  version: number;
+  status: BillingRunStatus;
+  rechnung_nummer: string;
+  rechnung_datum: string;
+  zeitraum_von: string;
+  zeitraum_bis: string;
+}
+
+export interface BillingAttachmentSummary {
+  einkaufspreis_ct: string;
+  umlagepreis_ct: string;
+  preis_ct: string;
+  preis_eur: string;
+  bezugsmenge: string;
+  zaehlersumme: string;
+  gesamtkosten: string;
+  gesamt_eur: string;
+  umsatzsteuer: string;
+}
+
+export interface BillingAttachmentLine {
+  label: string;
+  kostenstelle: number | null;
+  serial_numbers: string;
+  transformer_factor: number | null;
+  stand_alt: string | null;
+  stand_alt_art: string | null;
+  stand_neu: string | null;
+  stand_neu_art: string | null;
+  korrektur_kwh: string | null;
+  kwh: string | null;
+  eur: string | null;
+  invoice_line: string | null;
+}
+
+export interface BillingAttachmentKst {
+  kst: string | null;
+  kwh: string;
+  eur: string;
+}
+
+export interface BillingAttachmentSection {
+  name: string;
+  positionen: { name: string; betrag: string; ct: string }[];
+  summe: string;
+  ct: string;
+}
+
+export interface BillingAttachmentRecipient {
+  owner_name: string;
+  internal_allocation: boolean;
+  lines: BillingAttachmentLine[];
+  kostenstellen: BillingAttachmentKst[];
+  abschnitte: BillingAttachmentSection[];
+  kwh: string;
+  eur: string;
+  gesamt_ct: string;
+}
+
+export interface BillingAttachmentRead {
+  head: BillingAttachmentHead;
+  summary: BillingAttachmentSummary;
+  empfaenger: BillingAttachmentRecipient[];
+}
+
+/** Versionsvergleich zweier Abrechnungsläufe desselben Monats. */
+export type BillingDiffStatus = 'gleich' | 'geaendert' | 'neu' | 'entfallen';
+
+export interface BillingRunDiffLine {
+  label: string;
+  status: BillingDiffStatus;
+  felder: string[];
+  kwh_alt: string | null;
+  kwh_neu: string | null;
+  eur_alt: string | null;
+  eur_neu: string | null;
+  kwh_delta: string | null;
+  eur_delta: string | null;
+}
+
+export interface BillingRunDiffSide {
+  run_id: number;
+  version: number;
+  status: BillingRunStatus;
+  begruendung: string | null;
+  finalized_at: string | null;
+  preis_eur: string | null;
+  gesamt_eur: string | null;
+  saldo_eur: string | null;
+}
+
+export interface BillingRunDiff {
+  monat: string;
+  alt: BillingRunDiffSide;
+  neu: BillingRunDiffSide;
+  zeilen: BillingRunDiffLine[];
+  kwh_delta: string;
+  eur_delta: string;
+}
+
+export interface BillingHistoryPoint {
+  monat: string;
+  version: number;
+  kwh: string;
+  eur: string;
+}
+
+export interface BillingHistoryRow {
+  name: string;
+  internal_allocation: boolean;
+  punkte: BillingHistoryPoint[];
+}
+
+export interface BillingHistory {
+  monate: string[];
+  empfaenger: BillingHistoryRow[];
+  positionen: BillingHistoryRow[];
+}
+
+/** Monatsübersicht: Fortschritt eines Kreises in einem Monat. */
+export type BillingMonthStatus =
+  | 'leer'
+  | 'rechnung'
+  | 'entwurf'
+  | 'festgeschrieben'
+  | 'uebertragen';
+
+export interface BillingMonthCell {
+  monat: string;
+  status: BillingMonthStatus;
+  invoice: boolean;
+  run_id: number | null;
+  version: number | null;
+  eur: string | null;
+  empfaenger: number;
+  uebertragen: number;
+  blocking: number;
+}
+
+export interface BillingMonthRow {
+  circle_id: number;
+  code: string;
+  name: string;
+  monate: BillingMonthCell[];
+}
+
+export interface BillingMonthOverview {
+  von: string;
+  bis: string;
+  monate: string[];
+  kreise: BillingMonthRow[];
+}
+
+export interface BillingTransferRow {
+  datum: string;
+  menge: string;
+  beschreibung: string;
+  preis_eur: string;
+  umsatzsteuer: string;
+  betrag: string;
+  betrag_lauf: string;
+  positionen: string[];
+}
+
+export interface BillingTransferState {
+  id: number;
+  belegnummer: string | null;
+  note: string | null;
+  transferred_at: string;
+  transferred_by: number | null;
+}
+
+export interface BillingTransferRecipient {
+  owner_name: string;
+  internal_allocation: boolean;
+  rows: BillingTransferRow[];
+  netto: string;
+  brutto: string;
+  netto_lauf: string;
+  differenz: string;
+  transfer: BillingTransferState | null;
+}
+
+export interface BillingTransferView {
+  run_id: number;
+  monat: string;
+  monatsname: string;
+  stichtag: string;
+  kopfsatz: string;
+  preis_eur: string;
+  umsatzsteuer: string;
+  empfaenger: BillingTransferRecipient[];
+}
+
+export interface UnassignedMeterRead {
+  id: number;
+  name: string;
+  serial_numbers: string;
+}
+
+export type BillingRunStatus = 'entwurf' | 'festgeschrieben' | 'ersetzt';
+
+export interface BillingRunFinding {
+  position_id: number | null;
+  label: string;
+  code: string;
+  message: string;
+  blocking: boolean;
+}
+
+export interface BillingRunLineRead {
+  id: number;
+  sort_order: number;
+  position_id: number | null;
+  label: string;
+  kind: BillingPositionKind;
+  parent_label: string | null;
+  owner_id: number | null;
+  owner_name: string | null;
+  internal_allocation: boolean;
+  kostenstelle: number | null;
+  mieter_name: string | null;
+  invoice_line: string | null;
+  measuring_point_id: number | null;
+  measuring_point_name: string | null;
+  serial_numbers: string;
+  transformer_factor: number | null;
+  stand_alt: string | null;
+  stand_alt_art: BillingStandArt | null;
+  stand_alt_abstand: number | null;
+  stand_neu: string | null;
+  stand_neu_art: BillingStandArt | null;
+  stand_neu_abstand: number | null;
+  korrektur_kwh: string | null;
+  korrektur_note: string | null;
+  manual_stand_alt: string | null;
+  manual_stand_neu: string | null;
+  manual_korrektur_kwh: string | null;
+  manual_note: string | null;
+  kwh: string | null;
+  eur: string | null;
+  pruefung: string | null;
+}
+
+export interface BillingRunGroupResult {
+  name: string;
+  intern: boolean;
+  kwh: string;
+  eur: string;
+  kostenstellen: { kst: string | null; kwh: string; eur: string }[];
+}
+
+export interface BillingRunResult {
+  preis_ct: string;
+  preis_eur: string;
+  einkaufspreis_ct: string;
+  umlagepreis_ct: string;
+  bezugsmenge: string;
+  gesamtkosten: string;
+  zaehlersumme: string;
+  nicht_gemessen_kwh: string | null;
+  gesamt_eur: string;
+  saldo_eur: string;
+  saldo_grenze_eur: string;
+  gruppen: BillingRunGroupResult[];
+}
+
+export interface BillingRunSummary {
+  id: number;
+  circle_id: number;
+  monat: string;
+  version: number;
+  status: BillingRunStatus;
+  invoice_id: number;
+  begruendung: string | null;
+  created_at: string;
+  created_by: number | null;
+  finalized_at: string | null;
+  finalized_by: number | null;
+  preis_eur: string | null;
+  gesamt_eur: string | null;
+  saldo_eur: string | null;
+  blocking_count: number;
+}
+
+export interface BillingRunRead extends BillingRunSummary {
+  zusatzkosten: string;
+  aufschlag_prozent: string;
+  aufschlag_ct: string;
+  result: BillingRunResult | null;
+  befunde: BillingRunFinding[];
+  lines: BillingRunLineRead[];
+}
+
+/** Übernahme eines Monats-JSON (Excel-Weg) in einen Entwurf: Vorschau bzw. Ergebnis. */
+export type ExcelImportStatus =
+  | 'gleich'
+  | 'abweichend'
+  | 'unbekannt'
+  | 'nicht_uebernehmbar'
+  | 'fehlt_in_datei'
+  | 'rest';
+
+export interface ExcelImportLine {
+  label: string;
+  status: ExcelImportStatus;
+  hinweis: string | null;
+  app_stand_alt: string | null;
+  app_stand_neu: string | null;
+  app_korrektur: string | null;
+  excel_stand_alt: string | null;
+  excel_stand_neu: string | null;
+  excel_korrektur: string | null;
+}
+
+export interface ExcelImportParameter {
+  feld: 'zusatzkosten' | 'aufschlag_prozent' | 'aufschlag_ct';
+  app: string;
+  excel: string;
+}
+
+export interface BillingExcelImportRead {
+  uebernommen: boolean;
+  zeilen: ExcelImportLine[];
+  parameter: ExcelImportParameter[];
+}
+
+export interface BillingInvoicePositionRead {
+  id: number;
+  sort_order: number;
+  name: string;
+  abschnitt: string;
+  zeitraum: string;
+  menge: string | null;
+  preis_ct: string | null;
+  betrag: string;
+  kategorie: string | null;
+}
+
+export interface BillingInvoiceRead {
+  id: number;
+  circle_id: number;
+  nummer: string;
+  datum: string;
+  aid: string;
+  marktlokation: string;
+  period_from: string;
+  period_to: string;
+  period_month: string; // JJJJ-MM, vom Server aus dem Zeitraum abgeleitet
+  verbrauch_kwh: string;
+  leistungsspitze_kw: string;
+  betrag_netto: string;
+  hinweise: string[];
+  pdf_sha256: string;
+  pdf_size: number;
+  pdf_filename: string;
+  uploaded_by: number | null;
+  created_at: string;
+  positions: BillingInvoicePositionRead[];
+}
+
+export interface BillingCheckRead {
+  stichtag: string;
+  positions: BillingCheckRow[];
+  findings: BillingFinding[];
 }
 
 export interface OwnerAssignmentRead {
@@ -155,6 +638,14 @@ export interface MieterRead {
   email: string | null;
   phone: string | null;
   note: string | null;
+}
+
+/** Kostenstelle mit Gültigkeitszeitraum (halboffen: ``valid_to`` gehört nicht mehr dazu). */
+export interface KostenstelleAssignmentRead {
+  id: number;
+  kostenstelle: number;
+  valid_from: string;
+  valid_to: string | null;
 }
 
 export interface MieterAssignmentRead {

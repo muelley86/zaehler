@@ -12,6 +12,7 @@ class UserCreate(BaseModel):
     role: UserRole
     initial_password: str = Field(min_length=12, max_length=256)
     can_assign_qr_tokens: bool = False
+    can_billing: bool = False
 
 
 class UserUpdate(BaseModel):
@@ -19,6 +20,7 @@ class UserUpdate(BaseModel):
     role: UserRole | None = None
     is_active: bool | None = None
     can_assign_qr_tokens: bool | None = None
+    can_billing: bool | None = None
 
 
 class UserRead(APIModel):
@@ -29,6 +31,7 @@ class UserRead(APIModel):
     is_active: bool
     force_password_change: bool
     can_assign_qr_tokens: bool
+    can_billing: bool
     created_at: UtcDateTime
     last_login_at: UtcDateTime | None
 
