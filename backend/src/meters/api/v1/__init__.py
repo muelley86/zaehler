@@ -5,6 +5,9 @@ from fastapi import APIRouter
 from meters.api.v1 import (
     audit,
     auth,
+    billing_circles,
+    billing_invoices,
+    billing_runs,
     dashboard,
     deliveries,
     entries,
@@ -50,5 +53,8 @@ router.include_router(qr_tokens.router)
 router.include_router(reports.router)
 router.include_router(report_configs.router)
 router.include_router(search.router)
+router.include_router(billing_circles.router)
+router.include_router(billing_invoices.router)
+router.include_router(billing_runs.router)
 
 __all__ = ["router"]

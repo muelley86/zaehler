@@ -13,7 +13,10 @@ Drei Ebenen: MeasuringPoint → PhysicalMeter → Register → Reading
 - PhysicalMeter (konkretes Gerät, wird getauscht):
   id, measuring_point_id, serial_number,
   installed_at, removed_at (nullable),
-  initial_values (JSON: {obis_code: startwert})
+  initial_values (JSON: {obis_code: startwert}),
+  transformer_factor (nullable, nur Strom; seit Migration 0035 am Gerät statt an der
+  Messstelle — jede Ablesung wird mit dem Faktor des Geräts gerechnet, an dem sie hängt;
+  `MeasuringPoint.transformer_factor` ist nur noch der Faktor des aktiven Geräts)
   Beim Tausch: removed_at am alten setzen, neuen anlegen mit
   installed_at und Anfangsständen (meist 0, manchmal nicht).
 
@@ -89,6 +92,8 @@ Pflichtfelder:
 - new_serial_number
 - installed_at: Datum (>= removed_at)
 - initial_readings: Startstände des neuen Zählers pro OBIS-Code
+- new_transformer_factor (optional): Feld weglassen = Faktor des alten Geräts übernehmen,
+  `null` = kein Wandler
 
 Atomar in einer Transaktion:
 

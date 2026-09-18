@@ -38,6 +38,8 @@ data/*.db.*
 data/*.db-journal
 data/*.db-wal
 data/*.db-shm
+# Medien der laufenden App (Fotos, Rechnungs-PDFs der Stromabrechnung) - interne Daten, nie ins Repo
+data/media/
 # DB-Dateien/-Backups generell (z. B. Produktions-Backups im Repo-Root) —
 # echte Daten duerfen nie zu GitHub.
 *.db
