@@ -13,6 +13,7 @@ import json
 import sqlite3
 import tempfile
 import zipfile
+from pathlib import Path
 from typing import Any, cast
 
 from fastapi.testclient import TestClient
@@ -243,10 +244,12 @@ def test_backup_zip_contains_db_manifest_and_photos(admin_client: TestClient) ->
 
         # Snapshot in Temp-Datei schreiben und prüfen, dass die eben angelegte
         # Messstelle drin ist (bestätigt den konsistenten Hot-Backup inkl. WAL).
-        with tempfile.NamedTemporaryFile(suffix=".db") as tmp:
-            tmp.write(raw)
-            tmp.flush()
-            con = sqlite3.connect(tmp.name)
+        # Eigener Ordner statt NamedTemporaryFile: Windows kann eine noch offene Temp-Datei nicht
+        # ein zweites Mal oeffnen, sqlite3 scheitert dort sonst mit "unable to open database file".
+        with tempfile.TemporaryDirectory() as ordner:
+            pfad = Path(ordner) / "snapshot.db"
+            pfad.write_bytes(raw)
+            con = sqlite3.connect(pfad)
             try:
                 rows = [r[0] for r in con.execute("SELECT name FROM measuring_point")]
             finally:
