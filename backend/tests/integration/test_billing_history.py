@@ -12,7 +12,16 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 # Die Helfer des Lauf-Tests (Kreis mit Positionen, Staende, Rechnung) wiederverwenden.
-from test_billing_runs import BASE, _mp, _ok, _position, _setup, _stand, _zeile
+from tests.integration.test_billing_runs import (
+    BASE,
+    _invoice,
+    _mp,
+    _ok,
+    _position,
+    _setup,
+    _stand,
+    _zeile,
+)
 
 from meters.models import User
 
@@ -109,8 +118,6 @@ def test_vergleich_mit_ausdruecklicher_version_in_beide_richtungen(
 def test_vergleich_lehnt_fremden_kreis_und_fremden_monat_ab(
     admin_client: TestClient, admin_user: User, db: Session
 ) -> None:
-    from test_billing_runs import _invoice
-
     cid, _ = _setup(admin_client, db, admin_user)
     august = _ok(admin_client.post(f"{BASE}/{cid}/runs", json={"monat": "2026-08"}), 201)
 
