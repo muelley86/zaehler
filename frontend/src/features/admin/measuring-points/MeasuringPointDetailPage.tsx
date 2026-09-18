@@ -73,6 +73,7 @@ import {
   OWNER_ASSIGNMENT_CONFIG,
   SUPPLIER_ASSIGNMENT_CONFIG,
 } from './_shared/AssignmentHistoryCard';
+import { KostenstelleHistoryCard } from './_shared/KostenstelleHistoryCard';
 
 // Konstante Chart-Margin als Modul-Const, damit Recharts keine neue
 // Object-Referenz pro Render sieht.
@@ -221,6 +222,8 @@ export function MeasuringPointDetailPage() {
       <AssignmentHistoryCard mp={mp} onChanged={refreshMp} config={SUPPLIER_ASSIGNMENT_CONFIG} />
 
       <AssignmentHistoryCard mp={mp} onChanged={refreshMp} config={MIETER_ASSIGNMENT_CONFIG} />
+
+      <KostenstelleHistoryCard mp={mp} onChanged={refreshMp} />
 
       <ConsumptionChart consumption={consumption} mp={mp} />
 
@@ -528,9 +531,6 @@ function StammdatenEditForm({
   const [contractNumber, setContractNumber] = useState(mp.contract_number ?? '');
   const [marketLocation, setMarketLocation] = useState(mp.market_location ?? '');
   const [installationLocation, setInstallationLocation] = useState(mp.installation_location ?? '');
-  const [kostenstelle, setKostenstelle] = useState(
-    mp.kostenstelle !== null ? String(mp.kostenstelle) : '',
-  );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -593,19 +593,6 @@ function StammdatenEditForm({
           body['installation_location'] = trimmed;
         }
       }
-      // Kostenstelle (Ganzzahl 0-99999) fuer alle Typen, clear_* bei leerer Eingabe.
-      {
-        const trimmed = kostenstelle.trim();
-        if (trimmed === '') {
-          if (mp.kostenstelle !== null) body['clear_kostenstelle'] = true;
-        } else {
-          const parsed = Number(trimmed);
-          if (!Number.isInteger(parsed) || parsed < 0 || parsed > 99999) {
-            throw new RangeError('Kostenstelle muss eine Ganzzahl zwischen 0 und 99999 sein.');
-          }
-          if (parsed !== mp.kostenstelle) body['kostenstelle'] = parsed;
-        }
-      }
       const updated = await api.patch<MeasuringPointRead>(`/measuring-points/${mp.id}`, body);
       onSaved(updated);
     } catch (err) {
@@ -648,7 +635,7 @@ function StammdatenEditForm({
             pattern="[0-9]*"
             value={transformerFactor}
             onChange={(e) => setTransformerFactor(e.target.value)}
-            hint="leer = kein Wandler; ganzzahlig (z. B. 20, 50, 100). Verbräuche werden mit dem Faktor multipliziert."
+            hint="Gilt für den aktiven Zähler; leer = kein Wandler; ganzzahlig (z. B. 20, 50, 100). Verbräuche werden mit dem Faktor multipliziert."
             numeric
           />
           <div className="text-caption text-tertiary">
@@ -696,13 +683,10 @@ function StammdatenEditForm({
         onChange={(e) => setInstallationLocation(e.target.value)}
         hint="z. B. 1. Stock, Wohnung 4b — leer = nicht gesetzt"
       />
-      <TextField
-        label="Kostenstelle (optional)"
-        inputMode="numeric"
-        value={kostenstelle}
-        onChange={(e) => setKostenstelle(e.target.value.replace(/\D/g, '').slice(0, 5))}
-        hint="5-stellige Zahl (0–99999); leer = nicht gesetzt"
-      />
+      <div className="text-caption text-tertiary">
+        Die Kostenstelle hat einen Gültigkeitszeitraum und wird in der Kostenstellen-Historie
+        gepflegt.
+      </div>
       {error ? (
         <div className="rounded-card border-hairline border-danger/40 bg-danger/10 p-3 text-caption text-danger">
           {error}
@@ -787,7 +771,11 @@ function PhysicalMetersCard({ mp, onChanged }: { mp: MeasuringPointRead; onChang
         <ul className="divide-y divide-separator">
           {sortedMeters.map((meter) => (
             <li key={meter.id} className="px-5 py-4">
-              <PhysicalMeterRow meter={meter} onChanged={onChanged} />
+              <PhysicalMeterRow
+                meter={meter}
+                isElectricity={mp.type === 'electricity'}
+                onChanged={onChanged}
+              />
             </li>
           ))}
         </ul>
@@ -807,11 +795,24 @@ function PhysicalMetersCard({ mp, onChanged }: { mp: MeasuringPointRead; onChang
   );
 }
 
+/** Wandlerfaktor aus einem Eingabefeld: leer = ``null``, sonst positive Ganzzahl. */
+function parseTransformerFactor(raw: string): number | null {
+  const trimmed = raw.trim();
+  if (trimmed === '') return null;
+  const parsed = Number(trimmed);
+  if (!Number.isInteger(parsed) || parsed <= 0 || parsed > 10000) {
+    throw new RangeError('Wandlerfaktor muss eine Ganzzahl zwischen 1 und 10000 sein.');
+  }
+  return parsed;
+}
+
 function PhysicalMeterRow({
   meter,
+  isElectricity,
   onChanged,
 }: {
   meter: PhysicalMeterRead;
+  isElectricity: boolean;
   onChanged: () => void;
 }) {
   const [editing, setEditing] = useState(false);
@@ -821,6 +822,7 @@ function PhysicalMeterRow({
     return (
       <PhysicalMeterEditForm
         meter={meter}
+        isElectricity={isElectricity}
         onCancel={() => setEditing(false)}
         onSaved={() => {
           setEditing(false);
@@ -852,6 +854,9 @@ function PhysicalMeterRow({
           <span className="ml-2 text-quaternary">
             · {meter.registers.length} {meter.registers.length === 1 ? 'Register' : 'Register'}
           </span>
+          {meter.transformer_factor !== null ? (
+            <span className="ml-2 text-quaternary">· Wandler ×{meter.transformer_factor}</span>
+          ) : null}
         </div>
       </div>
       <Button
@@ -869,16 +874,21 @@ function PhysicalMeterRow({
 
 function PhysicalMeterEditForm({
   meter,
+  isElectricity,
   onCancel,
   onSaved,
 }: {
   meter: PhysicalMeterRead;
+  isElectricity: boolean;
   onCancel: () => void;
   onSaved: () => void;
 }) {
   const [serial, setSerial] = useState(meter.serial_number);
   const [installedAt, setInstalledAt] = useState(meter.installed_at);
   const [removedAt, setRemovedAt] = useState(meter.removed_at ?? '');
+  const [factor, setFactor] = useState(
+    meter.transformer_factor !== null ? String(meter.transformer_factor) : '',
+  );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -887,15 +897,22 @@ function PhysicalMeterEditForm({
     setBusy(true);
     setError(null);
     try {
-      await api.patch(`/physical-meters/${meter.id}`, {
+      const body: Record<string, unknown> = {
         serial_number: serial,
         installed_at: installedAt,
         removed_at: removedAt || null,
         clear_removed_at: removedAt === '',
-      });
+      };
+      if (isElectricity) {
+        const parsed = parseTransformerFactor(factor);
+        if (parsed === null) body['clear_transformer_factor'] = true;
+        else body['transformer_factor'] = parsed;
+      }
+      await api.patch(`/physical-meters/${meter.id}`, body);
       onSaved();
     } catch (err) {
       if (err instanceof ApiError) setError(err.problem.detail ?? err.problem.title);
+      else if (err instanceof RangeError) setError(err.message);
       else setError('Speichern fehlgeschlagen.');
     } finally {
       setBusy(false);
@@ -917,6 +934,17 @@ function PhysicalMeterEditForm({
         value={removedAt}
         onChange={(e) => setRemovedAt(e.target.value)}
       />
+      {isElectricity ? (
+        <TextField
+          label="Wandlerfaktor (leer = kein Wandler)"
+          inputMode="numeric"
+          pattern="[0-9]*"
+          value={factor}
+          onChange={(e) => setFactor(e.target.value)}
+          hint="Gilt für alle Ablesungen dieses Zählers; der Monatsverbrauch wird neu berechnet."
+          numeric
+        />
+      ) : null}
       {error ? (
         <div className="rounded-card border-hairline border-danger/40 bg-danger/10 p-3 text-caption text-danger">
           {error}
@@ -957,6 +985,10 @@ function ReplaceMeterForm({
   const [removedAt, setRemovedAt] = useState(today);
   const [installedAt, setInstalledAt] = useState(today);
   const [serial, setSerial] = useState('');
+  // Vorbelegt mit dem Faktor des alten Geräts (Wandler bleibt beim Tausch meist gleich).
+  const [factor, setFactor] = useState(
+    active?.transformer_factor != null ? String(active.transformer_factor) : '',
+  );
   const [final, setFinal] = useState<Record<string, string>>(() =>
     Object.fromEntries(obis.map((c) => [c, ''])),
   );
@@ -977,13 +1009,17 @@ function ReplaceMeterForm({
         finalParsed[code] = parseDe(final[code] ?? '');
         initialParsed[code] = parseDe(initial[code] ?? '0');
       }
-      await api.post(`/measuring-points/${mp.id}/replace-meter`, {
+      const body: Record<string, unknown> = {
         final_readings: finalParsed,
         removed_at: removedAt,
         new_serial_number: serial,
         installed_at: installedAt,
         initial_readings: initialParsed,
-      });
+      };
+      if (mp.type === 'electricity') {
+        body['new_transformer_factor'] = parseTransformerFactor(factor);
+      }
+      await api.post(`/measuring-points/${mp.id}/replace-meter`, body);
       onReplaced();
       onClose();
     } catch (err) {
@@ -1015,6 +1051,17 @@ function ReplaceMeterForm({
         onChange={(e) => setSerial(e.target.value)}
         required
       />
+      {mp.type === 'electricity' ? (
+        <TextField
+          label="Wandlerfaktor neuer Zähler (leer = kein Wandler)"
+          inputMode="numeric"
+          pattern="[0-9]*"
+          value={factor}
+          onChange={(e) => setFactor(e.target.value)}
+          hint="Vorbelegt mit dem Faktor des alten Zählers; frühere Ablesungen behalten ihren Faktor."
+          numeric
+        />
+      ) : null}
       <div>
         <div className="mb-2 text-caption-bold uppercase text-tertiary">Endstände (alt)</div>
         <div className="space-y-2">

@@ -140,6 +140,9 @@ class MeasuringPointUpdate(BaseModel):
     clear_installation_location: bool = False
     kostenstelle: int | None = Field(default=None, ge=0, le=99999)
     clear_kostenstelle: bool = False
+    # Stichtag fuer kostenstelle/clear_kostenstelle (seit 0036 periodisiert). Default: heute
+    # beim Wechsel/Beenden, Einbau des ersten Zaehlers beim erstmaligen Setzen.
+    kostenstelle_valid_from: date | None = None
 
 
 class MeasuringPointRead(APIModel):
@@ -182,6 +185,9 @@ class ReplaceMeterRequest(BaseModel):
     new_serial_number: str = Field(min_length=1, max_length=64)
     installed_at: date
     initial_readings: dict[str, DecimalStr] = Field(default_factory=dict)
+    # Wandlerfaktor des neuen Geraets. Feld weglassen = Faktor des alten Geraets
+    # uebernehmen; null = kein Faktor.
+    new_transformer_factor: int | None = Field(default=None, gt=0, le=10000)
 
 
 class MeasuringPointWithStateRead(APIModel):

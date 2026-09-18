@@ -229,7 +229,8 @@ def create_assignment(
         valid_to=valid_to,
     )
     db.add(assignment)
-    db.flush()
+    with open_period_guard(db, kind="Eigentümer"):
+        db.flush()
     record(
         db,
         user_id=user_id,

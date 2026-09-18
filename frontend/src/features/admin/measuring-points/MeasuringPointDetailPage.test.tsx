@@ -124,6 +124,7 @@ const _strom: MeasuringPointRead = {
       serial_number: 'SN-1',
       installed_at: '2025-01-15',
       removed_at: null,
+      transformer_factor: null,
       registers: [{ id: 100, obis_code: '1.8.0', label: 'Bezug', unit: 'kWh', ..._baseRegister }],
     },
   ],
@@ -158,6 +159,7 @@ const _heizung: MeasuringPointRead = {
       serial_number: 'OIL-1',
       installed_at: '2024-06-01',
       removed_at: null,
+      transformer_factor: null,
       registers: [
         {
           id: 200,
@@ -183,6 +185,7 @@ const _fernwaerme: MeasuringPointRead = {
       serial_number: 'FW-1',
       installed_at: '2024-06-01',
       removed_at: null,
+      transformer_factor: null,
       registers: [
         { id: 200, obis_code: 'heat.0', label: 'Wärmemengenzähler', unit: 'kWh', ..._baseRegister },
       ],
@@ -304,6 +307,59 @@ describe('MeasuringPointDetailPage Physische Zähler', () => {
     fireEvent.click(await screen.findByRole('button', { name: /Zähler tauschen/i }));
     expect(await screen.findByRole('button', { name: /Tausch durchführen/i })).toBeInTheDocument();
     expect(screen.getByLabelText(/Neue Seriennummer/i)).toBeInTheDocument();
+  });
+
+  it('übernimmt beim Tausch den Wandlerfaktor des alten Zählers (vorbelegt)', async () => {
+    const mitWandler = {
+      ..._strom,
+      transformer_factor: 80,
+      physical_meters: _strom.physical_meters.map((m) => ({ ...m, transformer_factor: 80 })),
+    };
+    _mockMp(mitWandler);
+    let postBody: unknown = null;
+    server.use(
+      http.post('/api/v1/measuring-points/1/replace-meter', async ({ request }) => {
+        postBody = await request.json();
+        return HttpResponse.json(mitWandler);
+      }),
+    );
+    renderWithRouter(<MeasuringPointDetailPage />, {
+      initialEntries: ['/admin/messstellen/1'],
+    });
+    fireEvent.click(await screen.findByRole('button', { name: /Zähler tauschen/i }));
+    const faktor = await screen.findByLabelText(/Wandlerfaktor neuer Zähler/i);
+    expect(faktor).toHaveValue('80');
+    fireEvent.change(screen.getByLabelText(/Neue Seriennummer/i), { target: { value: 'SN-2' } });
+    fireEvent.change(screen.getAllByLabelText('1.8.0')[0]!, { target: { value: '1234' } });
+    fireEvent.click(screen.getByRole('button', { name: /Tausch durchführen/i }));
+    await waitFor(() => expect(postBody).not.toBeNull());
+    expect(postBody).toMatchObject({ new_serial_number: 'SN-2', new_transformer_factor: 80 });
+  });
+
+  it('entfernt den Wandlerfaktor eines Zählers per PATCH, wenn das Feld geleert wird', async () => {
+    _mockMp({
+      ..._strom,
+      physical_meters: _strom.physical_meters.map((m) => ({ ...m, transformer_factor: 40 })),
+    });
+    let patchBody: unknown = null;
+    server.use(
+      http.patch('/api/v1/physical-meters/10', async ({ request }) => {
+        patchBody = await request.json();
+        return HttpResponse.json({});
+      }),
+    );
+    renderWithRouter(<MeasuringPointDetailPage />, {
+      initialEntries: ['/admin/messstellen/1'],
+    });
+    expect(await screen.findByText(/Wandler ×40/)).toBeInTheDocument();
+    // Reihenfolge der Bearbeiten-Knöpfe: Stammdaten, dann Zähler.
+    fireEvent.click((await screen.findAllByRole('button', { name: /^Bearbeiten$/ }))[1]!);
+    const faktor = await screen.findByLabelText(/Wandlerfaktor \(leer = kein Wandler\)/i);
+    expect(faktor).toHaveValue('40');
+    fireEvent.change(faktor, { target: { value: '' } });
+    fireEvent.click(screen.getByRole('button', { name: /^Speichern$/ }));
+    await waitFor(() => expect(patchBody).not.toBeNull());
+    expect(patchBody).toMatchObject({ clear_transformer_factor: true });
   });
 });
 
