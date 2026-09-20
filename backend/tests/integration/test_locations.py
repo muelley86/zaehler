@@ -270,7 +270,7 @@ def test_recorder_sees_only_locations_of_accessible_mps(
     ).json()
 
     def _mp(name: str, serial: str, location_id: int) -> dict[str, Any]:
-        return admin_client.post(
+        resp = admin_client.post(
             "/api/v1/measuring-points",
             json={
                 "name": name,
@@ -282,7 +282,10 @@ def test_recorder_sees_only_locations_of_accessible_mps(
                 "initial_values": {"water": "0.0"},
                 "location_id": location_id,
             },
-        ).json()
+        )
+        assert resp.status_code == 201, resp.text
+        out: dict[str, Any] = resp.json()
+        return out
 
     mp_sichtbar = _mp("MP sichtbar", "SN-VIS", sichtbar["id"])
     _mp("MP geheim", "SN-SECRET", geheim["id"])

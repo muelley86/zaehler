@@ -16,6 +16,8 @@ Eingaben sauber unterscheiden:
 from __future__ import annotations
 
 import asyncio
+from collections.abc import MutableMapping
+from typing import Any
 
 from fastapi.testclient import TestClient
 
@@ -114,7 +116,7 @@ def _raw_get(client: TestClient, raw_path: str) -> tuple[int, bytes]:
     dagegen prozentdekodiert und unnormalisiert in ``scope["path"]``
     durch -- genau das bilden wir hier nach.
     """
-    scope = {
+    scope: MutableMapping[str, Any] = {
         "type": "http",
         "asgi": {"version": "3.0", "spec_version": "2.3"},
         "http_version": "1.1",
@@ -131,16 +133,19 @@ def _raw_get(client: TestClient, raw_path: str) -> tuple[int, bytes]:
     status: list[int] = []
     body = bytearray()
 
-    async def receive() -> dict[str, object]:
+    async def receive() -> MutableMapping[str, Any]:
         return {"type": "http.request", "body": b"", "more_body": False}
 
-    async def send(message: dict[str, object]) -> None:
+    async def send(message: MutableMapping[str, Any]) -> None:
         if message["type"] == "http.response.start":
-            status.append(int(message["status"]))  # type: ignore[arg-type]
+            status.append(int(message["status"]))
         elif message["type"] == "http.response.body":
-            body.extend(bytes(message.get("body", b"")))  # type: ignore[arg-type]
+            body.extend(bytes(message.get("body", b"")))
 
-    asyncio.run(client.app(scope, receive, send))  # type: ignore[operator]
+    async def drive() -> None:
+        await client.app(scope, receive, send)
+
+    asyncio.run(drive())
     return status[0], bytes(body)
 
 
