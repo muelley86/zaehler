@@ -124,9 +124,10 @@ class BulkDeleteRequest(BaseModel):
 class BulkDeleteSkipped(BaseModel):
     """Ein nicht gelöschter Eintrag samt Grund.
 
-    ``reason``: ``not_found`` (existiert nicht / bereits entfernt),
-    ``forbidden`` (keine Edit-Berechtigung, z. B. 24h-Fenster abgelaufen),
-    ``no_access`` (Recorder ohne Zugriff auf die zugehörige Messstelle).
+    ``reason``: ``not_found`` (existiert nicht, bereits entfernt, **oder**
+    Recorder ohne Zugriff auf die zugehörige Messstelle — bewusst nicht
+    unterscheidbar, sonst wäre die Antwort ein Existenz-Orakel) oder
+    ``forbidden`` (keine Edit-Berechtigung, z. B. 24h-Fenster abgelaufen).
     """
 
     id: int

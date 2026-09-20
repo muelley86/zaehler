@@ -492,7 +492,12 @@ def test_bulk_delete_readings_recorder_permissions(
     db: Session,
 ) -> None:
     """Recorder löscht im Batch nur eigene <24h auf zugänglichen MPs;
-    fremde/alte → forbidden, nicht-zugängliche MP → no_access."""
+    fremde/alte → forbidden, nicht-zugängliche MP → not_found.
+
+    ``not_found`` statt ``no_access`` ist Absicht: der Unterschied wäre ein
+    Existenz-Orakel. Ein Recorder könnte sonst mit einer ID-Liste in einem
+    Request abzählen, welche fremden Readings es gibt. Damit gilt die
+    404-statt-403-Regel auch im Batch-Pfad."""
     from datetime import UTC, datetime, timedelta
     from decimal import Decimal
 
@@ -507,7 +512,7 @@ def test_bulk_delete_readings_recorder_permissions(
     a = _create_reading(recorder_client, register_id, "150", "2025-05-01T12:00:00")
     # B: Erfassung des Admins (nicht des Recorders) → forbidden
     b = _create_reading(admin_client, register_id, "160", "2025-06-01T12:00:00")
-    # D: Erfassung auf nicht-zugänglicher MP → no_access
+    # D: Erfassung auf nicht-zugänglicher MP → not_found (kein Existenz-Leak)
     d = _create_reading(admin_client, other_register_id, "20", "2025-06-01T12:00:00")
     # C: eigene Erfassung des Recorders, aber künstlich > 24h alt → forbidden
     old = Reading(
@@ -527,7 +532,14 @@ def test_bulk_delete_readings_recorder_permissions(
     body = resp.json()
     assert body["deleted"] == 1
     reasons = {item["id"]: item["reason"] for item in body["skipped"]}
-    assert reasons == {b: "forbidden", c: "forbidden", d: "no_access"}
+    assert reasons == {b: "forbidden", c: "forbidden", d: "not_found"}
+
+    # Gegenprobe: eine ID, die es gar nicht gibt, muss ununterscheidbar
+    # denselben Grund liefern wie die fremde MP oben.
+    ghost = 9_999_999
+    ghost_resp = recorder_client.post("/api/v1/readings/bulk-delete", json={"ids": [ghost, d]})
+    ghost_reasons = {i["id"]: i["reason"] for i in ghost_resp.json()["skipped"]}
+    assert ghost_reasons == {ghost: "not_found", d: "not_found"}
 
     # Nur A ist weg; B, C, D bestehen weiter (neben den Initial-Erfassungen).
     remaining = {r["id"] for r in admin_client.get("/api/v1/readings").json()}

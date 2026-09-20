@@ -1,7 +1,11 @@
 """Standorte (Locations) — zentrale Liste, an die Messstellen referenzieren.
 
 Lesen darf jeder eingeloggte User (für die Filter-/Auswahl-UI), Schreiben
-nur Admin. Beim Löschen eines Standorts werden referenzierende
+nur Admin. Für Recorder ist die Leseliste allerdings auf die Standorte
+beschränkt, auf die mindestens eine zugängliche Messstelle zeigt — sonst
+wären über diesen Umweg alle Adressen sichtbar, während der Filter für die
+Messstellen selbst greift (siehe
+``services/access.accessible_location_ids``). Beim Löschen eines Standorts werden referenzierende
 MeasuringPoints durch ``ON DELETE SET NULL`` automatisch entkoppelt — die
 Messstelle bleibt erhalten, hat danach nur keinen Standort mehr.
 """
@@ -16,13 +20,14 @@ from sqlalchemy.orm import Session
 from meters.api.deps import AdminUser, CurrentUser, DbDep, client_ip
 from meters.api.v1.measuring_points import measuring_points_with_state
 from meters.core.problem import ProblemError
-from meters.models import AuditAction, AuditEntityType, Location, MainLocation
+from meters.models import AuditAction, AuditEntityType, Location, MainLocation, User
 from meters.schemas import (
     LocationCreate,
     LocationRead,
     LocationUpdate,
     MeasuringPointWithStateRead,
 )
+from meters.services.access import accessible_location_ids
 from meters.services.audit import record
 from meters.services.location_queries import select_measuring_points_for_location
 
@@ -45,17 +50,35 @@ router = APIRouter(prefix="/locations", tags=["locations"])
 
 
 @router.get("", response_model=list[LocationRead])
-def list_locations(db: DbDep, _user: CurrentUser) -> list[LocationRead]:
-    rows = list(db.scalars(select(Location).order_by(Location.name)))
+def list_locations(db: DbDep, user: CurrentUser) -> list[LocationRead]:
+    stmt = select(Location).order_by(Location.name)
+    allowed = accessible_location_ids(db, user)
+    if allowed is not None:
+        if not allowed:
+            return []
+        stmt = stmt.where(Location.id.in_(allowed))
+    rows = list(db.scalars(stmt))
     return [_to_read(r) for r in rows]
 
 
-@router.get("/{location_id}", response_model=LocationRead)
-def get_location(location_id: int, db: DbDep, _user: CurrentUser) -> LocationRead:
+def _assert_location_visible(db: Session, user: User, location_id: int) -> Location:
+    """Laedt den Standort oder wirft 404 — auch bei fehlendem Zugriff.
+
+    404 statt 403 wie ueberall im Per-Recorder-Modell: der Statuscode darf
+    die Existenz fremder Standorte nicht verraten.
+    """
     loc = db.get(Location, location_id)
     if loc is None:
         raise ProblemError(status_code=404, title="Location not found")
-    return _to_read(loc)
+    allowed = accessible_location_ids(db, user)
+    if allowed is not None and location_id not in allowed:
+        raise ProblemError(status_code=404, title="Location not found")
+    return loc
+
+
+@router.get("/{location_id}", response_model=LocationRead)
+def get_location(location_id: int, db: DbDep, user: CurrentUser) -> LocationRead:
+    return _to_read(_assert_location_visible(db, user, location_id))
 
 
 @router.get(
@@ -70,8 +93,7 @@ def list_location_measuring_points(
     Quelle der Zaehlerstandort-Detailseite. Recorder sehen via ``restrict_mp_query``
     nur ihre zugaenglichen MPs.
     """
-    if db.get(Location, location_id) is None:
-        raise ProblemError(status_code=404, title="Location not found")
+    _assert_location_visible(db, user, location_id)
     return measuring_points_with_state(db, select_measuring_points_for_location(location_id), user)
 
 

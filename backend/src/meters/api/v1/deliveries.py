@@ -60,7 +60,9 @@ def list_deliveries(
     register = db.get(Register, register_id)
     if register is None:
         raise ProblemError(status_code=404, title="Register not found")
-    assert_can_access_register(db, user, register_id)
+    # Gleicher Titel in beiden Faellen: sonst verraet die Antwort, ob das
+    # Register existiert und nur zu einer fremden Messstelle gehoert.
+    assert_can_access_register(db, user, register_id, not_found_title="Register not found")
     rows = list(
         db.scalars(
             select(Delivery)
@@ -122,7 +124,9 @@ def create_delivery(
     register = db.get(Register, register_id)
     if register is None:
         raise ProblemError(status_code=404, title="Register not found")
-    assert_can_access_register(db, user, register_id)
+    # Gleicher Titel in beiden Faellen: sonst verraet die Antwort, ob das
+    # Register existiert und nur zu einer fremden Messstelle gehoert.
+    assert_can_access_register(db, user, register_id, not_found_title="Register not found")
     if not register.accepts_deliveries:
         raise ProblemError(
             status_code=400,

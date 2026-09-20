@@ -30,7 +30,7 @@ from sqlalchemy.orm import Session as DbSession
 
 from meters.core.problem import ProblemError
 from meters.models import FlowDirection, MeterType, User, VirtualMeasuringPoint, VirtualMpComponent
-from meters.services.access import accessible_mp_ids
+from meters.services.access import accessible_mp_ids, is_fully_accessible
 from meters.services.consumption import (
     ConsumptionPoint,
     Granularity,
@@ -45,10 +45,6 @@ VIRTUAL_REGISTER_ID = 0
 VIRTUAL_OBIS_CODE = "virtual"
 
 
-def _is_fully_accessible(vmp: VirtualMeasuringPoint, allowed: set[int]) -> bool:
-    return bool(vmp.components) and all(c.measuring_point_id in allowed for c in vmp.components)
-
-
 def visible_virtual_mps(db: DbSession, user: User) -> list[VirtualMeasuringPoint]:
     """Alle virtuellen MPs fuer Admins; fuer Recorder nur die, deren saemtliche
     Komponenten-MPs zugaenglich sind."""
@@ -56,7 +52,7 @@ def visible_virtual_mps(db: DbSession, user: User) -> list[VirtualMeasuringPoint
     allowed = accessible_mp_ids(db, user)
     if allowed is None:
         return vmps
-    return [v for v in vmps if _is_fully_accessible(v, allowed)]
+    return [v for v in vmps if is_fully_accessible(v, allowed)]
 
 
 def assert_can_access_virtual_mp(db: DbSession, user: User, vmp_id: int) -> VirtualMeasuringPoint:
@@ -66,7 +62,7 @@ def assert_can_access_virtual_mp(db: DbSession, user: User, vmp_id: int) -> Virt
     if vmp is None:
         raise ProblemError(status_code=404, title="Virtual measuring point not found")
     allowed = accessible_mp_ids(db, user)
-    if allowed is not None and not _is_fully_accessible(vmp, allowed):
+    if allowed is not None and not is_fully_accessible(vmp, allowed):
         raise ProblemError(status_code=404, title="Virtual measuring point not found")
     return vmp
 
