@@ -10,6 +10,13 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.75.1](https://github.com/muelley86/zaehler/compare/v2.75.0...v2.75.1) (2026-09-20)
+
+
+### Fehlerbehebungen
+
+* **security:** Path Traversal, Existenz-Orakel und Auth-Härtung ([#348](https://github.com/muelley86/zaehler/issues/348)) ([84e5693](https://github.com/muelley86/zaehler/commit/84e5693f83ee75cca45e5e8aacffb2ce9a3ef465))
+
 ## [2.75.0](https://github.com/muelley86/zaehler/compare/v2.74.1...v2.75.0) (2026-09-18)
 
 
