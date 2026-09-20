@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import csv
 import io
+import zipfile
 from datetime import UTC, date, datetime, time
 from decimal import Decimal, InvalidOperation
 from zoneinfo import ZoneInfo
@@ -35,6 +36,24 @@ from meters.schemas.import_readings import (
 from meters.services.audit import record
 
 _DATE_FORMATS = ("%d.%m.%Y", "%Y-%m-%d", "%d.%m.%y", "%d/%m/%Y", "%m/%Y", "%Y-%m")
+
+# Obergrenzen fuer die Grid-Groesse. Das Upload-Limit in ``api/v1/imports.py``
+# gilt fuer das *komprimierte* xlsx — eine ``sheet1.xml`` aus repetitivem XML
+# komprimiert um Faktor 1000+, und ``iter_rows`` paddet jede Zeile auf die in
+# ``<dimension>`` deklarierte Spaltenzahl (bis XFD = 16384). Ein 5-MB-Upload
+# kann den Prozess so ins OOM treiben; in einem LXC mit einem uvicorn-Prozess
+# heisst das: App tot. Darum zusaetzlich hier deckeln. Die Werte liegen weit
+# ueber jedem realen Monats-Import (eine Zeile je Messstelle, eine Spalte je
+# Monat), ohne dass ein Angreifer den Speicher sprengen kann.
+_MAX_IMPORT_ROWS = 5_000
+_MAX_IMPORT_COLS = 500
+# Deckel fuer die Summe der *entpackten* Bytes im xlsx (Decompression Bomb).
+# Anders als in ``services/restore.py`` reicht hier der Header-Wert: er ist
+# zwar vom Ersteller frei waehlbar, aber ``zipfile`` behandelt ihn als harte
+# *Obergrenze* (``ZipExtFile`` schneidet bei ``file_size`` ab und meldet
+# danach einen CRC-Fehler). Ein gelogener Wert liefert also weniger Daten,
+# nie mehr — die Summe ist damit eine belastbare Schranke.
+_MAX_UNCOMPRESSED_BYTES = 64 * 1024 * 1024
 
 
 def _parse_text_date(text: str) -> date | None:
@@ -85,13 +104,45 @@ def _cell_raw(value: object) -> str:
     return str(value)
 
 
+def _assert_no_zip_bomb(content: bytes) -> None:
+    """Entpackte Gesamtgroesse pruefen, bevor openpyxl die Datei anfasst."""
+    try:
+        with zipfile.ZipFile(io.BytesIO(content)) as zf:
+            total = sum(info.file_size for info in zf.infolist())
+    except zipfile.BadZipFile as exc:
+        raise ValueError("Die Datei ist kein gueltiges .xlsx.") from exc
+    if total > _MAX_UNCOMPRESSED_BYTES:
+        raise ValueError(
+            "Die Datei ist entpackt zu gross "
+            f"({total // (1024 * 1024)} MB, erlaubt sind "
+            f"{_MAX_UNCOMPRESSED_BYTES // (1024 * 1024)} MB)."
+        )
+
+
 def _rows_from_xlsx(content: bytes) -> list[list[object]]:
+    _assert_no_zip_bomb(content)
     wb = load_workbook(io.BytesIO(content), read_only=True, data_only=True)
     try:
         ws = wb.active
         if ws is None:
             return []
-        return [list(row) for row in ws.iter_rows(values_only=True)]
+        rows: list[list[object]] = []
+        # ``max_row``/``max_col`` begrenzen, was openpyxl ueberhaupt
+        # materialisiert; je eine Einheit mehr anfordern, um ein
+        # Ueberschreiten zu *erkennen* statt still abzuschneiden. Stilles
+        # Abschneiden waere hier besonders unangenehm: es gingen
+        # Zaehlerstaende verloren, ohne dass es jemandem auffiele.
+        for row in ws.iter_rows(
+            max_row=_MAX_IMPORT_ROWS + 1,
+            max_col=_MAX_IMPORT_COLS + 1,
+            values_only=True,
+        ):
+            if len(rows) >= _MAX_IMPORT_ROWS:
+                raise ValueError(f"Die Datei hat mehr als {_MAX_IMPORT_ROWS} Zeilen.")
+            if len(row) > _MAX_IMPORT_COLS and row[_MAX_IMPORT_COLS] is not None:
+                raise ValueError(f"Die Datei hat mehr als {_MAX_IMPORT_COLS} Spalten.")
+            rows.append(list(row[:_MAX_IMPORT_COLS]))
+        return rows
     finally:
         wb.close()
 
@@ -101,7 +152,14 @@ def _rows_from_csv(content: bytes) -> list[list[object]]:
     sample = text[:4096]
     delimiter = ";" if sample.count(";") >= sample.count(",") else ","
     reader = csv.reader(io.StringIO(text), delimiter=delimiter)
-    return [list(row) for row in reader]
+    rows: list[list[object]] = []
+    for row in reader:
+        if len(rows) >= _MAX_IMPORT_ROWS:
+            raise ValueError(f"Die Datei hat mehr als {_MAX_IMPORT_ROWS} Zeilen.")
+        if len(row) > _MAX_IMPORT_COLS:
+            raise ValueError(f"Die Datei hat mehr als {_MAX_IMPORT_COLS} Spalten.")
+        rows.append(list(row))
+    return rows
 
 
 def _read_grid(filename: str, content: bytes) -> list[list[object]]:

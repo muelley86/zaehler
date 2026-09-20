@@ -8,6 +8,7 @@ Frontend aufgelöste Mapping die Readings an (idempotent). Siehe
 
 from __future__ import annotations
 
+import logging
 from typing import Annotated, BinaryIO
 
 from fastapi import APIRouter, BackgroundTasks, File, Request, UploadFile
@@ -21,6 +22,8 @@ from meters.schemas.import_readings import (
 )
 from meters.services.import_readings import build_preview, commit_readings
 from meters.services.monthly_consumption import defer_recompute, recompute_registers
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/imports", tags=["imports"])
 
@@ -58,12 +61,29 @@ def preview_import(
     content = _read_limited(file.file, _MAX_UPLOAD_BYTES)
     try:
         return build_preview(db, filename=filename, content=content)
-    except Exception as exc:
-        # Parsefehler (kaputte Datei o. Ä.) dem Nutzer als 400 zurückmelden.
+    except ProblemError:
+        raise
+    except ValueError as exc:
+        # Erwartete Parse- und Limit-Fehler. Die Meldungen sind bewusst
+        # fuer den Admin formuliert ("mehr als 5000 Zeilen") und duerfen
+        # deshalb durchgereicht werden.
         raise ProblemError(
             status_code=400,
             title="Datei konnte nicht gelesen werden",
             detail=str(exc),
+        ) from exc
+    except Exception as exc:
+        # Alles andere kommt aus openpyxl/zipfile und enthaelt Dateipfade
+        # und Bibliotheks-Interna — die gehoeren ins Log, nicht in die
+        # HTTP-Antwort.
+        logger.exception("Import-Preview fehlgeschlagen (%s)", filename)
+        raise ProblemError(
+            status_code=400,
+            title="Datei konnte nicht gelesen werden",
+            detail=(
+                "Die Datei konnte nicht ausgewertet werden. Bitte als .xlsx "
+                "oder .csv im erwarteten Layout speichern und erneut versuchen."
+            ),
         ) from exc
 
 
