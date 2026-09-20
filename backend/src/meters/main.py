@@ -67,8 +67,12 @@ def create_app() -> FastAPI:
     # gebaute JS/CSS um typischerweise 60-75 %. Schwelle 1024 B vermeidet
     # Overhead für kleine Antworten.
     app.add_middleware(GZipMiddleware, minimum_size=1024)
-    install_security_headers(app)
+    # Reihenfolge ist relevant: bei Starlette ist die *zuletzt* registrierte
+    # Middleware die aeusserste. Der Origin-Check muss deshalb zuerst rein,
+    # damit die Security-Header sich um ihn herum legen — sonst ginge seine
+    # 403-Antwort ohne CSP, nosniff und X-Frame-Options raus.
     install_origin_check(app)
+    install_security_headers(app)
     install_problem_handlers(app)
     # Foto-Verzeichnis bei Bedarf anlegen — kein Boot-Fail, falls das
     # Volume noch nicht existiert (erster Container-Start). Pillow-Save
@@ -96,6 +100,8 @@ def _mount_static(app: FastAPI, static_dir: Path) -> None:
         app.mount("/assets", _CachedAssets(directory=assets_dir), name="assets")
 
     index_file = static_dir / "index.html"
+    # Basis für den Traversal-Schutz im SPA-Fallback (siehe unten).
+    static_root = static_dir.resolve()
 
     @app.get("/{full_path:path}", include_in_schema=False)
     def spa_fallback(full_path: str) -> Response:
@@ -115,11 +121,32 @@ def _mount_static(app: FastAPI, static_dir: Path) -> None:
             )
         # Echte Static-Files (manifest, sw.js, icons, …) werden direkt
         # ausgeliefert. Alles andere ist eine Client-Route → index.html.
-        candidate = static_dir / full_path
-        if full_path and candidate.is_file():
-            response = FileResponse(candidate)
-            response.headers.setdefault("Cache-Control", _NO_CACHE)
-            return response
+        #
+        # ACHTUNG Traversal: ``full_path`` kommt prozentdekodiert und
+        # *unnormalisiert* aus dem ASGI-Scope — uvicorn löst ``%2e%2e``
+        # zu ``..`` auf, Starlette normalisiert nicht. Ohne den
+        # Containment-Check unten liefert ``/..%2f..%2fdata%2fmeters.db``
+        # die komplette Datenbank aus, und zwar ohne Auth: diese Route
+        # hat bewusst keine Dependency. ``resolve()`` deckt ``..``,
+        # absolute Pfade und aus ``static/`` herausführende Symlinks ab
+        # (gleiches Muster wie ``reading_photo.photo_full_path``).
+        if full_path:
+            # ``resolve()`` kann werfen: unter Linux laesst ``posixpath``
+            # ein eingebettetes Null-Byte als ``ValueError`` durch (es faengt
+            # nur ``OSError`` ab), und ``GET /%00`` waere damit ein von
+            # aussen ausloesbarer 500 auf dieser bewusst auth-freien Route.
+            try:
+                candidate: Path | None = (static_root / full_path).resolve()
+            except (OSError, ValueError):
+                candidate = None
+            if (
+                candidate is not None
+                and candidate.is_relative_to(static_root)
+                and candidate.is_file()
+            ):
+                response = FileResponse(candidate)
+                response.headers.setdefault("Cache-Control", _NO_CACHE)
+                return response
         if index_file.is_file():
             response = FileResponse(index_file)
             response.headers.setdefault("Cache-Control", _NO_CACHE)

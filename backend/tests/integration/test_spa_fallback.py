@@ -15,6 +15,8 @@ Eingaben sauber unterscheiden:
 
 from __future__ import annotations
 
+import asyncio
+
 from fastapi.testclient import TestClient
 
 # ---------------------------------------------------------------------------
@@ -96,3 +98,82 @@ def test_deeply_nested_frontend_route_serves_index_html(admin_client: TestClient
     resp = admin_client.get("/messstellen/42/details")
     assert resp.status_code == 200
     assert "<!doctype html" in resp.text.lower() or "<html" in resp.text.lower()
+
+
+# ---------------------------------------------------------------------------
+# 4) Path-Traversal im SPA-Fallback
+# ---------------------------------------------------------------------------
+
+
+def _raw_get(client: TestClient, raw_path: str) -> tuple[int, bytes]:
+    """Ruft die ASGI-App mit einem *unnormalisierten* Pfad auf.
+
+    Der Umweg ist notwendig: ``TestClient``/httpx loesen ``..`` bereits
+    clientseitig auf, ein Test ueber ``client.get(...)`` wuerde also am
+    Problem vorbeilaufen und immer gruen sein. uvicorn reicht den Pfad
+    dagegen prozentdekodiert und unnormalisiert in ``scope["path"]``
+    durch -- genau das bilden wir hier nach.
+    """
+    scope = {
+        "type": "http",
+        "asgi": {"version": "3.0", "spec_version": "2.3"},
+        "http_version": "1.1",
+        "method": "GET",
+        "scheme": "http",
+        "path": raw_path,
+        "raw_path": raw_path.encode(),
+        "query_string": b"",
+        "root_path": "",
+        "headers": [(b"host", b"testserver")],
+        "client": ("127.0.0.1", 9999),
+        "server": ("testserver", 80),
+    }
+    status: list[int] = []
+    body = bytearray()
+
+    async def receive() -> dict[str, object]:
+        return {"type": "http.request", "body": b"", "more_body": False}
+
+    async def send(message: dict[str, object]) -> None:
+        if message["type"] == "http.response.start":
+            status.append(int(message["status"]))  # type: ignore[arg-type]
+        elif message["type"] == "http.response.body":
+            body.extend(bytes(message.get("body", b"")))  # type: ignore[arg-type]
+
+    asyncio.run(client.app(scope, receive, send))  # type: ignore[operator]
+    return status[0], bytes(body)
+
+
+def test_spa_fallback_rejects_path_traversal(admin_client: TestClient) -> None:
+    """Unauthentifizierter Arbitrary File Read ueber die Catch-All-Route.
+
+    Vor dem Fix lieferte ``GET /..%2f..%2f..%2f..%2fdata%2fmeters.db``
+    die komplette SQLite-Datenbank mit 200 aus -- ohne Login, weil die
+    Route bewusst keine Auth-Dependency hat. Betroffen waren damit auch
+    ``.env`` (METERS_SECRET_KEY) und alle Fotos unter ``data/media/``.
+    """
+    admin_client.cookies.clear()
+    for raw_path in (
+        "/../../../pyproject.toml",
+        "/../../../../data/meters.db",
+        "/../../../../.env",
+        "/..%2f..%2f..%2fpyproject.toml",
+        "/static/../../../pyproject.toml",
+    ):
+        status, body = _raw_get(admin_client, raw_path)
+        # Der Fallback darf hoechstens die SPA-Shell ausliefern, niemals
+        # eine Datei ausserhalb des Static-Verzeichnisses.
+        assert b"SQLite format 3" not in body, raw_path
+        assert b"[project]" not in body, raw_path
+        assert b"METERS_SECRET_KEY" not in body, raw_path
+        if status == 200:
+            assert b"<!doctype html" in body.lower() or b"<html" in body.lower(), raw_path
+
+
+def test_spa_fallback_still_serves_static_files_via_raw_scope(
+    admin_client: TestClient,
+) -> None:
+    """Gegenprobe: der Containment-Check darf legitime Dateien nicht blocken."""
+    status, body = _raw_get(admin_client, "/manifest.webmanifest")
+    assert status == 200
+    assert b"<!doctype html" not in body.lower()
