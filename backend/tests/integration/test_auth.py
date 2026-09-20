@@ -3,6 +3,7 @@ from __future__ import annotations
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
+from tests.conftest import reset_totp_replay_counter
 
 from meters.models import User
 
@@ -108,6 +109,7 @@ def test_2fa_setup_activate_and_login_flow(admin_client: TestClient) -> None:
     assert "meters_session" not in fresh.cookies
 
     # Login Step 2: TOTP-Code
+    reset_totp_replay_counter()
     step2 = fresh.post(
         "/api/v1/auth/2fa/verify",
         json={"challenge_token": challenge, "code": pyotp.TOTP(secret).now()},
@@ -162,6 +164,7 @@ def test_2fa_disable_requires_password_and_code(admin_client: TestClient) -> Non
     )
     assert no_code.status_code == 400
 
+    reset_totp_replay_counter()
     ok = admin_client.post(
         "/api/v1/auth/2fa/disable",
         json={
@@ -233,6 +236,11 @@ def test_2fa_drift_tolerance(admin_client: TestClient) -> None:
         json={"username": "admin", "password": "admin-pass-12345"},
     )
     challenge = step1.json()["challenge_token"]
+
+    # Der Zaehler steht nach dem Aktivieren auf dem aktuellen Schritt; er ist
+    # monoton, wuerde den aelteren Code also ablehnen. Hier geht es um die
+    # Drift-Toleranz, nicht um den Replay-Schutz (der hat einen eigenen Test).
+    reset_totp_replay_counter()
 
     # Code aus dem vorherigen 30-Sekunden-Fenster (-1 Step) sollte akzeptiert sein
     totp = pyotp.TOTP(secret)
@@ -482,3 +490,146 @@ def test_2fa_verify_throttled_per_username(admin_client: TestClient, client: Tes
         # username_limiter wird (anders als login_limiter) vom conftest-
         # Cleanup nicht zurückgesetzt — hier selbst aufräumen.
         username_limiter._state.clear()
+
+
+def test_2fa_code_cannot_be_replayed(admin_client: TestClient) -> None:
+    """Ein einmal eingeloester TOTP-Code ist verbraucht.
+
+    Ohne Replay-Schutz blieb ein abgefangener 6-stelliger Code im gesamten
+    Toleranzfenster (bis zu 90 s) gueltig — genug fuer einen Phishing-Proxy
+    oder einen Blick ueber die Schulter. Auch der *vorherige* Zeitschritt
+    darf danach nicht mehr durchgehen, der Zaehler ist monoton.
+    """
+    import pyotp
+
+    setup = admin_client.post("/api/v1/auth/2fa/setup")
+    secret = setup.json()["secret"]
+    admin_client.post("/api/v1/auth/2fa/activate", json={"code": pyotp.TOTP(secret).now()})
+    reset_totp_replay_counter()
+
+    fresh = TestClient(admin_client.app)
+    login = fresh.post(
+        "/api/v1/auth/login",
+        json={"username": "admin", "password": "admin-pass-12345"},
+    )
+    challenge = login.json()["challenge_token"]
+    code = pyotp.TOTP(secret).now()
+
+    first = fresh.post(
+        "/api/v1/auth/2fa/verify",
+        json={"challenge_token": challenge, "code": code},
+    )
+    assert first.status_code == 200, first.text
+
+    # Zweiter Anmeldeversuch mit demselben Code muss scheitern.
+    again = TestClient(admin_client.app)
+    login2 = again.post(
+        "/api/v1/auth/login",
+        json={"username": "admin", "password": "admin-pass-12345"},
+    )
+    replay = again.post(
+        "/api/v1/auth/2fa/verify",
+        json={"challenge_token": login2.json()["challenge_token"], "code": code},
+    )
+    assert replay.status_code == 401, replay.text
+    assert "meters_session" not in again.cookies
+
+
+def test_2fa_can_be_reconfigured_within_same_time_step(admin_client: TestClient) -> None:
+    """Deaktivieren und sofort neu einrichten muss im selben Zeitfenster gehen.
+
+    Der Replay-Zaehler ist reine Zeit und gilt secret-uebergreifend. Ohne
+    Reset in ``/2fa/setup`` haette das Deaktivieren den aktuellen Zeitschritt
+    verbraucht, und die anschliessende Aktivierung waere mit der
+    irrefuehrenden Meldung "Invalid TOTP code" gescheitert — bei voellig
+    korrektem Code. Bewusst OHNE ``reset_totp_replay_counter``: genau das
+    soll der Produktivcode leisten.
+    """
+    import pyotp
+
+    setup = admin_client.post("/api/v1/auth/2fa/setup")
+    secret = setup.json()["secret"]
+    admin_client.post("/api/v1/auth/2fa/activate", json={"code": pyotp.TOTP(secret).now()})
+    reset_totp_replay_counter()
+
+    disabled = admin_client.post(
+        "/api/v1/auth/2fa/disable",
+        json={"current_password": "admin-pass-12345", "code": pyotp.TOTP(secret).now()},
+    )
+    assert disabled.status_code == 200, disabled.text
+
+    # Neueinrichtung unmittelbar danach — selber Zeitschritt, neues Secret.
+    setup2 = admin_client.post("/api/v1/auth/2fa/setup")
+    assert setup2.status_code == 200, setup2.text
+    secret2 = setup2.json()["secret"]
+    activated = admin_client.post(
+        "/api/v1/auth/2fa/activate", json={"code": pyotp.TOTP(secret2).now()}
+    )
+    assert activated.status_code == 200, activated.text
+    assert admin_client.get("/api/v1/auth/2fa/status").json()["enabled"] is True
+
+
+def test_change_password_rotates_all_sessions(admin_client: TestClient) -> None:
+    """Passwortwechsel meldet alle anderen Geraete ab und rotiert die eigene Session.
+
+    Ein Passwortwechsel ist oft die Reaktion auf ein verlorenes Geraet oder
+    ein gestohlenes Cookie. Ohne Rotation ueberlebte ausgerechnet der
+    Diebstahl den Wechsel: das gestohlene Cookie ist derselbe Token wie der
+    des Opfers, eine blosse "alle ausser meiner"-Regel wuerde ihn verschonen.
+    """
+    # Zweites Geraet: eigener Client, eigener Login, eigener Token.
+    zweites_geraet = TestClient(admin_client.app)
+    login = zweites_geraet.post(
+        "/api/v1/auth/login",
+        json={"username": "admin", "password": "admin-pass-12345"},
+    )
+    assert login.status_code == 200, login.text
+    assert zweites_geraet.get("/api/v1/auth/me").status_code == 200
+
+    altes_cookie = admin_client.cookies.get("meters_session")
+    wechsel = admin_client.post(
+        "/api/v1/auth/change-password",
+        json={
+            "current_password": "admin-pass-12345",
+            "new_password": "neues-pass-45678",
+        },
+    )
+    assert wechsel.status_code == 200, wechsel.text
+
+    # Das zweite Geraet ist abgemeldet.
+    assert zweites_geraet.get("/api/v1/auth/me").status_code == 401
+
+    # Der wechselnde Browser bleibt angemeldet — aber mit *neuem* Token.
+    neues_cookie = admin_client.cookies.get("meters_session")
+    assert neues_cookie is not None
+    assert neues_cookie != altes_cookie, "Session wurde nicht rotiert"
+    assert admin_client.get("/api/v1/auth/me").status_code == 200
+
+    # Und der alte Token ist tot.
+    mit_altem_token = TestClient(admin_client.app)
+    mit_altem_token.cookies.set("meters_session", altes_cookie or "")
+    assert mit_altem_token.get("/api/v1/auth/me").status_code == 401
+
+
+@pytest.mark.parametrize(
+    ("passwort", "erwartet"),
+    [
+        ("x" * 72, 200),
+        ("x" * 73, 422),
+        ("ü" * 36, 200),  # 72 Bytes in UTF-8
+        ("ü" * 37, 422),  # 74 Bytes — Umlaute zaehlen doppelt
+    ],
+)
+def test_change_password_enforces_bcrypt_byte_limit(
+    admin_client: TestClient, passwort: str, erwartet: int
+) -> None:
+    """bcrypt wirft ab 73 Bytes — ohne Validierung waere das ein HTTP 500.
+
+    Gezaehlt wird in Bytes, nicht in Zeichen: ausgerechnet lange Passphrasen
+    und Umlaute haetten die App sonst zum Fehler gebracht.
+    """
+    resp = admin_client.post(
+        "/api/v1/auth/change-password",
+        json={"current_password": "admin-pass-12345", "new_password": passwort},
+    )
+    assert resp.status_code == erwartet, resp.text

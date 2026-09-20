@@ -3,14 +3,14 @@ from __future__ import annotations
 from pydantic import BaseModel, EmailStr, Field
 
 from meters.models import UserRole
-from meters.schemas.common import APIModel, UtcDateTime
+from meters.schemas.common import APIModel, NewPassword, UtcDateTime
 
 
 class UserCreate(BaseModel):
     username: str = Field(min_length=1, max_length=64)
     email: EmailStr | None = None
     role: UserRole
-    initial_password: str = Field(min_length=12, max_length=256)
+    initial_password: NewPassword
     can_assign_qr_tokens: bool = False
     can_billing: bool = False
 
@@ -37,7 +37,7 @@ class UserRead(APIModel):
 
 
 class PasswordResetRequest(BaseModel):
-    new_password: str = Field(min_length=12, max_length=256)
+    new_password: NewPassword
 
 
 class PasswordResetResponse(BaseModel):

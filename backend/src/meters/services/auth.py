@@ -111,18 +111,23 @@ def revoke_session(db: DbSession, *, session: Session, ip_address: str | None) -
 
 
 def revoke_all_for_user(db: DbSession, *, user_id: int, ip_address: str | None) -> int:
+    """Loescht alle Sessions des Users und liefert die Anzahl."""
     sessions = list(db.scalars(select(Session).where(Session.user_id == user_id)))
     for s in sessions:
         db.delete(s)
-    record(
-        db,
-        user_id=user_id,
-        action=AuditAction.LOGOUT,
-        entity_type=AuditEntityType.SESSION,
-        entity_id=None,
-        diff={"revoked": len(sessions)},
-        ip_address=ip_address,
-    )
+    # Nur protokollieren, wenn tatsaechlich etwas widerrufen wurde. Seit der
+    # Passwortwechsel diese Funktion immer aufruft, gaebe es sonst pro
+    # Wechsel eine inhaltsleere LOGOUT-Zeile im Audit-Log.
+    if sessions:
+        record(
+            db,
+            user_id=user_id,
+            action=AuditAction.LOGOUT,
+            entity_type=AuditEntityType.SESSION,
+            entity_id=None,
+            diff={"revoked": len(sessions)},
+            ip_address=ip_address,
+        )
     return len(sessions)
 
 

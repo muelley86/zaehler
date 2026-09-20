@@ -4,11 +4,39 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Annotated
 
-from pydantic import BaseModel, ConfigDict, Field, PlainSerializer
+from pydantic import AfterValidator, BaseModel, ConfigDict, Field, PlainSerializer
+
+from meters.core.security import MAX_PASSWORD_BYTES
 
 DecimalStr = Annotated[
     Decimal,
     PlainSerializer(lambda v: format(v, "f"), return_type=str, when_used="json"),
+]
+
+
+# Ohne diese Validierung quittiert die API eine lange Passphrase mit HTTP 500
+# statt einer feldbezogenen 422 — ausgerechnet die stärksten Passwörter wären
+# die einzigen, die nicht funktionieren. Die Grenze selbst kommt aus bcrypt,
+# siehe ``core.security.MAX_PASSWORD_BYTES``.
+
+
+def _fits_bcrypt(value: str) -> str:
+    if len(value.encode("utf-8")) > MAX_PASSWORD_BYTES:
+        raise ValueError(
+            f"Passwort darf höchstens {MAX_PASSWORD_BYTES} Bytes lang sein "
+            "(Umlaute zählen doppelt)."
+        )
+    return value
+
+
+#: Neues Passwort (Anlage, Wechsel, Admin-Reset). Mindestlänge 12 Zeichen,
+#: Obergrenze durch bcrypt. Für die *Eingabe* bestehender Passwörter beim
+#: Login bewusst nicht verwenden — dort darf keine Längenregel Nutzer
+#: aussperren, deren Hash vor dieser Validierung entstanden ist.
+NewPassword = Annotated[
+    str,
+    Field(min_length=12, max_length=256),
+    AfterValidator(_fits_bcrypt),
 ]
 
 

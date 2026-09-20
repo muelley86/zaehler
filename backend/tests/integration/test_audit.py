@@ -182,13 +182,16 @@ def test_password_change_audited(admin_client: TestClient) -> None:
 def test_totp_disable_audited(admin_client: TestClient) -> None:
     """TOTP-Deaktivierung muss als TOTP_DISABLED auftauchen."""
     import pyotp
+    from tests.conftest import reset_totp_replay_counter
 
     # 2FA zuerst aktivieren
     setup = admin_client.post("/api/v1/auth/2fa/setup")
     secret = setup.json()["secret"]
     admin_client.post("/api/v1/auth/2fa/activate", json={"code": pyotp.TOTP(secret).now()})
 
-    # Disable
+    # Disable — Replay-Zaehler zuruecksetzen, weil der Aktivierungs-Code
+    # denselben 30-Sekunden-Zeitschritt belegt (siehe totp.consume_totp).
+    reset_totp_replay_counter()
     disable = admin_client.post(
         "/api/v1/auth/2fa/disable",
         json={"current_password": "admin-pass-12345", "code": pyotp.TOTP(secret).now()},

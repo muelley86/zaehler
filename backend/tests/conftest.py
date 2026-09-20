@@ -127,3 +127,30 @@ def recorder_client(recorder_user: User) -> Iterator[TestClient]:
         )
         assert resp.status_code == 200, resp.text
         yield c
+
+
+def reset_totp_replay_counter(username: str = "admin") -> None:
+    """Setzt ``User.last_totp_counter`` zurueck.
+
+    Simuliert, dass zwischen zwei TOTP-Einloesungen echte Zeit vergangen
+    ist. Seit dem Replay-Schutz gilt jeder 30-Sekunden-Zeitschritt genau
+    einmal (``services/totp.consume_totp``) — Tests, die Aktivierung und
+    Login (oder Deaktivierung) in derselben Sekunde durchlaufen, wuerden
+    sonst am zweiten Code scheitern, obwohl echte Nutzer dazwischen
+    zwangslaeufig ein neues Fenster erwischen.
+
+    Nicht zu verwechseln mit dem Secret-Wechsel: dass eine *Neueinrichtung*
+    unmittelbar nach dem Deaktivieren funktioniert, stellt der Produktivcode
+    selbst sicher (``totp_setup`` setzt den Zaehler zurueck) — dafuer gibt es
+    einen eigenen Test ohne diesen Helper.
+    """
+    from sqlalchemy import select as _select
+
+    from meters.db import SessionLocal
+    from meters.models import User as _User
+
+    with SessionLocal() as db:
+        user = db.scalar(_select(_User).where(_User.username == username))
+        assert user is not None, f"Testbenutzer {username!r} nicht gefunden"
+        user.last_totp_counter = None
+        db.commit()

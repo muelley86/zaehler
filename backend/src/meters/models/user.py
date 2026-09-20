@@ -10,7 +10,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Boolean, String
+from sqlalchemy import Boolean, Integer, String
 from sqlalchemy import Enum as SAEnum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -44,6 +44,9 @@ class User(Base, TimestampMixin):
     # eine Erweiterung für später.
     totp_enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     totp_secret: Mapped[str | None] = mapped_column(String(64))
+    # Hoechster bereits eingeloester TOTP-Zeitschritt (Unixzeit // 30),
+    # darf nur steigen. Begruendung: ``services/totp.consume_totp``.
+    last_totp_counter: Mapped[int | None] = mapped_column(Integer)
 
     # Recorder-Berechtigung: darf unzugeordnete QR-Codes selbst einer MP
     # zuordnen. Default false — Admin schaltet pro Mitarbeiter explizit frei.

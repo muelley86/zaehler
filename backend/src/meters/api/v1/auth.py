@@ -171,7 +171,7 @@ def verify_2fa(
         raise ProblemError(status_code=400, title="TOTP not enabled")
 
     code = payload.code.strip()
-    success = totp_service.verify_totp(user.totp_secret, code)
+    success = totp_service.consume_totp(db, user=user, code=code)
     audit_action = AuditAction.LOGIN
     diff: dict[str, object] | None = None
     # Backup-Code-Variante (16 Hex-Zeichen, optional mit Trennstrich).
@@ -238,6 +238,7 @@ def me(user: CurrentUser) -> MeResponse:
 def change_password(
     payload: ChangePasswordRequest,
     request: Request,
+    response: Response,
     db: DbDep,
     user: CurrentUser,
 ) -> MeResponse:
@@ -248,6 +249,29 @@ def change_password(
 
     user.password_hash = hash_password(payload.new_password)
     user.force_password_change = False
+    # Ein Passwortwechsel ist haeufig die Reaktion auf ein abhanden
+    # gekommenes Geraet oder einen Cookie-Diebstahl. Bliebe eine fremde
+    # Session bestehen, liefe die Schutzreaktion ins Leere: Sessions sind
+    # 30 Tage gueltig und verlaengern sich per Sliding Expiration weiter.
+    #
+    # Darum *rotieren* statt ausnehmen: alle Sessions fallen, auch die
+    # eigene, und der Nutzer bekommt sofort eine neue. Wuerden wir die
+    # aktuelle verschonen, ueberlebte ausgerechnet ein gestohlenes Cookie
+    # den Wechsel — es ist ja derselbe Token wie der des Opfers. Nebenbei
+    # ist das die uebliche Regel "Session-ID bei Credential-Wechsel
+    # rotieren" (Session-Fixation).
+    auth_service.revoke_all_for_user(
+        db,
+        user_id=user.id,
+        ip_address=client_ip(request),
+    )
+    _session, new_token = auth_service.issue_session(
+        db,
+        user=user,
+        user_agent=request.headers.get("user-agent"),
+        ip_address=client_ip(request),
+    )
+    _set_session_cookie(response, new_token)
     record(
         db,
         user_id=user.id,
@@ -290,6 +314,14 @@ def totp_setup(db: DbDep, user: CurrentUser) -> TotpSetupResponse:
         )
     secret = totp_service.generate_secret()
     user.totp_secret = secret
+    # Der Replay-Zaehler ist reine Zeit und damit secret-uebergreifend.
+    # Ohne Reset schlaegt die Neueinrichtung fehl, wenn sie im selben
+    # 30-Sekunden-Schritt passiert wie die vorangegangene Deaktivierung:
+    # der Aktivierungscode waere "schon verbraucht", mit der irrefuehrenden
+    # Meldung "Invalid TOTP code". Gefahrlos, weil ``/2fa/setup``
+    # ``totp_enabled=False`` voraussetzt — es gibt hier keinen TOTP-Login,
+    # der sich wiederholen liesse.
+    user.last_totp_counter = None
     db.commit()
     uri = totp_service.provisioning_uri(secret=secret, username=user.username)
     return TotpSetupResponse(
@@ -314,7 +346,9 @@ def totp_activate(
             title="No TOTP setup pending",
             detail="Vorher /2fa/setup aufrufen.",
         )
-    if not totp_service.verify_totp(user.totp_secret, payload.code):
+    # Auch hier ueber consume_totp: sonst liesse sich der Code, mit dem
+    # 2FA gerade aktiviert wurde, direkt danach fuer den Login wiederverwenden.
+    if not totp_service.consume_totp(db, user=user, code=payload.code):
         raise ProblemError(status_code=400, title="Invalid TOTP code")
     user.totp_enabled = True
     backup_codes = totp_service.issue_backup_codes(db, user=user)
@@ -344,13 +378,13 @@ def totp_disable(
         # einen Backup-Code) — verhindert Bypass durch entwendetes Cookie.
         if not payload.code:
             raise ProblemError(status_code=400, title="TOTP code required")
-        secret = user.totp_secret
-        ok = bool(secret) and totp_service.verify_totp(secret or "", payload.code)
+        ok = totp_service.consume_totp(db, user=user, code=payload.code)
         if not ok and not totp_service.consume_backup_code(db, user=user, code=payload.code):
             raise ProblemError(status_code=400, title="Invalid TOTP / backup code")
 
     user.totp_enabled = False
     user.totp_secret = None
+    user.last_totp_counter = None
     for bc in list(user.backup_codes):
         db.delete(bc)
     record(

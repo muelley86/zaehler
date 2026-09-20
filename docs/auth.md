@@ -69,7 +69,45 @@ Per-Recorder MP-Zugriff:
 - Side-Effect: GET /api/v1/export/dump.json ist jetzt admin-only
   (Voll-Backup ist als Recorder-Artefakt sinnlos und semantisch
   inkonsistent mit dem Filter-Modell).
+- **ACHTUNG — `can_billing` hebelt diesen Filter aus.** Das Merkmal
+  (siehe `docs/features.md`) öffnet die Abrechnungs-Endpoints
+  (`/billing-circles/**`, `/billing-invoices/**`, `/billing-runs/**`) über
+  die Dependency `require_billing`. Diese Routen wenden `restrict_mp_query`
+  bewusst **nicht** an: wer abrechnet, muss quer über alle Messstellen
+  rechnen können. Ein Recorder mit `can_billing=True` liest damit
+  Zählerstände, Seriennummern und Verbräuche **aller** Messstellen —
+  auch derer, für die er keinen `UserMeasuringPointAccess`-Eintrag hat.
+  Das Merkmal ist also kein reiner Modul-Schalter, sondern erweitert die
+  Lesesicht. Beim Vergeben entsprechend bewerten; die Schreibrechte auf
+  Readings bleiben davon unberührt.
 
+
+Passwortwechsel und Sessions:
+
+- `POST /auth/change-password` **rotiert die Session**: alle bestehenden
+  Sessions werden widerrufen und sofort eine neue ausgestellt (neues Cookie
+  in der Antwort). Der Nutzer bleibt im aktuellen Browser angemeldet, alle
+  anderen Geräte fliegen raus.
+- Die Rotation ist Absicht und nicht optional: ein gestohlenes Cookie ist
+  derselbe Token wie der des Opfers. Würde die aktuelle Session verschont,
+  überlebte ausgerechnet der Diebstahl den Passwortwechsel.
+- Der Admin-Reset (`POST /users/{id}/reset-password`) widerruft ebenfalls
+  alle Sessions, stellt aber keine neue aus.
+
+TOTP-Replay-Schutz:
+
+- Jeder 30-Sekunden-Zeitschritt gilt **genau einmal** je Nutzer
+  (`User.last_totp_counter`, Migration 0042). Ein abgefangener Code ist
+  damit nicht mehr im gesamten Toleranzfenster (±1 Step = bis zu 90 s)
+  wiederverwendbar.
+- Praktische Folge: zwei Anmeldungen unmittelbar hintereinander brauchen
+  zwei verschiedene Codes — die zweite wartet auf das nächste Fenster.
+- Der Zähler ist reine Zeit und gilt secret-übergreifend. `/2fa/setup` und
+  `/2fa/disable` setzen ihn deshalb zurück, sonst schlüge eine
+  Neueinrichtung im selben Zeitschritt fehl.
+- Springt die Serveruhr zurück (NTP-Korrektur, LXC-Suspend), ist TOTP
+  gesperrt, bis die Realzeit aufgeholt hat. Escape-Hatch sind die
+  Backup-Codes — sie werden geprüft, nachdem TOTP fehlgeschlagen ist.
 
 ## Gleichzeitige Erfassung (Concurrency)
 
