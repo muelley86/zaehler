@@ -223,11 +223,17 @@ function BackupCodesSheet({ codes, onClose }: { codes: string[]; onClose: () => 
   function print() {
     const w = window.open('', '_blank');
     if (!w) return;
-    w.document.write(
-      `<pre style="font-family: 'JetBrains Mono', monospace; font-size: 14pt;">${codes
-        .map((c) => `  ${c}`)
-        .join('\n')}</pre>`,
-    );
+    // Bewusst ueber die DOM-API statt document.write mit Template-
+    // String: textContent schreibt den Inhalt garantiert als Text ins
+    // Dokument, egal was in den Codes steht. Aktuell erzeugt das
+    // Backend sie aus einem festen Alphabet -- aber die Sicherheit
+    // dieser Stelle soll nicht von einer Annahme ueber eine andere
+    // Datei abhaengen.
+    const pre = w.document.createElement('pre');
+    pre.style.fontFamily = "'JetBrains Mono', monospace";
+    pre.style.fontSize = '14pt';
+    pre.textContent = codes.map((c) => `  ${c}`).join('\n');
+    w.document.body.appendChild(pre);
     w.document.title = 'Zählerstand · Backup-Codes';
     w.print();
   }

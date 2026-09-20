@@ -15,8 +15,22 @@ import bcrypt
 
 from meters.core.config import settings
 
+#: bcrypt hasht nur die ersten 72 Bytes und wirft ab Version 4 bei laengeren
+#: Eingaben, statt still abzuschneiden. Gezaehlt wird in *Bytes*: ein Umlaut
+#: braucht in UTF-8 zwei.
+MAX_PASSWORD_BYTES = 72
+
 
 def hash_password(password: str) -> str:
+    """Hasht ein Passwort. Wirft ``ValueError`` bei ueber 72 Bytes.
+
+    Die Grenze wird hier geprueft und nicht nur in den Pydantic-Schemas:
+    ``hash_password`` ist der einzige Punkt, durch den alle Pfade muessen
+    (HTTP-API, CLI, kuenftige Aufrufer). Die Schemas bleiben trotzdem
+    zustaendig — sie liefern eine feldbezogene 422 statt einer 500.
+    """
+    if len(password.encode("utf-8")) > MAX_PASSWORD_BYTES:
+        raise ValueError(f"Passwort darf hoechstens {MAX_PASSWORD_BYTES} Bytes lang sein.")
     return bcrypt.hashpw(
         password.encode("utf-8"),
         bcrypt.gensalt(rounds=settings.bcrypt_rounds),

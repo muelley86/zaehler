@@ -28,7 +28,7 @@ from sqlalchemy import func, inspect, select
 from sqlalchemy.orm import Session
 
 from meters.core.config import settings
-from meters.core.security import hash_password
+from meters.core.security import MAX_PASSWORD_BYTES, hash_password
 from meters.db import SessionLocal, engine
 from meters.models import (
     MeasuringPoint,
@@ -71,6 +71,13 @@ def _cmd_create_admin(args: argparse.Namespace) -> int:
     if len(args.password) < 12:
         print("Passwort muss mindestens 12 Zeichen haben.", file=sys.stderr)
         return 2
+    if len(args.password.encode("utf-8")) > MAX_PASSWORD_BYTES:
+        print(
+            f"Passwort darf hoechstens {MAX_PASSWORD_BYTES} Bytes lang sein "
+            "(Umlaute zaehlen doppelt).",
+            file=sys.stderr,
+        )
+        return 2
 
     _ensure_schema_initialized()
     with SessionLocal() as db:
@@ -96,6 +103,13 @@ def _cmd_create_admin(args: argparse.Namespace) -> int:
 def _cmd_reset_password(args: argparse.Namespace) -> int:
     if len(args.password) < 12:
         print("Passwort muss mindestens 12 Zeichen haben.", file=sys.stderr)
+        return 2
+    if len(args.password.encode("utf-8")) > MAX_PASSWORD_BYTES:
+        print(
+            f"Passwort darf hoechstens {MAX_PASSWORD_BYTES} Bytes lang sein "
+            "(Umlaute zaehlen doppelt).",
+            file=sys.stderr,
+        )
         return 2
 
     _ensure_schema_initialized()

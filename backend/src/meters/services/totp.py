@@ -12,8 +12,10 @@
 from __future__ import annotations
 
 import base64
+import hmac
 import re
 import secrets
+import time
 from datetime import UTC, datetime, timedelta
 
 import pyotp
@@ -51,11 +53,64 @@ def qr_png_base64(uri: str) -> str:
     return base64.b64encode(qr_png_bytes(uri)).decode("ascii")
 
 
-def verify_totp(secret: str, code: str) -> bool:
-    """RFC-6238 mit ±1 Step Drift (= ±30 s)."""
-    if not re.fullmatch(r"\d{6}", code.strip()):
+TOTP_DRIFT_STEPS = 1
+
+
+def _matching_counter(secret: str, code: str) -> int | None:
+    """Liefert den Zeitschritt, zu dem ``code`` passt, sonst ``None``.
+
+    pyotps ``verify`` sagt nur ja/nein; fuer den Replay-Schutz brauchen wir
+    den konkreten Schritt, um ihn festhalten zu koennen. Darum die
+    Kandidaten des Toleranzfensters selbst durchgehen.
+    """
+    code = code.strip()
+    # ``[0-9]`` statt ``\d``: ``\d`` matcht auf ``str`` *alle* Unicode-
+    # Dezimalziffern (arabisch-indisch, Fullwidth, ...). ``compare_digest``
+    # verlangt fuer die str-Variante aber reines ASCII und wirft sonst
+    # ``TypeError`` — das waere ein von aussen ausloesbarer HTTP 500 auf
+    # dem Auth-Pfad, der Rate-Limiter und Audit-Log umgeht.
+    if not re.fullmatch(r"[0-9]{6}", code):
+        return None
+    totp = pyotp.TOTP(secret)
+    step = totp.interval
+    current = int(time.time()) // step
+    for offset in range(-TOTP_DRIFT_STEPS, TOTP_DRIFT_STEPS + 1):
+        counter = current + offset
+        # ``generate_otp(counter)`` statt ``at(timestamp)``: ``at()`` mit
+        # einem int laeuft ueber ``datetime.fromtimestamp`` und damit ueber
+        # *lokale* naive Zeit, die ``timecode()`` per ``time.mktime``
+        # zurueckrechnet. In der doppelt durchlaufenen Stunde der
+        # Zeitumstellung raet ``mktime`` die DST-Variante falsch und
+        # verschiebt den Schritt um 120 — TOTP waere dann eine Stunde lang
+        # fuer alle kaputt. Den HMAC-Counter haben wir ohnehin exakt.
+        # Bytes statt str: zweite Absicherung gegen die ASCII-Empfindlichkeit
+        # von ``compare_digest`` (siehe Regex oben).
+        if hmac.compare_digest(totp.generate_otp(counter).encode("ascii"), code.encode("ascii")):
+            return counter
+    return None
+
+
+def consume_totp(db: DbSession, *, user: User, code: str) -> bool:
+    """Prueft ``code`` und verbraucht ihn: jeder Zeitschritt gilt genau einmal.
+
+    Ohne diesen Schritt bliebe ein einmal abgefangener Code im gesamten
+    Toleranzfenster (bis zu 90 s) erneut einsetzbar — genug fuer einen
+    Phishing-Proxy oder einen Blick ueber die Schulter. ``last_totp_counter``
+    darf nur steigen, damit auch der vorige Schritt nicht nachtraeglich
+    eingeloest werden kann.
+
+    Der Aufrufer muss committen; wir schreiben nur auf dem Objekt.
+    """
+    if not user.totp_secret:
         return False
-    return pyotp.TOTP(secret).verify(code.strip(), valid_window=1)
+    counter = _matching_counter(user.totp_secret, code)
+    if counter is None:
+        return False
+    last = user.last_totp_counter
+    if last is not None and counter <= last:
+        return False
+    user.last_totp_counter = counter
+    return True
 
 
 # ---------------------------------------------------------------------------

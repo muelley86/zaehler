@@ -237,3 +237,160 @@ def test_location_postcode_must_be_five_digits(admin_client: TestClient) -> None
         "/api/v1/locations", json={"name": "Loc-PLZ-BAD", "address_postcode": "abc"}
     )
     assert bad.status_code == 422
+
+
+# ---------------------------------------------------------------------------
+# Per-Recorder-Sichtbarkeit von Standorten
+# ---------------------------------------------------------------------------
+
+
+def test_recorder_sees_only_locations_of_accessible_mps(
+    admin_client: TestClient,
+    recorder_client: TestClient,
+    db: Any,
+    recorder_user: Any,
+    admin_user: Any,
+) -> None:
+    """Standorte sind nur sichtbar, wenn eine zugaengliche Messstelle drauf zeigt.
+
+    Vorher war die komplette Standortliste fuer jeden eingeloggten Nutzer
+    lesbar — inklusive Strasse, PLZ, Ort und Notiz. Ein Recorder ohne jede
+    MP-Zuweisung sah damit alle Adressen, obwohl der Filter fuer die
+    Messstellen selbst sauber greift.
+    """
+    from meters.models import MeasuringPoint, UserMeasuringPointAccess
+
+    sichtbar = admin_client.post(
+        "/api/v1/locations",
+        json={"name": "Sichtbarer Standort", "address_city": "Musterstadt"},
+    ).json()
+    geheim = admin_client.post(
+        "/api/v1/locations",
+        json={"name": "Geheimer Standort", "address_city": "Geheimstadt"},
+    ).json()
+
+    def _mp(name: str, serial: str, location_id: int) -> dict[str, Any]:
+        resp = admin_client.post(
+            "/api/v1/measuring-points",
+            json={
+                "name": name,
+                "type": "water",
+                "is_bidirectional": False,
+                "has_dual_tariff": False,
+                "serial_number": serial,
+                "installed_at": "2024-01-01",
+                "initial_values": {"water": "0.0"},
+                "location_id": location_id,
+            },
+        )
+        assert resp.status_code == 201, resp.text
+        out: dict[str, Any] = resp.json()
+        return out
+
+    mp_sichtbar = _mp("MP sichtbar", "SN-VIS", sichtbar["id"])
+    _mp("MP geheim", "SN-SECRET", geheim["id"])
+
+    # Recorder bekommt Zugriff auf genau eine der beiden Messstellen.
+    db.add(
+        UserMeasuringPointAccess(
+            user_id=recorder_user.id,
+            measuring_point_id=mp_sichtbar["id"],
+            granted_by_user_id=admin_user.id,
+        )
+    )
+    db.commit()
+    assert db.query(MeasuringPoint).count() >= 2
+
+    namen = {r["name"] for r in recorder_client.get("/api/v1/locations").json()}
+    assert "Sichtbarer Standort" in namen
+    assert "Geheimer Standort" not in namen
+
+    # Direktzugriff auf den fremden Standort: 404, nicht 403 — der
+    # Statuscode darf die Existenz nicht verraten.
+    assert recorder_client.get(f"/api/v1/locations/{geheim['id']}").status_code == 404
+    assert recorder_client.get(f"/api/v1/locations/{sichtbar['id']}").status_code == 200
+
+    # Admin sieht weiterhin beides.
+    admin_namen = {r["name"] for r in admin_client.get("/api/v1/locations").json()}
+    assert {"Sichtbarer Standort", "Geheimer Standort"} <= admin_namen
+
+
+def test_recorder_sees_virtual_mp_location_only_with_all_components(
+    admin_client: TestClient,
+    recorder_client: TestClient,
+    db: Any,
+    recorder_user: Any,
+    admin_user: Any,
+) -> None:
+    """Der Standort einer verrechneten Messstelle folgt deren Zugriffsregel.
+
+    Eine verrechnete Messstelle ist nur sichtbar, wenn *saemtliche*
+    Komponenten zugaenglich sind — sonst liesse sich aus dem Aggregat auf
+    fremde Messstellen zurueckrechnen. Ihr Standort muss derselben Regel
+    folgen, sonst waere er das Schlupfloch.
+    """
+    from meters.models import UserMeasuringPointAccess
+
+    vmp_standort = admin_client.post(
+        "/api/v1/locations", json={"name": "Standort der Verrechnung"}
+    ).json()
+
+    def _strom_mp(name: str, serial: str) -> dict[str, Any]:
+        resp = admin_client.post(
+            "/api/v1/measuring-points",
+            json={
+                "name": name,
+                "type": "electricity",
+                "is_bidirectional": False,
+                "has_dual_tariff": False,
+                "serial_number": serial,
+                "installed_at": "2024-01-01",
+                "initial_values": {"bezug": "0.0"},
+            },
+        )
+        assert resp.status_code == 201, resp.text
+        out: dict[str, Any] = resp.json()
+        return out
+
+    komponente_a = _strom_mp("Komponente A", "SN-KOMP-A")
+    komponente_b = _strom_mp("Komponente B", "SN-KOMP-B")
+
+    vmp = admin_client.post(
+        "/api/v1/virtual-measuring-points",
+        json={
+            "name": "Verrechnet A+B",
+            "type": "electricity",
+            "location_id": vmp_standort["id"],
+            "components": [
+                {"measuring_point_id": komponente_a["id"], "direction": "bezug", "sign": 1},
+                {"measuring_point_id": komponente_b["id"], "direction": "bezug", "sign": 1},
+            ],
+        },
+    )
+    assert vmp.status_code == 201, vmp.text
+
+    def _standort_sichtbar() -> bool:
+        namen = {r["name"] for r in recorder_client.get("/api/v1/locations").json()}
+        return "Standort der Verrechnung" in namen
+
+    # Nur eine von zwei Komponenten -> verrechnete MP unsichtbar -> Standort auch.
+    db.add(
+        UserMeasuringPointAccess(
+            user_id=recorder_user.id,
+            measuring_point_id=komponente_a["id"],
+            granted_by_user_id=admin_user.id,
+        )
+    )
+    db.commit()
+    assert _standort_sichtbar() is False
+
+    # Zweite Komponente dazu -> jetzt sichtbar.
+    db.add(
+        UserMeasuringPointAccess(
+            user_id=recorder_user.id,
+            measuring_point_id=komponente_b["id"],
+            granted_by_user_id=admin_user.id,
+        )
+    )
+    db.commit()
+    assert _standort_sichtbar() is True

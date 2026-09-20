@@ -145,8 +145,25 @@ def _cleanup_expired() -> None:
 
 
 def _valid_photo_basename(name: str) -> bool:
-    """Gleiche Regeln wie ``reading_photo.photo_full_path``: kein Pfad-Anteil."""
-    return bool(name) and not ("/" in name or "\\" in name or ".." in name)
+    """Strenger als ``reading_photo.photo_full_path``: kein Pfad-Anteil, und
+
+    Zusaetzlich gegen zwei Windows-Eigenheiten abgesichert, die ein reiner
+    Separator-Check nicht faengt:
+
+    * ``"C:evil.jpg"`` ist *laufwerksrelativ*. ``Path("…/photos") / "C:evil.jpg"``
+      ergibt ``WindowsPath("C:evil.jpg")`` — die Basis wird stillschweigend
+      verworfen, geschrieben wird irgendwo auf C:. Darum kein ``:``.
+    * Ein NUL-Byte im Namen laesst ``open()`` mit ``ValueError`` platzen —
+      das waere ein unbehandelter 500 statt einer sauberen Meldung.
+
+    Ein fuehrender Punkt fliegt ebenfalls raus (``.``, ``..``, versteckte
+    Dateien).
+    """
+    if not name or name.startswith("."):
+        return False
+    if any(ch in name for ch in ("/", "\\", ":", "\x00")):
+        return False
+    return ".." not in name
 
 
 def _copy_limited(src: BinaryIO, dest_path: Path, *, limit: int) -> int:
@@ -207,6 +224,12 @@ def _extract_archive(archive: zipfile.ZipFile, staging: Path, warnings: list[str
                 warnings.append(f"Unerwartete Datei im Archiv ignoriert: {name}")
                 continue
             target = photos_dir / basename
+            # Zweite Verteidigungslinie: selbst wenn die Namenspruefung
+            # oben je eine Luecke bekommt, darf nichts ausserhalb des
+            # Staging-Verzeichnisses landen.
+            if not target.resolve().is_relative_to(photos_dir.resolve()):
+                warnings.append(f"Unerwartete Datei im Archiv ignoriert: {name}")
+                continue
             photo_count += 1
         else:
             warnings.append(f"Unerwartete Datei im Archiv ignoriert: {name}")

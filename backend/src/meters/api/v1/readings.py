@@ -231,7 +231,9 @@ def create_reading(
     register = db.get(Register, payload.register_id)
     if register is None or not register.is_active:
         raise ProblemError(status_code=404, title="Register not found or inactive")
-    assert_can_access_register(db, user, register.id)
+    assert_can_access_register(
+        db, user, register.id, not_found_title="Register not found or inactive"
+    )
 
     _check_value_in_series(
         db,
@@ -307,7 +309,11 @@ def update_reading(
     # Zugriff auf die zugehörige Messstelle ist Vorbedingung — selbst wenn
     # der Recorder Ersteller dieses Readings war, darf er es nach Entzug
     # des MP-Zugriffs nicht mehr ändern.
-    assert_can_access_register(db, user, reading.register_id)
+    #
+    # Gleicher Titel wie beim "gibt es nicht"-Fall oben: sonst verrät die
+    # Fehlermeldung, dass die ID existiert und nur einer fremden Messstelle
+    # gehört — der Recorder könnte den ID-Raum abzählen.
+    assert_can_access_register(db, user, reading.register_id, not_found_title="Reading not found")
     if not _can_edit(user, reading):
         raise ProblemError(status_code=403, title="Cannot edit this reading")
 
@@ -369,7 +375,8 @@ def delete_reading(
     reading = db.get(Reading, reading_id)
     if reading is None:
         raise ProblemError(status_code=404, title="Reading not found")
-    assert_can_access_register(db, user, reading.register_id)
+    # Einheitlicher Titel, siehe update_reading.
+    assert_can_access_register(db, user, reading.register_id, not_found_title="Reading not found")
     if not _can_edit(user, reading):
         raise ProblemError(status_code=403, title="Cannot delete this reading")
 
@@ -425,7 +432,9 @@ def bulk_delete_readings(
         try:
             assert_can_access_register(db, user, reading.register_id)
         except ProblemError:
-            skipped.append(BulkDeleteSkipped(id=reading_id, reason="no_access"))
+            # Bewusst "not_found", nicht "no_access": eine ID-Liste in
+            # einem Request waere sonst ein bequemes Existenz-Orakel.
+            skipped.append(BulkDeleteSkipped(id=reading_id, reason="not_found"))
             continue
         if not _can_edit(user, reading):
             skipped.append(BulkDeleteSkipped(id=reading_id, reason="forbidden"))
@@ -470,7 +479,9 @@ def add_reading_photo(
     reading = db.get(Reading, reading_id)
     if reading is None:
         raise ProblemError(status_code=404, title="Reading not found")
-    assert_can_access_register(db, user, reading.register_id)
+    # Einheitlicher Titel wie in update/delete_reading — sonst waere auch
+    # der Foto-Upload ein Existenz-Orakel fuer den Reading-ID-Raum.
+    assert_can_access_register(db, user, reading.register_id, not_found_title="Reading not found")
     if not _can_edit(user, reading):
         raise ProblemError(status_code=403, title="Cannot edit this reading")
     if len(reading.photos) >= MAX_PHOTOS_PER_READING:
@@ -518,12 +529,18 @@ def delete_reading_photo(
     db: DbDep,
     user: CurrentUser,
 ) -> None:
+    # Reihenfolge ist sicherheitsrelevant: erst Reading + Zugriff, dann
+    # Foto. Andersherum wäre der Statuscode ein Existenz-Orakel — "Foto
+    # gibt es nicht" (204) ließe sich von "Foto gehört einer fremden
+    # Messstelle" (404) unterscheiden.
+    reading = db.get(Reading, reading_id)
+    if reading is None:
+        raise ProblemError(status_code=404, title="Reading not found")
+    assert_can_access_register(db, user, reading.register_id, not_found_title="Reading not found")
     photo = db.get(ReadingPhoto, photo_id)
     if photo is None or photo.reading_id != reading_id:
         # Nicht (mehr) vorhanden — idempotent als 204 zurückgeben.
         return
-    reading = photo.reading
-    assert_can_access_register(db, user, reading.register_id)
     if not _can_edit(user, reading):
         raise ProblemError(status_code=403, title="Cannot edit this reading")
     basename = photo.photo_path
@@ -553,8 +570,14 @@ def get_reading_photo(
         raise ProblemError(status_code=404, title="No photo for this reading")
     # Auslieferung läuft über die API (nicht StaticFiles), damit der
     # Recorder-MP-Filter greift — sonst könnten User mit der URL fremde
-    # Fotos laden.
-    assert_can_access_register(db, user, photo.reading.register_id)
+    # Fotos laden. Gleicher Titel wie oben, damit die Antwort nicht
+    # verrät, ob es das Foto gibt (siehe delete_reading_photo).
+    assert_can_access_register(
+        db,
+        user,
+        photo.reading.register_id,
+        not_found_title="No photo for this reading",
+    )
     try:
         path = photo_full_path(photo.photo_path)
     except ValueError as exc:

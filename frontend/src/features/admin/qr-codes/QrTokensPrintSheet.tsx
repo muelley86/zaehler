@@ -246,6 +246,16 @@ export async function fetchSvgsWithConcurrency(tokens: QrTokenRead[]): Promise<T
   );
 }
 
+/**
+ * Baut das Innere eines Etiketts als HTML-String.
+ *
+ * ``token.svg`` wird bewusst *roh* eingesetzt -- es ist Markup, kein Text.
+ * Die Quelle ist eng: ``services/qr.py`` erzeugt das SVG mit
+ * ``qrcode.image.svg.SvgPathImage``, also reine Pfaddaten ohne jeden
+ * Nutzertext. Alles andere (Token, Messstellenname) laeuft durch
+ * ``escapeHtml``. Wird die SVG-Erzeugung im Backend je umgestellt, muss
+ * diese Annahme mitgeprueft werden.
+ */
 function buildLabelInner(token: TokenWithSvg, layout: LabelLayout): string {
   const subline = token.measuring_point_name
     ? escapeHtml(token.measuring_point_name)

@@ -11,17 +11,19 @@ from __future__ import annotations
 from fastapi import APIRouter, Request, status
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
 
 from meters.api.deps import AdminUser, CurrentUser, DbDep, client_ip
 from meters.api.v1.measuring_points import measuring_points_with_state
 from meters.core.problem import ProblemError
-from meters.models import AuditAction, AuditEntityType, MainLocation
+from meters.models import AuditAction, AuditEntityType, MainLocation, User
 from meters.schemas import (
     MainLocationCreate,
     MainLocationRead,
     MainLocationUpdate,
     MeasuringPointWithStateRead,
 )
+from meters.services.access import accessible_main_location_ids
 from meters.services.audit import record
 from meters.services.location_queries import select_measuring_points_for_main_location
 
@@ -29,21 +31,37 @@ router = APIRouter(prefix="/main-locations", tags=["main-locations"])
 
 
 @router.get("", response_model=list[MainLocationRead])
-def list_main_locations(db: DbDep, _user: CurrentUser) -> list[MainLocationRead]:
-    rows = list(db.scalars(select(MainLocation).order_by(MainLocation.name)))
+def list_main_locations(db: DbDep, user: CurrentUser) -> list[MainLocationRead]:
+    stmt = select(MainLocation).order_by(MainLocation.name)
+    allowed = accessible_main_location_ids(db, user)
+    if allowed is not None:
+        if not allowed:
+            return []
+        stmt = stmt.where(MainLocation.id.in_(allowed))
+    rows = list(db.scalars(stmt))
     return [MainLocationRead.model_validate(r) for r in rows]
+
+
+def _assert_main_location_visible(db: Session, user: User, main_location_id: int) -> MainLocation:
+    """Wie ``locations._assert_location_visible``, eine Ebene hoeher."""
+    obj = db.get(MainLocation, main_location_id)
+    if obj is None:
+        raise ProblemError(status_code=404, title="MainLocation not found")
+    allowed = accessible_main_location_ids(db, user)
+    if allowed is not None and main_location_id not in allowed:
+        raise ProblemError(status_code=404, title="MainLocation not found")
+    return obj
 
 
 @router.get("/{main_location_id}", response_model=MainLocationRead)
 def get_main_location(
     main_location_id: int,
     db: DbDep,
-    _user: CurrentUser,
+    user: CurrentUser,
 ) -> MainLocationRead:
-    obj = db.get(MainLocation, main_location_id)
-    if obj is None:
-        raise ProblemError(status_code=404, title="MainLocation not found")
-    return MainLocationRead.model_validate(obj)
+    return MainLocationRead.model_validate(
+        _assert_main_location_visible(db, user, main_location_id)
+    )
 
 
 @router.get(
@@ -58,8 +76,7 @@ def list_main_location_measuring_points(
     Quelle der Hauptstandort-Detailseite. Aggregiert ueber den Join MP -> Location;
     Recorder sehen via ``restrict_mp_query`` nur ihre zugaenglichen MPs.
     """
-    if db.get(MainLocation, main_location_id) is None:
-        raise ProblemError(status_code=404, title="MainLocation not found")
+    _assert_main_location_visible(db, user, main_location_id)
     return measuring_points_with_state(
         db, select_measuring_points_for_main_location(main_location_id), user
     )
