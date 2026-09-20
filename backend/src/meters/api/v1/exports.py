@@ -12,6 +12,7 @@ import io
 import json
 import shutil
 import tempfile
+import time
 from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
@@ -200,6 +201,34 @@ def full_dump(db: DbDep, _admin: AdminUser) -> Response:
     )
 
 
+_BACKUP_TMP_PREFIX = "meters-backup-"
+_BACKUP_TMP_MAX_AGE_SECONDS = 60 * 60
+
+
+def _sweep_stale_backup_dirs() -> None:
+    """Loescht Backup-Temp-Verzeichnisse, die aelter als eine Stunde sind.
+
+    Ein laufender Download ist nach einer Stunde sicher durch (oder tot),
+    darum ist das Alter ein verlaesslicheres Kriterium als ein Lock.
+    Fehler werden geschluckt: das Aufraeumen darf den Download nie
+    verhindern.
+    """
+    now = time.time()
+    try:
+        entries = list(Path(tempfile.gettempdir()).glob(f"{_BACKUP_TMP_PREFIX}*"))
+    except OSError:
+        return
+    for entry in entries:
+        try:
+            if not entry.is_dir():
+                continue
+            if now - entry.stat().st_mtime < _BACKUP_TMP_MAX_AGE_SECONDS:
+                continue
+        except OSError:
+            continue
+        shutil.rmtree(entry, ignore_errors=True)
+
+
 @router.get("/backup.zip")
 def full_backup_zip(request: Request, db: DbDep, admin: AdminUser) -> FileResponse:
     """Voll-Backup als ZIP: SQLite-Snapshot + alle Ablese-Fotos + Manifest (admin-only).
@@ -226,7 +255,11 @@ def full_backup_zip(request: Request, db: DbDep, admin: AdminUser) -> FileRespon
     if not src_path.is_file():
         raise ProblemError(status_code=404, title="Datenbankdatei nicht gefunden")
 
-    tmp_dir = Path(tempfile.mkdtemp(prefix="meters-backup-"))
+    # Der BackgroundTask unten laeuft nur bei durchgehender Response; ein
+    # abgebrochener Download liesse sonst eine komplette DB-Kopie liegen.
+    _sweep_stale_backup_dirs()
+
+    tmp_dir = Path(tempfile.mkdtemp(prefix=_BACKUP_TMP_PREFIX))
     try:
         zip_path = backup_service.build_backup_zip(src_path, tmp_dir)
     except Exception:
