@@ -52,16 +52,24 @@ def format_decimal_de(value: Decimal) -> str:
     return format(value, "f").replace(".", ",")
 
 
+# Führende Zeichen, die Excel/LibreOffice als Formelbeginn werten.
+# TAB und CR gehören dazu, obwohl sie harmlos aussehen: die Tabellen-
+# programme strippen sie beim Parsen und interpretieren das *danach*
+# folgende ``=`` wieder als Formel. Ein Wert wie ``"\t=HYPERLINK(...)"``
+# umgeht einen Guard, der nur ``= + - @`` kennt.
+_CSV_FORMULA_PREFIXES = frozenset({"=", "+", "-", "@", "\t", "\r"})
+
+
 def csv_guard_formula(value: str) -> str:
     """Schutz vor CSV-Formel-Injection in Excel/LibreOffice: Werte, die mit
-    ``=`` ``+`` ``-`` ``@`` beginnen, werden mit einem Apostroph geprefixt, damit
-    Tabellen sie als Text statt als Formel interpretieren. Spiegelt den Frontend-
-    ``csvField``-Helper.
+    ``=`` ``+`` ``-`` ``@`` ``TAB`` oder ``CR`` beginnen, werden mit einem
+    Apostroph geprefixt, damit Tabellen sie als Text statt als Formel
+    interpretieren. Spiegelt den Frontend-``csvField``-Helper.
 
     **Nur auf freie Textfelder anwenden** — NICHT auf formatierte Zahlen
     (führendes Minus!) oder Datumswerte.
     """
-    if value[:1] in {"=", "+", "-", "@"}:
+    if value[:1] in _CSV_FORMULA_PREFIXES:
         return "'" + value
     return value
 

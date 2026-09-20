@@ -21,6 +21,14 @@ describe('csvField', () => {
     expect(csvField('@SUM(A1)')).toBe("'@SUM(A1)");
   });
 
+  it('praefixt auch TAB und CR als Formel-Trigger', () => {
+    // Excel strippt fuehrendes TAB/CR beim Parsen und wertet das danach
+    // folgende = dann doch als Formel — ein Guard nur auf =+-@ greift
+    // zu kurz. TAB loest kein Quoting aus, CR schon.
+    expect(csvField('\t=SUM(A1)')).toBe("'\t=SUM(A1)");
+    expect(csvField('\r=SUM(A1)')).toBe('"\'\r=SUM(A1)"');
+  });
+
   it('kombiniert Formel-Praefix und Quoting bei Semikolon im Wert', () => {
     // fuehrendes = -> Apostroph, ausserdem ; -> quoten
     expect(csvField('=cmd;x')).toBe('"\'=cmd;x"');
