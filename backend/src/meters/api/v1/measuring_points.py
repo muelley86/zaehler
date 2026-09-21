@@ -11,6 +11,7 @@ Eine Messstelle kann nur gelöscht werden, wenn keine Erfassungen daran hängen
 
 from __future__ import annotations
 
+from datetime import datetime
 from decimal import Decimal
 
 from fastapi import APIRouter, Request, status
@@ -117,6 +118,7 @@ from meters.services.owner_assignment import (
 )
 from meters.services.state import (
     RegisterState,
+    last_reading_at_by_measuring_point,
     state_for_measuring_point,
     state_for_measuring_points,
 )
@@ -166,8 +168,14 @@ def to_measuring_point_read(
     current_owner: OwnerAssignment | None = None,
     current_supplier: SupplierAssignment | None = None,
     current_mieter: MieterAssignment | None = None,
+    last_reading_at: datetime | None = None,
 ) -> MeasuringPointRead:
     data = MeasuringPointRead.model_validate(mp)
+    # Letzte Ablesung: Listen-Pfade reichen sie gebuendelt durch; mit ``db``
+    # (Detail/Update/Replace) wird sie per Einzel-Query nachgeladen.
+    if last_reading_at is None and db is not None:
+        last_reading_at = last_reading_at_by_measuring_point(db, [mp]).get(mp.id)
+    data.last_reading_at = last_reading_at
     location = mp.location
     data.location_name = location.name if location else None
     main_loc = location.main_location if location else None
@@ -246,6 +254,14 @@ def measuring_points_with_state(
                 current_owner=owners_by_mp.get(mp.id),
                 current_supplier=suppliers_by_mp.get(mp.id),
                 current_mieter=mieters_by_mp.get(mp.id),
+                last_reading_at=max(
+                    (
+                        s.last_reading_at
+                        for s in states_by_mp.get(mp.id, [])
+                        if s.is_active and s.last_reading_at is not None
+                    ),
+                    default=None,
+                ),
             ),
             registers=[_to_state_read(s) for s in states_by_mp.get(mp.id, [])],
         )
@@ -273,12 +289,14 @@ def list_measuring_points(db: DbDep, user: CurrentUser) -> list[MeasuringPointRe
     owners_by_mp = current_assignments_bulk(db, ids)
     suppliers_by_mp = current_supplier_assignments_bulk(db, ids)
     mieters_by_mp = current_mieter_assignments_bulk(db, ids)
+    last_by_mp = last_reading_at_by_measuring_point(db, items)
     return [
         to_measuring_point_read(
             m,
             current_owner=owners_by_mp.get(m.id),
             current_supplier=suppliers_by_mp.get(m.id),
             current_mieter=mieters_by_mp.get(m.id),
+            last_reading_at=last_by_mp.get(m.id),
         )
         for m in items
     ]
@@ -319,6 +337,7 @@ def create_measuring_point(
         contract_number=payload.contract_number,
         market_location=payload.market_location,
         installation_location=payload.installation_location,
+        reading_interval_days=payload.reading_interval_days,
     )
     db.add(mp)
     db.flush()
@@ -563,6 +582,15 @@ def update_measuring_point(
             "to": payload.market_location,
         }
         mp.market_location = payload.market_location
+    if (
+        payload.reading_interval_days is not None
+        and payload.reading_interval_days != mp.reading_interval_days
+    ):
+        diff["reading_interval_days"] = {
+            "from": mp.reading_interval_days,
+            "to": payload.reading_interval_days,
+        }
+        mp.reading_interval_days = payload.reading_interval_days
 
     if diff:
         record(

@@ -7,8 +7,18 @@ Drei Ebenen: MeasuringPoint → PhysicalMeter → Register → Reading
 
 - MeasuringPoint (logische Messstelle, dauerhaft):
   id, name, type (electricity|gas|water), location,
-  is_bidirectional, has_dual_tariff, created_at
+  is_bidirectional, has_dual_tariff, created_at,
+  reading_interval_days (int, 1–3650, Default 35; seit Migration 0043 — Bestand
+  per `server_default` auf 35 gesetzt)
   Beispiel: "Hauptzähler Strom Keller"
+
+  **Fälligkeit** (nur echte Messstellen, berechnet im Frontend in
+  `frontend/src/lib/readingDue.ts`): fällig ⇔ nie abgelesen oder
+  `volle Tage seit last_reading_at >= reading_interval_days` (Grenze inklusiv).
+  `last_reading_at` = jüngste Ablesung über die aktiven Register des aktiven
+  Zählers. Ablesbar (und damit überhaupt fällig) ist eine Messstelle nur mit
+  eingebautem Zähler, der mindestens ein aktives Register hat — gilt einheitlich
+  für Liste, Detailseite und Dashboard.
 
 - PhysicalMeter (konkretes Gerät, wird getauscht):
   id, measuring_point_id, serial_number,

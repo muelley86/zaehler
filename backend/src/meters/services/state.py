@@ -121,6 +121,24 @@ def _last_reading_by_register(
     return {row.register_id: (row.value, row.reading_at) for row in last_rows}
 
 
+def last_reading_at_by_measuring_point(
+    db: DbSession, measuring_points: list[MeasuringPoint]
+) -> dict[int, datetime]:
+    """Juengste Ablesung je MP ueber die aktiven Register des aktiven Zaehlers.
+
+    Eine Query fuer alle MPs (``physical_meters``/``registers`` muessen
+    vorgeladen sein). MPs ohne jede Ablesung fehlen im Ergebnis.
+    """
+    registers_by_mp = {mp.id: _active_registers(mp) for mp in measuring_points}
+    last = _last_reading_by_register(db, [r.id for regs in registers_by_mp.values() for r in regs])
+    result: dict[int, datetime] = {}
+    for mp_id, regs in registers_by_mp.items():
+        times = [last[r.id][1] for r in regs if r.id in last]
+        if times:
+            result[mp_id] = max(times)
+    return result
+
+
 def _refilled_by_register(
     db: DbSession,
     active_registers: list[Register],

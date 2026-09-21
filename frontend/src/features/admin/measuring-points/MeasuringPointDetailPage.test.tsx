@@ -685,3 +685,40 @@ describe('MeasuringPointDetailPage Verbrauchskurve — Datumsfilter', () => {
     expect(url.searchParams.get('to_at')).toBe('2025-12-31');
   });
 });
+
+describe('MeasuringPointDetailPage Ableseintervall', () => {
+  it('zeigt Intervall und Fälligkeit in den Stammdaten', async () => {
+    _mockMp({
+      ..._strom,
+      reading_interval_days: 14,
+      last_reading_at: new Date(Date.now() - 20 * 86_400_000).toISOString(),
+    });
+    renderWithRouter(<MeasuringPointDetailPage />, {
+      initialEntries: ['/admin/messstellen/1'],
+    });
+    const label = await screen.findByText('Ableseintervall');
+    expect(label.nextElementSibling).toHaveTextContent('14 Tage');
+    expect(screen.getByText('fällig – vor 20 Tagen abgelesen')).toBeInTheDocument();
+  });
+
+  it('sendet ein geändertes Intervall per PATCH', async () => {
+    let patchBody: Record<string, unknown> | null = null;
+    _mockMp({ ..._strom, reading_interval_days: 35, last_reading_at: null });
+    server.use(
+      http.patch('/api/v1/measuring-points/1', async ({ request }) => {
+        patchBody = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json({ ..._strom, reading_interval_days: 60 });
+      }),
+    );
+    renderWithRouter(<MeasuringPointDetailPage />, {
+      initialEntries: ['/admin/messstellen/1'],
+    });
+    const editButtons = await screen.findAllByRole('button', { name: /^Bearbeiten$/ });
+    fireEvent.click(editButtons[0]!);
+    const input = await screen.findByLabelText(/Ableseintervall/);
+    fireEvent.change(input, { target: { value: '60' } });
+    fireEvent.click(screen.getByRole('button', { name: /Speichern/i }));
+    await waitFor(() => expect(patchBody).not.toBeNull());
+    expect(patchBody!['reading_interval_days']).toBe(60);
+  });
+});

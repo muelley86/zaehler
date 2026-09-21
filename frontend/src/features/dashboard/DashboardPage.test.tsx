@@ -334,7 +334,7 @@ describe('DashboardPage — KPI, Hinweise, Top-Verbraucher', () => {
     renderWithRouter(<DashboardPage />);
 
     const top = await screen.findByText('Top-Verbraucher · Wasser · m³');
-    const hinweise = screen.getByText('Hinweise');
+    const hinweise = screen.getByText(/^Hinweise/);
 
     expect(hinweise.compareDocumentPosition(top) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });

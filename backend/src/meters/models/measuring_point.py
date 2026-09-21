@@ -11,13 +11,17 @@ from __future__ import annotations
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Boolean, ForeignKey, String
+from sqlalchemy import Boolean, ForeignKey, Integer, String
 from sqlalchemy import Enum as SAEnum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from meters.db import Base, TimestampMixin
 from meters.db.types import DecimalText
 from meters.models._enums import HeatingSource, MeterType
+
+# Standard-Ableseintervall in Tagen fuer neue Messstellen (und per Migration
+# 0043 fuer alle Bestands-Messstellen).
+DEFAULT_READING_INTERVAL_DAYS = 35
 
 if TYPE_CHECKING:
     from meters.models.kostenstelle_assignment import KostenstelleAssignment
@@ -58,6 +62,14 @@ class MeasuringPoint(Base, TimestampMixin):
     # „Heizungsraum links"). Hilft, einen MP physisch zu finden, ohne dass die
     # Location-Granularitaet uebertrieben werden muss.
     installation_location: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    # Soll-Abstand zwischen zwei Ablesungen in Tagen. Die Faelligkeit
+    # (letzte Ablesung aelter als das Intervall) berechnet das Frontend.
+    reading_interval_days: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=DEFAULT_READING_INTERVAL_DAYS,
+        server_default=str(DEFAULT_READING_INTERVAL_DAYS),
+    )
 
     location: Mapped[Location | None] = relationship("Location")
     physical_meters: Mapped[list[PhysicalMeter]] = relationship(

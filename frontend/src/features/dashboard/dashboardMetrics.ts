@@ -12,6 +12,7 @@ import type {
   MeterType,
 } from '@/lib/types';
 import { TYPE_LABELS, TYPE_ORDER } from '@/lib/meterLabels';
+import { daysSince, isReadingDue } from '@/lib/readingDue';
 
 /** Addiert einen optionalen Decimal-String zu einer laufenden Summe; `null`/NaN tragen nicht bei. */
 function addContribution(sum: number, addend: string | null): number {
@@ -211,10 +212,7 @@ function compareKpiTiles(a: KpiTile, b: KpiTile): number {
 
 // --- Hinweise -------------------------------------------------------------
 
-export const STALE_AFTER_DAYS = 45;
 export const DEVIATION_PCT = 30;
-
-const MS_PER_DAY = 86_400_000;
 
 interface StaleInsight {
   kind: 'stale';
@@ -237,41 +235,30 @@ interface DeviationInsight {
 
 export type Insight = StaleInsight | DeviationInsight;
 
-function selectStaleInsights(
-  items: DashboardMeasuringPoint[],
-  now: Date,
-  staleAfterDays: number,
-): StaleInsight[] {
-  const result: StaleInsight[] = [];
-  for (const item of items) {
-    if (item.last_reading_at === null) {
-      result.push({
-        kind: 'stale',
-        mpId: item.id,
-        name: item.name,
-        lastReadingAt: null,
-        daysSince: null,
-      });
-      continue;
-    }
-    const daysSince = Math.floor(
-      (now.getTime() - new Date(item.last_reading_at).getTime()) / MS_PER_DAY,
-    );
-    if (daysSince > staleAfterDays) {
-      result.push({
-        kind: 'stale',
+/** Fällige Messstellen (siehe `lib/readingDue.ts`) — nie abgelesene zuerst, dann die ältesten. */
+function selectStaleInsights(items: DashboardMeasuringPoint[], now: Date): StaleInsight[] {
+  return (
+    items
+      // Ohne aktive Register (kein Zähler eingebaut) nichts abzulesen → nie fällig,
+      // wie `isMeasuringPointDue` in Liste und Detailseite.
+      .filter(
+        (item) =>
+          item.registers.length > 0 &&
+          isReadingDue(item.last_reading_at, item.reading_interval_days, now),
+      )
+      .map((item) => ({
+        kind: 'stale' as const,
         mpId: item.id,
         name: item.name,
         lastReadingAt: item.last_reading_at,
-        daysSince,
-      });
-    }
-  }
-  return result.sort((a, b) => {
-    if (a.daysSince === null) return b.daysSince === null ? 0 : -1;
-    if (b.daysSince === null) return 1;
-    return b.daysSince - a.daysSince;
-  });
+        daysSince: daysSince(item.last_reading_at, now),
+      }))
+      .sort((a, b) => {
+        if (a.daysSince === null) return b.daysSince === null ? 0 : -1;
+        if (b.daysSince === null) return 1;
+        return b.daysSince - a.daysSince;
+      })
+  );
 }
 
 /** Gleiche Form wie `KpiBucket` ohne `type` — Abweichungs-Buckets sind je Item schon typisiert. */
@@ -322,14 +309,10 @@ function selectDeviationInsights(
  */
 export function selectInsights(
   items: DashboardMeasuringPoint[],
-  opts: { now: Date; staleAfterDays?: number; deviationPct?: number },
+  opts: { now: Date; deviationPct?: number },
 ): Insight[] {
-  const staleAfterDays = opts.staleAfterDays ?? STALE_AFTER_DAYS;
   const deviationPct = opts.deviationPct ?? DEVIATION_PCT;
-  return [
-    ...selectStaleInsights(items, opts.now, staleAfterDays),
-    ...selectDeviationInsights(items, deviationPct),
-  ];
+  return [...selectStaleInsights(items, opts.now), ...selectDeviationInsights(items, deviationPct)];
 }
 
 // --- Top-Verbraucher --------------------------------------------------------

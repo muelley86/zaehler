@@ -475,3 +475,94 @@ describe('MeasuringPointsAdminPage Wizard', () => {
     expect(createBody!['supplier_valid_from']).toBe(createBody!['installed_at']);
   });
 });
+
+describe('MeasuringPointsAdminPage Ableseintervall', () => {
+  afterEach(() => {
+    window.localStorage.clear();
+    window.sessionStorage.clear();
+  });
+
+  const activeMeter = {
+    id: 1,
+    serial_number: 'SN',
+    installed_at: '2024-01-01',
+    removed_at: null,
+    transformer_factor: null,
+    registers: [
+      {
+        id: 1,
+        obis_code: '1.8.0',
+        label: 'Bezug',
+        unit: 'kWh',
+        is_active: true,
+        max_value: '0',
+        accepts_deliveries: false,
+      },
+    ],
+  };
+  const daysAgo = (d: number) => new Date(Date.now() - d * 86_400_000).toISOString();
+
+  it('markiert fällige Messstellen und filtert auf „Nur fällige"', async () => {
+    _mockList([
+      _mp({
+        id: 1,
+        name: 'Überfällig',
+        reading_interval_days: 35,
+        last_reading_at: daysAgo(40),
+        physical_meters: [activeMeter],
+      }),
+      _mp({
+        id: 2,
+        name: 'Aktuell',
+        reading_interval_days: 35,
+        last_reading_at: daysAgo(3),
+        physical_meters: [activeMeter],
+      }),
+      _mp({
+        id: 3,
+        name: 'Wöchentlich',
+        reading_interval_days: 7,
+        last_reading_at: daysAgo(10),
+        physical_meters: [activeMeter],
+      }),
+      _mp({ id: 4, name: 'Ohne Zähler', last_reading_at: null, physical_meters: [] }),
+    ]);
+    const user = userEvent.setup();
+    renderWithRouter(<MeasuringPointsAdminPage />);
+
+    expect(await screen.findByText('fällig · 40 Tage')).toBeInTheDocument();
+    expect(screen.getByText('fällig · 10 Tage')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Nur fällige' }));
+    expect(screen.getByText('Überfällig')).toBeInTheDocument();
+    expect(screen.getByText('Wöchentlich')).toBeInTheDocument();
+    expect(screen.queryByText('Aktuell')).not.toBeInTheDocument();
+    expect(screen.queryByText('Ohne Zähler')).not.toBeInTheDocument();
+  });
+
+  it('sendet das Ableseintervall beim Anlegen (Default 35, änderbar)', async () => {
+    let createBody: Record<string, unknown> | null = null;
+    _mockEmptyData();
+    server.use(
+      http.post('/api/v1/measuring-points', async ({ request }) => {
+        createBody = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json({ id: 99 }, { status: 201 });
+      }),
+    );
+    const user = userEvent.setup();
+    renderWithRouter(<MeasuringPointsAdminPage />);
+
+    await user.click(await screen.findByRole('button', { name: /Messstelle anlegen/i }));
+    await user.click(await screen.findByRole('button', { name: /Strom/i }));
+    const intervalInput = screen.getByLabelText(/Ableseintervall/);
+    expect(intervalInput).toHaveValue('35');
+    await user.clear(intervalInput);
+    await user.type(intervalInput, '14');
+    await user.type(screen.getByLabelText('Name'), 'Garten');
+    await user.type(screen.getByLabelText('Seriennummer'), 'W-1');
+    await user.click(screen.getByRole('button', { name: 'Anlegen' }));
+
+    await waitFor(() => expect(createBody).not.toBeNull());
+    expect(createBody!['reading_interval_days']).toBe(14);
+  });
+});

@@ -12,7 +12,8 @@
   pro Zeitraum/Granularität deckt die ganze Seite (kein `/measuring-points`,
   kein `/locations`), Client-Cache (SWR, 12 Einträge, `useDashboardData.ts`,
   auf Logout/401 geleert). KPI-Kacheln mit Δ zur Vorperiode, Hinweise-Karte
-  (nie/lange nicht abgelesen ab 45 Tagen, Abweichung > ±30 % ggü. Vorperiode),
+  (fällige Messstellen laut individuellem Ableseintervall — Kopf zeigt
+  „X Messstellen fällig", Abweichung > ±30 % ggü. Vorperiode),
   Top-Verbraucher (Top 5, nur Bezug, reale Messstellen). Filter inline
   (Desktop) bzw. Bottom-Sheet mit Chips (Mobile, `DashboardFilters.tsx`).
   **Keine Diagramme** (seit v2.72 entfernt — Verläufe gibt es in den

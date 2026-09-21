@@ -120,6 +120,7 @@ def _to_item(
         current_owner_name=owner_obj.name if owner_obj is not None else None,
         kostenstelle=mp.kostenstelle,
         installation_location=mp.installation_location,
+        reading_interval_days=mp.reading_interval_days,
         registers=[
             DashboardRegister(obis_code=s.obis_code, label=s.label, unit=s.unit) for s in states
         ],

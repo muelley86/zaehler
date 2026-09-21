@@ -59,6 +59,7 @@ class DashboardMeasuringPoint(APIModel):
     current_owner_name: str | None
     kostenstelle: int | None
     installation_location: str | None
+    reading_interval_days: int
     registers: list[DashboardRegister]
     # Maximum ueber die aktiven Register; ``None``, solange nichts erfasst ist.
     last_reading_at: UtcDateTime | None

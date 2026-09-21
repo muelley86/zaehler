@@ -46,7 +46,9 @@ export function dashboardItem(
     current_owner_name: null,
     kostenstelle: null,
     installation_location: null,
-    registers: [],
+    reading_interval_days: 35,
+    // Ein aktives Register = eingebauter Zähler → Messstelle ist ablesbar.
+    registers: [{ obis_code: '1.8.0', label: 'Bezug', unit: 'kWh' }],
     last_reading_at: null,
     consumption: [],
     totals: [],

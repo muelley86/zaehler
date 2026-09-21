@@ -7,7 +7,8 @@ from typing import Self
 from pydantic import BaseModel, Field, model_validator
 
 from meters.models import HeatingSource, MeterType
-from meters.schemas.common import APIModel, DecimalStr
+from meters.models.measuring_point import DEFAULT_READING_INTERVAL_DAYS
+from meters.schemas.common import APIModel, DecimalStr, UtcDateTime
 from meters.schemas.physical_meter import PhysicalMeterRead
 from meters.schemas.state import RegisterStateRead
 
@@ -15,6 +16,8 @@ from meters.schemas.state import RegisterStateRead
 # Die alten Wärme-Einheiten (h, L) bleiben für migrierte Heizöl-Bestände
 # kompatibel; m³ ist auch für Gas-Heizungen sinnvoll.
 ALLOWED_HEATING_UNITS = frozenset({"kWh", "MWh", "SRM", "CBM", "To", "h", "L", "m³"})
+
+MAX_READING_INTERVAL_DAYS = 3650
 
 
 class HeatingRegisterCreate(BaseModel):
@@ -52,6 +55,10 @@ class MeasuringPointBase(BaseModel):
     installation_location: str | None = Field(default=None, max_length=200)
     # Kostenstelle: optionale Ganzzahl 0-99999 (keine fuehrenden Nullen), alle Typen.
     kostenstelle: int | None = Field(default=None, ge=0, le=99999)
+    # Ableseintervall in Tagen (1 Tag bis 10 Jahre).
+    reading_interval_days: int = Field(
+        default=DEFAULT_READING_INTERVAL_DAYS, ge=1, le=MAX_READING_INTERVAL_DAYS
+    )
 
     @model_validator(mode="after")
     def _tank_capacity_only_heating(self) -> Self:
@@ -143,6 +150,8 @@ class MeasuringPointUpdate(BaseModel):
     # Stichtag fuer kostenstelle/clear_kostenstelle (seit 0036 periodisiert). Default: heute
     # beim Wechsel/Beenden, Einbau des ersten Zaehlers beim erstmaligen Setzen.
     kostenstelle_valid_from: date | None = None
+    # Nicht nullable — kein clear_-Flag; weglassen = unveraendert.
+    reading_interval_days: int | None = Field(default=None, ge=1, le=MAX_READING_INTERVAL_DAYS)
 
 
 class MeasuringPointRead(APIModel):
@@ -166,6 +175,10 @@ class MeasuringPointRead(APIModel):
     market_location: str | None = None
     installation_location: str | None = None
     kostenstelle: int | None = None
+    reading_interval_days: int = DEFAULT_READING_INTERVAL_DAYS
+    # Juengste Ablesung ueber die aktiven Register des aktiven Zaehlers — Basis
+    # der Faelligkeit. Vom Router befuellt; ``None`` = nie abgelesen.
+    last_reading_at: UtcDateTime | None = None
     # Aktueller Eigentuemer (vom Router aus dem ``OwnerAssignment`` mit
     # ``valid_to IS NULL`` befuellt). ``None``, wenn aktuell keiner.
     current_owner_id: int | None = None

@@ -51,6 +51,12 @@ import { useAuth } from '@/features/auth/auth-context';
 import { useFilterPrefs } from '@/features/prefs/filter-prefs-context';
 import { ApiError, api } from '@/lib/api';
 import { formatDateTickDe, formatDateTimeDe, formatDe, parseDe } from '@/lib/format';
+import {
+  DEFAULT_READING_INTERVAL_DAYS,
+  daysSince,
+  isMeasuringPointDue,
+  isMeasuringPointReadable,
+} from '@/lib/readingDue';
 import { useChartTheme } from '@/lib/useChartTheme';
 import type {
   ConsumptionPoint,
@@ -480,6 +486,11 @@ function StammdatenReadView({
       <FieldRow k="Aktueller Eigentümer" v={mp.current_owner_name ?? '—'} />
       <FieldRow k="Aktueller Lieferant" v={mp.current_supplier_name ?? '—'} />
       {mp.kostenstelle !== null ? <FieldRow k="Kostenstelle" v={String(mp.kostenstelle)} /> : null}
+      <FieldRow
+        k="Ableseintervall"
+        v={`${mp.reading_interval_days ?? DEFAULT_READING_INTERVAL_DAYS} Tage`}
+      />
+      <FieldRow k="Ablesestatus" v={<ReadingDueStatus mp={mp} />} />
       {location &&
       (location.address_street || location.address_postcode || location.address_city) ? (
         <FieldRow
@@ -508,6 +519,21 @@ function StammdatenReadView({
   );
 }
 
+/** Fälligkeit laut Ableseintervall (Regel: `lib/readingDue.ts`). */
+function ReadingDueStatus({ mp }: { mp: MeasuringPointRead }) {
+  const now = new Date();
+  if (!isMeasuringPointReadable(mp)) return <>—</>;
+  const days = daysSince(mp.last_reading_at, now);
+  if (!isMeasuringPointDue(mp, now)) {
+    return <>aktuell (vor {days} Tagen abgelesen)</>;
+  }
+  return (
+    <span className="font-semibold text-warning">
+      {days === null ? 'fällig – nie abgelesen' : `fällig – vor ${days} Tagen abgelesen`}
+    </span>
+  );
+}
+
 function StammdatenEditForm({
   mp,
   locations,
@@ -531,6 +557,8 @@ function StammdatenEditForm({
   const [contractNumber, setContractNumber] = useState(mp.contract_number ?? '');
   const [marketLocation, setMarketLocation] = useState(mp.market_location ?? '');
   const [installationLocation, setInstallationLocation] = useState(mp.installation_location ?? '');
+  const currentInterval = mp.reading_interval_days ?? DEFAULT_READING_INTERVAL_DAYS;
+  const [readingInterval, setReadingInterval] = useState(String(currentInterval));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -592,6 +620,15 @@ function StammdatenEditForm({
         } else if (trimmed !== mp.installation_location) {
           body['installation_location'] = trimmed;
         }
+      }
+      {
+        const parsed = Number(readingInterval.trim());
+        if (!Number.isInteger(parsed) || parsed < 1 || parsed > 3650) {
+          throw new RangeError(
+            'Ableseintervall muss eine Ganzzahl zwischen 1 und 3650 Tagen sein.',
+          );
+        }
+        if (parsed !== currentInterval) body['reading_interval_days'] = parsed;
       }
       const updated = await api.patch<MeasuringPointRead>(`/measuring-points/${mp.id}`, body);
       onSaved(updated);
@@ -682,6 +719,13 @@ function StammdatenEditForm({
         value={installationLocation}
         onChange={(e) => setInstallationLocation(e.target.value)}
         hint="z. B. 1. Stock, Wohnung 4b — leer = nicht gesetzt"
+      />
+      <TextField
+        label="Ableseintervall (Tage)"
+        inputMode="numeric"
+        value={readingInterval}
+        onChange={(e) => setReadingInterval(e.target.value.replace(/\D/g, '').slice(0, 4))}
+        hint="Nach so vielen Tagen seit der letzten Ablesung gilt die Messstelle als fällig."
       />
       <div className="text-caption text-tertiary">
         Die Kostenstelle hat einen Gültigkeitszeitraum und wird in der Kostenstellen-Historie

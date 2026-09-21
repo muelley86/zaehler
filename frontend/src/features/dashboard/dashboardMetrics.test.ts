@@ -8,7 +8,6 @@ import {
   selectInsights,
   selectKpiTiles,
   selectTopConsumers,
-  STALE_AFTER_DAYS,
   TOP_LIMIT,
 } from './dashboardMetrics';
 
@@ -231,26 +230,29 @@ describe('selectKpiTiles', () => {
 describe('selectInsights', () => {
   const now = new Date('2026-09-07T12:00:00Z');
 
-  it('46 Tage seit letzter Ablesung → stale; 44 Tage → kein Hinweis', () => {
-    const stale = dashboardItem({
+  it('fällig ab dem individuellen Ableseintervall (Grenze inklusiv)', () => {
+    const due = dashboardItem({
       id: 1,
-      last_reading_at: new Date(now.getTime() - 46 * 86_400_000).toISOString(),
+      reading_interval_days: 35,
+      last_reading_at: new Date(now.getTime() - 35 * 86_400_000).toISOString(),
     });
     const fresh = dashboardItem({
       id: 2,
-      last_reading_at: new Date(now.getTime() - 44 * 86_400_000).toISOString(),
+      reading_interval_days: 35,
+      last_reading_at: new Date(now.getTime() - 34 * 86_400_000).toISOString(),
     });
-    const insights = selectInsights([stale, fresh], { now });
-    expect(insights.filter((i) => i.kind === 'stale').map((i) => i.mpId)).toEqual([1]);
+    const weekly = dashboardItem({
+      id: 3,
+      reading_interval_days: 7,
+      last_reading_at: new Date(now.getTime() - 8 * 86_400_000).toISOString(),
+    });
+    const insights = selectInsights([due, fresh, weekly], { now });
+    expect(insights.filter((i) => i.kind === 'stale').map((i) => i.mpId)).toEqual([1, 3]);
   });
 
-  it('daysSince genau 45 (== STALE_AFTER_DAYS) → kein Hinweis (Grenze exklusiv)', () => {
-    const boundary = dashboardItem({
-      id: 1,
-      last_reading_at: new Date(now.getTime() - 45 * 86_400_000).toISOString(),
-    });
-    const insights = selectInsights([boundary], { now });
-    expect(insights.filter((i) => i.kind === 'stale')).toEqual([]);
+  it('ohne aktive Register (kein Zähler eingebaut) → nie fällig', () => {
+    const noMeter = dashboardItem({ id: 1, registers: [], last_reading_at: null });
+    expect(selectInsights([noMeter], { now }).filter((i) => i.kind === 'stale')).toEqual([]);
   });
 
   it('last_reading_at null → nie abgelesen, sortiert zuerst', () => {
@@ -319,33 +321,22 @@ describe('selectInsights', () => {
   });
 
   describe('Default-Konstanten', () => {
-    it('STALE_AFTER_DAYS/DEVIATION_PCT sind die Default-Schwellen', () => {
-      expect(STALE_AFTER_DAYS).toBe(45);
+    it('DEVIATION_PCT ist die Default-Schwelle', () => {
       expect(DEVIATION_PCT).toBe(30);
     });
 
-    it('opts.staleAfterDays/opts.deviationPct verschieben die Schwellen', () => {
-      const stale12 = dashboardItem({
-        id: 1,
-        last_reading_at: new Date(now.getTime() - 12 * 86_400_000).toISOString(),
-      });
+    it('opts.deviationPct verschiebt die Schwelle', () => {
       const dev40 = dashboardItem({
         id: 2,
         last_reading_at: now.toISOString(),
         totals: [total({ current: '140', previous: '100' })], // +40 %
       });
-
-      const withDefaults = selectInsights([stale12, dev40], { now });
-      expect(withDefaults.filter((i) => i.kind === 'stale')).toHaveLength(0); // 12 Tage < Default 45
-      expect(withDefaults.filter((i) => i.kind === 'deviation')).toHaveLength(1); // 40 % > Default 30
-
-      const withCustom = selectInsights([stale12, dev40], {
-        now,
-        staleAfterDays: 10,
-        deviationPct: 50,
-      });
-      expect(withCustom.filter((i) => i.kind === 'stale')).toHaveLength(1); // 12 Tage > custom 10
-      expect(withCustom.filter((i) => i.kind === 'deviation')).toHaveLength(0); // 40 % < custom 50
+      expect(selectInsights([dev40], { now }).filter((i) => i.kind === 'deviation')).toHaveLength(
+        1,
+      );
+      expect(
+        selectInsights([dev40], { now, deviationPct: 50 }).filter((i) => i.kind === 'deviation'),
+      ).toHaveLength(0);
     });
   });
 });

@@ -1,5 +1,6 @@
 /**
- * Hinweise-Karte: nie/lange nicht abgelesene Messstellen und auffällige
+ * Hinweise-Karte: fällige (nie bzw. länger als ihr Ableseintervall nicht
+ * abgelesene) Messstellen und auffällige
  * Verbrauchs-Abweichungen ggü. der Vorperiode (`dashboardMetrics.ts::selectInsights`).
  * Mehr als `MAX_VISIBLE` Einträge werden standardmäßig eingeklappt — ein
  * Toggle blendet den Rest ein und wieder aus.
@@ -75,9 +76,15 @@ export function InsightsCard({ insights }: InsightsCardProps) {
   const hasMore = insights.length > MAX_VISIBLE;
   const visible = expanded ? insights : insights.slice(0, MAX_VISIBLE);
   const remaining = insights.length - MAX_VISIBLE;
+  // Stale-Hinweise = fällige Messstellen (individuelles Ableseintervall je MP).
+  const dueCount = insights.filter((i) => i.kind === 'stale').length;
+  const header =
+    dueCount > 0
+      ? `Hinweise · ${dueCount} ${dueCount === 1 ? 'Messstelle' : 'Messstellen'} fällig`
+      : 'Hinweise';
 
   return (
-    <Section header="Hinweise">
+    <Section header={header}>
       <ul className="divide-y divide-separator">
         {visible.map((insight) =>
           insight.kind === 'stale' ? (

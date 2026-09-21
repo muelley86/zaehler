@@ -21,6 +21,7 @@ import {
   Card,
   LargeTitle,
   MultiSelectDropdown,
+  Pill,
   Section,
   Select,
   Switch,
@@ -32,7 +33,9 @@ import { ApiError, api } from '@/lib/api';
 import { parseDe } from '@/lib/format';
 import { HEATING_SOURCE_LABELS, TYPE_LABELS, describeMeterType } from '@/lib/meterLabels';
 import { useFilterPrefs } from '@/features/prefs/filter-prefs-context';
+import { DEFAULT_READING_INTERVAL_DAYS, daysSince, isMeasuringPointDue } from '@/lib/readingDue';
 import { setCodec, useStickyState } from '@/lib/useStickyState';
+import type { StickyCodec } from '@/lib/useStickyState';
 import type {
   HeatingSource,
   HeatingUnit,
@@ -124,6 +127,10 @@ const TYPE_CODEC = setCodec<MeterType>(isMeterType);
 // Id-Filter mit „ohne …"-Option: null = Messstellen ohne Zuordnung.
 const isIdMember = (x: unknown): x is number | null => x === null || typeof x === 'number';
 const ID_CODEC = setCodec<number | null>(isIdMember);
+const BOOL_CODEC: StickyCodec<boolean> = {
+  serialize: (b) => (b ? '1' : '0'),
+  deserialize: (raw) => raw === '1',
+};
 
 // Client-seitiges inkrementelles Rendern: bei Firmen-Skala (hunderte MPs)
 // nicht alle Karten auf einmal in den DOM haengen. Filter grenzt zuerst ein;
@@ -172,6 +179,14 @@ export function MeasuringPointsAdminPage() {
     rememberFilters,
     ID_CODEC,
   );
+  const [dueOnly, setDueOnly] = useStickyState<boolean>(
+    FILTER_NS + 'dueOnly',
+    false,
+    rememberFilters,
+    BOOL_CODEC,
+  );
+  // Referenzzeitpunkt der Fälligkeit — einmal je Datenladen, nicht je Render.
+  const [now, setNow] = useState(() => new Date());
 
   useEffect(() => {
     Promise.all([
@@ -183,6 +198,7 @@ export function MeasuringPointsAdminPage() {
     ])
       .then(([mps, locs, owns, supps, mits]) => {
         setPoints(mps);
+        setNow(new Date());
         setLocations(locs);
         setOwners(owns);
         setSuppliers(supps);
@@ -241,9 +257,19 @@ export function MeasuringPointsAdminPage() {
           (ownerFilter.size === 0 || ownerFilter.has(mp.current_owner_id)) &&
           (supplierFilter.size === 0 || supplierFilter.has(mp.current_supplier_id)) &&
           (mainLocationFilter.size === 0 || mainLocationFilter.has(mp.main_location_id)) &&
-          (mieterFilter.size === 0 || mieterFilter.has(mp.current_mieter_id)),
+          (mieterFilter.size === 0 || mieterFilter.has(mp.current_mieter_id)) &&
+          (!dueOnly || isMeasuringPointDue(mp, now)),
       ),
-    [points, typeFilter, ownerFilter, supplierFilter, mainLocationFilter, mieterFilter],
+    [
+      points,
+      typeFilter,
+      ownerFilter,
+      supplierFilter,
+      mainLocationFilter,
+      mieterFilter,
+      dueOnly,
+      now,
+    ],
   );
 
   const hasActiveFilters =
@@ -251,7 +277,8 @@ export function MeasuringPointsAdminPage() {
     ownerFilter.size > 0 ||
     supplierFilter.size > 0 ||
     mainLocationFilter.size > 0 ||
-    mieterFilter.size > 0;
+    mieterFilter.size > 0 ||
+    dueOnly;
 
   function resetFilters() {
     setTypeFilter(new Set());
@@ -259,6 +286,7 @@ export function MeasuringPointsAdminPage() {
     setSupplierFilter(new Set());
     setMainLocationFilter(new Set());
     setMieterFilter(new Set());
+    setDueOnly(false);
   }
 
   return (
@@ -338,6 +366,9 @@ export function MeasuringPointsAdminPage() {
               onChange={setMainLocationFilter}
             />
           ) : null}
+          <Pill active={dueOnly} onClick={() => setDueOnly((v) => !v)}>
+            Nur fällige
+          </Pill>
           {hasActiveFilters ? (
             <Button variant="plain" size="sm" onClick={resetFilters}>
               Filter zurücksetzen
@@ -348,7 +379,7 @@ export function MeasuringPointsAdminPage() {
 
       <div className="space-y-3">
         {filtered.slice(0, visibleCount).map((mp) => (
-          <MPCard key={mp.id} mp={mp} onChanged={refresh} />
+          <MPCard key={mp.id} mp={mp} now={now} onChanged={refresh} />
         ))}
         {filtered.length > visibleCount ? (
           <Button
@@ -376,7 +407,15 @@ export function MeasuringPointsAdminPage() {
  * Damit der Löschen-Klick nicht in den Card-Link bubbelt, halten wir den
  * Klick mit ``e.stopPropagation()`` an der Knopf-Ebene zurück.
  */
-function MPCard({ mp, onChanged }: { mp: MeasuringPointRead; onChanged: () => void }) {
+function MPCard({
+  mp,
+  now,
+  onChanged,
+}: {
+  mp: MeasuringPointRead;
+  now: Date;
+  onChanged: () => void;
+}) {
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -412,6 +451,9 @@ function MPCard({ mp, onChanged }: { mp: MeasuringPointRead; onChanged: () => vo
             {mp.location_name ? ` · ${mp.location_name}` : ''}
           </div>
         </div>
+        {isMeasuringPointDue(mp, now) ? (
+          <DueBadge lastReadingAt={mp.last_reading_at} now={now} />
+        ) : null}
         <button
           type="button"
           onClick={(e) => void deleteMp(e)}
@@ -429,6 +471,16 @@ function MPCard({ mp, onChanged }: { mp: MeasuringPointRead; onChanged: () => vo
         </div>
       ) : null}
     </Card>
+  );
+}
+
+/** Hinweis-Badge für fällige Messstellen (Ableseintervall überschritten bzw. nie abgelesen). */
+function DueBadge({ lastReadingAt, now }: { lastReadingAt: string | null | undefined; now: Date }) {
+  const days = daysSince(lastReadingAt, now);
+  return (
+    <span className="shrink-0 whitespace-nowrap rounded-full bg-warning/15 px-2 py-0.5 text-caption font-medium text-warning">
+      {days === null ? 'nie abgelesen' : `fällig · ${days} Tage`}
+    </span>
   );
 }
 
@@ -540,6 +592,9 @@ function CreateFormFields({
   // Kostenstelle (alle Typen, optional)
   const [kostenstelle, setKostenstelle] = useState('');
 
+  // Ableseintervall in Tagen (alle Typen, Default 35)
+  const [readingInterval, setReadingInterval] = useState(String(DEFAULT_READING_INTERVAL_DAYS));
+
   // Heizung
   const [heatingSource, setHeatingSource] = useState<HeatingSource>('oil');
   const [registers, setRegisters] = useState<RegisterDraft[]>(HEATING_PRESETS.oil);
@@ -601,6 +656,11 @@ function CreateFormFields({
         }
         body['kostenstelle'] = parsed;
       }
+      const interval = Number(readingInterval.trim());
+      if (!Number.isInteger(interval) || interval < 1 || interval > 3650) {
+        throw new RangeError('Ableseintervall muss eine Ganzzahl zwischen 1 und 3650 Tagen sein.');
+      }
+      body['reading_interval_days'] = interval;
       if (type === 'heating') {
         body['heating_source'] = heatingSource;
         // Fernwärme: kein Tankvolumen (Feld ist ausgeblendet) — ggf. veraltet
@@ -689,6 +749,13 @@ function CreateFormFields({
         value={kostenstelle}
         onChange={(e) => setKostenstelle(e.target.value.replace(/\D/g, '').slice(0, 5))}
         hint="5-stellige Zahl (0–99999); leer = nicht gesetzt"
+      />
+      <TextField
+        label="Ableseintervall (Tage)"
+        inputMode="numeric"
+        value={readingInterval}
+        onChange={(e) => setReadingInterval(e.target.value.replace(/\D/g, '').slice(0, 4))}
+        hint="Nach so vielen Tagen gilt die Messstelle als fällig (Standard 35)."
       />
       <TextField
         label="Seriennummer"

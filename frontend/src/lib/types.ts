@@ -721,6 +721,11 @@ export interface MeasuringPointRead {
   current_mieter_id: number | null;
   current_mieter_name: string | null;
   kostenstelle: number | null;
+  // Ableseintervall in Tagen (Default 35). Optional, weil Offline-Snapshots
+  // von vor dem Feld es nicht enthalten — Fallback siehe `lib/readingDue.ts`.
+  reading_interval_days?: number;
+  // Jüngste Ablesung über die aktiven Register; null = nie abgelesen.
+  last_reading_at?: string | null;
   physical_meters: PhysicalMeterRead[];
 }
 
@@ -807,6 +812,7 @@ export interface DashboardMeasuringPoint {
   current_owner_name: string | null;
   kostenstelle: number | null;
   installation_location: string | null;
+  reading_interval_days: number;
   registers: DashboardRegister[];
   last_reading_at: string | null; // ISO-DateTime
   consumption: ConsumptionPoint[];
