@@ -321,3 +321,34 @@ def test_0040_uebertragung_hin_und_zurueck(fresh_engine: Engine) -> None:
             text("SELECT count(*) FROM sqlite_master WHERE name LIKE 'billing_transfer%'")
         ).scalar_one()
     assert rest == 0
+
+
+def test_0043_setzt_ableseintervall_35_ohne_datenverlust(fresh_engine: Engine) -> None:
+    """Bestands-Messstellen bekommen per ``server_default`` 35 Tage; Up- und Downgrade
+    duerfen bei ``foreign_keys=ON`` keine Kinddaten loeschen (vgl. 0035)."""
+    event.listen(
+        fresh_engine, "connect", lambda dbapi, _rec: dbapi.execute("PRAGMA foreign_keys=ON")
+    )
+    _upgrade(fresh_engine, "0042_user_last_totp_counter")
+    with fresh_engine.begin() as conn:
+        conn.execute(
+            text(
+                "INSERT INTO measuring_point (id, name, type, is_bidirectional, has_dual_tariff, "
+                "created_at) VALUES (1, 'Bestand', 'ELECTRICITY', 0, 0, datetime('now'))"
+            )
+        )
+        conn.execute(
+            text(
+                "INSERT INTO physical_meter (id, measuring_point_id, serial_number, installed_at, "
+                "created_at) VALUES (1, 1, 'X', '2024-01-01', datetime('now'))"
+            )
+        )
+    _upgrade(fresh_engine, "0043_mp_reading_interval")
+    with fresh_engine.connect() as conn:
+        wert = conn.execute(
+            text("SELECT reading_interval_days FROM measuring_point WHERE id = 1")
+        ).scalar()
+        assert wert == 35
+    _downgrade(fresh_engine, "0042_user_last_totp_counter")
+    with fresh_engine.connect() as conn:
+        assert conn.execute(text("SELECT COUNT(*) FROM physical_meter")).scalar() == 1

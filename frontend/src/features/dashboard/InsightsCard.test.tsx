@@ -39,7 +39,7 @@ function deviation(overrides: Partial<Extract<Insight, { kind: 'deviation' }>> =
 describe('InsightsCard', () => {
   it('rendert eine stale-Zeile mit Tagen, Datum und "Jetzt erfassen"-Link', () => {
     renderWithRouter(<InsightsCard insights={[stale()]} />);
-    expect(screen.getByText('Hinweise')).toBeInTheDocument();
+    expect(screen.getByText('Hinweise · 1 Messstelle fällig')).toBeInTheDocument();
     expect(
       screen.getByText('Wasser Garten: letzte Ablesung vor 60 Tagen (01.06.2026)'),
     ).toBeInTheDocument();

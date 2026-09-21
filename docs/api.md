@@ -21,7 +21,10 @@ Alle Endpoints unter `/api/v1`. Fehler im RFC-7807-Format
 
 ## Measuring Points
 
-- `GET /measuring-points`
+- `GET /measuring-points` — jede MP inkl. `reading_interval_days` und
+  `last_reading_at` (jüngste Ablesung der aktiven Register, gebündelt in einer
+  Query; `null` = nie abgelesen). `GET/PATCH /measuring-points/{id}` liefern
+  beide Felder ebenso; `reading_interval_days` ist in POST/PATCH setzbar (1–3650).
 - `POST /measuring-points`
 - `PATCH /measuring-points/{id}`
 - `DELETE /measuring-points/{id}`

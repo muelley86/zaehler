@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any, cast
 
+import pytest
 from fastapi.testclient import TestClient
 
 
@@ -496,3 +497,62 @@ def test_kostenstelle_rejects_out_of_range(admin_client: TestClient) -> None:
             },
         )
         assert resp.status_code == 422, resp.text
+
+
+def test_reading_interval_defaults_to_35(admin_client: TestClient) -> None:
+    mp = _create_electricity(admin_client)
+    assert mp["reading_interval_days"] == 35
+
+
+def test_create_with_reading_interval(admin_client: TestClient) -> None:
+    resp = admin_client.post(
+        "/api/v1/measuring-points",
+        json={
+            "name": "Wasser monatlich",
+            "type": "water",
+            "reading_interval_days": 7,
+            "serial_number": "W-INT-1",
+            "installed_at": "2024-01-01",
+            "initial_values": {"8.0": "0"},
+        },
+    )
+    assert resp.status_code == 201, resp.text
+    assert resp.json()["reading_interval_days"] == 7
+
+
+def test_patch_reading_interval_is_audited(admin_client: TestClient) -> None:
+    mp = _create_electricity(admin_client)
+    resp = admin_client.patch(
+        f"/api/v1/measuring-points/{mp['id']}", json={"reading_interval_days": 90}
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["reading_interval_days"] == 90
+    audit = admin_client.get("/api/v1/audit-log")
+    assert audit.status_code == 200, audit.text
+    diffs = [e["diff"] or {} for e in audit.json()]
+    assert {"from": 35, "to": 90} in [d.get("reading_interval_days") for d in diffs]
+
+
+@pytest.mark.parametrize("value", [0, 3651])
+def test_reading_interval_rejects_out_of_range(admin_client: TestClient, value: int) -> None:
+    mp = _create_electricity(admin_client)
+    resp = admin_client.patch(
+        f"/api/v1/measuring-points/{mp['id']}", json={"reading_interval_days": value}
+    )
+    assert resp.status_code == 422
+
+
+def test_list_and_detail_include_last_reading_at(admin_client: TestClient) -> None:
+    mp = _create_electricity(admin_client)
+    register_ids = [r["id"] for r in mp["physical_meters"][0]["registers"]]
+    for register_id, ts in zip(register_ids, ["2025-03-01T08:00:00", "2025-04-01T08:00:00"]):
+        resp = admin_client.post(
+            "/api/v1/readings",
+            json={"register_id": register_id, "value": "99999", "reading_at": ts},
+        )
+        assert resp.status_code == 201, resp.text
+    listed = admin_client.get("/api/v1/measuring-points").json()
+    item = next(m for m in listed if m["id"] == mp["id"])
+    assert item["last_reading_at"].startswith("2025-04-01T08:00:00")
+    detail = admin_client.get(f"/api/v1/measuring-points/{mp['id']}").json()
+    assert detail["last_reading_at"] == item["last_reading_at"]
