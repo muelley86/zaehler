@@ -10,6 +10,13 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.76.0](https://github.com/muelley86/zaehler/compare/v2.75.1...v2.76.0) (2026-09-21)
+
+
+### Funktionen
+
+* **measuring-points:** Ableseintervall je Messstelle mit Fälligkeit ([#350](https://github.com/muelley86/zaehler/issues/350)) ([03a965e](https://github.com/muelley86/zaehler/commit/03a965e297b552b674dcd18e1f79da60ed4db34f))
+
 ## [2.75.1](https://github.com/muelley86/zaehler/compare/v2.75.0...v2.75.1) (2026-09-20)
 
 
