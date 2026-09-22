@@ -2,11 +2,14 @@ import { useEffect, useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
 import { KeyRound } from 'lucide-react';
 
-import { Button, EmptyState, LargeTitle, Section, Sheet, TextField } from '@/components/ui';
+import { Button, EmptyState, LargeTitle, Section, Sheet } from '@/components/ui';
 import { ApiError, api } from '@/lib/api';
 import type { MeasuringPointRead, MieterRead } from '@/lib/types';
 
 import { MasterDataList } from '../_shared/MasterDataList';
+import { FormFields, MieterCreateForm } from './MieterFormFields';
+import { fromMieter, toBody } from './mieterFormState';
+import type { MieterFormState } from './mieterFormState';
 
 export function MietersAdminPage() {
   const [mieters, setMieters] = useState<MieterRead[] | null>(null);
@@ -68,7 +71,9 @@ export function MietersAdminPage() {
         </div>
       ) : null}
 
-      <CreateForm onCreated={refresh} />
+      <Section header="Neuer Mieter">
+        <MieterCreateForm onCreated={refresh} className="p-5" />
+      </Section>
 
       <MasterDataList
         items={mieters}
@@ -106,56 +111,6 @@ export function MietersAdminPage() {
       </Sheet>
     </>
   );
-}
-
-interface MieterFormState {
-  first_name: string;
-  last_name: string;
-  address_street: string;
-  address_postcode: string;
-  address_city: string;
-  email: string;
-  phone: string;
-  note: string;
-}
-
-function emptyFormState(): MieterFormState {
-  return {
-    first_name: '',
-    last_name: '',
-    address_street: '',
-    address_postcode: '',
-    address_city: '',
-    email: '',
-    phone: '',
-    note: '',
-  };
-}
-
-function fromMieter(m: MieterRead): MieterFormState {
-  return {
-    first_name: m.first_name ?? '',
-    last_name: m.last_name,
-    address_street: m.address_street ?? '',
-    address_postcode: m.address_postcode ?? '',
-    address_city: m.address_city ?? '',
-    email: m.email ?? '',
-    phone: m.phone ?? '',
-    note: m.note ?? '',
-  };
-}
-
-function toBody(s: MieterFormState): Record<string, unknown> {
-  return {
-    first_name: s.first_name || null,
-    last_name: s.last_name,
-    address_street: s.address_street || null,
-    address_postcode: s.address_postcode || null,
-    address_city: s.address_city || null,
-    email: s.email || null,
-    phone: s.phone || null,
-    note: s.note || null,
-  };
 }
 
 function MieterForm({
@@ -199,104 +154,5 @@ function MieterForm({
         </Button>
       </div>
     </form>
-  );
-}
-
-function CreateForm({ onCreated }: { onCreated: () => void }) {
-  const [state, setState] = useState<MieterFormState>(() => emptyFormState());
-  const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-
-  async function handleSubmit(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    setError(null);
-    setBusy(true);
-    try {
-      await api.post('/mieters', toBody(state));
-      setState(emptyFormState());
-      onCreated();
-    } catch (err) {
-      if (err instanceof ApiError) setError(err.problem.detail ?? err.problem.title);
-      else setError('Anlegen fehlgeschlagen.');
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <Section header="Neuer Mieter">
-      <form onSubmit={(e) => void handleSubmit(e)} className="space-y-3 p-5">
-        <FormFields state={state} onChange={setState} />
-        {error ? <div className="text-caption text-danger">{error}</div> : null}
-        <Button type="submit" variant="filled" disabled={busy} fullWidth>
-          {busy ? 'Speichere…' : 'Anlegen'}
-        </Button>
-      </form>
-    </Section>
-  );
-}
-
-function FormFields({
-  state,
-  onChange,
-}: {
-  state: MieterFormState;
-  onChange: (s: MieterFormState) => void;
-}) {
-  function set<K extends keyof MieterFormState>(key: K, value: string) {
-    onChange({ ...state, [key]: value });
-  }
-  return (
-    <>
-      <div className="grid grid-cols-2 gap-2">
-        <TextField
-          label="Vorname (optional)"
-          value={state.first_name}
-          onChange={(e) => set('first_name', e.target.value)}
-        />
-        <TextField
-          label="Nachname"
-          value={state.last_name}
-          onChange={(e) => set('last_name', e.target.value)}
-          required
-        />
-      </div>
-      <TextField
-        label="Straße + Hausnr. (optional)"
-        value={state.address_street}
-        onChange={(e) => set('address_street', e.target.value)}
-      />
-      <div className="grid grid-cols-3 gap-2">
-        <TextField
-          label="PLZ"
-          value={state.address_postcode}
-          onChange={(e) => set('address_postcode', e.target.value)}
-          inputMode="numeric"
-          pattern="\d{5}"
-          maxLength={5}
-          hint="5 Ziffern"
-        />
-        <div className="col-span-2">
-          <TextField
-            label="Ort"
-            value={state.address_city}
-            onChange={(e) => set('address_city', e.target.value)}
-          />
-        </div>
-      </div>
-      <TextField
-        label="E-Mail"
-        value={state.email}
-        onChange={(e) => set('email', e.target.value)}
-        type="email"
-      />
-      <TextField
-        label="Telefon"
-        value={state.phone}
-        onChange={(e) => set('phone', e.target.value)}
-        type="tel"
-      />
-      <TextField label="Notiz" value={state.note} onChange={(e) => set('note', e.target.value)} />
-    </>
   );
 }

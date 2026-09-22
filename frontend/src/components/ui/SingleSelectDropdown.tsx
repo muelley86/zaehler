@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { useId, useMemo, useState } from 'react';
+import type { ReactNode } from 'react';
 import { Search } from 'lucide-react';
 
 import { Dropdown } from './Dropdown';
@@ -11,7 +12,8 @@ import { cx } from './cx';
  * Mechanik wie {@link MultiSelectDropdown}, aber genau ein Wert: Klick auf eine
  * Option übernimmt sie und schließt das Panel. Suchfeld erscheint bei langen
  * Listen (> ``searchThreshold``). Der Trigger zeigt das gewählte Label bzw.
- * ``placeholder``.
+ * ``placeholder``. Optionales ``label`` erscheint wie bei {@link Select} über dem
+ * Feld und ist per ``aria-labelledby`` mit dem Trigger verknüpft.
  */
 export function SingleSelectDropdown<T extends string | number>({
   options,
@@ -19,14 +21,18 @@ export function SingleSelectDropdown<T extends string | number>({
   onChange,
   placeholder = 'Auswählen…',
   searchThreshold = 8,
+  label,
 }: {
   options: DropdownOption<T>[];
   value: T | null;
   onChange: (value: T) => void;
   placeholder?: string;
   searchThreshold?: number;
+  label?: ReactNode;
 }) {
   const [search, setSearch] = useState('');
+  const labelId = useId();
+  const triggerId = useId();
   const showSearch = options.length > searchThreshold;
 
   const visible = useMemo(() => {
@@ -37,8 +43,13 @@ export function SingleSelectDropdown<T extends string | number>({
 
   const selectedLabel = options.find((o) => o.value === value)?.label ?? placeholder;
 
-  return (
-    <Dropdown variant="field" label={selectedLabel}>
+  const dropdown = (
+    <Dropdown
+      variant="field"
+      label={selectedLabel}
+      id={triggerId}
+      ariaLabelledBy={label ? `${labelId} ${triggerId}` : undefined}
+    >
       {(close) => (
         <div className="flex flex-col">
           {showSearch ? (
@@ -79,5 +90,15 @@ export function SingleSelectDropdown<T extends string | number>({
         </div>
       )}
     </Dropdown>
+  );
+
+  if (!label) return dropdown;
+  return (
+    <div className="block">
+      <span id={labelId} className="mb-1.5 block text-caption-bold uppercase text-tertiary">
+        {label}
+      </span>
+      {dropdown}
+    </div>
   );
 }

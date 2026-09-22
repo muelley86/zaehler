@@ -147,3 +147,73 @@ def test_blank_last_name_rejected(admin_client: TestClient) -> None:
 
 def test_get_unknown_mieter_404(admin_client: TestClient) -> None:
     assert admin_client.get("/api/v1/mieters/999999").status_code == 404
+
+
+def test_person_is_default(admin_client: TestClient) -> None:
+    body = admin_client.post("/api/v1/mieters", json={"last_name": "Person"}).json()
+    assert body["is_company"] is False
+
+
+def test_create_company_drops_first_name(admin_client: TestClient) -> None:
+    resp = admin_client.post(
+        "/api/v1/mieters",
+        json={"is_company": True, "first_name": "Ignoriert", "last_name": "Beispiel GmbH"},
+    )
+    assert resp.status_code == 201, resp.text
+    body = resp.json()
+    assert body["is_company"] is True
+    assert body["first_name"] is None
+    # Firmen erscheinen ueberall nur mit dem Firmennamen.
+    assert body["display_name"] == "Beispiel GmbH"
+    log = _last_log(AuditAction.CREATE)
+    assert log is not None
+    assert (log.diff or {})["is_company"] is True
+
+
+def test_switch_person_to_company_clears_first_name(admin_client: TestClient) -> None:
+    created = admin_client.post(
+        "/api/v1/mieters", json={"first_name": "Erika", "last_name": "Muster"}
+    ).json()
+    resp = admin_client.patch(
+        f"/api/v1/mieters/{created['id']}",
+        json={"is_company": True, "last_name": "Muster AG"},
+    )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["is_company"] is True
+    assert body["first_name"] is None
+    assert body["display_name"] == "Muster AG"
+    log = _last_log(AuditAction.UPDATE)
+    assert log is not None
+    diff: dict[str, Any] = log.diff or {}
+    assert diff["is_company"] == {"from": False, "to": True}
+    assert diff["first_name"] == {"from": "Erika", "to": None}
+
+
+def test_switch_company_back_to_person(admin_client: TestClient) -> None:
+    created = admin_client.post(
+        "/api/v1/mieters", json={"is_company": True, "last_name": "Firma"}
+    ).json()
+    body = admin_client.patch(
+        f"/api/v1/mieters/{created['id']}",
+        json={"is_company": False, "first_name": "Max", "last_name": "Mustermann"},
+    ).json()
+    assert body["is_company"] is False
+    assert body["display_name"] == "Mustermann, Max"
+
+
+def test_patch_company_with_first_name_in_same_call(admin_client: TestClient) -> None:
+    created = admin_client.post(
+        "/api/v1/mieters", json={"first_name": "Alt", "last_name": "Beides"}
+    ).json()
+    body = admin_client.patch(
+        f"/api/v1/mieters/{created['id']}",
+        json={"is_company": True, "first_name": "Soll-Weg", "last_name": "Beides KG"},
+    ).json()
+    assert body["is_company"] is True
+    assert body["first_name"] is None
+    assert body["display_name"] == "Beides KG"
+    # Audit zeigt den tatsaechlich gespeicherten Vornamen, nicht den verworfenen.
+    log = _last_log(AuditAction.UPDATE)
+    assert log is not None
+    assert (log.diff or {})["first_name"] == {"from": "Alt", "to": None}

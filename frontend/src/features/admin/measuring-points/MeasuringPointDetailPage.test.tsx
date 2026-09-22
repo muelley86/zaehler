@@ -84,6 +84,12 @@ const _baseRegister = {
   accepts_deliveries: false,
 };
 
+/** Wählt im durchsuchbaren Zuordnungs-Dropdown (Feld ``label``, noch leer) die Option. */
+async function _pickOption(label: string, option: string) {
+  fireEvent.click(await screen.findByRole('button', { name: `${label} — bitte wählen —` }));
+  fireEvent.click(await screen.findByRole('button', { name: option }));
+}
+
 function _mockMp(mp: MeasuringPointRead) {
   server.use(
     http.get('/api/v1/measuring-points/1', () => HttpResponse.json(mp)),
@@ -457,7 +463,7 @@ describe('MeasuringPointDetailPage Eigentümer-Historie', () => {
       initialEntries: ['/admin/messstellen/1'],
     });
     fireEvent.click(await screen.findByRole('button', { name: /^Periode hinzufügen$/ }));
-    fireEvent.change(await screen.findByLabelText(/^Eigentümer$/), { target: { value: '6' } });
+    await _pickOption('Eigentümer', 'Bob AG');
     fireEvent.change(screen.getByLabelText(/Gültig ab/i), { target: { value: '2020-01-01' } });
     fireEvent.change(screen.getByLabelText(/Gültig bis/i), { target: { value: '2021-01-01' } });
     fireEvent.click(screen.getByRole('button', { name: /Speichern/i }));
@@ -491,8 +497,7 @@ describe('MeasuringPointDetailPage Eigentümer-Historie', () => {
     // Zweite Zeile = geschlossene Periode von Bob AG (id 30).
     const editButtons = await screen.findAllByRole('button', { name: 'Periode bearbeiten' });
     fireEvent.click(editButtons[1]!);
-    const ownerSelect = await screen.findByLabelText(/^Eigentümer$/);
-    expect(ownerSelect).toHaveValue('6');
+    expect(await screen.findByRole('button', { name: 'Eigentümer Bob AG' })).toBeInTheDocument();
     expect(screen.getByLabelText(/Gültig ab/i)).toHaveValue('2022-01-01');
     fireEvent.change(screen.getByLabelText(/Gültig bis/i), { target: { value: '2023-12-31' } });
     fireEvent.click(screen.getByRole('button', { name: /Speichern/i }));
@@ -544,7 +549,7 @@ describe('MeasuringPointDetailPage Eigentümer-Historie', () => {
       initialEntries: ['/admin/messstellen/1'],
     });
     fireEvent.click(await screen.findByRole('button', { name: /^Periode hinzufügen$/ }));
-    fireEvent.change(await screen.findByLabelText(/^Eigentümer$/), { target: { value: '5' } });
+    await _pickOption('Eigentümer', 'Alice GmbH');
     fireEvent.change(screen.getByLabelText(/Gültig ab/i), { target: { value: '2024-06-01' } });
     fireEvent.click(screen.getByRole('button', { name: /Speichern/i }));
     expect(
@@ -614,9 +619,7 @@ describe('MeasuringPointDetailPage Lieferanten-Historie', () => {
       initialEntries: ['/admin/messstellen/1'],
     });
     fireEvent.click(await screen.findByRole('button', { name: /Lieferant wechseln/i }));
-    fireEvent.change(await screen.findByLabelText(/^Neuer Lieferant$/), {
-      target: { value: '8' },
-    });
+    await _pickOption('Neuer Lieferant', 'Regionalwerk');
     fireEvent.change(screen.getByLabelText(/Wechsel zum/i), { target: { value: '2025-06-01' } });
     fireEvent.click(screen.getByRole('button', { name: /^Wechseln$/ }));
     await waitFor(() => expect(postBody).not.toBeNull());
@@ -646,7 +649,7 @@ describe('MeasuringPointDetailPage Lieferanten-Historie', () => {
       initialEntries: ['/admin/messstellen/1'],
     });
     fireEvent.click(await screen.findByRole('button', { name: 'Lieferanten-Periode hinzufügen' }));
-    fireEvent.change(await screen.findByLabelText(/^Lieferant$/), { target: { value: '8' } });
+    await _pickOption('Lieferant', 'Regionalwerk');
     fireEvent.change(screen.getByLabelText(/Gültig ab/i), { target: { value: '2020-01-01' } });
     fireEvent.change(screen.getByLabelText(/Gültig bis/i), { target: { value: '2021-01-01' } });
     fireEvent.click(screen.getByRole('button', { name: /Speichern/i }));

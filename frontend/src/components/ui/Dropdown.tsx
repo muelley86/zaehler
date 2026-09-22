@@ -33,6 +33,8 @@ export function Dropdown({
   variant = 'pill',
   dense = false,
   hideChevron = false,
+  id,
+  ariaLabelledBy,
 }: {
   label: ReactNode;
   /** Aktiv-Zähler (nur ``pill``). > 0 → Trigger aktiv gestylt und zeigt das Badge. */
@@ -45,6 +47,10 @@ export function Dropdown({
   hideChevron?: boolean;
   /** Kompaktere Schrift/Höhe für enge Container (z. B. Sidebar). */
   dense?: boolean;
+  /** DOM-id des Trigger-Buttons (z. B. für ``aria-labelledby``). */
+  id?: string;
+  /** ``aria-labelledby`` des Trigger-Buttons — verknüpft ein sichtbares Feld-Label. */
+  ariaLabelledBy?: string | undefined;
 }) {
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState<{
@@ -119,7 +125,9 @@ export function Dropdown({
     <div className={isField ? 'block w-full' : 'inline-block'}>
       <button
         ref={triggerRef}
+        id={id}
         type="button"
+        aria-labelledby={ariaLabelledBy}
         onClick={() => {
           if (!open) place();
           setOpen((o) => !o);

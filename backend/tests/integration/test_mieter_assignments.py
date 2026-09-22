@@ -362,3 +362,18 @@ def test_mp_delete_cascades_assignments(admin_client: TestClient) -> None:
         db.commit()
         remaining = db.query(MieterAssignment).filter_by(measuring_point_id=mp["id"]).all()
         assert remaining == []
+
+
+def test_change_to_company_mieter_shows_company_name(admin_client: TestClient) -> None:
+    a = _create_mieter(admin_client, "Mieter-Privat")
+    firma = admin_client.post(
+        "/api/v1/mieters", json={"is_company": True, "last_name": "Gewerbe GmbH"}
+    ).json()
+    mp = _create_mp(admin_client, "Strom-Firma", "SN-FI-1", mieter_id=a)
+    resp = admin_client.post(
+        f"/api/v1/measuring-points/{mp['id']}/change-mieter",
+        json={"mieter_id": firma["id"], "valid_from": "2025-03-01"},
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["current_mieter_name"] == "Gewerbe GmbH"
+    assert _history(admin_client, mp["id"])[0]["mieter_name"] == "Gewerbe GmbH"

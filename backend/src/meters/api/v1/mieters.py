@@ -4,7 +4,8 @@ Lesen UND Schreiben nur Admin: Mieter-Stammdaten sind personenbezogene Daten
 (Klarname, Privatadresse, E-Mail, Telefon). Recorder brauchen sie nicht — die
 Filter-/Auswahl-UI speist sich aus den MP-Feldern ``current_mieter_name`` (pro
 MP zugriffsgefiltert), nicht aus diesem Endpoint.
-Mieter sind natuerliche Personen (Vorname optional, Nachname Pflicht) und
+Mieter sind natuerliche Personen (Vorname optional, Nachname Pflicht) oder
+Firmen (``is_company``, Firmenname in ``last_name``, kein Vorname) und
 duerfen namensgleich sein — daher kein UNIQUE. Beim Loeschen werden
 ``mieter_assignment``-Eintraege via DB-Cascade ``SET NULL`` entkoppelt; die
 historischen Mieter-Perioden bleiben erhalten, zeigen aber „unbekannt".
@@ -32,6 +33,7 @@ router = APIRouter(prefix="/mieters", tags=["mieters"])
 
 # Stammdaten-Felder fuer Anlegen/Aendern (Reihenfolge = Audit-Diff-Reihenfolge).
 _MIETER_FIELDS = (
+    "is_company",
     "first_name",
     "last_name",
     "address_street",
@@ -88,7 +90,11 @@ def create_mieter(
         action=AuditAction.CREATE,
         entity_type=AuditEntityType.MIETER,
         entity_id=obj.id,
-        diff={"last_name": obj.last_name, "first_name": obj.first_name},
+        diff={
+            "last_name": obj.last_name,
+            "first_name": obj.first_name,
+            "is_company": obj.is_company,
+        },
         ip_address=client_ip(request),
     )
     db.commit()
@@ -113,6 +119,10 @@ def update_mieter(
         if new_value is not None and new_value != getattr(obj, field_name):
             diff[field_name] = {"from": getattr(obj, field_name), "to": new_value}
             setattr(obj, field_name, new_value)
+    if obj.is_company and obj.first_name is not None:
+        # Firma traegt keinen Vornamen — auch nicht aus der Zeit als Person.
+        diff["first_name"] = {"from": obj.first_name, "to": None}
+        obj.first_name = None
     if diff:
         record(
             db,
@@ -144,7 +154,11 @@ def delete_mieter(
         action=AuditAction.DELETE,
         entity_type=AuditEntityType.MIETER,
         entity_id=obj.id,
-        diff={"last_name": obj.last_name, "first_name": obj.first_name},
+        diff={
+            "last_name": obj.last_name,
+            "first_name": obj.first_name,
+            "is_company": obj.is_company,
+        },
         ip_address=client_ip(request),
     )
     db.delete(obj)
