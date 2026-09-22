@@ -10,6 +10,13 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.79.0](https://github.com/muelley86/zaehler/compare/v2.78.0...v2.79.0) (2026-09-22)
+
+
+### Funktionen
+
+* **mieter:** Firmen als Mieter, Neuanlage beim Mieterwechsel, durchsuchbare Auswahl ([#358](https://github.com/muelley86/zaehler/issues/358)) ([6dcb989](https://github.com/muelley86/zaehler/commit/6dcb989758fd691cd31ce549cd181e2b8aa4b9ac))
+
 ## [2.78.0](https://github.com/muelley86/zaehler/compare/v2.77.1...v2.78.0) (2026-09-22)
 
 
