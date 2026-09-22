@@ -63,10 +63,7 @@ export function KpiTiles({ tiles, compareLabel }: KpiTilesProps) {
   if (tiles.length === 0) return null;
 
   return (
-    <Section
-      header="Verbrauch im Zeitraum"
-      {...(compareLabel ? { footer: `Vergleich mit ${compareLabel}` } : {})}
-    >
+    <Section {...(compareLabel ? { footer: `Vergleich mit ${compareLabel}` } : {})}>
       <ul className="grid grid-cols-2 gap-px bg-separator md:grid-cols-4">
         {tiles.map((tile) => (
           <li key={tile.key} className="space-y-1 bg-surface p-4">

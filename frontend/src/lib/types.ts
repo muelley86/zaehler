@@ -1094,3 +1094,12 @@ export interface RestoreCommitResponse {
   restored: RestoreCounts;
   message: string;
 }
+
+/** Kachel-IDs des Dashboards — Spiegel von `schemas/dashboard_layout.py::DashboardTileId`. */
+export type DashboardTileId = 'kpi' | 'due' | 'insights' | 'top';
+
+/** `GET/PUT /auth/me/dashboard-layout`: Reihenfolge + eingeklappte Kacheln je Benutzer. */
+export interface DashboardLayout {
+  order: DashboardTileId[];
+  collapsed: DashboardTileId[];
+}

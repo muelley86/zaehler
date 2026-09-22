@@ -23,6 +23,7 @@ from meters.schemas.common import (
     DecimalStr,
     ProblemDetails,
 )
+from meters.schemas.dashboard_layout import DashboardLayout
 from meters.schemas.delivery import DeliveryCreate, DeliveryRead, DeliveryUpdate
 from meters.schemas.kostenstelle_assignment import (
     ChangeKostenstelleRequest,
@@ -123,6 +124,7 @@ __all__ = [
     "ChangePasswordRequest",
     "ChangeSupplierRequest",
     "ConsumptionPoint",
+    "DashboardLayout",
     "DecimalStr",
     "DeliveryCreate",
     "DeliveryRead",

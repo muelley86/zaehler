@@ -214,7 +214,7 @@ function compareKpiTiles(a: KpiTile, b: KpiTile): number {
 
 export const DEVIATION_PCT = 30;
 
-interface StaleInsight {
+export interface StaleInsight {
   kind: 'stale';
   mpId: number;
   name: string;
@@ -222,7 +222,7 @@ interface StaleInsight {
   daysSince: number | null;
 }
 
-interface DeviationInsight {
+export interface DeviationInsight {
   kind: 'deviation';
   mpId: number;
   name: string;
@@ -233,10 +233,11 @@ interface DeviationInsight {
   deltaPct: number;
 }
 
-export type Insight = StaleInsight | DeviationInsight;
-
-/** Fällige Messstellen (siehe `lib/readingDue.ts`) — nie abgelesene zuerst, dann die ältesten. */
-function selectStaleInsights(items: DashboardMeasuringPoint[], now: Date): StaleInsight[] {
+/**
+ * Fällige Messstellen (siehe `lib/readingDue.ts`) — nie abgelesene zuerst, dann die ältesten.
+ * Referenzzeitpunkt ist `now`, nicht das Ende des gewählten Zeitraums.
+ */
+export function selectStaleInsights(items: DashboardMeasuringPoint[], now: Date): StaleInsight[] {
   return (
     items
       // Ohne aktive Register (kein Zähler eingebaut) nichts abzulesen → nie fällig,
@@ -264,9 +265,10 @@ function selectStaleInsights(items: DashboardMeasuringPoint[], now: Date): Stale
 /** Gleiche Form wie `KpiBucket` ohne `type` — Abweichungs-Buckets sind je Item schon typisiert. */
 type DeviationBucket = Omit<KpiBucket, 'type'>;
 
-function selectDeviationInsights(
+/** Auffällige Abweichung (> `deviationPct` %) ggü. der Vorperiode, stärkste zuerst. */
+export function selectDeviationInsights(
   items: DashboardMeasuringPoint[],
-  deviationPct: number,
+  deviationPct: number = DEVIATION_PCT,
 ): DeviationInsight[] {
   const result: DeviationInsight[] = [];
   for (const item of items) {
@@ -299,20 +301,6 @@ function selectDeviationInsights(
     }
   }
   return result.sort((a, b) => Math.abs(b.deltaPct) - Math.abs(a.deltaPct));
-}
-
-/**
- * Hinweise auf ungewöhnliche Zustände unter den (gefilterten, realen) Items:
- * nie/lange nicht abgelesen (`stale`) und auffällige Abweichung ggü. der
- * Vorperiode (`deviation`). Referenzzeitpunkt ist `now`, nicht das Ende des
- * gewählten Zeitraums.
- */
-export function selectInsights(
-  items: DashboardMeasuringPoint[],
-  opts: { now: Date; deviationPct?: number },
-): Insight[] {
-  const deviationPct = opts.deviationPct ?? DEVIATION_PCT;
-  return [...selectStaleInsights(items, opts.now), ...selectDeviationInsights(items, deviationPct)];
 }
 
 // --- Top-Verbraucher --------------------------------------------------------

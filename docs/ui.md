@@ -11,10 +11,16 @@
 - Übersichtsdashboard (`features/dashboard/`): ein `GET /api/v1/dashboard`-Request
   pro Zeitraum/Granularität deckt die ganze Seite (kein `/measuring-points`,
   kein `/locations`), Client-Cache (SWR, 12 Einträge, `useDashboardData.ts`,
-  auf Logout/401 geleert). KPI-Kacheln mit Δ zur Vorperiode, Hinweise-Karte
-  (fällige Messstellen laut individuellem Ableseintervall — Kopf zeigt
-  „X Messstellen fällig", Abweichung > ±30 % ggü. Vorperiode),
-  Top-Verbraucher (Top 5, nur Bezug, reale Messstellen). Filter inline
+  auf Logout/401 geleert). Vier Kacheln: „Verbrauch im Zeitraum" (KPI mit Δ
+  zur Vorperiode), „Fällige Messstellen" (laut individuellem Ableseintervall,
+  Kopf zeigt die Anzahl), „Weitere Hinweise" (Abweichung > ±30 % ggü.
+  Vorperiode) und „Top-Verbraucher" (Top 5, nur Bezug, reale Messstellen).
+  Jede Kachel ist auf-/zuklappbar und per Drag & Drop (@dnd-kit, Griff links)
+  oder ▲/▼ verschiebbar; Reihenfolge und Klappzustand speichert
+  `useDashboardLayout.ts` je Benutzer serverseitig
+  (`/auth/me/dashboard-layout`, PUT entprellt, Fehler still → Standard-Layout).
+  Leere Kacheln bleiben mit Leertext stehen, damit die Anordnung stabil
+  bleibt. Filterleiste und Erfasser-Hinweis sind fest oben. Filter inline
   (Desktop) bzw. Bottom-Sheet mit Chips (Mobile, `DashboardFilters.tsx`).
   **Keine Diagramme** (seit v2.72 entfernt — Verläufe gibt es in den
   Auswertungen): das Frontend sendet fest `granularity=month` (günstigster

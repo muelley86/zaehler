@@ -8,9 +8,9 @@ beim ersten Login zum Passwortwechsel.
 from __future__ import annotations
 
 from datetime import datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import Boolean, Integer, String
+from sqlalchemy import JSON, Boolean, Integer, String
 from sqlalchemy import Enum as SAEnum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -67,6 +67,10 @@ class User(Base, TimestampMixin):
         nullable=False,
         server_default="0",
     )
+
+    # Dashboard-Kacheln: Reihenfolge + eingeklappte (``schemas/dashboard_layout``).
+    # ``None`` = Standard-Layout; gelesen wird immer ueber ``normalize_layout``.
+    dashboard_layout: Mapped[dict[str, Any] | None] = mapped_column(JSON)
 
     sessions: Mapped[list[Session]] = relationship(
         "Session",

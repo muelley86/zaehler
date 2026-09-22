@@ -28,6 +28,7 @@ from meters.models import AuditAction, AuditEntityType
 from meters.schemas import (
     BackupCodesResponse,
     ChangePasswordRequest,
+    DashboardLayout,
     LoginRequest,
     LoginResponse,
     MeResponse,
@@ -38,6 +39,7 @@ from meters.schemas import (
     TotpStatusResponse,
     TotpVerifyRequest,
 )
+from meters.schemas.dashboard_layout import normalize_layout
 from meters.services import auth as auth_service
 from meters.services import totp as totp_service
 from meters.services.audit import record
@@ -232,6 +234,21 @@ def logout(request: Request, response: Response, db: DbDep, user: CurrentUser) -
 @router.get("/me", response_model=MeResponse)
 def me(user: CurrentUser) -> MeResponse:
     return MeResponse.model_validate(user)
+
+
+# Dashboard-Layout des angemeldeten Users. Reine UI-Praeferenz: kein Audit,
+# keine fremden User adressierbar (keine ID im Pfad).
+@router.get("/me/dashboard-layout", response_model=DashboardLayout)
+def get_dashboard_layout(user: CurrentUser) -> DashboardLayout:
+    return normalize_layout(user.dashboard_layout)
+
+
+@router.put("/me/dashboard-layout", response_model=DashboardLayout)
+def put_dashboard_layout(payload: DashboardLayout, db: DbDep, user: CurrentUser) -> DashboardLayout:
+    layout = normalize_layout(payload.model_dump())
+    user.dashboard_layout = layout.model_dump()
+    db.commit()
+    return layout
 
 
 @router.post("/change-password", response_model=MeResponse)

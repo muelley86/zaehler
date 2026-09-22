@@ -10,6 +10,11 @@ Alle Endpoints unter `/api/v1`. Fehler im RFC-7807-Format
 - `POST /auth/login`
 - `POST /auth/logout`
 - `POST /auth/change-password`
+- `GET /auth/me/dashboard-layout` — Kachel-Layout des angemeldeten Users
+  (`{order, collapsed}` mit IDs `kpi|due|insights|top`); ohne gespeichertes
+  Layout der Standard, beim Lesen tolerant normalisiert
+- `PUT /auth/me/dashboard-layout` — speichert das Layout (unbekannte/doppelte
+  IDs → 422, fehlende werden angehängt); kein Audit, reine UI-Präferenz
 
 ## Users (admin only)
 

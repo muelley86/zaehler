@@ -42,7 +42,8 @@ Zählerständen). reading_date strikt von created_at trennen –
 Erfassung erfolgt oft nachträglich.
 
 - User: id, username (unique), email (optional), password_hash,
-  role (admin|recorder), is_active, created_at, last_login_at
+  role (admin|recorder), is_active, created_at, last_login_at,
+  dashboard_layout (JSON `{order, collapsed}`, NULL = Standard; Migration 0044)
 
 - Session: id, user_id, token_hash, created_at, expires_at,
   last_seen_at, user_agent, ip_address
