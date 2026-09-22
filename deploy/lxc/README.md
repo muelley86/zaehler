@@ -274,7 +274,7 @@ Container, die noch auf UTC stehen).
 > **Hinweis:** `upgrade-app` aktualisiert **uv/pnpm nicht** — nur `upgrade-all`
 > bzw. `upgrade-tools` bringen die Tool-Chain auf die aktuelle Version. Wer nur
 > `upgrade-app` fährt, bleibt sonst dauerhaft auf der alten pnpm-Version hängen
-> (z. B. pnpm 9.x, während das Repo bereits 11.x pinnt). Daher gelegentlich
+> (z. B. pnpm 11.x, während das Repo bereits 12.x pinnt). Daher gelegentlich
 > `sudo zaehler upgrade-all` oder `sudo zaehler upgrade-tools` mitlaufen lassen.
 > `upgrade-app` warnt inzwischen, wenn pnpm veraltet ist.
 
