@@ -173,6 +173,12 @@ export function MeasuringPointsAdminPage() {
     rememberFilters,
     ID_CODEC,
   );
+  const [locationFilter, setLocationFilter] = useStickyState<Set<number | null>>(
+    FILTER_NS + 'location',
+    new Set(),
+    rememberFilters,
+    ID_CODEC,
+  );
   const [mieterFilter, setMieterFilter] = useStickyState<Set<number | null>>(
     FILTER_NS + 'mieter',
     new Set(),
@@ -249,6 +255,16 @@ export function MeasuringPointsAdminPage() {
     return Array.from(map.entries());
   }, [points]);
 
+  const locationOptions = useMemo(() => {
+    const map = new Map<number, string>();
+    points?.forEach((mp) => {
+      if (mp.location_id !== null && !map.has(mp.location_id)) {
+        map.set(mp.location_id, mp.location_name ?? `#${mp.location_id}`);
+      }
+    });
+    return Array.from(map.entries());
+  }, [points]);
+
   const filtered = useMemo(
     () =>
       (points ?? []).filter(
@@ -257,6 +273,7 @@ export function MeasuringPointsAdminPage() {
           (ownerFilter.size === 0 || ownerFilter.has(mp.current_owner_id)) &&
           (supplierFilter.size === 0 || supplierFilter.has(mp.current_supplier_id)) &&
           (mainLocationFilter.size === 0 || mainLocationFilter.has(mp.main_location_id)) &&
+          (locationFilter.size === 0 || locationFilter.has(mp.location_id)) &&
           (mieterFilter.size === 0 || mieterFilter.has(mp.current_mieter_id)) &&
           (!dueOnly || isMeasuringPointDue(mp, now)),
       ),
@@ -266,6 +283,7 @@ export function MeasuringPointsAdminPage() {
       ownerFilter,
       supplierFilter,
       mainLocationFilter,
+      locationFilter,
       mieterFilter,
       dueOnly,
       now,
@@ -277,6 +295,7 @@ export function MeasuringPointsAdminPage() {
     ownerFilter.size > 0 ||
     supplierFilter.size > 0 ||
     mainLocationFilter.size > 0 ||
+    locationFilter.size > 0 ||
     mieterFilter.size > 0 ||
     dueOnly;
 
@@ -285,6 +304,7 @@ export function MeasuringPointsAdminPage() {
     setOwnerFilter(new Set());
     setSupplierFilter(new Set());
     setMainLocationFilter(new Set());
+    setLocationFilter(new Set());
     setMieterFilter(new Set());
     setDueOnly(false);
   }
@@ -364,6 +384,19 @@ export function MeasuringPointsAdminPage() {
               ]}
               selected={mainLocationFilter}
               onChange={setMainLocationFilter}
+            />
+          ) : null}
+          {locationOptions.length > 0 ? (
+            <MultiSelectDropdown
+              label="Standort"
+              options={[
+                ...locationOptions.map(
+                  ([id, name]): DropdownOption<number | null> => ({ value: id, label: name }),
+                ),
+                { value: null, label: 'ohne Standort' } satisfies DropdownOption<number | null>,
+              ]}
+              selected={locationFilter}
+              onChange={setLocationFilter}
             />
           ) : null}
           <Pill active={dueOnly} onClick={() => setDueOnly((v) => !v)}>
