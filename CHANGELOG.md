@@ -10,6 +10,13 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.78.0](https://github.com/muelley86/zaehler/compare/v2.77.1...v2.78.0) (2026-09-22)
+
+
+### Funktionen
+
+* **messstellen:** Notizen je Messstelle mit Ersteller und Zeitstempel ([#356](https://github.com/muelley86/zaehler/issues/356)) ([96dd8da](https://github.com/muelley86/zaehler/commit/96dd8da3218272da722ab474834b06e0b6b1d6af))
+
 ## [2.77.1](https://github.com/muelley86/zaehler/compare/v2.77.0...v2.77.1) (2026-09-22)
 
 
