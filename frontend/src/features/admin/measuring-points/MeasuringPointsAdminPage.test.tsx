@@ -431,6 +431,35 @@ describe('MeasuringPointsAdminPage Wizard', () => {
     expect(screen.getByText('MP-Ohne')).toBeInTheDocument();
   });
 
+  it('filtert die Liste nach Standort inkl. „ohne Standort"-Option', async () => {
+    _mockList([
+      _mp({ id: 1, name: 'MP-Keller', location_id: 21, location_name: 'Keller' }),
+      _mp({ id: 2, name: 'MP-Stall', location_id: 22, location_name: 'Stall' }),
+      _mp({ id: 3, name: 'MP-Ohne' }),
+    ]);
+    const user = userEvent.setup();
+    renderWithRouter(<MeasuringPointsAdminPage />);
+
+    expect(await screen.findByText('MP-Keller')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Standort' }));
+    await user.click(await screen.findByRole('checkbox', { name: 'Keller' }));
+    expect(screen.getByText('MP-Keller')).toBeInTheDocument();
+    expect(screen.queryByText('MP-Stall')).not.toBeInTheDocument();
+    expect(screen.queryByText('MP-Ohne')).not.toBeInTheDocument();
+
+    // Umschalten auf „ohne Standort" zeigt nur die MP ohne Standort.
+    await user.click(screen.getByRole('checkbox', { name: 'Keller' }));
+    await user.click(screen.getByRole('checkbox', { name: 'ohne Standort' }));
+    expect(screen.getByText('MP-Ohne')).toBeInTheDocument();
+    expect(screen.queryByText('MP-Keller')).not.toBeInTheDocument();
+    expect(screen.queryByText('MP-Stall')).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Filter zurücksetzen' }));
+    expect(screen.getByText('MP-Keller')).toBeInTheDocument();
+    expect(screen.getByText('MP-Stall')).toBeInTheDocument();
+    expect(screen.getByText('MP-Ohne')).toBeInTheDocument();
+  });
+
   it('sendet supplier_id + supplier_valid_from, wenn ein Lieferant gewählt ist', async () => {
     let createBody: Record<string, unknown> | null = null;
     server.use(
