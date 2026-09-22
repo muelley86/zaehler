@@ -5,7 +5,8 @@ import type { DashboardTotal } from '@/lib/types';
 import { dashboardItem, virtualItem } from './testFixtures';
 import {
   DEVIATION_PCT,
-  selectInsights,
+  selectDeviationInsights,
+  selectStaleInsights,
   selectKpiTiles,
   selectTopConsumers,
   TOP_LIMIT,
@@ -227,7 +228,7 @@ describe('selectKpiTiles', () => {
   });
 });
 
-describe('selectInsights', () => {
+describe('selectStaleInsights', () => {
   const now = new Date('2026-09-07T12:00:00Z');
 
   it('fällig ab dem individuellen Ableseintervall (Grenze inklusiv)', () => {
@@ -246,13 +247,12 @@ describe('selectInsights', () => {
       reading_interval_days: 7,
       last_reading_at: new Date(now.getTime() - 8 * 86_400_000).toISOString(),
     });
-    const insights = selectInsights([due, fresh, weekly], { now });
-    expect(insights.filter((i) => i.kind === 'stale').map((i) => i.mpId)).toEqual([1, 3]);
+    expect(selectStaleInsights([due, fresh, weekly], now).map((i) => i.mpId)).toEqual([1, 3]);
   });
 
   it('ohne aktive Register (kein Zähler eingebaut) → nie fällig', () => {
     const noMeter = dashboardItem({ id: 1, registers: [], last_reading_at: null });
-    expect(selectInsights([noMeter], { now }).filter((i) => i.kind === 'stale')).toEqual([]);
+    expect(selectStaleInsights([noMeter], now)).toEqual([]);
   });
 
   it('last_reading_at null → nie abgelesen, sortiert zuerst', () => {
@@ -262,12 +262,13 @@ describe('selectInsights', () => {
       name: 'Alt',
       last_reading_at: new Date(now.getTime() - 100 * 86_400_000).toISOString(),
     });
-    const insights = selectInsights([stale, never], { now });
-    const staleInsights = insights.filter((i) => i.kind === 'stale');
+    const staleInsights = selectStaleInsights([stale, never], now);
     expect(staleInsights.map((i) => i.mpId)).toEqual([1, 2]);
     expect(staleInsights[0]).toMatchObject({ daysSince: null });
   });
+});
 
+describe('selectDeviationInsights', () => {
   it('Abweichungs-Grenze exakt 30 % → kein Hinweis; > 30 % → Hinweis', () => {
     const exact = dashboardItem({
       id: 1,
@@ -277,9 +278,7 @@ describe('selectInsights', () => {
       id: 2,
       totals: [total({ current: '131', previous: '100' })],
     });
-    const insights = selectInsights([exact, over], { now });
-    const deviations = insights.filter((i) => i.kind === 'deviation');
-    expect(deviations.map((i) => i.mpId)).toEqual([2]);
+    expect(selectDeviationInsights([exact, over]).map((i) => i.mpId)).toEqual([2]);
   });
 
   it('previous=0 oder current=0 → kein Abweichungs-Hinweis', () => {
@@ -288,8 +287,7 @@ describe('selectInsights', () => {
       id: 2,
       totals: [total({ current: '0', previous: '100' })],
     });
-    const insights = selectInsights([zeroPrev, zeroCurrent], { now });
-    expect(insights.filter((i) => i.kind === 'deviation')).toEqual([]);
+    expect(selectDeviationInsights([zeroPrev, zeroCurrent])).toEqual([]);
   });
 
   it('HT + NT werden vor dem Vergleich summiert', () => {
@@ -301,23 +299,7 @@ describe('selectInsights', () => {
       ],
     });
     // Summe: current 160 vs previous 100 → +60 % Abweichung.
-    const insights = selectInsights([item], { now });
-    const deviations = insights.filter((i) => i.kind === 'deviation');
-    expect(deviations).toHaveLength(1);
-  });
-
-  it('gibt stale-Hinweise vor deviation-Hinweisen zurück', () => {
-    const staleItem = dashboardItem({
-      id: 1,
-      last_reading_at: new Date(now.getTime() - 100 * 86_400_000).toISOString(),
-    });
-    const deviatingItem = dashboardItem({
-      id: 2,
-      last_reading_at: now.toISOString(),
-      totals: [total({ current: '200', previous: '100' })],
-    });
-    const insights = selectInsights([staleItem, deviatingItem], { now });
-    expect(insights.map((i) => i.kind)).toEqual(['stale', 'deviation']);
+    expect(selectDeviationInsights([item])).toHaveLength(1);
   });
 
   describe('Default-Konstanten', () => {
@@ -325,18 +307,13 @@ describe('selectInsights', () => {
       expect(DEVIATION_PCT).toBe(30);
     });
 
-    it('opts.deviationPct verschiebt die Schwelle', () => {
+    it('deviationPct verschiebt die Schwelle', () => {
       const dev40 = dashboardItem({
         id: 2,
-        last_reading_at: now.toISOString(),
         totals: [total({ current: '140', previous: '100' })], // +40 %
       });
-      expect(selectInsights([dev40], { now }).filter((i) => i.kind === 'deviation')).toHaveLength(
-        1,
-      );
-      expect(
-        selectInsights([dev40], { now, deviationPct: 50 }).filter((i) => i.kind === 'deviation'),
-      ).toHaveLength(0);
+      expect(selectDeviationInsights([dev40])).toHaveLength(1);
+      expect(selectDeviationInsights([dev40], 50)).toHaveLength(0);
     });
   });
 });

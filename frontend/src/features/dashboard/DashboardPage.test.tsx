@@ -1,10 +1,11 @@
 /**
  * Smoke-Tests für das Dashboard: die Filterleiste (mobil im Sheet, auf
- * Desktop inline), die KPI-Kacheln inkl. Vorperioden-Delta, Hinweise,
+ * Desktop inline), die KPI-Kacheln inkl. Vorperioden-Delta, fällige Messstellen,
  * Top-Verbraucher, Leerzustände und das Refetch-Feedback.
  *
- * Die Seite spricht ausschließlich `/api/v1/dashboard` an; der MSW-Server läuft
- * mit `onUnhandledRequest: 'error'` und schlägt bei jedem anderen Request an.
+ * Die Seite spricht nur `/api/v1/dashboard` und das Kachel-Layout
+ * (`/api/v1/auth/me/dashboard-layout`) an; der MSW-Server läuft mit
+ * `onUnhandledRequest: 'error'` und schlägt bei jedem anderen Request an.
  *
  * AbortSignal-Strip: Das Dashboard lädt `/dashboard` mit einem AbortSignal; unter
  * jsdom akzeptiert undici-`fetch` (MSW) die jsdom-AbortSignal-Instanz nicht — wir
@@ -19,8 +20,13 @@ import { renderWithRouter } from '@/tests/render';
 import { server } from '@/tests/server';
 import { api } from '@/lib/api';
 import { DESKTOP_QUERY } from '@/lib/useMediaQuery';
-import type { DashboardMeasuringPoint, DashboardVirtualMeasuringPoint } from '@/lib/types';
+import type {
+  DashboardLayout,
+  DashboardMeasuringPoint,
+  DashboardVirtualMeasuringPoint,
+} from '@/lib/types';
 
+import { DEFAULT_LAYOUT } from './dashboardLayout';
 import { cp, dashboardItem, dashboardResponse, virtualItem } from './testFixtures';
 import { clearDashboardCache } from './useDashboardData';
 import { DashboardPage } from './DashboardPage';
@@ -95,8 +101,33 @@ async function openFilterSheet(): Promise<HTMLElement> {
   return screen.getByRole('dialog');
 }
 
+const LAYOUT_URL = '/api/v1/auth/me/dashboard-layout';
+
+/** Kachel-Layout-Endpoint; protokolliert die PUT-Bodies. */
+function mockLayout(initial: DashboardLayout = DEFAULT_LAYOUT): { puts: DashboardLayout[] } {
+  const puts: DashboardLayout[] = [];
+  server.use(
+    http.get(LAYOUT_URL, () => HttpResponse.json(initial)),
+    http.put(LAYOUT_URL, async ({ request }) => {
+      const body = (await request.json()) as DashboardLayout;
+      puts.push(body);
+      return HttpResponse.json(body);
+    }),
+  );
+  return { puts };
+}
+
+/** Kachel-Titel (h2) in DOM-Reihenfolge; `withCount: false` schneidet „ · N“ ab. */
+function tileTitles({ withCount = true }: { withCount?: boolean } = {}): string[] {
+  return screen
+    .getAllByRole('heading', { level: 2 })
+    .map((h) => h.textContent ?? '')
+    .map((t) => (withCount ? t : t.replace(/ · \d+$/, '')));
+}
+
 beforeEach(() => {
   clearDashboardCache();
+  mockLayout();
   // AbortSignal unter jsdom strippen (siehe Datei-Kommentar).
   const realGetWithMeta = api.getWithMeta;
   vi.spyOn(api, 'getWithMeta').mockImplementation(<T,>(path: string) => realGetWithMeta<T>(path));
@@ -141,13 +172,13 @@ describe('DashboardPage — Datenabruf', () => {
     );
 
     const first = renderWithRouter(<DashboardPage />);
-    await screen.findByText('Top-Verbraucher · Wasser · m³');
+    await screen.findByText('Wasser · m³');
     expect(screen.queryByText('Aktualisiere…')).toBeNull();
     first.unmount();
 
     renderWithRouter(<DashboardPage />);
     expect(await screen.findByText('Aktualisiere…')).toBeInTheDocument();
-    expect(screen.getByText('Top-Verbraucher · Wasser · m³')).toBeInTheDocument();
+    expect(screen.getByText('Wasser · m³')).toBeInTheDocument();
 
     release();
     await waitFor(() => expect(screen.queryByText('Aktualisiere…')).toBeNull());
@@ -322,21 +353,97 @@ describe('DashboardPage — KPI, Hinweise, Top-Verbraucher', () => {
     ]);
     renderWithRouter(<DashboardPage />);
 
-    expect(await screen.findByText('Top-Verbraucher · Wasser · m³')).toBeInTheDocument();
+    expect(await screen.findByText('Wasser · m³')).toBeInTheDocument();
     expect(screen.getByText('75 %')).toBeInTheDocument();
     expect(screen.getByText('25 %')).toBeInTheDocument();
   });
 
-  it('stellt die Hinweise vor die Top-Verbraucher (DOM-Reihenfolge = Mobile-Ansicht)', async () => {
-    // Die breakpointabhängige Anordnung steckt in CSS-Klassen — geprüft wird
-    // die DOM-Reihenfolge, die der Mobile-Spalte entspricht.
+  it('zeigt fällige Messstellen und weitere Hinweise in getrennten Kacheln', async () => {
+    const sixtyDaysAgo = new Date(Date.now() - 60 * 86_400_000).toISOString();
+    mockEndpoints([
+      dashboardItem({ id: 1, name: 'Wasser Garten', type: 'water', last_reading_at: sixtyDaysAgo }),
+    ]);
+    renderWithRouter(<DashboardPage />);
+
+    await screen.findByText(/Wasser Garten: letzte Ablesung vor 60 Tagen/);
+    expect(tileTitles()).toEqual([
+      'Verbrauch im Zeitraum',
+      'Fällige Messstellen · 1',
+      'Weitere Hinweise',
+      'Top-Verbraucher',
+    ]);
+    expect(screen.getByText('Keine Auffälligkeiten im Zeitraum.')).toBeInTheDocument();
+  });
+});
+
+describe('DashboardPage — Kachel-Layout', () => {
+  it('ordnet die Kacheln nach dem gespeicherten Layout und klappt eingeklappte zu', async () => {
+    mockLayout({ order: ['top', 'insights', 'due', 'kpi'], collapsed: ['insights'] });
     mockEndpoints([wasserMitVerbrauch(1, 'Wasser Garten'), wasserMitVerbrauch(2, 'Wasser Haus')]);
     renderWithRouter(<DashboardPage />);
 
-    const top = await screen.findByText('Top-Verbraucher · Wasser · m³');
-    const hinweise = screen.getByText(/^Hinweise/);
+    await screen.findByText('Wasser · m³');
+    expect(tileTitles({ withCount: false })).toEqual([
+      'Top-Verbraucher',
+      'Weitere Hinweise',
+      'Fällige Messstellen',
+      'Verbrauch im Zeitraum',
+    ]);
+    const toggle = screen.getByRole('button', { name: '„Weitere Hinweise“ aufklappen' });
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByText('Keine Auffälligkeiten im Zeitraum.')).toBeNull();
+  });
 
-    expect(hinweise.compareDocumentPosition(top) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  it('verschiebt per ▲ und speichert das Layout', async () => {
+    const { puts } = mockLayout();
+    mockEndpoints([wasserMitVerbrauch(1, 'Wasser Garten'), wasserMitVerbrauch(2, 'Wasser Haus')]);
+    renderWithRouter(<DashboardPage />);
+
+    await screen.findByText('Wasser · m³');
+    expect(
+      screen.getByRole('button', { name: '„Verbrauch im Zeitraum“ nach oben' }),
+    ).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: '„Top-Verbraucher“ nach oben' }));
+
+    expect(tileTitles({ withCount: false })).toEqual([
+      'Verbrauch im Zeitraum',
+      'Fällige Messstellen',
+      'Top-Verbraucher',
+      'Weitere Hinweise',
+    ]);
+    await waitFor(() =>
+      expect(puts).toEqual([{ order: ['kpi', 'due', 'top', 'insights'], collapsed: [] }]),
+    );
+  });
+
+  it('klappt eine Kachel zu und speichert den Zustand', async () => {
+    const { puts } = mockLayout();
+    mockEndpoints([wasserMitVerbrauch(1, 'Wasser Garten'), wasserMitVerbrauch(2, 'Wasser Haus')]);
+    renderWithRouter(<DashboardPage />);
+
+    await screen.findByText('Wasser · m³');
+    fireEvent.click(screen.getByRole('button', { name: '„Top-Verbraucher“ zuklappen' }));
+
+    expect(screen.queryByText('Wasser · m³')).toBeNull();
+    expect(screen.getByRole('button', { name: '„Top-Verbraucher“ aufklappen' })).toHaveAttribute(
+      'aria-expanded',
+      'false',
+    );
+    await waitFor(() => expect(puts).toEqual([{ ...DEFAULT_LAYOUT, collapsed: ['top'] }]));
+  });
+
+  it('fällt auf das Standard-Layout zurück, wenn das Layout nicht geladen werden kann', async () => {
+    server.use(http.get(LAYOUT_URL, () => new HttpResponse(null, { status: 500 })));
+    mockEndpoints([wasserMitVerbrauch(1, 'Wasser Garten'), wasserMitVerbrauch(2, 'Wasser Haus')]);
+    renderWithRouter(<DashboardPage />);
+
+    await screen.findByText('Wasser · m³');
+    expect(tileTitles({ withCount: false })).toEqual([
+      'Verbrauch im Zeitraum',
+      'Fällige Messstellen',
+      'Weitere Hinweise',
+      'Top-Verbraucher',
+    ]);
   });
 });
 

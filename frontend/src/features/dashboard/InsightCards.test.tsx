@@ -1,17 +1,16 @@
 /**
- * Smoke-Test für InsightsCard: stale-/deviation-Zeilen, das beidseitige
- * "+n weitere"/"weniger anzeigen"-Toggle ab neun Einträgen und der
- * Leerzustand.
+ * Smoke-Test für DueCard/DeviationsCard: stale-/deviation-Zeilen, das beidseitige
+ * "+n weitere"/"weniger anzeigen"-Toggle ab neun Einträgen und die Leerzustände.
  */
 
 import { describe, expect, it } from 'vitest';
 import { fireEvent, screen } from '@testing-library/react';
 
 import { renderWithRouter } from '@/tests/render';
-import type { Insight } from './dashboardMetrics';
-import { InsightsCard } from './InsightsCard';
+import type { DeviationInsight, StaleInsight } from './dashboardMetrics';
+import { DeviationsCard, DueCard } from './InsightCards';
 
-function stale(overrides: Partial<Extract<Insight, { kind: 'stale' }>> = {}): Insight {
+function stale(overrides: Partial<StaleInsight> = {}): StaleInsight {
   return {
     kind: 'stale',
     mpId: 1,
@@ -22,7 +21,7 @@ function stale(overrides: Partial<Extract<Insight, { kind: 'stale' }>> = {}): In
   };
 }
 
-function deviation(overrides: Partial<Extract<Insight, { kind: 'deviation' }>> = {}): Insight {
+function deviation(overrides: Partial<DeviationInsight> = {}): DeviationInsight {
   return {
     kind: 'deviation',
     mpId: 2,
@@ -36,10 +35,9 @@ function deviation(overrides: Partial<Extract<Insight, { kind: 'deviation' }>> =
   };
 }
 
-describe('InsightsCard', () => {
+describe('DueCard / DeviationsCard', () => {
   it('rendert eine stale-Zeile mit Tagen, Datum und "Jetzt erfassen"-Link', () => {
-    renderWithRouter(<InsightsCard insights={[stale()]} />);
-    expect(screen.getByText('Hinweise · 1 Messstelle fällig')).toBeInTheDocument();
+    renderWithRouter(<DueCard insights={[stale()]} />);
     expect(
       screen.getByText('Wasser Garten: letzte Ablesung vor 60 Tagen (01.06.2026)'),
     ).toBeInTheDocument();
@@ -48,12 +46,12 @@ describe('InsightsCard', () => {
   });
 
   it('zeigt "noch nie abgelesen" ohne Datum, wenn lastReadingAt null ist', () => {
-    renderWithRouter(<InsightsCard insights={[stale({ lastReadingAt: null, daysSince: null })]} />);
+    renderWithRouter(<DueCard insights={[stale({ lastReadingAt: null, daysSince: null })]} />);
     expect(screen.getByText('Wasser Garten: noch nie abgelesen')).toBeInTheDocument();
   });
 
   it('rendert eine deviation-Zeile mit Vorzeichen, Richtung und Werten', () => {
-    renderWithRouter(<InsightsCard insights={[deviation()]} />);
+    renderWithRouter(<DeviationsCard insights={[deviation()]} />);
     expect(
       screen.getByText('Strom Haus: +50 % Bezug gegenüber Vorzeitraum (100 → 150 kWh)'),
     ).toBeInTheDocument();
@@ -63,7 +61,7 @@ describe('InsightsCard', () => {
     const insights = Array.from({ length: 9 }, (_, i) =>
       stale({ mpId: i + 1, name: `MP ${i + 1}` }),
     );
-    renderWithRouter(<InsightsCard insights={insights} />);
+    renderWithRouter(<DueCard insights={insights} />);
     expect(
       screen.queryByText('MP 9: letzte Ablesung vor 60 Tagen (01.06.2026)'),
     ).not.toBeInTheDocument();
@@ -81,8 +79,14 @@ describe('InsightsCard', () => {
     expect(screen.getByRole('button', { name: '+1 weitere' })).toBeInTheDocument();
   });
 
-  it('rendert nichts, wenn keine Hinweise vorhanden sind', () => {
-    const { container } = renderWithRouter(<InsightsCard insights={[]} />);
-    expect(container).toBeEmptyDOMElement();
+  it('zeigt einen Leertext, wenn nichts fällig bzw. auffällig ist', () => {
+    renderWithRouter(
+      <>
+        <DueCard insights={[]} />
+        <DeviationsCard insights={[]} />
+      </>,
+    );
+    expect(screen.getByText('Keine Messstelle fällig.')).toBeInTheDocument();
+    expect(screen.getByText('Keine Auffälligkeiten im Zeitraum.')).toBeInTheDocument();
   });
 });

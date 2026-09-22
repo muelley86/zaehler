@@ -352,3 +352,19 @@ def test_0043_setzt_ableseintervall_35_ohne_datenverlust(fresh_engine: Engine) -
     _downgrade(fresh_engine, "0042_user_last_totp_counter")
     with fresh_engine.connect() as conn:
         assert conn.execute(text("SELECT COUNT(*) FROM physical_meter")).scalar() == 1
+
+
+def test_0044_dashboard_layout_hin_und_zurueck(fresh_engine: Engine) -> None:
+    """Spalte kommt nullable hinzu; der Downgrade darf bei ``foreign_keys=ON`` keine
+    Sessions (``ON DELETE CASCADE``-Kinder von ``user``) loeschen."""
+    event.listen(
+        fresh_engine, "connect", lambda dbapi, _rec: dbapi.execute("PRAGMA foreign_keys=ON")
+    )
+    _upgrade(fresh_engine, "0044_user_dashboard_layout")
+    with fresh_engine.connect() as conn:
+        spalten = [r[1] for r in conn.execute(text('PRAGMA table_info("user")'))]
+    assert "dashboard_layout" in spalten
+    _downgrade(fresh_engine, "0043_mp_reading_interval")
+    with fresh_engine.connect() as conn:
+        spalten = [r[1] for r in conn.execute(text('PRAGMA table_info("user")'))]
+    assert "dashboard_layout" not in spalten

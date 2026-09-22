@@ -30,7 +30,6 @@ function tile(overrides: Partial<KpiTile> = {}): KpiTile {
 describe('KpiTiles', () => {
   it('rendert Label, Wert, Einheit und signiertes Delta mit sr-only-Zusatz', () => {
     renderWithRouter(<KpiTiles tiles={[tile()]} />);
-    expect(screen.getByText('Verbrauch im Zeitraum')).toBeInTheDocument();
     expect(screen.getByText('Strom')).toBeInTheDocument();
     expect(screen.getByText('123,4')).toBeInTheDocument();
     expect(screen.getByText('kWh')).toBeInTheDocument();

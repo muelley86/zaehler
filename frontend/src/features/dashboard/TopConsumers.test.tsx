@@ -27,7 +27,7 @@ function group(overrides: Partial<TopConsumerGroup> = {}): TopConsumerGroup {
 describe('TopConsumers', () => {
   it('rendert den Gruppen-Header und Rang/Name/Wert/Anteil je Zeile', () => {
     renderWithRouter(<TopConsumers groups={[group()]} />);
-    expect(screen.getByText('Top-Verbraucher · Strom · kWh')).toBeInTheDocument();
+    expect(screen.getByText('Strom · kWh')).toBeInTheDocument();
     expect(screen.getByText('1.')).toBeInTheDocument();
     expect(screen.getByText('Haus A')).toBeInTheDocument();
     expect(screen.getByText('200')).toBeInTheDocument();
@@ -48,8 +48,8 @@ describe('TopConsumers', () => {
         groups={[group(), group({ type: 'water', unit: 'm³', entries: [], total: 0 })]}
       />,
     );
-    expect(screen.getByText('Top-Verbraucher · Strom · kWh')).toBeInTheDocument();
-    expect(screen.getByText('Top-Verbraucher · Wasser · m³')).toBeInTheDocument();
+    expect(screen.getByText('Strom · kWh')).toBeInTheDocument();
+    expect(screen.getByText('Wasser · m³')).toBeInTheDocument();
   });
 
   it('rendert nichts, wenn keine Gruppen vorhanden sind', () => {

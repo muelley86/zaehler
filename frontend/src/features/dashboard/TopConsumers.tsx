@@ -66,7 +66,7 @@ export function TopConsumers({ groups }: TopConsumersProps) {
       {groups.map((group) => (
         <Section
           key={`${group.type}::${group.unit}`}
-          header={`Top-Verbraucher · ${TYPE_LABELS[group.type]} · ${group.unit}`}
+          header={`${TYPE_LABELS[group.type]} · ${group.unit}`}
           {...(group.others
             ? { footer: <OthersFooter others={group.others} unit={group.unit} /> }
             : {})}
