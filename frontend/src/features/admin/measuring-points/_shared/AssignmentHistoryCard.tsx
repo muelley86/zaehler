@@ -10,12 +10,19 @@
  * Loeschen, Client-Validierung, `valid_to===''→null`, ChangeForm-Default
  * `validFrom=heute`, `disabled` wenn Master-Liste leer, still verschluckter
  * Master-GET-Fehler.
+ *
+ * Die Master-Auswahl ist ein durchsuchbares Dropdown. Setzt die Config
+ * ``createMaster`` (nur Mieter), kann im Sheet direkt ein neuer Master angelegt
+ * werden: Das Sheet zeigt dann statt des Zuordnungs-Formulars das Anlegen-
+ * Formular (keine verschachtelten ``<form>``), danach ist der neue Eintrag
+ * ausgewählt und die übrigen Eingaben (Datum) bleiben erhalten.
  */
 import { useEffect, useState } from 'react';
-import type { FormEvent } from 'react';
+import type { FormEvent, ReactNode } from 'react';
 import { Pencil, Trash2 } from 'lucide-react';
 
-import { Button, Section, Select, Sheet, TextField } from '@/components/ui';
+import { Button, Section, Sheet, SingleSelectDropdown, TextField } from '@/components/ui';
+import { MieterCreateForm } from '@/features/admin/mieters/MieterFormFields';
 import { ApiError, api } from '@/lib/api';
 import { formatDateDe } from '@/lib/format';
 import type {
@@ -62,6 +69,85 @@ export interface AssignmentHistoryConfig<TAssignment, TMaster> {
     editAriaLabel: string;
     deleteAriaLabel: string;
   };
+  /** Optional: Neuanlage eines Masters direkt aus dem Sheet heraus. */
+  createMaster?: {
+    /** Link-Text unter der Auswahl, zugleich Überschrift des Anlegen-Formulars. */
+    label: string;
+    render: (p: { onCreated: (m: TMaster) => void; onCancel: () => void }) => ReactNode;
+  };
+}
+
+function MasterPicker<TAssignment, TMaster>({
+  label,
+  masters,
+  value,
+  onChange,
+  config,
+  onCreateRequest,
+}: {
+  label: string;
+  masters: TMaster[];
+  value: number | '';
+  onChange: (id: number) => void;
+  config: AssignmentHistoryConfig<TAssignment, TMaster>;
+  onCreateRequest: () => void;
+}) {
+  return (
+    <div className="space-y-1.5">
+      <SingleSelectDropdown
+        label={label}
+        options={masters.map((m) => ({
+          value: config.getMasterId(m),
+          label: config.getMasterLabel(m),
+        }))}
+        value={value === '' ? null : value}
+        onChange={onChange}
+        placeholder="— bitte wählen —"
+        searchThreshold={0}
+      />
+      {config.createMaster ? (
+        <button
+          type="button"
+          onClick={onCreateRequest}
+          className="text-body-sm font-semibold text-primary hover:underline"
+        >
+          + {config.createMaster.label}
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * Anlegen-Ansicht im Sheet. ``null``, wenn die Config keine Neuanlage kennt.
+ * Nach dem Anlegen wird der neue Master in die Liste der Karte übernommen und
+ * über ``onSelect`` im aufrufenden Formular ausgewählt.
+ */
+function CreateMasterView<TAssignment, TMaster>({
+  config,
+  onMasterCreated,
+  onSelect,
+  onClose,
+}: {
+  config: AssignmentHistoryConfig<TAssignment, TMaster>;
+  onMasterCreated: (m: TMaster) => void;
+  onSelect: (id: number) => void;
+  onClose: () => void;
+}) {
+  if (!config.createMaster) return null;
+  return (
+    <div className="space-y-3">
+      <div className="text-caption-bold uppercase text-tertiary">{config.createMaster.label}</div>
+      {config.createMaster.render({
+        onCreated: (m) => {
+          onMasterCreated(m);
+          onSelect(config.getMasterId(m));
+          onClose();
+        },
+        onCancel: onClose,
+      })}
+    </div>
+  );
 }
 
 function AssignmentPeriodForm<TAssignment, TMaster>({
@@ -69,6 +155,7 @@ function AssignmentPeriodForm<TAssignment, TMaster>({
   masters,
   period,
   config,
+  onMasterCreated,
   onSaved,
   onCancel,
 }: {
@@ -76,9 +163,11 @@ function AssignmentPeriodForm<TAssignment, TMaster>({
   masters: TMaster[];
   period: TAssignment | null;
   config: AssignmentHistoryConfig<TAssignment, TMaster>;
+  onMasterCreated: (m: TMaster) => void;
   onSaved: () => void;
   onCancel: () => void;
 }) {
+  const [creating, setCreating] = useState(false);
   const [masterId, setMasterId] = useState<number | ''>(
     period ? (config.getAssignmentMasterId(period) ?? '') : '',
   );
@@ -122,21 +211,27 @@ function AssignmentPeriodForm<TAssignment, TMaster>({
     }
   }
 
+  if (creating) {
+    return (
+      <CreateMasterView
+        config={config}
+        onMasterCreated={onMasterCreated}
+        onSelect={setMasterId}
+        onClose={() => setCreating(false)}
+      />
+    );
+  }
+
   return (
     <form onSubmit={(e) => void save(e)} className="space-y-3">
-      <Select
+      <MasterPicker
         label={config.labels.periodSelectLabel}
+        masters={masters}
         value={masterId}
-        onChange={(e) => setMasterId(e.target.value ? Number(e.target.value) : '')}
-        required
-      >
-        <option value="">— bitte wählen —</option>
-        {masters.map((m) => (
-          <option key={config.getMasterId(m)} value={config.getMasterId(m)}>
-            {config.getMasterLabel(m)}
-          </option>
-        ))}
-      </Select>
+        onChange={setMasterId}
+        config={config}
+        onCreateRequest={() => setCreating(true)}
+      />
       <TextField
         label="Gültig ab"
         type="date"
@@ -167,15 +262,18 @@ function ChangeAssignmentForm<TAssignment, TMaster>({
   mpId,
   masters,
   config,
+  onMasterCreated,
   onSaved,
   onCancel,
 }: {
   mpId: number;
   masters: TMaster[];
   config: AssignmentHistoryConfig<TAssignment, TMaster>;
+  onMasterCreated: (m: TMaster) => void;
   onSaved: () => void;
   onCancel: () => void;
 }) {
+  const [creating, setCreating] = useState(false);
   const [masterId, setMasterId] = useState<number | ''>('');
   const [validFrom, setValidFrom] = useState(new Date().toISOString().slice(0, 10));
   const [busy, setBusy] = useState(false);
@@ -203,21 +301,27 @@ function ChangeAssignmentForm<TAssignment, TMaster>({
     }
   }
 
+  if (creating) {
+    return (
+      <CreateMasterView
+        config={config}
+        onMasterCreated={onMasterCreated}
+        onSelect={setMasterId}
+        onClose={() => setCreating(false)}
+      />
+    );
+  }
+
   return (
     <form onSubmit={(e) => void save(e)} className="space-y-3">
-      <Select
+      <MasterPicker
         label={config.labels.changeSelectLabel}
+        masters={masters}
         value={masterId}
-        onChange={(e) => setMasterId(e.target.value ? Number(e.target.value) : '')}
-        required
-      >
-        <option value="">— bitte wählen —</option>
-        {masters.map((m) => (
-          <option key={config.getMasterId(m)} value={config.getMasterId(m)}>
-            {config.getMasterLabel(m)}
-          </option>
-        ))}
-      </Select>
+        onChange={setMasterId}
+        config={config}
+        onCreateRequest={() => setCreating(true)}
+      />
       <TextField
         label="Wechsel zum"
         type="date"
@@ -285,6 +389,19 @@ export function AssignmentHistoryCard<TAssignment, TMaster>({
     onChanged();
   }
 
+  // Neu angelegten Master sofort in die Auswahl übernehmen (alphabetisch wie
+  // die Server-Liste), ohne auf den nächsten Refresh zu warten.
+  function addMaster(m: TMaster) {
+    setMasters((prev) =>
+      [...prev, m].sort((a, b) =>
+        config.getMasterLabel(a).localeCompare(config.getMasterLabel(b), 'de'),
+      ),
+    );
+  }
+
+  // Ohne Master-Liste nur sinnvoll, wenn im Sheet angelegt werden kann.
+  const pickerDisabled = masters.length === 0 && !config.createMaster;
+
   async function removePeriod(a: TAssignment) {
     const label = config.getAssignmentName(a) ?? 'unbekannt';
     if (!window.confirm(`${config.labels.deleteConfirmNoun} "${label}" wirklich löschen?`)) return;
@@ -308,7 +425,7 @@ export function AssignmentHistoryCard<TAssignment, TMaster>({
               variant="bordered"
               size="sm"
               onClick={() => setPeriodSheet({ period: null })}
-              disabled={masters.length === 0}
+              disabled={pickerDisabled}
               aria-label={config.labels.addPeriodAriaLabel}
             >
               {config.labels.addPeriodButton}
@@ -317,7 +434,7 @@ export function AssignmentHistoryCard<TAssignment, TMaster>({
               variant="bordered"
               size="sm"
               onClick={() => setOpen(true)}
-              disabled={masters.length === 0}
+              disabled={pickerDisabled}
             >
               {config.labels.changeButton}
             </Button>
@@ -378,16 +495,19 @@ export function AssignmentHistoryCard<TAssignment, TMaster>({
         )}
       </div>
       <Sheet open={open} onClose={() => setOpen(false)} title={config.labels.changeButton}>
-        <ChangeAssignmentForm
-          mpId={mp.id}
-          masters={masters}
-          config={config}
-          onSaved={() => {
-            setOpen(false);
-            refresh();
-          }}
-          onCancel={() => setOpen(false)}
-        />
+        {open ? (
+          <ChangeAssignmentForm
+            mpId={mp.id}
+            masters={masters}
+            config={config}
+            onMasterCreated={addMaster}
+            onSaved={() => {
+              setOpen(false);
+              refresh();
+            }}
+            onCancel={() => setOpen(false)}
+          />
+        ) : null}
       </Sheet>
       <Sheet
         open={periodSheet !== null}
@@ -400,6 +520,7 @@ export function AssignmentHistoryCard<TAssignment, TMaster>({
             masters={masters}
             period={periodSheet.period}
             config={config}
+            onMasterCreated={addMaster}
             onSaved={() => {
               setPeriodSheet(null);
               refresh();
@@ -499,5 +620,11 @@ export const MIETER_ASSIGNMENT_CONFIG: AssignmentHistoryConfig<MieterAssignmentR
     deleteConfirmNoun: 'Mieter-Periode',
     editAriaLabel: 'Mieter-Periode bearbeiten',
     deleteAriaLabel: 'Mieter-Periode löschen',
+  },
+  createMaster: {
+    label: 'Neuen Mieter anlegen',
+    render: ({ onCreated, onCancel }) => (
+      <MieterCreateForm onCreated={onCreated} onCancel={onCancel} autoFocus />
+    ),
   },
 };

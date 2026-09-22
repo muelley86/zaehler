@@ -15,6 +15,7 @@ export function MieterDetailPage() {
       fallbackTitle="Mieter"
       getTitle={(mieter) => mieter.display_name}
       getRows={(mieter) => [
+        { label: 'Art', value: mieter.is_company ? 'Firma' : 'Person' },
         { label: 'Adresse', value: formatAddress(mieter) },
         { label: 'E-Mail', value: mieter.email },
         { label: 'Telefon', value: mieter.phone },

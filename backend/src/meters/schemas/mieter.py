@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from meters.schemas._master_data import (
     EMAIL_RE,
@@ -12,6 +12,7 @@ from meters.schemas.common import APIModel
 
 
 class MieterCreate(BaseModel):
+    is_company: bool = False
     first_name: str | None = Field(default=None, max_length=80)
     last_name: str = Field(min_length=1, max_length=80)
     address_street: str | None = Field(default=None, max_length=200)
@@ -39,8 +40,16 @@ class MieterCreate(BaseModel):
     def _strip_optional(cls, value: str | None) -> str | None:
         return strip_or_none(value)
 
+    @model_validator(mode="after")
+    def _company_has_no_first_name(self) -> MieterCreate:
+        # Firma: Firmenname steht in ``last_name``, ein Vorname ergibt keinen Sinn.
+        if self.is_company:
+            self.first_name = None
+        return self
+
 
 class MieterUpdate(BaseModel):
+    is_company: bool | None = None
     first_name: str | None = Field(default=None, max_length=80)
     # PATCH erlaubt leeren String zum Loeschen des Vornamens; deshalb hier
     # keine Regex/Pflicht — Nachname bleibt jedoch nicht-leerbar (Validator).
@@ -59,12 +68,21 @@ class MieterUpdate(BaseModel):
             return None
         return strip_name(value)
 
+    @model_validator(mode="after")
+    def _company_has_no_first_name(self) -> MieterUpdate:
+        # Wie beim Anlegen: ein mitgesendeter Vorname wird bei Firma verworfen.
+        # Einen gespeicherten Vornamen raeumt der PATCH-Handler (mit Audit) ab.
+        if self.is_company:
+            self.first_name = None
+        return self
+
 
 class MieterRead(APIModel):
     id: int
+    is_company: bool
     first_name: str | None
     last_name: str
-    # „Nachname, Vorname" — aus der Model-Property ``Mieter.display_name``.
+    # „Nachname, Vorname" bzw. Firmenname — aus der Model-Property ``Mieter.display_name``.
     display_name: str
     address_street: str | None
     address_postcode: str | None

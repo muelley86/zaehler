@@ -634,10 +634,12 @@ export interface OwnerAssignmentRead {
   valid_to: string | null;
 }
 
-/** Mieter — natürliche Person (Vorname optional, Nachname Pflicht), ohne Steuer-IDs.
- *  `display_name` ist „Nachname, Vorname" (vom Backend abgeleitet). */
+/** Mieter — natürliche Person (Vorname optional, Nachname Pflicht) oder Firma
+ *  (`is_company`: Firmenname in `last_name`, kein Vorname), ohne Steuer-IDs.
+ *  `display_name` ist „Nachname, Vorname" bzw. der Firmenname (vom Backend abgeleitet). */
 export interface MieterRead {
   id: number;
+  is_company: boolean;
   first_name: string | null;
   last_name: string;
   display_name: string;

@@ -27,6 +27,7 @@ vi.mock('@/features/auth/auth-context', () => ({
 function _mieter(overrides: Partial<MieterRead>): MieterRead {
   return {
     id: 1,
+    is_company: false,
     first_name: null,
     last_name: 'Mieter',
     display_name: 'Mieter',
@@ -121,6 +122,33 @@ describe('MietersAdminPage', () => {
     expect(postBody!['email']).toBe('info@example.com');
     // Leere optionale Felder werden als null gesendet.
     expect(postBody!['address_street']).toBeNull();
+  });
+
+  it('legt eine Firma nur mit Firmenname an', async () => {
+    _mock([]);
+    let postBody: Record<string, unknown> | null = null;
+    server.use(
+      http.post('/api/v1/mieters', async ({ request }) => {
+        postBody = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json(_mieter({ id: 6, is_company: true, last_name: 'Beispiel GmbH' }), {
+          status: 201,
+        });
+      }),
+    );
+    const user = userEvent.setup();
+    renderWithRouter(<MietersAdminPage />);
+
+    // Vorher getippter Vorname darf nach dem Umschalten nicht mitgesendet werden.
+    await user.type(await screen.findByLabelText('Vorname (optional)'), 'Weg');
+    await user.click(screen.getByRole('radio', { name: 'Firma' }));
+    expect(screen.queryByLabelText('Vorname (optional)')).not.toBeInTheDocument();
+    await user.type(screen.getByLabelText('Firmenname'), 'Beispiel GmbH');
+    await user.click(screen.getByRole('button', { name: 'Anlegen' }));
+
+    await waitFor(() => expect(postBody).not.toBeNull());
+    expect(postBody!['is_company']).toBe(true);
+    expect(postBody!['first_name']).toBeNull();
+    expect(postBody!['last_name']).toBe('Beispiel GmbH');
   });
 
   it('löscht einen Mieter nach Bestätigung per DELETE', async () => {
