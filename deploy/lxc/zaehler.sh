@@ -44,7 +44,7 @@ BACKUP_DIR="${BACKUP_DIR:-$APP_DIR/backups}"
 SERVICE_NAME="${SERVICE_NAME:-zaehler.service}"
 REPO_URL="${REPO_URL:-https://example.invalid/REPLACE-ME.git}"
 PYTHON_BIN="${PYTHON_BIN:-python3}"
-PNPM_VERSION="${PNPM_VERSION:-11}"
+PNPM_VERSION="${PNPM_VERSION:-12}"
 
 # -----------------------------------------------------------------------------
 # Hilfsfunktionen
@@ -1625,7 +1625,7 @@ ${C_BOLD}zaehler.sh — Verwaltungsskript für die Zählerstand-App${C_RESET}
     BACKUP_DIR           Default: \$APP_DIR/backups
     SERVICE_NAME         Default: zaehler.service
     PYTHON_BIN           Default: python3 (Distri-Default)
-    PNPM_VERSION         Default: 11
+    PNPM_VERSION         Default: 12
 
   ${C_BOLD}Beispiele:${C_RESET}
     # Erstinstallation:
