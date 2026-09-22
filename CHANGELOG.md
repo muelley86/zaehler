@@ -10,6 +10,13 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.77.1](https://github.com/muelley86/zaehler/compare/v2.77.0...v2.77.1) (2026-09-22)
+
+
+### Fehlerbehebungen
+
+* **deploy:** auf pnpm 12 umstellen ([#354](https://github.com/muelley86/zaehler/issues/354)) ([a9d9a3d](https://github.com/muelley86/zaehler/commit/a9d9a3d7660508ad1be6a1eea74f4274f0c7cb51))
+
 ## [2.77.0](https://github.com/muelley86/zaehler/compare/v2.76.0...v2.77.0) (2026-09-22)
 
 
