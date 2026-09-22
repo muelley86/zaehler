@@ -10,6 +10,13 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.77.0](https://github.com/muelley86/zaehler/compare/v2.76.0...v2.77.0) (2026-09-22)
+
+
+### Funktionen
+
+* **dashboard:** Kacheln klapp- und sortierbar, Layout je Benutzer gespeichert ([#352](https://github.com/muelley86/zaehler/issues/352)) ([b3a0b17](https://github.com/muelley86/zaehler/commit/b3a0b175a3f8751bd261791bac76dbb672c03646))
+
 ## [2.76.0](https://github.com/muelley86/zaehler/compare/v2.75.1...v2.76.0) (2026-09-21)
 
 
