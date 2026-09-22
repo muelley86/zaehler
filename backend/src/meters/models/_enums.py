@@ -102,6 +102,7 @@ class AuditEntityType(enum.StrEnum):
     USER = "user"
     READING = "reading"
     MEASURING_POINT = "measuring_point"
+    MEASURING_POINT_NOTE = "measuring_point_note"
     PHYSICAL_METER = "physical_meter"
     REGISTER = "register"
     LOCATION = "location"

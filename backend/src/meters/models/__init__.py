@@ -28,6 +28,7 @@ from meters.models.kostenstelle_assignment import KostenstelleAssignment
 from meters.models.location import Location
 from meters.models.main_location import MainLocation
 from meters.models.measuring_point import MeasuringPoint
+from meters.models.measuring_point_note import MeasuringPointNote
 from meters.models.mieter import Mieter
 from meters.models.mieter_assignment import MieterAssignment
 from meters.models.monthly_consumption import MonthlyConsumption
@@ -68,6 +69,7 @@ __all__ = [
     "Location",
     "MainLocation",
     "MeasuringPoint",
+    "MeasuringPointNote",
     "MeterType",
     "Mieter",
     "MieterAssignment",

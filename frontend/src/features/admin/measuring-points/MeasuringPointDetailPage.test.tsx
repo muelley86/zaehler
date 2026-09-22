@@ -90,6 +90,7 @@ function _mockMp(mp: MeasuringPointRead) {
     http.get('/api/v1/measuring-points/1/consumption', () => HttpResponse.json([])),
     http.get('/api/v1/measuring-points/1/state', () => HttpResponse.json([])),
     http.get('/api/v1/measuring-points/1/users', () => HttpResponse.json([])),
+    http.get('/api/v1/measuring-points/1/notes', () => HttpResponse.json([])),
     http.get('/api/v1/locations', () => HttpResponse.json([])),
     http.get('/api/v1/qr-tokens', () => HttpResponse.json([])),
   );

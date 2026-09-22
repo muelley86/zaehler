@@ -41,6 +41,12 @@ Werte als Decimal speichern, NIEMALS Float (Rundungsfehler bei
 Zählerständen). reading_date strikt von created_at trennen –
 Erfassung erfolgt oft nachträglich.
 
+- MeasuringPointNote (`measuring_point_note`, Migration 0045): id,
+  measuring_point_id (FK, CASCADE), text (≤ 500), created_by_user_id (FK user,
+  NOT NULL + SET NULL = effektives RESTRICT → User mit Notizen nur
+  deaktivierbar), created_at (UTC). Unveränderlich; Löschen durch Ersteller
+  oder Admin, beides im Audit-Log (`measuring_point_note`).
+
 - User: id, username (unique), email (optional), password_hash,
   role (admin|recorder), is_active, created_at, last_login_at,
   dashboard_layout (JSON `{order, collapsed}`, NULL = Standard; Migration 0044)

@@ -15,6 +15,7 @@ from meters.api.v1 import (
     imports,
     locations,
     main_locations,
+    measuring_point_notes,
     measuring_points,
     mieters,
     owners,
@@ -39,6 +40,7 @@ router.include_router(owners.router)
 router.include_router(suppliers.router)
 router.include_router(mieters.router)
 router.include_router(measuring_points.router)
+router.include_router(measuring_point_notes.router)
 router.include_router(virtual_measuring_points.router)
 router.include_router(physical_meters.router)
 router.include_router(dashboard.router)

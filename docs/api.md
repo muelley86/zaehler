@@ -34,6 +34,12 @@ Alle Endpoints unter `/api/v1`. Fehler im RFC-7807-Format
 - `PATCH /measuring-points/{id}`
 - `DELETE /measuring-points/{id}`
 - `POST /measuring-points/{id}/replace-meter`
+- `GET /measuring-points/{id}/notes` — Notizen, neueste zuerst; jeder User mit
+  Zugriff auf die MP (Recorder ohne Zuordnung → 404).
+- `POST /measuring-points/{id}/notes` — `{text}` (1–500 Zeichen, getrimmt);
+  Ersteller und `created_at` setzt der Server. Admin + zugeordnete Recorder.
+- `DELETE /measuring-point-notes/{id}` — Ersteller oder Admin; fremde Notiz
+  für Recorder → 404. Keine Bearbeitung vorgesehen.
 
 ## Dashboard
 

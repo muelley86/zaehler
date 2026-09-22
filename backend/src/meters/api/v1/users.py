@@ -19,6 +19,7 @@ from meters.models import (
     AuditEntityType,
     Delivery,
     MeasuringPoint,
+    MeasuringPointNote,
     Reading,
     User,
     UserMeasuringPointAccess,
@@ -231,6 +232,12 @@ def delete_user(
         or 0,
         "deliveries": db.scalar(
             select(func.count(Delivery.id)).where(Delivery.created_by_user_id == user.id)
+        )
+        or 0,
+        "notes": db.scalar(
+            select(func.count(MeasuringPointNote.id)).where(
+                MeasuringPointNote.created_by_user_id == user.id
+            )
         )
         or 0,
         "granted_accesses": db.scalar(
