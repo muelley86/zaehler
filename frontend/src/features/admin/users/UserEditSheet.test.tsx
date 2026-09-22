@@ -125,7 +125,7 @@ describe('UserEditSheet', () => {
             title: 'User has data references',
             status: 409,
             detail: 'Benutzer hat noch Daten.',
-            references: { readings: 3, deliveries: 1, granted_accesses: 0 },
+            references: { readings: 3, deliveries: 1, notes: 2, granted_accesses: 0 },
           },
           { status: 409 },
         ),
@@ -141,6 +141,7 @@ describe('UserEditSheet', () => {
       const errEl = screen.getByTestId('user-edit-error');
       expect(errEl).toHaveTextContent(/3 Erfassungen/);
       expect(errEl).toHaveTextContent(/1 Lieferungen/);
+      expect(errEl).toHaveTextContent(/2 Notizen/);
       expect(errEl).toHaveTextContent(/deaktivieren/);
     });
     confirmSpy.mockRestore();

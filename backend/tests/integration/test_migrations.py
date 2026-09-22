@@ -66,6 +66,7 @@ def test_full_upgrade_to_head(fresh_engine: Engine) -> None:
             "register",
             "reading",
             "delivery",
+            "measuring_point_note",
             "location",
             "user_measuring_point_access",
             "qr_token",

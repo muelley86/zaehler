@@ -26,6 +26,7 @@ DEFAULT_READING_INTERVAL_DAYS = 35
 if TYPE_CHECKING:
     from meters.models.kostenstelle_assignment import KostenstelleAssignment
     from meters.models.location import Location
+    from meters.models.measuring_point_note import MeasuringPointNote
     from meters.models.mieter_assignment import MieterAssignment
     from meters.models.owner_assignment import OwnerAssignment
     from meters.models.physical_meter import PhysicalMeter
@@ -111,6 +112,13 @@ class MeasuringPoint(Base, TimestampMixin):
         cascade="all, delete-orphan",
         order_by="KostenstelleAssignment.valid_from",
         lazy="selectin",
+    )
+    # Freitext-Notizen (seit 0045), neueste zuerst. Ohne MP wertlos -> Cascade.
+    notes: Mapped[list[MeasuringPointNote]] = relationship(
+        "MeasuringPointNote",
+        back_populates="measuring_point",
+        cascade="all, delete-orphan",
+        order_by="MeasuringPointNote.created_at.desc()",
     )
 
     @property

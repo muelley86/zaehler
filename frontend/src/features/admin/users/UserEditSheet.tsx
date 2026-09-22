@@ -25,6 +25,7 @@ interface UserEditSheetProps {
 interface ReferencesInfo {
   readings: number;
   deliveries: number;
+  notes: number;
   granted_accesses: number;
 }
 
@@ -38,6 +39,7 @@ function isReferenceError(
     refs !== null &&
     'readings' in refs &&
     'deliveries' in refs &&
+    'notes' in refs &&
     'granted_accesses' in refs
   );
 }
@@ -103,7 +105,7 @@ export function UserEditSheet({ user, me, onClose, onSaved }: UserEditSheetProps
         if (isReferenceError(err)) {
           const r = err.problem.references;
           setError(
-            `Benutzer hat noch Datenbezuege (${r.readings} Erfassungen, ${r.deliveries} Lieferungen, ${r.granted_accesses} erteilte Zugriffe). ` +
+            `Benutzer hat noch Datenbezuege (${r.readings} Erfassungen, ${r.deliveries} Lieferungen, ${r.notes} Notizen, ${r.granted_accesses} erteilte Zugriffe). ` +
               'Bitte stattdessen deaktivieren.',
           );
         } else {
@@ -227,8 +229,8 @@ export function UserEditSheet({ user, me, onClose, onSaved }: UserEditSheetProps
             Benutzer loeschen
           </Button>
           <div className="mt-1 text-caption text-tertiary">
-            Klappt nur, wenn der Benutzer keine Erfassungen, Lieferungen oder erteilten Zugriffe hat
-            — sonst stattdessen deaktivieren.
+            Klappt nur, wenn der Benutzer keine Erfassungen, Lieferungen, Notizen oder erteilten
+            Zugriffe hat — sonst stattdessen deaktivieren.
           </div>
         </div>
       </div>

@@ -45,6 +45,7 @@ from meters.schemas.measuring_point import (
     MeasuringPointWithStateRead,
     ReplaceMeterRequest,
 )
+from meters.schemas.measuring_point_note import MeasuringPointNoteCreate, MeasuringPointNoteRead
 from meters.schemas.mieter import MieterCreate, MieterRead, MieterUpdate
 from meters.schemas.mieter_assignment import (
     ChangeMieterRequest,
@@ -143,6 +144,8 @@ __all__ = [
     "MainLocationUpdate",
     "MeResponse",
     "MeasuringPointCreate",
+    "MeasuringPointNoteCreate",
+    "MeasuringPointNoteRead",
     "MeasuringPointRead",
     "MeasuringPointUpdate",
     "MeasuringPointWithStateRead",

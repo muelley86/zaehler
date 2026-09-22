@@ -76,6 +76,15 @@ export interface DeliveryRead {
   created_by_username: string | null;
 }
 
+export interface MeasuringPointNoteRead {
+  id: number;
+  measuring_point_id: number;
+  text: string;
+  created_at: string;
+  created_by_user_id: number | null;
+  created_by_username: string | null;
+}
+
 export interface RegisterStateRead {
   register_id: number;
   physical_meter_id: number;

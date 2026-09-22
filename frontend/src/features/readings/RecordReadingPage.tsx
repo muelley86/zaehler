@@ -19,6 +19,7 @@ import { isValidToken } from '@/features/scanner/parseScannedUrl';
 import { ApiError, NetworkError, api, isPlausibilityWarning } from '@/lib/api';
 import { StaleDataHint } from '@/components/StaleDataHint';
 import { useAuth } from '@/features/auth/auth-context';
+import { MeasuringPointNotes } from '@/features/measuring-point-notes/MeasuringPointNotes';
 import { formatDateTimeDe, formatDe, localInputToIso, nowForInput, parseDe } from '@/lib/format';
 import { mapWithConcurrency } from '@/lib/concurrency';
 import { tryGetDeviceLocation } from '@/lib/geo';
@@ -414,6 +415,9 @@ export function RecordReadingPage() {
                 Wandlerfaktor ×{selectedMP.transformer_factor} — gib hier den Sekundärwert vom
                 Zähler ein. Verbräuche werden mit diesem Faktor multipliziert.
               </div>
+            ) : null}
+            {selectedMP ? (
+              <MeasuringPointNotes key={selectedMP.id} mpId={selectedMP.id} variant="compact" />
             ) : null}
           </div>
         </Section>

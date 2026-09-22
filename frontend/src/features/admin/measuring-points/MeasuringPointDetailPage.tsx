@@ -48,6 +48,7 @@ import {
 } from '@/components/ui';
 import { LocationMapSheet } from '@/components/LocationMapSheet';
 import { useAuth } from '@/features/auth/auth-context';
+import { MeasuringPointNotes } from '@/features/measuring-point-notes/MeasuringPointNotes';
 import { useFilterPrefs } from '@/features/prefs/filter-prefs-context';
 import { ApiError, api } from '@/lib/api';
 import { formatDateTickDe, formatDateTimeDe, formatDe, parseDe } from '@/lib/format';
@@ -220,6 +221,8 @@ export function MeasuringPointDetailPage() {
         onMapOpen={() => setMapOpen(true)}
         onUpdated={(updated) => setMp(updated)}
       />
+
+      <MeasuringPointNotes mpId={mp.id} variant="card" />
 
       <PhysicalMetersCard mp={mp} onChanged={refresh} />
 
