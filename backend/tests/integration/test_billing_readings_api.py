@@ -82,7 +82,6 @@ def test_monatsend_staende_je_position(
         kind="rest",
         owner_id=owner,
         kostenstelle=10101,
-        sort_order=9,
     )
 
     # Stall: abgelesen am 31.07., interpoliert zum 31.08. (30.08. 150, 01.09. 170 -> 160)
@@ -108,7 +107,7 @@ def test_monatsend_staende_je_position(
     assert (erg["stichtag_alt"], erg["stichtag_neu"]) == ("2026-07-31", "2026-08-31")
     assert erg["max_abstand_tage"] == 3
     zeilen = {z["label"]: z for z in erg["positions"]}
-    assert list(zeilen) == ["Pumpe", "Stall", "Rest"]
+    assert list(zeilen) == ["Stall", "Pumpe", "Rest"]  # Anlagereihenfolge (10, 20, 30)
 
     s = zeilen["Stall"]
     assert s["transformer_factor"] == 40

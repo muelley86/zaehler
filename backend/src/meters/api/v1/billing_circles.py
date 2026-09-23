@@ -20,6 +20,7 @@ from meters.models import (
     BillingInvoice,
     BillingPosition,
     BillingPositionKind,
+    Owner,
 )
 from meters.schemas.billing_circle import (
     BillingCheckRead,
@@ -27,6 +28,7 @@ from meters.schemas.billing_circle import (
     BillingCircleRead,
     BillingCircleUpdate,
     BillingPositionCreate,
+    BillingPositionOrder,
     BillingPositionRead,
     BillingPositionUpdate,
     UnassignedMeterRead,
@@ -40,7 +42,10 @@ from meters.services.billing_circle import (
     FELDER,
     PositionData,
     check_circle,
+    next_sort_order,
     positions_at,
+    recipients_at,
+    reorder_positions,
     unassigned_meters,
     validate_position,
 )
@@ -73,11 +78,19 @@ def _position(db: DbDep, circle_id: int, position_id: int) -> BillingPosition:
     return position
 
 
-def _position_read(p: BillingPosition) -> BillingPositionRead:
+def _position_read(p: BillingPosition, recipient: Owner | None = None) -> BillingPositionRead:
     data = BillingPositionRead.model_validate(p)
     data.measuring_point_name = p.measuring_point.name if p.measuring_point else None
     data.owner_name = p.owner.name if p.owner else None
+    data.recipient_name = recipient.name if recipient else None
+    data.recipient_internal = bool(recipient and recipient.internal_allocation)
     return data
+
+
+def _positions_read(db: DbDep, positions: list[BillingPosition]) -> list[BillingPositionRead]:
+    """Positionen samt heutigem Empfaenger (Gruppierung in der Positionsliste)."""
+    empfaenger = recipients_at(db, positions, date.today())
+    return [_position_read(p, empfaenger.get(p.id)) for p in positions]
 
 
 def _commit_code(db: DbDep) -> None:
@@ -303,7 +316,34 @@ def list_positions(
     circle_id: int, db: DbDep, _user: BillingUser, stichtag: date | None = None
 ) -> list[BillingPositionRead]:
     _circle(db, circle_id)
-    return [_position_read(p) for p in positions_at(db, circle_id, stichtag)]
+    return _positions_read(db, positions_at(db, circle_id, stichtag))
+
+
+@router.put("/{circle_id}/positions/order", response_model=list[BillingPositionRead])
+def reorder(
+    circle_id: int,
+    payload: BillingPositionOrder,
+    request: Request,
+    db: DbDep,
+    user: BillingUser,
+) -> list[BillingPositionRead]:
+    """Reihenfolge aller Positionen setzen (Drag & Drop in der Positionsliste)."""
+    circle = _circle(db, circle_id)
+    vorher = [p.label for p in positions_at(db, circle.id, None)]
+    positionen = reorder_positions(db, circle, payload.position_ids)
+    nachher = [p.label for p in positionen]
+    if nachher != vorher:
+        record(
+            db,
+            user_id=user.id,
+            action=AuditAction.UPDATE,
+            entity_type=AuditEntityType.BILLING_CIRCLE,
+            entity_id=circle.id,
+            diff={"reihenfolge": {"from": vorher, "to": nachher}},
+            ip_address=client_ip(request),
+        )
+    db.commit()
+    return _positions_read(db, positionen)
 
 
 @router.post(
@@ -319,8 +359,11 @@ def create_position(
     user: BillingUser,
 ) -> BillingPositionRead:
     circle = _circle(db, circle_id)
-    validate_position(db, circle, PositionData(**payload.model_dump()), None)
-    position = BillingPosition(circle_id=circle.id, **payload.model_dump())
+    felder = payload.model_dump()
+    if felder["sort_order"] is None:
+        felder["sort_order"] = next_sort_order(db, circle.id)
+    validate_position(db, circle, PositionData(**felder), None)
+    position = BillingPosition(circle_id=circle.id, **felder)
     db.add(position)
     db.flush()
     record(
@@ -329,12 +372,12 @@ def create_position(
         action=AuditAction.CREATE,
         entity_type=AuditEntityType.BILLING_POSITION,
         entity_id=position.id,
-        diff={k: _json(v) for k, v in payload.model_dump().items()} | {"circle_id": circle.id},
+        diff={k: _json(v) for k, v in felder.items()} | {"circle_id": circle.id},
         ip_address=client_ip(request),
     )
     db.commit()
     db.refresh(position)
-    return _position_read(position)
+    return _positions_read(db, [position])[0]
 
 
 @router.patch("/{circle_id}/positions/{position_id}", response_model=BillingPositionRead)
@@ -386,7 +429,7 @@ def update_position(
         )
     db.commit()
     db.refresh(position)
-    return _position_read(position)
+    return _positions_read(db, [position])[0]
 
 
 @router.delete("/{circle_id}/positions/{position_id}", status_code=status.HTTP_204_NO_CONTENT)

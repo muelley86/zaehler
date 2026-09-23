@@ -1,0 +1,283 @@
+/**
+ * Positionsliste eines Abrechnungskreises, gruppiert nach heutigem Empfänger. Gruppen und
+ * Positionen innerhalb einer Gruppe werden per Griff verschoben (Drag & Drop via @dnd-kit, per
+ * Tastatur: Leertaste, Pfeiltasten, Leertaste). Eine Position wechselt die Gruppe nicht — der
+ * Empfänger kommt aus der Messstelle; die interne Umlage bleibt immer am Ende.
+ */
+import { useMemo } from 'react';
+import type { ReactNode } from 'react';
+import {
+  DndContext,
+  KeyboardSensor,
+  PointerSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core';
+import type { Announcements, DragEndEvent, ScreenReaderInstructions } from '@dnd-kit/core';
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import { GripVertical, Pencil, Trash2 } from 'lucide-react';
+
+import { cx } from '@/components/ui/cx';
+import { formatDateDe } from '@/lib/format';
+import type { BillingPositionRead } from '@/lib/types';
+
+import { flattenGroups, groupPositions, moveGroup, movePosition } from './positionGroups';
+import type { PositionGroup } from './positionGroups';
+
+const GRIP =
+  'flex h-8 w-8 shrink-0 cursor-grab touch-none items-center justify-center rounded-full text-tertiary hover:bg-fill hover:text-label active:cursor-grabbing';
+
+const DRAGGING = 'relative z-20 opacity-90 shadow-glass';
+
+// Stabile Optionen: `useSensor` memoisiert über das Options-Objekt.
+const POINTER_OPTIONS = { activationConstraint: { distance: 5 } };
+const KEYBOARD_OPTIONS = { coordinateGetter: sortableKeyboardCoordinates };
+
+// @dnd-kit bringt nur englische Ansagen mit.
+const INSTRUCTIONS: ScreenReaderInstructions = {
+  draggable:
+    'Leertaste nimmt den Eintrag auf, Pfeiltasten verschieben ihn, Leertaste legt ihn ab, Escape bricht ab.',
+};
+
+function announcements(name: (id: string | number) => string): Announcements {
+  return {
+    onDragStart: ({ active }) => `„${name(active.id)}“ aufgenommen.`,
+    onDragOver: ({ active, over }) =>
+      over ? `„${name(active.id)}“ über „${name(over.id)}“.` : undefined,
+    onDragEnd: ({ active, over }) =>
+      over
+        ? `„${name(active.id)}“ an Stelle von „${name(over.id)}“ abgelegt.`
+        : `„${name(active.id)}“ abgelegt.`,
+    onDragCancel: ({ active }) => `Verschieben von „${name(active.id)}“ abgebrochen.`,
+  };
+}
+
+function groupTitle(g: PositionGroup): string {
+  return g.recipient ?? 'Ohne Empfänger';
+}
+
+export interface PositionsListProps {
+  positions: BillingPositionRead[];
+  /** Neue Reihenfolge aller Positionen (IDs). */
+  onReorder: (ids: number[]) => void;
+  onEdit: (p: BillingPositionRead) => void;
+  onRemove: (p: BillingPositionRead) => void;
+}
+
+export function PositionsList({ positions, onReorder, onEdit, onRemove }: PositionsListProps) {
+  const groups = useMemo(() => groupPositions(positions), [positions]);
+  const labelById = useMemo(() => new Map(positions.map((p) => [p.id, p.label])), [positions]);
+  // Pointer erst ab 5 px, damit ein Tipp auf den Griff kein Drag startet (wie im Dashboard).
+  const sensors = useSensors(
+    useSensor(PointerSensor, POINTER_OPTIONS),
+    useSensor(KeyboardSensor, KEYBOARD_OPTIONS),
+  );
+  // Memoisiert: jeder DndContext meldet seine Ansagen bei neuer Referenz neu an.
+  const groupAnnouncements = useMemo(
+    () =>
+      announcements((id) => {
+        const g = groups.find((x) => x.key === id);
+        return g ? groupTitle(g) : String(id);
+      }),
+    [groups],
+  );
+  const positionAnnouncements = useMemo(
+    () => announcements((id) => labelById.get(Number(id)) ?? String(id)),
+    [labelById],
+  );
+
+  function handleGroupDragEnd({ active, over }: DragEndEvent) {
+    if (!over) return;
+    const next = moveGroup(groups, String(active.id), String(over.id));
+    if (next) onReorder(flattenGroups(next));
+  }
+
+  function handlePositionDragEnd({ active, over }: DragEndEvent) {
+    if (!over) return;
+    const next = movePosition(groups, Number(active.id), Number(over.id));
+    if (next) onReorder(flattenGroups(next));
+  }
+
+  return (
+    <DndContext
+      sensors={sensors}
+      collisionDetection={closestCenter}
+      onDragEnd={handleGroupDragEnd}
+      accessibility={{
+        announcements: groupAnnouncements,
+        screenReaderInstructions: INSTRUCTIONS,
+      }}
+    >
+      <SortableContext items={groups.map((g) => g.key)} strategy={verticalListSortingStrategy}>
+        <div className="divide-y divide-separator">
+          {groups.map((g) => (
+            <SortableGroup key={g.key} group={g}>
+              {/* Eigener Kontext je Gruppe: Positionen bleiben in ihrer Gruppe. */}
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragEnd={handlePositionDragEnd}
+                accessibility={{
+                  announcements: positionAnnouncements,
+                  screenReaderInstructions: INSTRUCTIONS,
+                }}
+              >
+                <SortableContext
+                  items={g.positions.map((p) => p.id)}
+                  strategy={verticalListSortingStrategy}
+                >
+                  <ul className="divide-y divide-separator">
+                    {g.positions.map((p) => (
+                      <SortablePosition
+                        key={p.id}
+                        position={p}
+                        parentLabel={
+                          p.parent_position_id !== null
+                            ? (labelById.get(p.parent_position_id) ?? '?')
+                            : null
+                        }
+                        onEdit={onEdit}
+                        onRemove={onRemove}
+                      />
+                    ))}
+                  </ul>
+                </SortableContext>
+              </DndContext>
+            </SortableGroup>
+          ))}
+        </div>
+      </SortableContext>
+    </DndContext>
+  );
+}
+
+function SortableGroup({ group, children }: { group: PositionGroup; children: ReactNode }) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    setActivatorNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: group.key });
+  const title = groupTitle(group);
+  return (
+    <section
+      ref={setNodeRef}
+      style={{ transform: CSS.Translate.toString(transform), transition }}
+      className={cx(isDragging && cx(DRAGGING, 'bg-surface-solid'))}
+      role="group"
+      aria-label={`Empfänger „${title}“`}
+    >
+      <div className="bg-fill/40 flex items-center gap-1 px-3 py-2">
+        <button
+          type="button"
+          ref={setActivatorNodeRef}
+          {...attributes}
+          {...listeners}
+          aria-label={`Empfänger „${title}“ verschieben`}
+          className={GRIP}
+        >
+          <GripVertical size={16} aria-hidden />
+        </button>
+        <h2 className="min-w-0 flex-1 truncate text-caption-bold uppercase text-secondary">
+          {title} · {group.positions.length}
+        </h2>
+        {group.internal ? (
+          <span className="shrink-0 rounded-full bg-fill px-2 py-0.5 text-caption text-secondary">
+            Interne Umlage – immer zuletzt
+          </span>
+        ) : null}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function SortablePosition({
+  position: p,
+  parentLabel,
+  onEdit,
+  onRemove,
+}: {
+  position: BillingPositionRead;
+  parentLabel: string | null;
+  onEdit: (p: BillingPositionRead) => void;
+  onRemove: (p: BillingPositionRead) => void;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    setActivatorNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: p.id });
+  return (
+    <li
+      ref={setNodeRef}
+      style={{ transform: CSS.Translate.toString(transform), transition }}
+      className={cx(
+        'flex items-center gap-2 py-3 pl-3 pr-5',
+        isDragging && cx(DRAGGING, 'bg-surface-solid'),
+      )}
+    >
+      <button
+        type="button"
+        ref={setActivatorNodeRef}
+        {...attributes}
+        {...listeners}
+        aria-label={`Position „${p.label}“ verschieben`}
+        className={GRIP}
+      >
+        <GripVertical size={16} aria-hidden />
+      </button>
+      <div className="min-w-0 flex-1">
+        <div className="truncate text-body font-semibold text-label">
+          {p.label}
+          {p.kind === 'rest' ? (
+            <span className="ml-2 rounded-full bg-fill px-2 py-0.5 text-caption text-secondary">
+              Restmenge
+            </span>
+          ) : null}
+        </div>
+        <div className="truncate text-caption text-tertiary">
+          {p.kind === 'meter'
+            ? `Messstelle: ${p.measuring_point_name ?? '—'}`
+            : `KST ${p.kostenstelle ?? '—'}`}
+          {parentLabel !== null ? ` · Unterzähler von ${parentLabel}` : ''}
+          {p.invoice_line ? ` · ${p.invoice_line}` : ''}
+        </div>
+        <div className="text-caption text-quaternary">
+          ab {formatDateDe(p.valid_from)}
+          {p.valid_to ? ` bis ${formatDateDe(p.valid_to)}` : ''}
+        </div>
+      </div>
+      <button
+        type="button"
+        onClick={() => onEdit(p)}
+        aria-label={`Position ${p.label} bearbeiten`}
+        className="flex h-8 w-8 items-center justify-center rounded-full text-secondary hover:bg-fill"
+      >
+        <Pencil size={14} />
+      </button>
+      <button
+        type="button"
+        onClick={() => onRemove(p)}
+        aria-label={`Position ${p.label} löschen`}
+        className="flex h-8 w-8 items-center justify-center rounded-full text-danger hover:bg-danger/10"
+      >
+        <Trash2 size={14} />
+      </button>
+    </li>
+  );
+}

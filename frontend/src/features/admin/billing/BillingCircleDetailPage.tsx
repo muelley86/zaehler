@@ -1,15 +1,15 @@
 /**
  * Detail eines Abrechnungskreises: Stammdaten, Positionen (Messstellen bzw. Restmenge mit
- * Gültigkeitszeitraum, Unterzähler, Agrarmonitor-Rechnungszeile) und Prüfbericht zum Stichtag.
+ * Gültigkeitszeitraum, Unterzähler, Agrarmonitor-Rechnungszeile; nach Empfänger gruppiert und
+ * per Drag & Drop sortierbar) und Prüfbericht zum Stichtag.
  */
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Pencil, Plus, Trash2 } from 'lucide-react';
+import { ArrowLeft, Plus } from 'lucide-react';
 
 import { Button, LargeTitle, Section, Select, Sheet, TextField } from '@/components/ui';
 import { api } from '@/lib/api';
-import { formatDateDe } from '@/lib/format';
 import type {
   BillingCheckRead,
   BillingCircleRead,
@@ -24,6 +24,7 @@ import { CircleFields } from './CircleFields';
 import { HistoryCard } from './HistoryCard';
 import { InvoicesSection } from './InvoicesSection';
 import { MonthReadingsSection } from './MonthReadingsSection';
+import { PositionsList } from './PositionsList';
 import { circleBody, circleFormState, errorText, lastDayOfPreviousMonth } from './circleForm';
 import type { CircleFormState } from './circleForm';
 
@@ -42,6 +43,8 @@ export function BillingCircleDetailPage() {
   } | null>(null);
   const [tick, setTick] = useState(0);
   const refresh = () => setTick((t) => t + 1);
+  const saveQueue = useRef<Promise<void>>(Promise.resolve());
+  const pendingSaves = useRef(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -97,7 +100,29 @@ export function BillingCircleDetailPage() {
     }
   }
 
-  const labelById = useMemo(() => new Map(positions.map((p) => [p.id, p.label])), [positions]);
+  function reorderPositions(ids: number[]) {
+    // Sofort anzeigen, dann speichern. Speichervorgänge laufen nacheinander, damit bei schnellem
+    // Umsortieren die letzte Reihenfolge gewinnt; erst danach neu laden (auch Zählerstände und
+    // Prüfbericht folgen der Reihenfolge, bei Fehler kommt der Serverstand zurück).
+    const byId = new Map(positions.map((p) => [p.id, p]));
+    setPositions(
+      ids.flatMap((id, i) => {
+        const p = byId.get(id);
+        return p ? [{ ...p, sort_order: (i + 1) * 10 }] : [];
+      }),
+    );
+    pendingSaves.current += 1;
+    saveQueue.current = saveQueue.current.then(async () => {
+      try {
+        await api.put(`/billing-circles/${circleId}/positions/order`, { position_ids: ids });
+        setError(null);
+      } catch (err) {
+        setError(errorText(err, 'Reihenfolge konnte nicht gespeichert werden.'));
+      }
+      pendingSaves.current -= 1;
+      if (pendingSaves.current === 0) refresh();
+    });
+  }
 
   return (
     <>
@@ -159,51 +184,19 @@ export function BillingCircleDetailPage() {
         {positions.length === 0 ? (
           <div className="p-5 text-caption text-tertiary">Noch keine Positionen.</div>
         ) : (
-          <ul className="divide-y divide-separator">
-            {positions.map((p) => (
-              <li key={p.id} className="flex items-center gap-3 px-5 py-3">
-                <div className="min-w-0 flex-1">
-                  <div className="truncate text-body font-semibold text-label">
-                    {p.label}
-                    {p.kind === 'rest' ? (
-                      <span className="ml-2 rounded-full bg-fill px-2 py-0.5 text-caption text-secondary">
-                        Restmenge
-                      </span>
-                    ) : null}
-                  </div>
-                  <div className="truncate text-caption text-tertiary">
-                    {p.kind === 'meter'
-                      ? `Messstelle: ${p.measuring_point_name ?? '—'}`
-                      : `Empfänger: ${p.owner_name ?? '—'} · KST ${p.kostenstelle ?? '—'}`}
-                    {p.parent_position_id !== null
-                      ? ` · Unterzähler von ${labelById.get(p.parent_position_id) ?? '?'}`
-                      : ''}
-                    {p.invoice_line ? ` · ${p.invoice_line}` : ''}
-                  </div>
-                  <div className="text-caption text-quaternary">
-                    ab {formatDateDe(p.valid_from)}
-                    {p.valid_to ? ` bis ${formatDateDe(p.valid_to)}` : ''}
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setPositionSheet({ position: p })}
-                  aria-label={`Position ${p.label} bearbeiten`}
-                  className="flex h-8 w-8 items-center justify-center rounded-full text-secondary hover:bg-fill"
-                >
-                  <Pencil size={14} />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => void removePosition(p)}
-                  aria-label={`Position ${p.label} löschen`}
-                  className="flex h-8 w-8 items-center justify-center rounded-full text-danger hover:bg-danger/10"
-                >
-                  <Trash2 size={14} />
-                </button>
-              </li>
-            ))}
-          </ul>
+          <>
+            <p className="px-5 py-3 text-caption text-tertiary">
+              Gruppiert nach Empfänger (Stand heute). Reihenfolge über den Griff verschieben — sie
+              gilt für Abrechnungslauf, Agrarmonitor-Übertragung und Excel. Ein Stammdaten-Import
+              setzt sie wieder auf die Reihenfolge der Excel.
+            </p>
+            <PositionsList
+              positions={positions}
+              onReorder={reorderPositions}
+              onEdit={(p) => setPositionSheet({ position: p })}
+              onRemove={(p) => void removePosition(p)}
+            />
+          </>
         )}
       </Section>
 
@@ -321,7 +314,6 @@ function PositionForm({
   const [kst, setKst] = useState(position?.kostenstelle?.toString() ?? '');
   const [invoiceLine, setInvoiceLine] = useState(position?.invoice_line ?? '');
   const [note, setNote] = useState(position?.note ?? '');
-  const [sortOrder, setSortOrder] = useState(String(position?.sort_order ?? 0));
   const [validFrom, setValidFrom] = useState(position?.valid_from ?? '');
   const [validTo, setValidTo] = useState(position?.valid_to ?? '');
   const [busy, setBusy] = useState(false);
@@ -346,7 +338,7 @@ function PositionForm({
     const body = {
       label: label.trim(),
       kind,
-      sort_order: Number(sortOrder) || 0,
+      // Reihenfolge nur per Drag & Drop; neue Positionen setzt der Server ans Ende.
       measuring_point_id: kind === 'meter' && mpId ? Number(mpId) : null,
       parent_position_id: kind === 'meter' && parentId ? Number(parentId) : null,
       owner_id: kind === 'rest' && ownerId ? Number(ownerId) : null,
@@ -447,13 +439,7 @@ function PositionForm({
         maxLength={120}
       />
       <TextField label="Bemerkung" value={note} onChange={(e) => setNote(e.target.value)} />
-      <div className="grid grid-cols-3 gap-2">
-        <TextField
-          label="Reihenfolge"
-          value={sortOrder}
-          onChange={(e) => setSortOrder(e.target.value.replace(/\D/g, ''))}
-          inputMode="numeric"
-        />
+      <div className="grid grid-cols-2 gap-2">
         <TextField
           label="Gültig ab"
           type="date"
