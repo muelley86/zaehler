@@ -10,6 +10,13 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.81.0](https://github.com/muelley86/zaehler/compare/v2.80.0...v2.81.0) (2026-09-23)
+
+
+### Funktionen
+
+* **abrechnung:** Positionen nach Empfänger gruppiert per Drag & Drop sortieren ([#362](https://github.com/muelley86/zaehler/issues/362)) ([c3ab0b6](https://github.com/muelley86/zaehler/commit/c3ab0b6edafd447a97f013d2247027b2252b1c2a))
+
 ## [2.80.0](https://github.com/muelley86/zaehler/compare/v2.79.0...v2.80.0) (2026-09-22)
 
 
