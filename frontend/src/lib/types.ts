@@ -172,6 +172,9 @@ export interface BillingPositionRead {
   parent_position_id: number | null;
   owner_id: number | null;
   owner_name: string | null;
+  /** Empfänger heute (Eigentümer der Messstelle bzw. der Restposition) — Gruppierung der Liste. */
+  recipient_name: string | null;
+  recipient_internal: boolean;
   kostenstelle: number | null;
   invoice_line: string | null;
   note: string | null;

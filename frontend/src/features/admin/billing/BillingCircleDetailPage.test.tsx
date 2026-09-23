@@ -43,6 +43,8 @@ function mockApi() {
           parent_position_id: null,
           owner_id: null,
           owner_name: null,
+          recipient_name: 'Nord KG',
+          recipient_internal: false,
           kostenstelle: null,
           invoice_line: null,
           note: null,
@@ -107,6 +109,21 @@ describe('BillingCircleDetailPage', () => {
     expect(await screen.findByText(/Messstelle: SUED - Pumpe/)).toBeInTheDocument();
     expect(await screen.findByText('Strom (gewerblich) Kostenstelle 10108')).toBeInTheDocument();
     expect(screen.getByText(/Kein Eigentuemer/)).toBeInTheDocument();
+  });
+
+  it('gruppiert nach Empfänger mit Griffen statt Reihenfolge-Nummer', async () => {
+    mockApi();
+    renderWithRouter(<BillingCircleDetailPage />);
+    expect(await screen.findByRole('group', { name: 'Empfänger „Nord KG“' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Empfänger „Nord KG“ verschieben' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Position „Pumpe“ verschieben' }),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Position Pumpe bearbeiten' }));
+    expect(await screen.findByLabelText('Bezeichnung')).toHaveValue('Pumpe');
+    expect(screen.queryByLabelText('Reihenfolge')).not.toBeInTheDocument();
   });
 
   it('legt eine Restposition mit Empfänger und Kostenstelle an', async () => {

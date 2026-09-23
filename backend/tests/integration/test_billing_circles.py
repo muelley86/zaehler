@@ -351,3 +351,79 @@ def test_artwechsel_leert_unpassende_felder(admin_client: TestClient) -> None:
     assert resp.status_code == 200, resp.text
     assert resp.json()["measuring_point_id"] is None
     assert resp.json()["kind"] == "rest"
+
+
+# --- Reihenfolge --------------------------------------------------------------------------------
+
+
+def _positionen(client: TestClient, cid: int) -> list[dict[str, Any]]:
+    resp = client.get(f"{BASE}/{cid}/positions")
+    assert resp.status_code == 200, resp.text
+    return cast(list[dict[str, Any]], resp.json())
+
+
+def test_positionsliste_nennt_heutigen_empfaenger(admin_client: TestClient) -> None:
+    cid = _circle(admin_client)
+    agrar = _owner(admin_client, "Agrar KG")
+    intern = _owner(admin_client, "Service GmbH", internal_allocation=True)
+    stall = _mp(admin_client, "Stall", owner_id=agrar)
+    bhkw = _mp(admin_client, "BHKW", owner_id=intern)
+    _meter_pos(admin_client, cid, "Stall", measuring_point_id=stall)
+    _meter_pos(admin_client, cid, "BHKW", measuring_point_id=bhkw)
+    _meter_pos(admin_client, cid, "Ohne")
+    _ok(_position(admin_client, cid, label="Rest", kind="rest", owner_id=agrar, kostenstelle=1))
+    zeilen = {p["label"]: p for p in _positionen(admin_client, cid)}
+    assert zeilen["Stall"]["recipient_name"] == "Agrar KG"
+    assert zeilen["Stall"]["recipient_internal"] is False
+    assert zeilen["BHKW"]["recipient_name"] == "Service GmbH"
+    assert zeilen["BHKW"]["recipient_internal"] is True
+    assert zeilen["Ohne"]["recipient_name"] is None
+    assert zeilen["Rest"]["recipient_name"] == "Agrar KG"
+
+
+def test_neue_position_ohne_reihenfolge_kommt_ans_ende(admin_client: TestClient) -> None:
+    cid = _circle(admin_client)
+    assert _meter_pos(admin_client, cid, "Erste")["sort_order"] == 10
+    _meter_pos(admin_client, cid, "Mitte", sort_order=55)
+    assert _meter_pos(admin_client, cid, "Letzte")["sort_order"] == 65
+    assert [p["label"] for p in _positionen(admin_client, cid)] == ["Erste", "Mitte", "Letzte"]
+
+
+def test_reihenfolge_setzen(admin_client: TestClient) -> None:
+    cid = _circle(admin_client)
+    a = _meter_pos(admin_client, cid, "A")
+    b = _meter_pos(admin_client, cid, "B")
+    c = _meter_pos(admin_client, cid, "C", valid_to="2026-09-01")  # abgelaufen, zaehlt mit
+    resp = admin_client.put(
+        f"{BASE}/{cid}/positions/order", json={"position_ids": [c["id"], a["id"], b["id"]]}
+    )
+    assert resp.status_code == 200, resp.text
+    assert [(p["label"], p["sort_order"]) for p in resp.json()] == [
+        ("C", 10),
+        ("A", 20),
+        ("B", 30),
+    ]
+    assert [p["label"] for p in _positionen(admin_client, cid)] == ["C", "A", "B"]
+    eintraege = admin_client.get("/api/v1/audit-log").json()
+    assert any(
+        e["entity_type"] == "billing_circle"
+        and e["entity_id"] == cid
+        and e["diff"]["reihenfolge"]["to"] == ["C", "A", "B"]
+        for e in eintraege
+    )
+
+
+def test_reihenfolge_muss_alle_positionen_genau_einmal_nennen(admin_client: TestClient) -> None:
+    cid = _circle(admin_client)
+    fremd = _meter_pos(admin_client, _circle(admin_client, "SUED"), "Fremd")
+    a = _meter_pos(admin_client, cid, "A")
+    b = _meter_pos(admin_client, cid, "B")
+    url = f"{BASE}/{cid}/positions/order"
+    for ids in ([a["id"]], [a["id"], a["id"]], [a["id"], b["id"], fremd["id"]]):
+        assert admin_client.put(url, json={"position_ids": ids}).status_code == 422
+    assert [p["sort_order"] for p in _positionen(admin_client, cid)] == [10, 20]
+
+
+def test_reihenfolge_nur_mit_abrechnungsrecht(recorder_client: TestClient) -> None:
+    resp = recorder_client.put(f"{BASE}/1/positions/order", json={"position_ids": [1]})
+    assert resp.status_code == 403

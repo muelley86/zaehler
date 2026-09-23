@@ -13,7 +13,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date
 
-from sqlalchemy import Select, or_, select
+from sqlalchemy import Select, func, or_, select
 from sqlalchemy.orm import Session, selectinload
 
 from meters.core.problem import ProblemError
@@ -35,6 +35,8 @@ from meters.schemas.billing_circle import (
     UnassignedMeterRead,
 )
 from meters.services.kostenstelle_assignment import kostenstellen_am
+
+SORT_ORDER_MAX = 100000  # Obergrenze wie im Schema (``le=100000``)
 
 FELDER = (
     "label",
@@ -226,20 +228,69 @@ def unassigned_meters(db: Session, stichtag: date) -> list[UnassignedMeterRead]:
     ]
 
 
-def check_circle(db: Session, circle: BillingCircle, stichtag: date) -> BillingCheckRead:
-    """Loest die zum Stichtag gueltigen Positionen auf; meldet, was eine Abrechnung verhindert."""
-    positionen = positions_at(db, circle.id, stichtag)
-    mp_ids = [p.measuring_point_id for p in positionen if p.measuring_point_id is not None]
-
+def _owners_am(db: Session, mp_ids: list[int], stichtag: date) -> dict[int, Owner]:
+    """Eigentuemer (= Empfaenger) je Messstelle zum Stichtag."""
     owners: dict[int, Owner] = {}
-    mieter: dict[int, str] = {}
-    zaehler: set[int] = set()
     if mp_ids:
         for a in db.scalars(
             select(OwnerAssignment).where(OwnerAssignment.measuring_point_id.in_(mp_ids))
         ):
             if _gilt_am(a.valid_from, a.valid_to, stichtag) and a.owner is not None:
                 owners[a.measuring_point_id] = a.owner
+    return owners
+
+
+def recipients_at(
+    db: Session, positions: list[BillingPosition], stichtag: date
+) -> dict[int, Owner | None]:
+    """Empfaenger je Position zum Stichtag: Eigentuemer der Messstelle bzw. der Restposition."""
+    mp_ids = [p.measuring_point_id for p in positions if p.measuring_point_id is not None]
+    owners = _owners_am(db, mp_ids, stichtag)
+    return {
+        p.id: owners.get(p.measuring_point_id) if p.measuring_point_id is not None else p.owner
+        for p in positions
+    }
+
+
+def next_sort_order(db: Session, circle_id: int) -> int:
+    """Reihenfolge fuer eine neue Position: ans Ende des Kreises."""
+    hoechste = db.scalar(
+        select(func.max(BillingPosition.sort_order)).where(BillingPosition.circle_id == circle_id)
+    )
+    return min((hoechste or 0) + 10, SORT_ORDER_MAX)
+
+
+def reorder_positions(
+    db: Session, circle: BillingCircle, position_ids: list[int]
+) -> list[BillingPosition]:
+    """Setzt die Reihenfolge aller Positionen des Kreises (10, 20, 30, ...).
+
+    Die Liste muss jede Position des Kreises genau einmal enthalten (auch nicht mehr gueltige),
+    sonst 422 - ein veralteter Browser-Stand soll nichts still vertauschen.
+    """
+    positionen = {p.id: p for p in positions_at(db, circle.id, None)}
+    if len(position_ids) != len(set(position_ids)) or set(position_ids) != set(positionen):
+        raise ProblemError(
+            status_code=422,
+            title="Invalid position order",
+            detail="Die Reihenfolge muss jede Position des Kreises genau einmal enthalten "
+            "- bitte die Seite neu laden.",
+        )
+    geordnet = [positionen[i] for i in position_ids]
+    for index, position in enumerate(geordnet, start=1):
+        position.sort_order = index * 10
+    return geordnet
+
+
+def check_circle(db: Session, circle: BillingCircle, stichtag: date) -> BillingCheckRead:
+    """Loest die zum Stichtag gueltigen Positionen auf; meldet, was eine Abrechnung verhindert."""
+    positionen = positions_at(db, circle.id, stichtag)
+    mp_ids = [p.measuring_point_id for p in positionen if p.measuring_point_id is not None]
+
+    owners = _owners_am(db, mp_ids, stichtag)
+    mieter: dict[int, str] = {}
+    zaehler: set[int] = set()
+    if mp_ids:
         for m in db.scalars(
             select(MieterAssignment).where(MieterAssignment.measuring_point_id.in_(mp_ids))
         ):

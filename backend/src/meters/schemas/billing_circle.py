@@ -41,7 +41,8 @@ class BillingCircleRead(APIModel):
 class BillingPositionCreate(BaseModel):
     label: str = Field(min_length=1, max_length=120)
     kind: BillingPositionKind
-    sort_order: int = Field(default=0, ge=0, le=100000)
+    # Ohne Angabe ans Ende des Kreises (hoechste Reihenfolge + 10).
+    sort_order: int | None = Field(default=None, ge=0, le=100000)
     measuring_point_id: int | None = None
     parent_position_id: int | None = None
     owner_id: int | None = None
@@ -79,11 +80,20 @@ class BillingPositionRead(APIModel):
     parent_position_id: int | None
     owner_id: int | None
     owner_name: str | None = None
+    # Empfaenger heute (Eigentuemer der Messstelle bzw. der Restposition) - fuer die Gruppierung.
+    recipient_name: str | None = None
+    recipient_internal: bool = False
     kostenstelle: int | None
     invoice_line: str | None
     note: str | None
     valid_from: date
     valid_to: date | None
+
+
+class BillingPositionOrder(BaseModel):
+    """Neue Reihenfolge: alle Positionen des Kreises, jede genau einmal."""
+
+    position_ids: list[int] = Field(min_length=1, max_length=2000)
 
 
 class BillingCheckRow(BaseModel):
