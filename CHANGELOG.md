@@ -10,6 +10,13 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.82.1](https://github.com/muelley86/zaehler/compare/v2.82.0...v2.82.1) (2026-09-24)
+
+
+### Fehlerbehebungen
+
+* **abrechnung:** gleichnamige Empfänger erhalten eine gemeinsame Rechnung ([#366](https://github.com/muelley86/zaehler/issues/366)) ([36dc8a0](https://github.com/muelley86/zaehler/commit/36dc8a035a888e969b42796e663f42a822c14b22))
+
 ## [2.82.0](https://github.com/muelley86/zaehler/compare/v2.81.0...v2.82.0) (2026-09-24)
 
 
