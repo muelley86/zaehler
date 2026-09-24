@@ -5,7 +5,13 @@ import { describe, expect, it } from 'vitest';
 
 import type { BillTo, BillingPositionRead } from '@/lib/types';
 
-import { flattenGroups, groupPositions, moveGroup, movePosition } from './positionGroups';
+import {
+  flattenGroups,
+  groupPositions,
+  mieterBadge,
+  moveGroup,
+  movePosition,
+} from './positionGroups';
 
 function pos(
   id: number,
@@ -60,14 +66,17 @@ describe('groupPositions', () => {
 });
 
 describe('groupPositions mit Mieter-Empfaengern', () => {
-  it('trennt gleichnamige Eigentuemer und Mieter und markiert die Mieter-Gruppe', () => {
+  it('gleicher Name = eine Gruppe (eine Rechnung), Kennzeichen je Anteil der Mieter', () => {
     const groups = groupPositions([
       pos(1, 10, 'Muster', false, 'owner'),
       pos(2, 20, 'Muster', false, 'mieter'),
+      pos(3, 30, 'Firma', false, 'mieter'),
+      pos(4, 40, 'Agrar', false, 'owner'),
     ]);
-    expect(groups.map((g) => [g.recipient, g.mieter, g.positions.map((p) => p.id)])).toEqual([
-      ['Muster', false, [1]],
-      ['Muster', true, [2]],
+    expect(groups.map((g) => [g.recipient, mieterBadge(g), g.positions.map((p) => p.id)])).toEqual([
+      ['Muster', 'teils Mieter', [1, 2]],
+      ['Firma', 'Mieter', [3]],
+      ['Agrar', null, [4]],
     ]);
   });
 });
@@ -75,20 +84,18 @@ describe('groupPositions mit Mieter-Empfaengern', () => {
 describe('moveGroup', () => {
   it('verschiebt eine Gruppe samt Positionen', () => {
     const groups = groupPositions(POSITIONS);
-    const next = moveGroup(groups, 'extern:owner:B KG', 'extern:owner:A KG');
+    const next = moveGroup(groups, 'extern:B KG', 'extern:A KG');
     expect(next && flattenGroups(next)).toEqual([3, 6, 1, 4, 5, 2]);
   });
 
   it('hält die interne Umlage am Ende', () => {
     const groups = groupPositions(POSITIONS);
-    expect(moveGroup(groups, 'intern:owner:Service GmbH', 'extern:owner:A KG')).toBeNull();
-    expect(moveGroup(groups, 'extern:owner:A KG', 'intern:owner:Service GmbH')).toBeNull();
+    expect(moveGroup(groups, 'intern:Service GmbH', 'extern:A KG')).toBeNull();
+    expect(moveGroup(groups, 'extern:A KG', 'intern:Service GmbH')).toBeNull();
   });
 
   it('ignoriert Ablegen an derselben Stelle', () => {
-    expect(
-      moveGroup(groupPositions(POSITIONS), 'extern:owner:A KG', 'extern:owner:A KG'),
-    ).toBeNull();
+    expect(moveGroup(groupPositions(POSITIONS), 'extern:A KG', 'extern:A KG')).toBeNull();
   });
 });
 

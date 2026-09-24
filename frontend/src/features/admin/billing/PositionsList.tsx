@@ -28,7 +28,13 @@ import { cx } from '@/components/ui/cx';
 import { formatDateDe } from '@/lib/format';
 import type { BillingPositionRead } from '@/lib/types';
 
-import { flattenGroups, groupPositions, moveGroup, movePosition } from './positionGroups';
+import {
+  flattenGroups,
+  groupPositions,
+  mieterBadge,
+  moveGroup,
+  movePosition,
+} from './positionGroups';
 import type { PositionGroup } from './positionGroups';
 
 const GRIP =
@@ -169,6 +175,7 @@ function SortableGroup({ group, children }: { group: PositionGroup; children: Re
     isDragging,
   } = useSortable({ id: group.key });
   const title = groupTitle(group);
+  const mieter = mieterBadge(group);
   return (
     <section
       ref={setNodeRef}
@@ -191,9 +198,9 @@ function SortableGroup({ group, children }: { group: PositionGroup; children: Re
         <h2 className="min-w-0 flex-1 truncate text-caption-bold uppercase text-secondary">
           {title} · {group.positions.length}
         </h2>
-        {group.mieter ? (
+        {mieter ? (
           <span className="shrink-0 rounded-full bg-fill px-2 py-0.5 text-caption text-secondary">
-            Mieter
+            {mieter}
           </span>
         ) : null}
         {group.internal ? (

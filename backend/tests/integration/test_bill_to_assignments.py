@@ -209,7 +209,34 @@ def test_ohne_mieter_geht_rechnung_an_eigentuemer(admin_client: TestClient) -> N
     assert {(b["label"], b["code"]) for b in bericht["findings"]} == {("Leer", "mieter_fehlt")}
 
 
-def test_gleichnamige_empfaenger_sind_mehrdeutig(admin_client: TestClient) -> None:
+def _codes(client: TestClient, cid: int) -> list[tuple[str, str]]:
+    befunde = _pruefung(client, cid, "2026-08-31")["findings"]
+    return sorted((f["label"], f["code"]) for f in befunde)
+
+
+def test_mieter_gleichnamig_mit_eigentuemer_ist_ein_empfaenger(admin_client: TestClient) -> None:
+    """Die Mieter-Firma ist dieselbe Firma wie der Eigentuemer: eine Rechnung, keine Meldung."""
+    cid = _kreis(admin_client)
+    wohnen = _owner(admin_client, "Wohnen GmbH")
+    agrar = _owner(admin_client, "Agrar KG")
+    haus = _mp(admin_client, "Haus", owner_id=wohnen, kostenstelle=1)
+    stall = _mp(
+        admin_client,
+        "Stall",
+        owner_id=agrar,
+        kostenstelle=2,
+        mieter_id=_mieter(admin_client, "Wohnen GmbH"),
+    )
+    _pos(admin_client, cid, "Haus", haus)
+    _pos(admin_client, cid, "Stall", stall)
+    _ok(_wechsel(admin_client, stall, "mieter", "2026-01-01"))
+
+    bericht = _pruefung(admin_client, cid, "2026-08-31")
+    assert bericht["findings"] == []
+    assert {z["owner_name"] for z in bericht["positions"]} == {"Wohnen GmbH"}
+
+
+def test_gleichnamige_mieter_geben_einen_hinweis(admin_client: TestClient) -> None:
     cid = _kreis(admin_client)
     agrar = _owner(admin_client, "Agrar KG")
     a = _mp(admin_client, "A", owner_id=agrar, kostenstelle=1, mieter_id=_mieter(admin_client, "M"))
@@ -219,7 +246,25 @@ def test_gleichnamige_empfaenger_sind_mehrdeutig(admin_client: TestClient) -> No
     for mp in (a, b):
         _ok(_wechsel(admin_client, mp, "mieter", "2026-01-01"))
 
-    befunde = {
-        (f["label"], f["code"]) for f in _pruefung(admin_client, cid, "2026-08-31")["findings"]
-    }
-    assert befunde == {("A", "empfaenger_mehrdeutig"), ("B", "empfaenger_mehrdeutig")}
+    assert _codes(admin_client, cid) == [("A", "empfaenger_gleichnamig")]
+
+
+def test_gleichnamig_mit_interner_umlage_blockiert(admin_client: TestClient) -> None:
+    """Interne Umlage und externer Empfaenger duerfen nicht in eine Gruppe fallen."""
+    cid = _kreis(admin_client)
+    body = {"name": "Service GmbH", "internal_allocation": True}
+    intern = int(_ok(admin_client.post("/api/v1/owners", json=body), 201)["id"])
+    agrar = _owner(admin_client, "Agrar KG")
+    bhkw = _mp(admin_client, "BHKW", owner_id=intern, kostenstelle=1)
+    stall = _mp(
+        admin_client,
+        "Stall",
+        owner_id=agrar,
+        kostenstelle=2,
+        mieter_id=_mieter(admin_client, "Service GmbH"),
+    )
+    _pos(admin_client, cid, "BHKW", bhkw)
+    _pos(admin_client, cid, "Stall", stall)
+    _ok(_wechsel(admin_client, stall, "mieter", "2026-01-01"))
+
+    assert _codes(admin_client, cid) == [("BHKW", "empfaenger_mehrdeutig")]
