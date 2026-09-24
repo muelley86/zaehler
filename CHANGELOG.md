@@ -10,6 +10,13 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.84.0](https://github.com/muelley86/zaehler/compare/v2.83.0...v2.84.0) (2026-09-24)
+
+
+### Funktionen
+
+* **abrechnung:** Bänderung im ganzen Abrechnungsmodul und im Rechnungsanhang ([#370](https://github.com/muelley86/zaehler/issues/370)) ([d02ac7c](https://github.com/muelley86/zaehler/commit/d02ac7ce8722e4024395970c9ddc91cf2356ba9c))
+
 ## [2.83.0](https://github.com/muelley86/zaehler/compare/v2.82.1...v2.83.0) (2026-09-24)
 
 
