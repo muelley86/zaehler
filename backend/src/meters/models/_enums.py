@@ -85,6 +85,12 @@ class AuditAction(enum.StrEnum):
     KOSTENSTELLE_ASSIGNMENT_CREATED = "kostenstelle_assignment_created"
     KOSTENSTELLE_ASSIGNMENT_UPDATED = "kostenstelle_assignment_updated"
     KOSTENSTELLE_ASSIGNMENT_DELETED = "kostenstelle_assignment_deleted"
+    # "Abrechnen an" mit Gueltigkeitszeitraum (seit 0047) — Muster wie KOSTENSTELLE_*.
+    # Kurze Namen: die Spalte ``audit_log.action`` fasst 32 Zeichen.
+    BILL_TO_CHANGED = "bill_to_changed"
+    BILL_TO_ASSIGNMENT_CREATED = "bill_to_assignment_created"
+    BILL_TO_ASSIGNMENT_UPDATED = "bill_to_assignment_updated"
+    BILL_TO_ASSIGNMENT_DELETED = "bill_to_assignment_deleted"
     # Voll-Backup (ZIP mit DB-Snapshot + Fotos) heruntergeladen bzw. per
     # GUI-Restore eingespielt — entity_type=SYSTEM, entity_id=None. Der
     # Restore-Eintrag wird NACH dem Swap in die restaurierte DB geschrieben.
@@ -128,6 +134,14 @@ class BillingPositionKind(enum.StrEnum):
 
     METER = "meter"
     REST = "rest"
+
+
+class BillTo(enum.StrEnum):
+    """An wen eine Messstelle abgerechnet wird. ``MIETER`` = den zum Stichtag aktuellen Mieter;
+    ohne Mieter geht die Rechnung an den Eigentuemer. Ohne Periode gilt ``OWNER``."""
+
+    OWNER = "owner"
+    MIETER = "mieter"
 
 
 class BillingRunStatus(enum.StrEnum):

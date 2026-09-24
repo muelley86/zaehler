@@ -2,6 +2,8 @@
 
 Invarianten einer Position (je Gueltigkeitszeitraum, halboffen ``[valid_from, valid_to)``):
 - ``meter``: Strom-Messstelle Pflicht; Empfaenger/Kostenstelle kommen aus der Messstelle.
+  Empfaenger ist der Eigentuemer - oder der Mieter, wenn die Messstelle zum Stichtag
+  "Abrechnen an Mieter" hat und einen Mieter hat (sonst wieder der Eigentuemer).
 - ``rest``: ohne Messstelle, Empfaenger und Kostenstelle Pflicht, hoechstens eine je Kreis,
   kein Unterzaehler.
 - Bezeichnung eindeutig im Kreis; eine Messstelle nur in einer Position (kreisuebergreifend).
@@ -21,8 +23,10 @@ from meters.models import (
     BillingCircle,
     BillingPosition,
     BillingPositionKind,
+    BillTo,
     MeasuringPoint,
     MeterType,
+    Mieter,
     MieterAssignment,
     Owner,
     OwnerAssignment,
@@ -34,6 +38,7 @@ from meters.schemas.billing_circle import (
     BillingFinding,
     UnassignedMeterRead,
 )
+from meters.services.bill_to_assignment import bill_to_am
 from meters.services.kostenstelle_assignment import kostenstellen_am
 
 SORT_ORDER_MAX = 100000  # Obergrenze wie im Schema (``le=100000``)
@@ -229,7 +234,7 @@ def unassigned_meters(db: Session, stichtag: date) -> list[UnassignedMeterRead]:
 
 
 def _owners_am(db: Session, mp_ids: list[int], stichtag: date) -> dict[int, Owner]:
-    """Eigentuemer (= Empfaenger) je Messstelle zum Stichtag."""
+    """Eigentuemer je Messstelle zum Stichtag."""
     owners: dict[int, Owner] = {}
     if mp_ids:
         for a in db.scalars(
@@ -240,14 +245,77 @@ def _owners_am(db: Session, mp_ids: list[int], stichtag: date) -> dict[int, Owne
     return owners
 
 
+def _mieter_am(db: Session, mp_ids: list[int], stichtag: date) -> dict[int, Mieter]:
+    """Mieter je Messstelle zum Stichtag."""
+    mieter: dict[int, Mieter] = {}
+    if mp_ids:
+        for m in db.scalars(
+            select(MieterAssignment).where(MieterAssignment.measuring_point_id.in_(mp_ids))
+        ):
+            if _gilt_am(m.valid_from, m.valid_to, stichtag) and m.mieter is not None:
+                mieter[m.measuring_point_id] = m.mieter
+    return mieter
+
+
+@dataclass(frozen=True)
+class Empfaenger:
+    """Rechnungsempfaenger einer Position: Eigentuemer (``owner_id``) oder Mieter."""
+
+    kind: BillTo
+    name: str
+    owner_id: int | None = None
+    mieter_id: int | None = None
+    internal_allocation: bool = False
+
+    @staticmethod
+    def von_owner(owner: Owner) -> Empfaenger:
+        return Empfaenger(
+            kind=BillTo.OWNER,
+            name=owner.name,
+            owner_id=owner.id,
+            internal_allocation=owner.internal_allocation,
+        )
+
+    @staticmethod
+    def von_mieter(mieter: Mieter) -> Empfaenger:
+        return Empfaenger(kind=BillTo.MIETER, name=mieter.display_name, mieter_id=mieter.id)
+
+
+@dataclass(frozen=True)
+class _MpEmpfaenger:
+    empfaenger: dict[int, Empfaenger]  # je Messstelle; fehlt = kein Empfaenger
+    mieter: dict[int, Mieter]
+    mieter_fehlt: set[int]  # "Abrechnen an Mieter", aber kein Mieter -> Eigentuemer
+
+
+def _empfaenger_je_mp(db: Session, mp_ids: list[int], stichtag: date) -> _MpEmpfaenger:
+    """Empfaenger je Messstelle zum Stichtag nach "Abrechnen an" (Standard Eigentuemer)."""
+    owners = _owners_am(db, mp_ids, stichtag)
+    mieter = _mieter_am(db, mp_ids, stichtag)
+    an_mieter = {
+        mp_id for mp_id, wert in bill_to_am(db, mp_ids, stichtag).items() if wert is BillTo.MIETER
+    }
+    empfaenger: dict[int, Empfaenger] = {}
+    for mp_id in mp_ids:
+        if mp_id in an_mieter and mp_id in mieter:
+            empfaenger[mp_id] = Empfaenger.von_mieter(mieter[mp_id])
+        elif mp_id in owners:
+            empfaenger[mp_id] = Empfaenger.von_owner(owners[mp_id])
+    return _MpEmpfaenger(empfaenger=empfaenger, mieter=mieter, mieter_fehlt=an_mieter - set(mieter))
+
+
 def recipients_at(
     db: Session, positions: list[BillingPosition], stichtag: date
-) -> dict[int, Owner | None]:
-    """Empfaenger je Position zum Stichtag: Eigentuemer der Messstelle bzw. der Restposition."""
+) -> dict[int, Empfaenger | None]:
+    """Empfaenger je Position zum Stichtag: aus der Messstelle bzw. Eigentuemer der Restposition."""
     mp_ids = [p.measuring_point_id for p in positions if p.measuring_point_id is not None]
-    owners = _owners_am(db, mp_ids, stichtag)
+    je_mp = _empfaenger_je_mp(db, mp_ids, stichtag).empfaenger
     return {
-        p.id: owners.get(p.measuring_point_id) if p.measuring_point_id is not None else p.owner
+        p.id: (
+            je_mp.get(p.measuring_point_id)
+            if p.measuring_point_id is not None
+            else (Empfaenger.von_owner(p.owner) if p.owner is not None else None)
+        )
         for p in positions
     }
 
@@ -287,15 +355,9 @@ def check_circle(db: Session, circle: BillingCircle, stichtag: date) -> BillingC
     positionen = positions_at(db, circle.id, stichtag)
     mp_ids = [p.measuring_point_id for p in positionen if p.measuring_point_id is not None]
 
-    owners = _owners_am(db, mp_ids, stichtag)
-    mieter: dict[int, str] = {}
+    je_mp = _empfaenger_je_mp(db, mp_ids, stichtag)
     zaehler: set[int] = set()
     if mp_ids:
-        for m in db.scalars(
-            select(MieterAssignment).where(MieterAssignment.measuring_point_id.in_(mp_ids))
-        ):
-            if _gilt_am(m.valid_from, m.valid_to, stichtag) and m.mieter is not None:
-                mieter[m.measuring_point_id] = m.mieter.display_name
         for pm in db.scalars(
             select(PhysicalMeter).where(PhysicalMeter.measuring_point_id.in_(mp_ids))
         ):
@@ -311,20 +373,31 @@ def check_circle(db: Session, circle: BillingCircle, stichtag: date) -> BillingC
     def befund(p: BillingPosition, code: str, text: str) -> None:
         befunde.append(BillingFinding(position_id=p.id, label=p.label, code=code, message=text))
 
+    empfaenger_je_position: dict[int, Empfaenger] = {}
     for p in positionen:
-        owner: Owner | None
+        empfaenger: Empfaenger | None
         if p.kind is BillingPositionKind.METER and p.measuring_point_id is not None:
-            owner = owners.get(p.measuring_point_id)
+            empfaenger = je_mp.empfaenger.get(p.measuring_point_id)
             kostenstelle = kst.get(p.measuring_point_id)
-            mieter_name = mieter.get(p.measuring_point_id)
+            mieter = je_mp.mieter.get(p.measuring_point_id)
+            mieter_name = mieter.display_name if mieter is not None else None
             if p.measuring_point_id not in zaehler:
                 befund(p, "ohne_zaehler", "Messstelle hat zum Stichtag keinen eingebauten Zaehler.")
+            if p.measuring_point_id in je_mp.mieter_fehlt:
+                befund(
+                    p,
+                    "mieter_fehlt",
+                    "Abrechnen an Mieter, aber zum Stichtag kein Mieter - "
+                    "die Rechnung geht an den Eigentuemer.",
+                )
         else:
-            owner = p.owner
+            empfaenger = Empfaenger.von_owner(p.owner) if p.owner is not None else None
             kostenstelle = p.kostenstelle
             mieter_name = None
-        if owner is None:
+        if empfaenger is None:
             befund(p, "ohne_eigentuemer", "Kein Eigentuemer (Empfaenger) zum Stichtag.")
+        else:
+            empfaenger_je_position[p.id] = empfaenger
         if kostenstelle is None:
             befund(p, "ohne_kostenstelle", "Keine Kostenstelle zum Stichtag.")
         if p.parent_position_id is not None and p.parent_position_id not in aktive_ids:
@@ -337,14 +410,16 @@ def check_circle(db: Session, circle: BillingCircle, stichtag: date) -> BillingC
                 measuring_point_id=p.measuring_point_id,
                 measuring_point_name=p.measuring_point.name if p.measuring_point else None,
                 parent_position_id=p.parent_position_id,
-                owner_id=owner.id if owner else None,
-                owner_name=owner.name if owner else None,
-                internal_allocation=bool(owner and owner.internal_allocation),
+                owner_id=empfaenger.owner_id if empfaenger else None,
+                owner_name=empfaenger.name if empfaenger else None,
+                recipient_kind=empfaenger.kind if empfaenger else BillTo.OWNER,
+                internal_allocation=bool(empfaenger and empfaenger.internal_allocation),
                 kostenstelle=kostenstelle,
                 mieter_name=mieter_name,
                 invoice_line=invoice_line_for(p, mieter_name, kostenstelle),
             )
         )
+    befunde += _mehrdeutige_empfaenger(positionen, empfaenger_je_position)
     if not positionen:
         befunde.append(
             BillingFinding(
@@ -355,3 +430,27 @@ def check_circle(db: Session, circle: BillingCircle, stichtag: date) -> BillingC
             )
         )
     return BillingCheckRead(stichtag=stichtag, positions=zeilen, findings=befunde)
+
+
+def _mehrdeutige_empfaenger(
+    positionen: list[BillingPosition], empfaenger: dict[int, Empfaenger]
+) -> list[BillingFinding]:
+    """Abrechnung und Uebertragung gruppieren nach Empfaengernamen. Tragen verschiedene
+    Empfaenger denselben Namen (Mieter-Namen sind nicht eindeutig), fielen ihre Rechnungen
+    still zusammen - das blockiert die Abrechnung, bis die Namen eindeutig sind."""
+    je_name: dict[str, set[tuple[BillTo, int | None]]] = {}
+    for e in empfaenger.values():
+        wer = (e.kind, e.owner_id if e.kind is BillTo.OWNER else e.mieter_id)
+        je_name.setdefault(e.name, set()).add(wer)
+    doppelt = {name for name, wer in je_name.items() if len(wer) > 1}
+    return [
+        BillingFinding(
+            position_id=p.id,
+            label=p.label,
+            code="empfaenger_mehrdeutig",
+            message=f"Mehrere Empfaenger heissen '{empfaenger[p.id].name}' - "
+            "bitte die Namen eindeutig machen.",
+        )
+        for p in positionen
+        if p.id in empfaenger and empfaenger[p.id].name in doppelt
+    ]

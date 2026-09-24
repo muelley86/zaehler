@@ -80,6 +80,7 @@ import {
   OWNER_ASSIGNMENT_CONFIG,
   SUPPLIER_ASSIGNMENT_CONFIG,
 } from './_shared/AssignmentHistoryCard';
+import { BillToHistoryCard } from './_shared/BillToHistoryCard';
 import { KostenstelleHistoryCard } from './_shared/KostenstelleHistoryCard';
 
 // Konstante Chart-Margin als Modul-Const, damit Recharts keine neue
@@ -231,6 +232,8 @@ export function MeasuringPointDetailPage() {
       <AssignmentHistoryCard mp={mp} onChanged={refreshMp} config={SUPPLIER_ASSIGNMENT_CONFIG} />
 
       <AssignmentHistoryCard mp={mp} onChanged={refreshMp} config={MIETER_ASSIGNMENT_CONFIG} />
+
+      <BillToHistoryCard mp={mp} />
 
       <KostenstelleHistoryCard mp={mp} onChanged={refreshMp} />
 

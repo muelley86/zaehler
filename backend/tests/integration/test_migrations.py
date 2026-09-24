@@ -369,3 +369,35 @@ def test_0044_dashboard_layout_hin_und_zurueck(fresh_engine: Engine) -> None:
     with fresh_engine.connect() as conn:
         spalten = [r[1] for r in conn.execute(text('PRAGMA table_info("user")'))]
     assert "dashboard_layout" not in spalten
+
+
+def test_0047_bill_to_hin_und_zurueck(fresh_engine: Engine) -> None:
+    """Neue Tabelle + Snapshot-Spalte; Up- und Downgrade loeschen bei ``foreign_keys=ON``
+    keine Messstellen-Kinddaten (vgl. 0035)."""
+    event.listen(
+        fresh_engine, "connect", lambda dbapi, _rec: dbapi.execute("PRAGMA foreign_keys=ON")
+    )
+    _upgrade(fresh_engine, "0046_mieter_is_company")
+    with fresh_engine.begin() as conn:
+        conn.execute(
+            text(
+                "INSERT INTO measuring_point (id, name, type, is_bidirectional, has_dual_tariff, "
+                "created_at) VALUES (1, 'Bestand', 'ELECTRICITY', 0, 0, datetime('now'))"
+            )
+        )
+        conn.execute(
+            text(
+                "INSERT INTO physical_meter (id, measuring_point_id, serial_number, installed_at, "
+                "created_at) VALUES (1, 1, 'X', '2024-01-01', datetime('now'))"
+            )
+        )
+    _upgrade(fresh_engine, "0047_bill_to_assignment")
+    with fresh_engine.connect() as conn:
+        spalten = [r[1] for r in conn.execute(text("PRAGMA table_info(billing_run_line)"))]
+        assert "recipient_kind" in spalten
+        assert conn.execute(text("SELECT COUNT(*) FROM bill_to_assignment")).scalar() == 0
+    _downgrade(fresh_engine, "0046_mieter_is_company")
+    with fresh_engine.connect() as conn:
+        spalten = [r[1] for r in conn.execute(text("PRAGMA table_info(billing_run_line)"))]
+        assert "recipient_kind" not in spalten
+        assert conn.execute(text("SELECT COUNT(*) FROM physical_meter")).scalar() == 1

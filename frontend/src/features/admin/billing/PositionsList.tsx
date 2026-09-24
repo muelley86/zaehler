@@ -191,6 +191,11 @@ function SortableGroup({ group, children }: { group: PositionGroup; children: Re
         <h2 className="min-w-0 flex-1 truncate text-caption-bold uppercase text-secondary">
           {title} · {group.positions.length}
         </h2>
+        {group.mieter ? (
+          <span className="shrink-0 rounded-full bg-fill px-2 py-0.5 text-caption text-secondary">
+            Mieter
+          </span>
+        ) : null}
         {group.internal ? (
           <span className="shrink-0 rounded-full bg-fill px-2 py-0.5 text-caption text-secondary">
             Interne Umlage – immer zuletzt

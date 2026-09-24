@@ -4,7 +4,7 @@ from datetime import date
 
 from pydantic import BaseModel, Field
 
-from meters.models import BillingPositionKind
+from meters.models import BillingPositionKind, BillTo
 from meters.schemas.common import APIModel
 
 
@@ -80,8 +80,10 @@ class BillingPositionRead(APIModel):
     parent_position_id: int | None
     owner_id: int | None
     owner_name: str | None = None
-    # Empfaenger heute (Eigentuemer der Messstelle bzw. der Restposition) - fuer die Gruppierung.
+    # Empfaenger heute (Eigentuemer oder - bei "Abrechnen an Mieter" - Mieter der Messstelle
+    # bzw. Eigentuemer der Restposition) - fuer die Gruppierung.
     recipient_name: str | None = None
+    recipient_kind: BillTo | None = None
     recipient_internal: bool = False
     kostenstelle: int | None
     invoice_line: str | None
@@ -105,8 +107,9 @@ class BillingCheckRow(BaseModel):
     measuring_point_id: int | None
     measuring_point_name: str | None
     parent_position_id: int | None
-    owner_id: int | None
-    owner_name: str | None
+    owner_id: int | None  # nur bei Eigentuemer-Empfaenger
+    owner_name: str | None  # Name des Empfaengers (Eigentuemer oder Mieter)
+    recipient_kind: BillTo = BillTo.OWNER
     internal_allocation: bool
     kostenstelle: int | None
     mieter_name: str | None

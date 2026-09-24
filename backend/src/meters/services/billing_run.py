@@ -57,7 +57,12 @@ from meters.services.billing_readings import monatsgrenzen, readings_for_month
 
 OHNE_EMPFAENGER = "(ohne Empfaenger)"
 # Blockierende Befunde des Pruefberichts; die uebrigen sind Hinweise.
-_BLOCKIEREND_CHECK = {"ohne_eigentuemer", "hauptzaehler_inaktiv", "keine_positionen"}
+_BLOCKIEREND_CHECK = {
+    "ohne_eigentuemer",
+    "empfaenger_mehrdeutig",
+    "hauptzaehler_inaktiv",
+    "keine_positionen",
+}
 _NULL = Decimal("0")
 _MENGEN_TOLERANZ = Decimal("0.005")  # wie die Excel-Kontrolle "Kontrolle Menge"
 
@@ -128,6 +133,7 @@ def snapshot(
             parent_label=label_von.get(r.parent_position_id) if r.parent_position_id else None,
             owner_id=r.owner_id,
             owner_name=r.owner_name,
+            recipient_kind=r.recipient_kind,
             internal_allocation=r.internal_allocation,
             kostenstelle=r.kostenstelle,
             mieter_name=r.mieter_name,

@@ -3,7 +3,7 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import type { BillingPositionRead } from '@/lib/types';
+import type { BillTo, BillingPositionRead } from '@/lib/types';
 
 import { flattenGroups, groupPositions, moveGroup, movePosition } from './positionGroups';
 
@@ -12,6 +12,7 @@ function pos(
   sort_order: number,
   recipient_name: string | null,
   recipient_internal = false,
+  recipient_kind: BillTo | null = recipient_name === null ? null : 'owner',
 ): BillingPositionRead {
   return {
     id,
@@ -25,6 +26,7 @@ function pos(
     owner_id: null,
     owner_name: null,
     recipient_name,
+    recipient_kind,
     recipient_internal,
     kostenstelle: null,
     invoice_line: null,
@@ -57,21 +59,36 @@ describe('groupPositions', () => {
   });
 });
 
+describe('groupPositions mit Mieter-Empfaengern', () => {
+  it('trennt gleichnamige Eigentuemer und Mieter und markiert die Mieter-Gruppe', () => {
+    const groups = groupPositions([
+      pos(1, 10, 'Muster', false, 'owner'),
+      pos(2, 20, 'Muster', false, 'mieter'),
+    ]);
+    expect(groups.map((g) => [g.recipient, g.mieter, g.positions.map((p) => p.id)])).toEqual([
+      ['Muster', false, [1]],
+      ['Muster', true, [2]],
+    ]);
+  });
+});
+
 describe('moveGroup', () => {
   it('verschiebt eine Gruppe samt Positionen', () => {
     const groups = groupPositions(POSITIONS);
-    const next = moveGroup(groups, 'extern:B KG', 'extern:A KG');
+    const next = moveGroup(groups, 'extern:owner:B KG', 'extern:owner:A KG');
     expect(next && flattenGroups(next)).toEqual([3, 6, 1, 4, 5, 2]);
   });
 
   it('hält die interne Umlage am Ende', () => {
     const groups = groupPositions(POSITIONS);
-    expect(moveGroup(groups, 'intern:Service GmbH', 'extern:A KG')).toBeNull();
-    expect(moveGroup(groups, 'extern:A KG', 'intern:Service GmbH')).toBeNull();
+    expect(moveGroup(groups, 'intern:owner:Service GmbH', 'extern:owner:A KG')).toBeNull();
+    expect(moveGroup(groups, 'extern:owner:A KG', 'intern:owner:Service GmbH')).toBeNull();
   });
 
   it('ignoriert Ablegen an derselben Stelle', () => {
-    expect(moveGroup(groupPositions(POSITIONS), 'extern:A KG', 'extern:A KG')).toBeNull();
+    expect(
+      moveGroup(groupPositions(POSITIONS), 'extern:owner:A KG', 'extern:owner:A KG'),
+    ).toBeNull();
   });
 });
 
