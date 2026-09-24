@@ -67,7 +67,7 @@ export function InvoicesSection({ circleId }: { circleId: number }) {
           {invoices.map((inv) => {
             const expanded = open === inv.id;
             return (
-              <li key={inv.id} className="px-5 py-3">
+              <li key={inv.id} className="px-5 py-3 even:bg-fill">
                 <div className="flex items-center gap-3">
                   <button
                     type="button"
@@ -93,7 +93,7 @@ export function InvoicesSection({ circleId }: { circleId: number }) {
                     target="_blank"
                     rel="noopener noreferrer"
                     aria-label={`PDF der Rechnung ${inv.nummer} öffnen`}
-                    className="flex h-8 w-8 items-center justify-center rounded-full text-secondary hover:bg-fill"
+                    className="flex h-8 w-8 items-center justify-center rounded-full text-secondary hover:bg-fill-strong"
                   >
                     <FileText size={14} />
                   </a>

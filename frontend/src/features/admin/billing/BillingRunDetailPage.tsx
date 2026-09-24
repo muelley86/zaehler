@@ -54,7 +54,7 @@ function Stand({
       {art && art !== 'abgelesen' ? (
         <span
           className={`ml-1 rounded-full px-1.5 py-0.5 ${
-            art === 'interpoliert' ? 'bg-fill text-secondary' : 'bg-danger/10 text-danger'
+            art === 'interpoliert' ? 'bg-fill-strong text-secondary' : 'bg-danger/10 text-danger'
           }`}
         >
           {art === 'interpoliert' ? `±${abstand ?? 0} T` : 'unvollständig'}
@@ -248,7 +248,7 @@ export function BillingRunDetailPage() {
               </thead>
               <tbody>
                 {r.gruppen.map((g) => (
-                  <tr key={g.name} className="border-t border-separator">
+                  <tr key={g.name} className="border-t border-separator even:bg-fill">
                     <td className="py-1 pr-3 text-label">
                       {g.name}
                       {g.intern ? ' (intern)' : ''}
@@ -297,7 +297,7 @@ export function BillingRunDetailPage() {
             </thead>
             <tbody>
               {run.lines.map((z) => (
-                <tr key={z.id} className="border-t border-separator align-top">
+                <tr key={z.id} className="border-t border-separator align-top even:bg-fill">
                   <td className="py-1 pr-3 text-label">
                     {z.label}
                     {z.kind === 'rest' ? ' (Rest)' : ''}
@@ -354,7 +354,7 @@ export function BillingRunDetailPage() {
                         type="button"
                         onClick={() => setZeile(z)}
                         aria-label={`Zeile ${z.label} manuell ändern`}
-                        className="flex h-7 w-7 items-center justify-center rounded-full text-secondary hover:bg-fill"
+                        className="flex h-7 w-7 items-center justify-center rounded-full text-secondary hover:bg-fill-strong"
                       >
                         <Pencil size={13} />
                       </button>

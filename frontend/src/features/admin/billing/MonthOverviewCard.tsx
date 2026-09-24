@@ -24,7 +24,7 @@ const STATUS_LABEL: Record<BillingMonthStatus, string> = {
 
 const STATUS_CLASS: Record<BillingMonthStatus, string> = {
   leer: 'bg-fill/50 text-tertiary',
-  rechnung: 'bg-fill text-secondary',
+  rechnung: 'bg-fill-strong text-secondary',
   entwurf: 'bg-warning/15 text-warning',
   festgeschrieben: 'bg-success/10 text-success',
   uebertragen: 'bg-success text-white',
@@ -126,7 +126,7 @@ export function MonthOverviewCard({ tick = 0 }: { tick?: number }) {
               </thead>
               <tbody>
                 {data.kreise.map((k) => (
-                  <tr key={k.circle_id} className="border-t border-separator">
+                  <tr key={k.circle_id} className="border-t border-separator even:bg-fill">
                     <th scope="row" className="py-1 pr-3 text-left font-normal">
                       <Link to={`/admin/abrechnungskreise/${k.circle_id}`} className="text-primary">
                         {k.code}

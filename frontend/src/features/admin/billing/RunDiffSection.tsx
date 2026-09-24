@@ -144,7 +144,7 @@ export function RunDiffSection({ circleId, runId }: { circleId: number; runId: n
               </thead>
               <tbody>
                 {geaendert.map((z) => (
-                  <tr key={z.label} className="border-t border-separator">
+                  <tr key={z.label} className="border-t border-separator even:bg-fill">
                     <td className="py-1 pr-3 text-label">
                       {z.label}
                       <span className={`ml-2 rounded-full px-1.5 py-0.5 ${STATUS_CLASS[z.status]}`}>

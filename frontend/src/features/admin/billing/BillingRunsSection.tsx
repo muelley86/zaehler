@@ -99,7 +99,7 @@ export function BillingRunsSection({ circleId }: { circleId: number }) {
             </thead>
             <tbody>
               {runs.map((r) => (
-                <tr key={r.id} className="border-t border-separator">
+                <tr key={r.id} className="border-t border-separator even:bg-fill">
                   <td className="py-1 pr-3">
                     <Link
                       to={`/admin/abrechnungskreise/${circleId}/laeufe/${r.id}`}

@@ -56,9 +56,12 @@ export function UnassignedMetersCard({ tick = 0 }: { tick?: number }) {
             Alle Strom-Messstellen mit Zähler werden abgerechnet.
           </div>
         ) : (
-          <ul className="space-y-1" aria-label="Nicht abgerechnete Messstellen">
+          <ul aria-label="Nicht abgerechnete Messstellen">
             {meters.map((m) => (
-              <li key={m.id} className="flex items-center gap-2 text-caption">
+              <li
+                key={m.id}
+                className="flex items-center gap-2 rounded-badge px-2 py-1 text-caption even:bg-fill"
+              >
                 <Link to={`/admin/messstellen/${m.id}`} className="text-primary">
                   {m.name}
                 </Link>

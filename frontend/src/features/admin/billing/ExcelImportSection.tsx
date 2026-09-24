@@ -50,7 +50,7 @@ function Werte({
 
 function Zeile({ z }: { z: ExcelImportLine }) {
   return (
-    <tr className="border-hairline border-t align-top">
+    <tr className="border-hairline border-t align-top even:bg-fill">
       <td className="py-1 pr-3">{z.label}</td>
       <td className="py-1 pr-3">{STATUS_LABEL[z.status]}</td>
       <td className="py-1 pr-3">

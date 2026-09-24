@@ -17,7 +17,9 @@ function StandCell({ stand }: { stand: BillingStandRead | null }) {
       {stand.art === 'abgelesen' ? null : (
         <span
           className={`ml-1 rounded-full px-1.5 py-0.5 ${
-            stand.art === 'interpoliert' ? 'bg-fill text-secondary' : 'bg-danger/10 text-danger'
+            stand.art === 'interpoliert'
+              ? 'bg-fill-strong text-secondary'
+              : 'bg-danger/10 text-danger'
           }`}
         >
           {stand.art === 'interpoliert' ? `interpoliert ±${stand.abstand_tage} T` : 'unvollständig'}
@@ -77,7 +79,7 @@ export function MonthReadingsView({ report }: { report: BillingReadingsRead }) {
             </thead>
             <tbody>
               {zaehler.map((r) => (
-                <tr key={r.position_id} className="border-t border-separator">
+                <tr key={r.position_id} className="border-t border-separator even:bg-fill">
                   <td className="py-1 pr-3 text-label">{r.label}</td>
                   <td className="py-1 pr-3">{r.serial_numbers || '—'}</td>
                   <td className="py-1 pr-3 text-right tabular-nums">

@@ -62,10 +62,10 @@ export function BillingCirclesAdminPage() {
         ) : (
           <ul className="divide-y divide-separator">
             {items.map((c) => (
-              <li key={c.id}>
+              <li key={c.id} className="even:bg-fill">
                 <Link
                   to={`/admin/abrechnungskreise/${c.id}`}
-                  className="flex items-center gap-3 px-5 py-3 hover:bg-fill"
+                  className="flex items-center gap-3 px-5 py-3 hover:bg-fill-strong"
                 >
                   <span className="num w-14 text-headline text-label">{c.code}</span>
                   <span className="min-w-0 flex-1">

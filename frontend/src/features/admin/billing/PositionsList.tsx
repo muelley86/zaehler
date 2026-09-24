@@ -38,7 +38,7 @@ import {
 import type { PositionGroup } from './positionGroups';
 
 const GRIP =
-  'flex h-8 w-8 shrink-0 cursor-grab touch-none items-center justify-center rounded-full text-tertiary hover:bg-fill hover:text-label active:cursor-grabbing';
+  'flex h-8 w-8 shrink-0 cursor-grab touch-none items-center justify-center rounded-full text-tertiary hover:bg-fill-strong hover:text-label active:cursor-grabbing';
 
 const DRAGGING = 'relative z-20 opacity-90 shadow-glass';
 
@@ -292,7 +292,7 @@ function SortablePosition({
         type="button"
         onClick={() => onEdit(p)}
         aria-label={`Position ${p.label} bearbeiten`}
-        className="flex h-8 w-8 items-center justify-center rounded-full text-secondary hover:bg-fill"
+        className="flex h-8 w-8 items-center justify-center rounded-full text-secondary hover:bg-fill-strong"
       >
         <Pencil size={14} />
       </button>

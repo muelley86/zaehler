@@ -130,11 +130,11 @@ export function HistoryCard({ circleId }: { circleId: number }) {
             </thead>
             <tbody>
               {zeilen.map((z) => (
-                <tr key={z.name} className="border-t border-separator">
+                <tr key={z.name} className="border-t border-separator even:bg-fill">
                   <th scope="row" className="py-1 pr-3 text-left font-normal text-label">
                     {z.name || '(ohne Empfänger)'}
                     {z.internal_allocation ? (
-                      <span className="ml-2 rounded-full bg-fill px-2 py-0.5 text-tertiary">
+                      <span className="ml-2 rounded-full bg-fill-strong px-2 py-0.5 text-tertiary">
                         intern
                       </span>
                     ) : null}
