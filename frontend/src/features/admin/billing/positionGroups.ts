@@ -8,21 +8,26 @@ import { arrayMove } from '@dnd-kit/sortable';
 import type { BillingPositionRead } from '@/lib/types';
 
 export interface PositionGroup {
-  /**
-   * Stabiler Schlüssel für Drag & Drop (interne Umlage + Art + Empfängername, leer = ohne
-   * Empfänger).
-   */
+  /** Stabiler Schlüssel für Drag & Drop (interne Umlage + Empfängername, leer = ohne Empfänger). */
   key: string;
   recipient: string | null;
   internal: boolean;
-  /** Empfänger ist ein Mieter („Abrechnen an Mieter“). */
-  mieter: boolean;
   positions: BillingPositionRead[];
 }
 
+/**
+ * Gleicher Name = eine Rechnung (wie im Abrechnungslauf): ein Mieter, der wie ein Eigentümer
+ * heißt, fällt in dessen Gruppe.
+ */
 export function groupKey(p: BillingPositionRead): string {
-  const art = p.recipient_internal ? 'intern' : 'extern';
-  return `${art}:${p.recipient_kind ?? ''}:${p.recipient_name ?? ''}`;
+  return `${p.recipient_internal ? 'intern' : 'extern'}:${p.recipient_name ?? ''}`;
+}
+
+/** Kennzeichen der Gruppe für „Abrechnen an Mieter“: alle, einige oder keine Position. */
+export function mieterBadge(g: PositionGroup): string | null {
+  const anzahl = g.positions.filter((p) => p.recipient_kind === 'mieter').length;
+  if (anzahl === 0) return null;
+  return anzahl === g.positions.length ? 'Mieter' : 'teils Mieter';
 }
 
 /** Gruppiert die Positionen nach heutigem Empfänger (Reihenfolge = `sort_order`). */
@@ -40,7 +45,6 @@ export function groupPositions(positions: BillingPositionRead[]): PositionGroup[
         key,
         recipient: p.recipient_name,
         internal: p.recipient_internal,
-        mieter: p.recipient_kind === 'mieter',
         positions: [p],
       });
   }

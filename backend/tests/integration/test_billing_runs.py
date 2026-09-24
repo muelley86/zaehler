@@ -739,3 +739,30 @@ def test_abrechnen_an_mieter_bildet_eigenen_empfaenger(
     nach = _ok(admin_client.post(url, json={"owner_name": "Pumpen GmbH"}), 201)
     pumpen = next(e for e in nach["empfaenger"] if e["owner_name"] == "Pumpen GmbH")
     assert pumpen["transfer"] is not None
+
+
+def test_mieter_gleichnamig_mit_eigentuemer_eine_rechnung(
+    admin_client: TestClient, admin_user: User, db: Session
+) -> None:
+    """Heisst der Mieter wie ein Eigentuemer, landen beide auf einer Rechnung - ohne Sperre."""
+    cid, mps = _setup(admin_client, db, admin_user)
+    mieter = _ok(admin_client.post("/api/v1/mieters", json={"last_name": "Muster A KG"}), 201)
+    pumpe = f"/api/v1/measuring-points/{mps['Pumpe']}"
+    _ok(
+        admin_client.post(
+            f"{pumpe}/change-mieter", json={"mieter_id": mieter["id"], "valid_from": "2026-01-01"}
+        )
+    )
+    _ok(
+        admin_client.post(
+            f"{pumpe}/change-bill-to", json={"bill_to": "mieter", "valid_from": "2026-01-01"}
+        )
+    )
+    run = _ok(admin_client.post(f"{BASE}/{cid}/runs", json={"monat": "2026-08"}), 201)
+    assert _zeile(run, "Pumpe")["recipient_kind"] == "mieter"
+    assert not [b for b in run["befunde"] if b["blocking"]]
+
+    anhang = _ok(admin_client.get(f"{BASE}/{cid}/runs/{run['id']}/anhang"))
+    extern = next(e for e in anhang["empfaenger"] if e["owner_name"] == "Muster A KG")
+    assert [z["label"] for z in extern["lines"]] == ["Stall", "Pumpe", "Rest"]
+    assert extern["eur"] == "225.00"

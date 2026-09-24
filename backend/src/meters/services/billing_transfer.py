@@ -175,7 +175,8 @@ def mark_transferred(
         )
     eintrag = BillingTransfer(
         run_id=run.id,
-        owner_id=treffer[0].owner_id,
+        # Gleicher Name = eine Rechnung: die Gruppe kann Mieter-Zeilen (ohne owner_id) enthalten.
+        owner_id=next((z.owner_id for z in treffer if z.owner_id is not None), None),
         owner_name=owner_name,
         belegnummer=belegnummer,
         note=note,

@@ -419,7 +419,7 @@ def check_circle(db: Session, circle: BillingCircle, stichtag: date) -> BillingC
                 invoice_line=invoice_line_for(p, mieter_name, kostenstelle),
             )
         )
-    befunde += _mehrdeutige_empfaenger(positionen, empfaenger_je_position)
+    befunde += _gleichnamige_empfaenger(positionen, empfaenger_je_position)
     if not positionen:
         befunde.append(
             BillingFinding(
@@ -432,25 +432,45 @@ def check_circle(db: Session, circle: BillingCircle, stichtag: date) -> BillingC
     return BillingCheckRead(stichtag=stichtag, positions=zeilen, findings=befunde)
 
 
-def _mehrdeutige_empfaenger(
+def _gleichnamige_empfaenger(
     positionen: list[BillingPosition], empfaenger: dict[int, Empfaenger]
 ) -> list[BillingFinding]:
-    """Abrechnung und Uebertragung gruppieren nach Empfaengernamen. Tragen verschiedene
-    Empfaenger denselben Namen (Mieter-Namen sind nicht eindeutig), fielen ihre Rechnungen
-    still zusammen - das blockiert die Abrechnung, bis die Namen eindeutig sind."""
-    je_name: dict[str, set[tuple[BillTo, int | None]]] = {}
-    for e in empfaenger.values():
-        wer = (e.kind, e.owner_id if e.kind is BillTo.OWNER else e.mieter_id)
-        je_name.setdefault(e.name, set()).add(wer)
-    doppelt = {name for name, wer in je_name.items() if len(wer) > 1}
-    return [
-        BillingFinding(
-            position_id=p.id,
-            label=p.label,
-            code="empfaenger_mehrdeutig",
-            message=f"Mehrere Empfaenger heissen '{empfaenger[p.id].name}' - "
-            "bitte die Namen eindeutig machen.",
-        )
-        for p in positionen
-        if p.id in empfaenger and empfaenger[p.id].name in doppelt
-    ]
+    """Abrechnung und Uebertragung gruppieren nach Empfaengernamen: gleicher Name = eine
+    Rechnung (Entscheidung des Nutzers). Ein Mieter, der wie ein Eigentuemer heisst, ist
+    dieselbe Firma - keine Meldung. Heissen verschiedene Mieter-Datensaetze gleich, gibt es
+    einen Hinweis. Blockierend nur, wenn die Gruppe interne Umlage und externe Empfaenger
+    mischt (der Rechenkern kennt je Gruppe nur ein Kennzeichen)."""
+    erste: dict[str, BillingPosition] = {}
+    mieter_ids: dict[str, set[int | None]] = {}
+    intern: dict[str, set[bool]] = {}
+    for p in positionen:
+        e = empfaenger.get(p.id)
+        if e is None:
+            continue
+        erste.setdefault(e.name, p)
+        intern.setdefault(e.name, set()).add(e.internal_allocation)
+        if e.kind is BillTo.MIETER:
+            mieter_ids.setdefault(e.name, set()).add(e.mieter_id)
+    befunde: list[BillingFinding] = []
+    for name, p in erste.items():
+        if len(intern[name]) > 1:
+            befunde.append(
+                BillingFinding(
+                    position_id=p.id,
+                    label=p.label,
+                    code="empfaenger_mehrdeutig",
+                    message=f"'{name}' ist teils interne Umlage, teils externer Empfaenger - "
+                    "bitte die Namen eindeutig machen.",
+                )
+            )
+        elif len(mieter_ids.get(name, ())) > 1:
+            befunde.append(
+                BillingFinding(
+                    position_id=p.id,
+                    label=p.label,
+                    code="empfaenger_gleichnamig",
+                    message=f"Mehrere Mieter heissen '{name}' - sie erhalten eine gemeinsame "
+                    "Rechnung.",
+                )
+            )
+    return befunde
