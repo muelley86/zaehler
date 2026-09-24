@@ -10,6 +10,13 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.82.0](https://github.com/muelley86/zaehler/compare/v2.81.0...v2.82.0) (2026-09-24)
+
+
+### Funktionen
+
+* **abrechnung:** je Messstelle an Eigentümer oder Mieter abrechnen ([#364](https://github.com/muelley86/zaehler/issues/364)) ([5e2bc49](https://github.com/muelley86/zaehler/commit/5e2bc49d3aefdefd43407ef04db7191de596dbe2))
+
 ## [2.81.0](https://github.com/muelley86/zaehler/compare/v2.80.0...v2.81.0) (2026-09-23)
 
 
