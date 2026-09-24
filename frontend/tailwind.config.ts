@@ -43,6 +43,7 @@ const config: Config = {
         primary: 'var(--primary)',
         'primary-deep': 'var(--primary-deep)',
         'primary-soft': 'var(--primary-soft)',
+        'accent-tint': 'var(--accent-tint)',
 
         electricity: 'var(--electricity)',
         gas: 'var(--gas)',

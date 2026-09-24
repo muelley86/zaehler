@@ -122,7 +122,7 @@ export function PositionsList({ positions, onReorder, onEdit, onRemove }: Positi
       }}
     >
       <SortableContext items={groups.map((g) => g.key)} strategy={verticalListSortingStrategy}>
-        <div className="divide-y divide-separator">
+        <div className="space-y-3 px-3 pb-3">
           {groups.map((g) => (
             <SortableGroup key={g.key} group={g}>
               {/* Eigener Kontext je Gruppe: Positionen bleiben in ihrer Gruppe. */}
@@ -180,11 +180,22 @@ function SortableGroup({ group, children }: { group: PositionGroup; children: Re
     <section
       ref={setNodeRef}
       style={{ transform: CSS.Translate.toString(transform), transition }}
-      className={cx(isDragging && cx(DRAGGING, 'bg-surface-solid'))}
+      className={cx(
+        'overflow-hidden rounded-card border-hairline border-border bg-surface-solid',
+        isDragging && DRAGGING,
+      )}
       role="group"
       aria-label={`Empfänger „${title}“`}
     >
-      <div className="bg-fill/40 flex items-center gap-1 px-3 py-2">
+      {/* Kopfzeile hebt den Rechnungsempfänger ab; interne Umlage neutral statt Akzentfarbe. */}
+      <div
+        className={cx(
+          'flex items-center gap-1 border-b-hairline border-l-4 border-b-border px-3 py-2.5',
+          group.internal
+            ? 'border-l-border-strong bg-fill-strong'
+            : 'border-l-primary bg-accent-tint',
+        )}
+      >
         <button
           type="button"
           ref={setActivatorNodeRef}
@@ -195,16 +206,17 @@ function SortableGroup({ group, children }: { group: PositionGroup; children: Re
         >
           <GripVertical size={16} aria-hidden />
         </button>
-        <h2 className="min-w-0 flex-1 truncate text-caption-bold uppercase text-secondary">
-          {title} · {group.positions.length}
-        </h2>
+        <h2 className="min-w-0 flex-1 truncate text-body-sm font-semibold text-label">{title}</h2>
+        <span className="shrink-0 rounded-full bg-surface-solid px-2 py-0.5 text-caption text-secondary">
+          {group.positions.length} {group.positions.length === 1 ? 'Position' : 'Positionen'}
+        </span>
         {mieter ? (
-          <span className="shrink-0 rounded-full bg-fill px-2 py-0.5 text-caption text-secondary">
+          <span className="shrink-0 rounded-full bg-surface-solid px-2 py-0.5 text-caption font-semibold text-primary-deep">
             {mieter}
           </span>
         ) : null}
         {group.internal ? (
-          <span className="shrink-0 rounded-full bg-fill px-2 py-0.5 text-caption text-secondary">
+          <span className="shrink-0 rounded-full bg-surface-solid px-2 py-0.5 text-caption text-secondary">
             Interne Umlage – immer zuletzt
           </span>
         ) : null}
@@ -240,7 +252,9 @@ function SortablePosition({
       style={{ transform: CSS.Translate.toString(transform), transition }}
       className={cx(
         'flex items-center gap-2 py-3 pl-3 pr-5',
-        isDragging && cx(DRAGGING, 'bg-surface-solid'),
+        // Gebändert: jede zweite Position hinterlegt. Beim Ziehen aus, sonst schlüge
+        // `even:` (höhere Spezifität) den festen Drag-Hintergrund.
+        isDragging ? cx(DRAGGING, 'bg-surface-solid') : 'even:bg-fill',
       )}
     >
       <button
