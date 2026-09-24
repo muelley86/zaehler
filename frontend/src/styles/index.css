@@ -24,6 +24,9 @@
   --fill: oklch(0.92 0.012 60 / 0.5);
   --fill-strong: oklch(0.88 0.014 60 / 0.7);
   --separator: oklch(0.85 0.008 60 / 0.4);
+  /* Hintergrund für hervorgehobene Kopfzeilen (z. B. Rechnungsempfänger). Hell bewusst
+     gleich --primary-soft, aber anders als dieses themenfähig (Dark: gedämpftes Orange). */
+  --accent-tint: oklch(0.92 0.06 60);
 
   color-scheme: light;
 }
@@ -48,6 +51,7 @@
   --fill: oklch(0.3 0.014 60 / 0.5);
   --fill-strong: oklch(0.38 0.016 60 / 0.7);
   --separator: oklch(0.32 0.01 60 / 0.5);
+  --accent-tint: oklch(0.32 0.06 55);
 
   color-scheme: dark;
 }
@@ -74,6 +78,7 @@
     --fill: oklch(0.3 0.014 60 / 0.5);
     --fill-strong: oklch(0.38 0.016 60 / 0.7);
     --separator: oklch(0.32 0.01 60 / 0.5);
+    --accent-tint: oklch(0.32 0.06 55);
 
     color-scheme: dark;
   }
