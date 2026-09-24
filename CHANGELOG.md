@@ -10,6 +10,13 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.83.0](https://github.com/muelley86/zaehler/compare/v2.82.1...v2.83.0) (2026-09-24)
+
+
+### Funktionen
+
+* **abrechnung:** Positionsliste gebändert, Empfänger farbig abgesetzt ([#368](https://github.com/muelley86/zaehler/issues/368)) ([6588069](https://github.com/muelley86/zaehler/commit/658806931f376993556583e0968463cc1ed5ab32))
+
 ## [2.82.1](https://github.com/muelley86/zaehler/compare/v2.82.0...v2.82.1) (2026-09-24)
 
 
