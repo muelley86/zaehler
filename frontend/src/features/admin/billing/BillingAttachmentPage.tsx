@@ -93,10 +93,22 @@ const DRUCK_CSS = `
     margin: 0 !important;
     min-height: 0 !important;
     box-shadow: none !important;
+    /* Sonst lassen Browser die Bänderung der Zeilen im Druck weg. */
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
   }
   .anhang-blatt + .anhang-blatt { break-before: page; }
 }
 `;
+
+/**
+ * Bänderung wie im übrigen Abrechnungsmodul, aber als festes Grau: das Blatt ist in beiden
+ * Themes weiß (Druck). Nach Index statt `even:`, weil in „Zusammensetzung“ Abschnittsköpfe und
+ * Zwischensummen in derselben Tabelle stehen.
+ */
+function band(index: number): string {
+  return index % 2 === 1 ? 'bg-black/[0.06]' : '';
+}
 
 function Stand({ wert, art }: { wert: string | null; art: string | null }) {
   if (wert === null) return null;
@@ -300,8 +312,8 @@ function Blatt({
             </tr>
           </thead>
           <tbody>
-            {recipient.lines.map((z) => (
-              <tr key={z.label} className="border-b border-black/10">
+            {recipient.lines.map((z, i) => (
+              <tr key={z.label} className={`border-b border-black/10 ${band(i)}`}>
                 <td className="py-0.5 pr-2">{z.label}</td>
                 <td className="py-0.5 pr-2 tabular-nums">{z.kostenstelle ?? ''}</td>
                 <td className="py-0.5 pr-2">{z.serial_numbers || 'ohne Zähler'}</td>
@@ -348,8 +360,8 @@ function Blatt({
             </tr>
           </thead>
           <tbody>
-            {recipient.kostenstellen.map((k) => (
-              <tr key={k.kst ?? 'ohne'} className="border-b border-black/10">
+            {recipient.kostenstellen.map((k, i) => (
+              <tr key={k.kst ?? 'ohne'} className={`border-b border-black/10 ${band(i)}`}>
                 <td className="py-0.5 pr-2 tabular-nums">{k.kst ?? 'ohne KST/KTR'}</td>
                 <td className="py-0.5 pr-2 text-right tabular-nums">{zwei(k.kwh)}</td>
                 <td className="py-0.5 text-right tabular-nums">{zwei(k.eur)}</td>
@@ -392,8 +404,8 @@ function Blatt({
                     {a.name}
                   </td>
                 </tr>
-                {a.positionen.map((p) => (
-                  <tr key={`${a.name}-${p.name}`}>
+                {a.positionen.map((p, i) => (
+                  <tr key={`${a.name}-${p.name}`} className={band(i)}>
                     <td className="py-0.5 pl-3 pr-2">{p.name}</td>
                     <td className="py-0.5 pr-2 text-right tabular-nums">{zwei(recipient.kwh)}</td>
                     <td className="py-0.5 pr-2 text-right tabular-nums">

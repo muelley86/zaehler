@@ -21,7 +21,7 @@ const LEVEL_LABEL: Record<BillingImportLevel, string> = {
 
 const LEVEL_CLASS: Record<BillingImportLevel, string> = {
   aktion: 'bg-primary-soft text-primary-deep',
-  hinweis: 'bg-fill text-secondary',
+  hinweis: 'bg-fill-strong text-secondary',
   fehler: 'bg-danger/10 text-danger',
 };
 
@@ -110,9 +110,12 @@ export function StammdatenImportCard({ onApplied }: { onApplied: () => void }) {
               {report.valid_from}): {report.counts.aktion} Aktionen, {report.counts.hinweis}{' '}
               Hinweise, {report.counts.fehler} Fehler
             </div>
-            <ul className="max-h-96 space-y-1 overflow-y-auto" aria-label="Import-Ergebnis">
+            <ul className="max-h-96 overflow-y-auto" aria-label="Import-Ergebnis">
               {report.entries.map((entry, i) => (
-                <li key={i} className="flex items-start gap-2 text-caption">
+                <li
+                  key={i}
+                  className="flex items-start gap-2 rounded-badge px-2 py-1 text-caption even:bg-fill"
+                >
                   <span
                     className={`shrink-0 rounded-full px-2 py-0.5 font-semibold ${LEVEL_CLASS[entry.level]}`}
                   >

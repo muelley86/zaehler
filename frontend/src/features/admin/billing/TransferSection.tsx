@@ -205,7 +205,7 @@ function Recipient({
           </thead>
           <tbody>
             {recipient.rows.map((r) => (
-              <tr key={r.beschreibung} className="border-t border-separator">
+              <tr key={r.beschreibung} className="border-t border-separator even:bg-fill">
                 <td className="py-1 pr-3">{formatDateDe(r.datum)}</td>
                 <td className="py-1 pr-3 text-right">
                   <KopierZelle wert={formatDe(r.menge)} label={`Menge ${r.beschreibung}`} />

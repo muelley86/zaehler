@@ -533,7 +533,7 @@ function CheckSection({ circleId, tick }: { circleId: number; tick: number }) {
                   </thead>
                   <tbody>
                     {report.positions.map((r) => (
-                      <tr key={r.position_id} className="border-t border-separator">
+                      <tr key={r.position_id} className="border-t border-separator even:bg-fill">
                         <td className="py-1 pr-3 text-label">{r.label}</td>
                         <td className="py-1 pr-3">
                           {r.owner_name ?? '—'}
