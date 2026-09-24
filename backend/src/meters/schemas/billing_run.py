@@ -6,7 +6,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from meters.models import BillingPositionKind, BillingRunStatus
+from meters.models import BillingPositionKind, BillingRunStatus, BillTo
 from meters.schemas.common import APIModel, DecimalStr
 
 _MONAT = r"^(19|20)\d{2}-(0[1-9]|1[0-2])$"
@@ -57,7 +57,8 @@ class BillingRunLineRead(APIModel):
     kind: BillingPositionKind
     parent_label: str | None
     owner_id: int | None
-    owner_name: str | None
+    owner_name: str | None  # Empfaenger (Eigentuemer oder Mieter)
+    recipient_kind: BillTo
     internal_allocation: bool
     kostenstelle: int | None
     mieter_name: str | None

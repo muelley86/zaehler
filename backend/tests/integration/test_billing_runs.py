@@ -702,3 +702,40 @@ def test_lebenszyklus_wird_protokolliert(
     assert [a for a, _ in zweiter] == ["create", "billing_run_finalized"]
     assert (zweiter[0][1]["version"], zweiter[0][1]["begruendung"]) == (2, "Ablesefehler")
     assert zweiter[1][1]["ersetzt_run_id"] == v1["id"]
+
+
+def test_abrechnen_an_mieter_bildet_eigenen_empfaenger(
+    admin_client: TestClient, admin_user: User, db: Session
+) -> None:
+    """Pumpe rechnet an ihren Mieter ab: eigener Empfaenger in Lauf, Anhang und Uebertragung."""
+    cid, mps = _setup(admin_client, db, admin_user)
+    mieter = _ok(admin_client.post("/api/v1/mieters", json={"last_name": "Pumpen GmbH"}), 201)
+    _ok(
+        admin_client.post(
+            f"/api/v1/measuring-points/{mps['Pumpe']}/change-mieter",
+            json={"mieter_id": mieter["id"], "valid_from": "2026-01-01"},
+        )
+    )
+    _ok(
+        admin_client.post(
+            f"/api/v1/measuring-points/{mps['Pumpe']}/change-bill-to",
+            json={"bill_to": "mieter", "valid_from": "2026-01-01"},
+        )
+    )
+    run = _ok(admin_client.post(f"{BASE}/{cid}/runs", json={"monat": "2026-08"}), 201)
+    pumpe = _zeile(run, "Pumpe")
+    assert (pumpe["owner_name"], pumpe["recipient_kind"]) == ("Pumpen GmbH", "mieter")
+    assert _zeile(run, "Stall")["recipient_kind"] == "owner"
+    assert not [b for b in run["befunde"] if b["blocking"]]
+
+    anhang = _ok(admin_client.get(f"{BASE}/{cid}/runs/{run['id']}/anhang"))
+    gruppen = {e["owner_name"]: e for e in anhang["empfaenger"]}
+    assert [z["label"] for z in gruppen["Pumpen GmbH"]["lines"]] == ["Pumpe"]
+    assert gruppen["Pumpen GmbH"]["eur"] == "50.00"  # 200 kWh x 0,25
+    assert gruppen["Muster A KG"]["eur"] == "175.00"  # Stall 125 + Rest 50
+
+    _ok(admin_client.post(f"{BASE}/{cid}/runs/{run['id']}/finalize"))
+    url = f"{BASE}/{cid}/runs/{run['id']}/transfers"
+    nach = _ok(admin_client.post(url, json={"owner_name": "Pumpen GmbH"}), 201)
+    pumpen = next(e for e in nach["empfaenger"] if e["owner_name"] == "Pumpen GmbH")
+    assert pumpen["transfer"] is not None

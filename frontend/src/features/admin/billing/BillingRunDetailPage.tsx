@@ -310,6 +310,7 @@ export function BillingRunDetailPage() {
                   </td>
                   <td className="py-1 pr-3">
                     {z.owner_name ?? <span className="text-danger">ohne Empfänger</span>}
+                    {z.recipient_kind === 'mieter' ? ' (Mieter)' : ''}
                     <div className="text-tertiary">KST {z.kostenstelle ?? '—'}</div>
                   </td>
                   <td className="py-1 pr-3">{z.serial_numbers || '—'}</td>

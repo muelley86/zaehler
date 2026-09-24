@@ -24,6 +24,7 @@ from meters.models._enums import HeatingSource, MeterType
 DEFAULT_READING_INTERVAL_DAYS = 35
 
 if TYPE_CHECKING:
+    from meters.models.bill_to_assignment import BillToAssignment
     from meters.models.kostenstelle_assignment import KostenstelleAssignment
     from meters.models.location import Location
     from meters.models.measuring_point_note import MeasuringPointNote
@@ -112,6 +113,13 @@ class MeasuringPoint(Base, TimestampMixin):
         cascade="all, delete-orphan",
         order_by="KostenstelleAssignment.valid_from",
         lazy="selectin",
+    )
+    # "Abrechnen an" mit Gueltigkeitszeitraum (seit 0047); ohne Periode = Eigentuemer.
+    bill_to_assignments: Mapped[list[BillToAssignment]] = relationship(
+        "BillToAssignment",
+        back_populates="measuring_point",
+        cascade="all, delete-orphan",
+        order_by="BillToAssignment.valid_from",
     )
     # Freitext-Notizen (seit 0045), neueste zuerst. Ohne MP wertlos -> Cascade.
     notes: Mapped[list[MeasuringPointNote]] = relationship(

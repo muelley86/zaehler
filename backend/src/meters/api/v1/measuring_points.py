@@ -40,6 +40,10 @@ from meters.models import (
     UserRole,
 )
 from meters.schemas import (
+    BillToAssignmentCreate,
+    BillToAssignmentRead,
+    BillToAssignmentUpdate,
+    ChangeBillToRequest,
     ChangeKostenstelleRequest,
     ChangeMieterRequest,
     ChangeOwnerRequest,
@@ -66,6 +70,19 @@ from meters.schemas import (
 )
 from meters.services.access import assert_can_access_mp, restrict_mp_query
 from meters.services.audit import record
+from meters.services.bill_to_assignment import assign_bill_to
+from meters.services.bill_to_assignment import (
+    create_assignment as create_bill_to_assignment,
+)
+from meters.services.bill_to_assignment import (
+    delete_assignment as delete_bill_to_assignment,
+)
+from meters.services.bill_to_assignment import (
+    list_history as list_bill_to_history_service,
+)
+from meters.services.bill_to_assignment import (
+    update_assignment as update_bill_to_assignment,
+)
 from meters.services.kostenstelle_assignment import assign_kostenstelle
 from meters.services.kostenstelle_assignment import (
     create_assignment as create_kostenstelle_assignment,
@@ -1240,6 +1257,111 @@ def delete_kostenstelle_period(
     admin: AdminUser,
 ) -> None:
     delete_kostenstelle_assignment(
+        db,
+        mp_id=mp_id,
+        assignment_id=assignment_id,
+        user_id=admin.id,
+        ip_address=client_ip(request),
+    )
+    db.commit()
+
+
+# ---------------------------------------------------------------------------
+# "Abrechnen an" (seit 0047) - Muster wie die Kostenstellen-Historie. Ohne Periode
+# rechnet die Abrechnung an den Eigentuemer ab.
+# ---------------------------------------------------------------------------
+
+
+@router.get("/{mp_id}/bill-to", response_model=list[BillToAssignmentRead])
+def list_bill_to_history(
+    mp_id: int,
+    db: DbDep,
+    user: CurrentUser,
+) -> list[BillToAssignmentRead]:
+    assert_can_access_mp(db, user, mp_id)
+    return [BillToAssignmentRead.model_validate(a) for a in list_bill_to_history_service(db, mp_id)]
+
+
+@router.post("/{mp_id}/change-bill-to", response_model=BillToAssignmentRead)
+def change_bill_to_endpoint(
+    mp_id: int,
+    payload: ChangeBillToRequest,
+    request: Request,
+    db: DbDep,
+    admin: AdminUser,
+) -> BillToAssignmentRead:
+    assignment = assign_bill_to(
+        db,
+        mp_id=mp_id,
+        bill_to=payload.bill_to,
+        valid_from=payload.valid_from,
+        user_id=admin.id,
+        ip_address=client_ip(request),
+    )
+    db.commit()
+    db.refresh(assignment)
+    return BillToAssignmentRead.model_validate(assignment)
+
+
+@router.post(
+    "/{mp_id}/bill-to",
+    response_model=BillToAssignmentRead,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_bill_to_period(
+    mp_id: int,
+    payload: BillToAssignmentCreate,
+    request: Request,
+    db: DbDep,
+    admin: AdminUser,
+) -> BillToAssignmentRead:
+    assignment = create_bill_to_assignment(
+        db,
+        mp_id=mp_id,
+        bill_to=payload.bill_to,
+        valid_from=payload.valid_from,
+        valid_to=payload.valid_to,
+        user_id=admin.id,
+        ip_address=client_ip(request),
+    )
+    db.commit()
+    db.refresh(assignment)
+    return BillToAssignmentRead.model_validate(assignment)
+
+
+@router.patch("/{mp_id}/bill-to/{assignment_id}", response_model=BillToAssignmentRead)
+def update_bill_to_period(
+    mp_id: int,
+    assignment_id: int,
+    payload: BillToAssignmentUpdate,
+    request: Request,
+    db: DbDep,
+    admin: AdminUser,
+) -> BillToAssignmentRead:
+    assignment = update_bill_to_assignment(
+        db,
+        mp_id=mp_id,
+        assignment_id=assignment_id,
+        bill_to=payload.bill_to,
+        valid_from=payload.valid_from,
+        valid_to=payload.valid_to,
+        user_id=admin.id,
+        ip_address=client_ip(request),
+    )
+    db.commit()
+    db.refresh(assignment)
+    return BillToAssignmentRead.model_validate(assignment)
+
+
+@router.delete("/{mp_id}/bill-to/{assignment_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_bill_to_period(
+    mp_id: int,
+    assignment_id: int,
+    request: Request,
+    db: DbDep,
+    admin: AdminUser,
+) -> None:
+    delete_bill_to_assignment(
         db,
         mp_id=mp_id,
         assignment_id=assignment_id,

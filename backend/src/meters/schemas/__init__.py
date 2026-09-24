@@ -15,6 +15,12 @@ from meters.schemas.auth import (
     TotpStatusResponse,
     TotpVerifyRequest,
 )
+from meters.schemas.bill_to_assignment import (
+    BillToAssignmentCreate,
+    BillToAssignmentRead,
+    BillToAssignmentUpdate,
+    ChangeBillToRequest,
+)
 from meters.schemas.common import (
     APIModel,
     BulkDeleteRequest,
@@ -116,9 +122,13 @@ __all__ = [
     "APIModel",
     "AuditLogRead",
     "BackupCodesResponse",
+    "BillToAssignmentCreate",
+    "BillToAssignmentRead",
+    "BillToAssignmentUpdate",
     "BulkDeleteRequest",
     "BulkDeleteResult",
     "BulkDeleteSkipped",
+    "ChangeBillToRequest",
     "ChangeKostenstelleRequest",
     "ChangeMieterRequest",
     "ChangeOwnerRequest",

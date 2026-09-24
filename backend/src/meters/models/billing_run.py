@@ -21,7 +21,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from meters.db import Base, TimestampMixin
 from meters.db.types import DecimalText
-from meters.models._enums import BillingPositionKind, BillingRunStatus
+from meters.models._enums import BillingPositionKind, BillingRunStatus, BillTo
 
 
 class BillingRun(Base, TimestampMixin):
@@ -92,7 +92,14 @@ class BillingRunLine(Base):
     )
     parent_label: Mapped[str | None] = mapped_column(String(120))  # Hauptzaehler (Abzug)
     owner_id: Mapped[int | None] = mapped_column(ForeignKey("owner.id", ondelete="SET NULL"))
-    owner_name: Mapped[str | None] = mapped_column(String(200))
+    owner_name: Mapped[str | None] = mapped_column(String(200))  # Empfaenger (Eigentuemer/Mieter)
+    # Art des Empfaengers (seit 0047); bei MIETER ist ``owner_id`` leer.
+    recipient_kind: Mapped[BillTo] = mapped_column(
+        SAEnum(BillTo, name="bill_to", native_enum=False, length=16),
+        nullable=False,
+        default=BillTo.OWNER,
+        server_default=BillTo.OWNER.name,
+    )
     internal_allocation: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     kostenstelle: Mapped[int | None] = mapped_column(Integer)
     mieter_name: Mapped[str | None] = mapped_column(String(200))

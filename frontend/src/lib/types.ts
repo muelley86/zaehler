@@ -172,8 +172,12 @@ export interface BillingPositionRead {
   parent_position_id: number | null;
   owner_id: number | null;
   owner_name: string | null;
-  /** Empfänger heute (Eigentümer der Messstelle bzw. der Restposition) — Gruppierung der Liste. */
+  /**
+   * Empfänger heute (Eigentümer bzw. bei „Abrechnen an Mieter“ der Mieter der Messstelle,
+   * Eigentümer der Restposition) — Gruppierung der Liste.
+   */
   recipient_name: string | null;
+  recipient_kind: BillTo | null;
   recipient_internal: boolean;
   kostenstelle: number | null;
   invoice_line: string | null;
@@ -190,7 +194,9 @@ export interface BillingCheckRow {
   measuring_point_name: string | null;
   parent_position_id: number | null;
   owner_id: number | null;
+  /** Name des Empfängers (Eigentümer oder Mieter, siehe `recipient_kind`). */
   owner_name: string | null;
+  recipient_kind: BillTo;
   internal_allocation: boolean;
   kostenstelle: number | null;
   mieter_name: string | null;
@@ -480,7 +486,9 @@ export interface BillingRunLineRead {
   kind: BillingPositionKind;
   parent_label: string | null;
   owner_id: number | null;
+  /** Name des Empfängers (Eigentümer oder Mieter, siehe `recipient_kind`). */
   owner_name: string | null;
+  recipient_kind: BillTo;
   internal_allocation: boolean;
   kostenstelle: number | null;
   mieter_name: string | null;
@@ -652,6 +660,20 @@ export interface MieterRead {
   email: string | null;
   phone: string | null;
   note: string | null;
+}
+
+/**
+ * An wen eine Messstelle abgerechnet wird: `mieter` = den zum Stichtag aktuellen Mieter
+ * (ohne Mieter den Eigentümer). Ohne Periode gilt `owner`.
+ */
+export type BillTo = 'owner' | 'mieter';
+
+/** „Abrechnen an“ mit Gültigkeitszeitraum (halboffen, seit Migration 0047). */
+export interface BillToAssignmentRead {
+  id: number;
+  bill_to: BillTo;
+  valid_from: string;
+  valid_to: string | null;
 }
 
 /** Kostenstelle mit Gültigkeitszeitraum (halboffen: ``valid_to`` gehört nicht mehr dazu). */

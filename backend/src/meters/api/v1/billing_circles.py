@@ -20,7 +20,6 @@ from meters.models import (
     BillingInvoice,
     BillingPosition,
     BillingPositionKind,
-    Owner,
 )
 from meters.schemas.billing_circle import (
     BillingCheckRead,
@@ -40,6 +39,7 @@ from meters.schemas.billing_readings import BillingReadingsRead
 from meters.services.audit import record
 from meters.services.billing_circle import (
     FELDER,
+    Empfaenger,
     PositionData,
     check_circle,
     next_sort_order,
@@ -78,11 +78,12 @@ def _position(db: DbDep, circle_id: int, position_id: int) -> BillingPosition:
     return position
 
 
-def _position_read(p: BillingPosition, recipient: Owner | None = None) -> BillingPositionRead:
+def _position_read(p: BillingPosition, recipient: Empfaenger | None = None) -> BillingPositionRead:
     data = BillingPositionRead.model_validate(p)
     data.measuring_point_name = p.measuring_point.name if p.measuring_point else None
     data.owner_name = p.owner.name if p.owner else None
     data.recipient_name = recipient.name if recipient else None
+    data.recipient_kind = recipient.kind if recipient else None
     data.recipient_internal = bool(recipient and recipient.internal_allocation)
     return data
 

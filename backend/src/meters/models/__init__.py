@@ -5,6 +5,7 @@ from meters.models._enums import (
     AuditEntityType,
     BillingPositionKind,
     BillingRunStatus,
+    BillTo,
     FlowDirection,
     HeatingSource,
     MeterType,
@@ -15,6 +16,7 @@ from meters.models._enums import (
 )
 from meters.models.audit_log import AuditLog
 from meters.models.backup_code import BackupCode, PendingTotpChallenge
+from meters.models.bill_to_assignment import BillToAssignment
 from meters.models.billing_circle import BillingCircle, BillingPosition
 from meters.models.billing_invoice import (
     BillingInvoice,
@@ -52,6 +54,8 @@ __all__ = [
     "AuditEntityType",
     "AuditLog",
     "BackupCode",
+    "BillTo",
+    "BillToAssignment",
     "BillingCircle",
     "BillingInvoice",
     "BillingInvoiceFile",

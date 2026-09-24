@@ -537,6 +537,7 @@ function CheckSection({ circleId, tick }: { circleId: number; tick: number }) {
                         <td className="py-1 pr-3 text-label">{r.label}</td>
                         <td className="py-1 pr-3">
                           {r.owner_name ?? '—'}
+                          {r.recipient_kind === 'mieter' ? ' (Mieter)' : ''}
                           {r.internal_allocation ? ' (intern)' : ''}
                         </td>
                         <td className="num py-1 pr-3">{r.kostenstelle ?? '—'}</td>
