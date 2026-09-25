@@ -10,6 +10,13 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.86.0](https://github.com/muelley86/zaehler/compare/v2.85.0...v2.86.0) (2026-09-25)
+
+
+### Funktionen
+
+* **abrechnung:** Kreis-Detailseite neu geordnet, Prüfabschnitte und Empfänger einklappbar ([#375](https://github.com/muelley86/zaehler/issues/375)) ([716e1f9](https://github.com/muelley86/zaehler/commit/716e1f925ed12b8db0902ebd5bd61aa0c2a3ec1f))
+
 ## [2.85.0](https://github.com/muelley86/zaehler/compare/v2.84.0...v2.85.0) (2026-09-25)
 
 
