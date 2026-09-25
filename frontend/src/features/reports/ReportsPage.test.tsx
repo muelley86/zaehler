@@ -12,8 +12,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { http, HttpResponse } from 'msw';
 
 import { renderWithRouter } from '@/tests/render';
+import { server } from '@/tests/server';
 import type { ReportAggregateResponse, ReportConfigRead } from '@/lib/types';
 
 const auth = vi.hoisted((): { role: 'admin' | 'recorder' } => ({ role: 'admin' }));
@@ -203,6 +205,28 @@ describe('ReportsPage — gespeicherte Auswertungen', () => {
     mockEndpoints();
     renderWithRouter(<ReportsPage />);
     expect(await screen.findByRole('button', { name: /Speichern/ })).toBeInTheDocument();
+  });
+
+  it('Speichern mit Standard-Zeitraum sendet period_kind shared_range ohne Daten', async () => {
+    mockEndpoints();
+    let body: unknown = null;
+    server.use(
+      http.post('/api/v1/report-configs', async ({ request }) => {
+        body = await request.json();
+        return HttpResponse.json({ ...SAVED, id: 2 }, { status: 201 });
+      }),
+    );
+    const prompt = vi.spyOn(window, 'prompt').mockReturnValue('Meine Auswertung');
+    renderWithRouter(<ReportsPage />);
+    fireEvent.click(await screen.findByRole('button', { name: /Speichern/ }));
+    await waitFor(() => expect(body).not.toBeNull());
+    expect(body).toMatchObject({
+      name: 'Meine Auswertung',
+      period_kind: 'shared_range',
+      from_date: null,
+      to_date: null,
+    });
+    prompt.mockRestore();
   });
 
   it('Erfasser sieht keinen Speichern-Button', async () => {

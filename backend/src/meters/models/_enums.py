@@ -185,3 +185,6 @@ class ReportPeriodKind(enum.StrEnum):
     CURRENT_MONTH = "current_month"
     LAST_MONTH = "last_month"
     ALL = "all"
+    # „Aktueller Zeitraum": folgt dem globalen Datumsbereich des Frontends
+    # (Navigation) — keine festen Daten, aufgeloest wird im Client.
+    SHARED_RANGE = "shared_range"
