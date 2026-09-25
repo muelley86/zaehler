@@ -1,16 +1,19 @@
 /**
  * Zählerstände zum Monatsende je Position: Stand alt (Ende Vormonat) und Stand neu (Monatsende)
  * aus den Ablesungen der App, interpolierte Stände gekennzeichnet, Zählertausch/Überlauf als
- * Korrektur, Befunde (fehlende oder weit entfernte Ablesungen).
+ * Korrektur, Befunde (fehlende oder weit entfernte Ablesungen). Ohne Befund eingeklappt.
  */
 import { useEffect, useState } from 'react';
 
-import { Section, TextField } from '@/components/ui';
+import { TextField } from '@/components/ui';
 import { api } from '@/lib/api';
 import { formatDateDe } from '@/lib/format';
 import type { BillingReadingsRead } from '@/lib/types';
 
 import { errorText, lastDayOfPreviousMonth } from './circleForm';
+import { CollapsibleSection } from './CollapsibleSection';
+import { useFindingsDisclosure } from './findingsDisclosure';
+import type { FindingsState } from './findingsDisclosure';
 import { MonthReadingsView } from './MonthReadingsView';
 
 export function MonthReadingsSection({ circleId, tick }: { circleId: number; tick: number }) {
@@ -42,8 +45,20 @@ export function MonthReadingsSection({ circleId, tick }: { circleId: number; tic
     };
   }, [circleId, monat, tick]);
 
+  const state: FindingsState = error
+    ? { error: true }
+    : report
+      ? { error: false, findings: report.findings.length }
+      : null;
+  const { open, toggle } = useFindingsDisclosure(state);
+
   return (
-    <Section header="Zählerstände zum Monatsende">
+    <CollapsibleSection
+      title="Zählerstände zum Monatsende"
+      state={state}
+      open={open}
+      onToggle={toggle}
+    >
       <div className="space-y-3 p-5">
         <TextField
           label="Abrechnungsmonat"
@@ -61,6 +76,6 @@ export function MonthReadingsSection({ circleId, tick }: { circleId: number; tic
         {error ? <div className="text-caption text-danger">{error}</div> : null}
         {report ? <MonthReadingsView report={report} /> : null}
       </div>
-    </Section>
+    </CollapsibleSection>
   );
 }

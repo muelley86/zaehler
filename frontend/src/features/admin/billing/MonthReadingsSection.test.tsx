@@ -1,6 +1,6 @@
 /**
  * Zählerstände zum Monatsende: Tabelle mit Kennzeichnung interpolierter Stände, Befunde,
- * Monatswechsel. Nur fiktive Werte.
+ * Monatswechsel, Einklappen ohne Befund. Nur fiktive Werte.
  */
 import { http, HttpResponse } from 'msw';
 import { describe, expect, it } from 'vitest';
@@ -82,6 +82,7 @@ describe('MonthReadingsSection', () => {
     );
     renderWithRouter(<MonthReadingsSection circleId={1} tick={0} />);
 
+    // Mit Befund von selbst aufgeklappt.
     const zeile = await screen.findByRole('row', { name: /TEST-1 \/ TEST-2/ });
     expect(zeile).toHaveTextContent('Stall A');
     expect(screen.queryByRole('row', { name: /Rest/ })).not.toBeInTheDocument();
@@ -92,6 +93,35 @@ describe('MonthReadingsSection', () => {
 
     fireEvent.change(screen.getByLabelText(/Abrechnungsmonat/), { target: { value: '2026-06' } });
     await waitFor(() => expect(monate).toContain('2026-06'));
+  });
+
+  it('bleibt ohne Befund eingeklappt und klappt per Überschrift auf', async () => {
+    server.use(
+      http.get('/api/v1/billing-circles/1/readings', () =>
+        HttpResponse.json({ ...antwort('2026-08'), findings: [] }),
+      ),
+    );
+    renderWithRouter(<MonthReadingsSection circleId={1} tick={0} />);
+    const kopf = screen.getByRole('button', { name: /Zählerstände zum Monatsende/ });
+    await waitFor(() => expect(kopf).toHaveTextContent('in Ordnung'));
+    expect(kopf).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByRole('row', { name: /TEST-1/ })).not.toBeInTheDocument();
+    fireEvent.click(kopf);
+    expect(screen.getByRole('row', { name: /TEST-1/ })).toBeInTheDocument();
+  });
+
+  it('bleibt nach manuellem Zuklappen zu, auch wenn neu geladen wird', async () => {
+    server.use(
+      http.get('/api/v1/billing-circles/1/readings', () => HttpResponse.json(antwort('2026-08'))),
+    );
+    const { rerender } = renderWithRouter(<MonthReadingsSection circleId={1} tick={0} />);
+    await screen.findByRole('row', { name: /TEST-1/ });
+    fireEvent.click(screen.getByRole('button', { name: /Zählerstände zum Monatsende/ }));
+    rerender(<MonthReadingsSection circleId={1} tick={1} />);
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: /Zählerstände/ })).toHaveTextContent('1 Befund'),
+    );
+    expect(screen.queryByRole('row', { name: /TEST-1/ })).not.toBeInTheDocument();
   });
 
   it('zeigt Serverfehler', async () => {

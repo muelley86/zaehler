@@ -1,7 +1,8 @@
 /**
- * Detail eines Abrechnungskreises: Stammdaten, Positionen (Messstellen bzw. Restmenge mit
- * Gültigkeitszeitraum, Unterzähler, Agrarmonitor-Rechnungszeile; nach Empfänger gruppiert und
- * per Drag & Drop sortierbar) und Prüfbericht zum Stichtag.
+ * Detail eines Abrechnungskreises: Stammdaten, dann Abrechnungsläufe, Rechnungen, Verlauf,
+ * Zählerstände und Prüfbericht zum Stichtag (beide ohne Befund eingeklappt) und zuletzt die
+ * Positionen (Messstellen bzw. Restmenge mit Gültigkeitszeitraum, Unterzähler,
+ * Agrarmonitor-Rechnungszeile; nach Empfänger gruppiert, eingeklappt und per Drag & Drop sortierbar).
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
@@ -29,6 +30,9 @@ import type {
 
 import { BillingRunsSection } from './BillingRunsSection';
 import { CircleFields } from './CircleFields';
+import { CollapsibleSection } from './CollapsibleSection';
+import { useFindingsDisclosure } from './findingsDisclosure';
+import type { FindingsState } from './findingsDisclosure';
 import { HistoryCard } from './HistoryCard';
 import { InvoicesSection } from './InvoicesSection';
 import { MonthReadingsSection } from './MonthReadingsSection';
@@ -174,6 +178,17 @@ export function BillingCircleDetailPage() {
         </div>
       ) : null}
 
+      <BillingRunsSection circleId={circleId} />
+
+      <InvoicesSection circleId={circleId} />
+
+      <HistoryCard circleId={circleId} />
+
+      {/* key: Klappzustand gehört zum Kreis — die Route remountet bei neuer :id nicht. */}
+      <MonthReadingsSection key={`readings-${circleId}`} circleId={circleId} tick={tick} />
+
+      <CheckSection key={`check-${circleId}`} circleId={circleId} tick={tick} />
+
       <Section
         header={
           <div className="flex items-center justify-between gap-2">
@@ -194,11 +209,13 @@ export function BillingCircleDetailPage() {
         ) : (
           <>
             <p className="px-5 py-3 text-caption text-tertiary">
-              Gruppiert nach Empfänger (Stand heute). Reihenfolge über den Griff verschieben — sie
-              gilt für Abrechnungslauf, Agrarmonitor-Übertragung und Excel. Ein Stammdaten-Import
-              setzt sie wieder auf die Reihenfolge der Excel.
+              Gruppiert nach Empfänger (Stand heute), zum Aufklappen auf den Empfänger tippen.
+              Reihenfolge über den Griff verschieben — sie gilt für Abrechnungslauf,
+              Agrarmonitor-Übertragung und Excel. Ein Stammdaten-Import setzt sie wieder auf die
+              Reihenfolge der Excel.
             </p>
             <PositionsList
+              key={circleId}
               positions={positions}
               onReorder={reorderPositions}
               onEdit={(p) => setPositionSheet({ position: p })}
@@ -207,16 +224,6 @@ export function BillingCircleDetailPage() {
           </>
         )}
       </Section>
-
-      <BillingRunsSection circleId={circleId} />
-
-      <InvoicesSection circleId={circleId} />
-
-      <HistoryCard circleId={circleId} />
-
-      <MonthReadingsSection circleId={circleId} tick={tick} />
-
-      <CheckSection circleId={circleId} tick={tick} />
 
       <Sheet open={editCircle} onClose={() => setEditCircle(false)} title="Kreis bearbeiten">
         {circle && editCircle ? (
@@ -503,8 +510,15 @@ function CheckSection({ circleId, tick }: { circleId: number; tick: number }) {
     };
   }, [circleId, stichtag, tick]);
 
+  const state: FindingsState = error
+    ? { error: true }
+    : report
+      ? { error: false, findings: report.findings.length }
+      : null;
+  const { open, toggle } = useFindingsDisclosure(state);
+
   return (
-    <Section header="Prüfbericht">
+    <CollapsibleSection title="Prüfbericht" state={state} open={open} onToggle={toggle}>
       <div className="space-y-3 p-5">
         <TextField
           label="Stichtag"
@@ -563,6 +577,6 @@ function CheckSection({ circleId, tick }: { circleId: number; tick: number }) {
           </>
         ) : null}
       </div>
-    </Section>
+    </CollapsibleSection>
   );
 }
