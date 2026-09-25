@@ -49,7 +49,6 @@ export function BillingCirclesAdminPage() {
       <MonthOverviewCard tick={tick} />
       <StammdatenImportCard onApplied={() => setTick((t) => t + 1)} />
       <CreateForm onCreated={() => setTick((t) => t + 1)} />
-      <UnassignedMetersCard tick={tick} />
       <Section header="Kreise">
         {items === null ? (
           <div className="p-5 text-caption text-tertiary">Lade…</div>
@@ -82,6 +81,7 @@ export function BillingCirclesAdminPage() {
           </ul>
         )}
       </Section>
+      <UnassignedMetersCard tick={tick} />
     </>
   );
 }

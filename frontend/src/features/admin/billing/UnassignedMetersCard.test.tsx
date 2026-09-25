@@ -30,6 +30,12 @@ describe('UnassignedMetersCard', () => {
     );
     renderWithRouter(<UnassignedMetersCard />);
 
+    const toggle = await screen.findByRole('button', { name: /Nicht abgerechnete.*1/ });
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByRole('link', { name: 'Stall A' })).not.toBeInTheDocument();
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+
     const link = await screen.findByRole('link', { name: 'Stall A' });
     expect(link).toHaveAttribute('href', '/admin/messstellen/5');
     expect(screen.getByText('TEST-1')).toBeInTheDocument();

@@ -8,7 +8,15 @@ import type { FormEvent } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Plus } from 'lucide-react';
 
-import { Button, LargeTitle, Section, Select, Sheet, TextField } from '@/components/ui';
+import {
+  Button,
+  LargeTitle,
+  Section,
+  Select,
+  Sheet,
+  SingleSelectDropdown,
+  TextField,
+} from '@/components/ui';
 import { api } from '@/lib/api';
 import type {
   BillingCheckRead,
@@ -322,13 +330,21 @@ function PositionForm({
   const parents = positions.filter(
     (p) => p.kind === 'meter' && p.parent_position_id === null && p.id !== position?.id,
   );
-  const sortedMeters = useMemo(
-    () => [...meters].sort((a, b) => a.name.localeCompare(b.name, 'de')),
+  const meterOptions = useMemo(
+    () =>
+      [...meters]
+        .sort((a, b) => a.name.localeCompare(b.name, 'de'))
+        .map((m) => ({ value: m.id, label: m.name })),
     [meters],
   );
 
   async function save(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    // Die Suchauswahl kennt kein natives `required`.
+    if (kind === 'meter' && !mpId) {
+      setError('Bitte eine Messstelle wählen.');
+      return;
+    }
     if (kind === 'rest' && !/^\d{1,5}$/.test(kst.trim())) {
       setError('Kostenstelle muss eine Ganzzahl von 0 bis 99999 sein.');
       return;
@@ -380,19 +396,15 @@ function PositionForm({
       </Select>
       {kind === 'meter' ? (
         <>
-          <Select
+          <SingleSelectDropdown
             label="Messstelle"
-            value={mpId}
-            onChange={(e) => setMpId(e.target.value)}
-            required
-          >
-            <option value="">— bitte wählen —</option>
-            {sortedMeters.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.name}
-              </option>
-            ))}
-          </Select>
+            options={meterOptions}
+            value={mpId ? Number(mpId) : null}
+            onChange={(id) => setMpId(String(id))}
+            placeholder="— bitte wählen —"
+            searchThreshold={0}
+            autoFocusSearch
+          />
           <Select
             label="Unterzähler von (optional)"
             value={parentId}
