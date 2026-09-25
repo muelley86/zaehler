@@ -22,6 +22,7 @@ export function SingleSelectDropdown<T extends string | number>({
   placeholder = 'Auswählen…',
   searchThreshold = 8,
   label,
+  autoFocusSearch = false,
 }: {
   options: DropdownOption<T>[];
   value: T | null;
@@ -29,6 +30,8 @@ export function SingleSelectDropdown<T extends string | number>({
   placeholder?: string;
   searchThreshold?: number;
   label?: ReactNode;
+  /** Suchfeld beim Öffnen fokussieren (Desktop-Formulare; mobil öffnet es die Tastatur). */
+  autoFocusSearch?: boolean;
 }) {
   const [search, setSearch] = useState('');
   const labelId = useId();
@@ -59,6 +62,7 @@ export function SingleSelectDropdown<T extends string | number>({
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Suchen…"
+                autoFocus={autoFocusSearch}
                 trailing={<Search size={14} className="text-tertiary" />}
               />
             </div>

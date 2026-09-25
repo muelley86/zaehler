@@ -1,9 +1,11 @@
 /**
- * Abrechnungskreis-Detail: Positionen, Prüfbericht mit Befunden und Anlegen einer Restposition.
+ * Abrechnungskreis-Detail: Positionen, Prüfbericht mit Befunden, Anlegen einer Restposition und
+ * einer Messstellen-Position über die Suchauswahl.
  */
 import { http, HttpResponse } from 'msw';
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 
 import { renderWithRouter } from '@/tests/render';
 import { server } from '@/tests/server';
@@ -156,5 +158,56 @@ describe('BillingCircleDetailPage', () => {
       valid_from: '2026-08-01',
       valid_to: null,
     });
+  });
+
+  it('sucht die Messstelle einer neuen Position per Suchfeld', async () => {
+    mockApi();
+    let body: unknown = null;
+    server.use(
+      http.get('/api/v1/measuring-points', () =>
+        HttpResponse.json([
+          { id: 7, name: 'Stall B', type: 'electricity' },
+          { id: 8, name: 'Werkstatt', type: 'electricity' },
+          { id: 9, name: 'Brunnen', type: 'water' },
+        ]),
+      ),
+      http.post('/api/v1/billing-circles/1/positions', async ({ request }) => {
+        body = await request.json();
+        return HttpResponse.json({}, { status: 201 });
+      }),
+    );
+    const user = userEvent.setup();
+    renderWithRouter(<BillingCircleDetailPage />);
+    await user.click(await screen.findByRole('button', { name: /Position hinzufügen/ }));
+    await user.type(await screen.findByLabelText('Bezeichnung'), 'Werkstatt');
+    await user.click(screen.getByRole('button', { name: /Messstelle/ }));
+    // Suchfeld hat nach dem Öffnen den Fokus, man kann direkt tippen.
+    expect(screen.getByPlaceholderText('Suchen…')).toHaveFocus();
+    await user.keyboard('werk');
+    expect(screen.queryByRole('button', { name: 'Stall B' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Brunnen' })).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Werkstatt' }));
+    fireEvent.change(screen.getByLabelText('Gültig ab'), { target: { value: '2026-08-01' } });
+    await user.click(screen.getByRole('button', { name: /^Speichern$/ }));
+    await waitFor(() => expect(body).not.toBeNull());
+    expect(body).toMatchObject({ kind: 'meter', measuring_point_id: 8 });
+  });
+
+  it('verlangt eine Messstelle, bevor gespeichert wird', async () => {
+    mockApi();
+    let posted = false;
+    server.use(
+      http.post('/api/v1/billing-circles/1/positions', () => {
+        posted = true;
+        return HttpResponse.json({}, { status: 201 });
+      }),
+    );
+    renderWithRouter(<BillingCircleDetailPage />);
+    fireEvent.click(await screen.findByRole('button', { name: /Position hinzufügen/ }));
+    fireEvent.change(await screen.findByLabelText('Bezeichnung'), { target: { value: 'X' } });
+    fireEvent.change(screen.getByLabelText('Gültig ab'), { target: { value: '2026-08-01' } });
+    fireEvent.click(screen.getByRole('button', { name: /^Speichern$/ }));
+    expect(await screen.findByText('Bitte eine Messstelle wählen.')).toBeInTheDocument();
+    expect(posted).toBe(false);
   });
 });
