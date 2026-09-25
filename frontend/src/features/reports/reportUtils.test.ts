@@ -10,6 +10,7 @@ import {
   directionSuffix,
   displayGroupLabel,
   groupsWithEinspeisung,
+  mpSelectionKeys,
   periodLabel,
   previousPeriodRange,
   previousYearRange,
@@ -17,6 +18,7 @@ import {
   resolvePeriod,
   rowKey,
   runBlocker,
+  splitMpSelection,
 } from './reportUtils';
 
 describe('Vergleichsperioden', () => {
@@ -245,6 +247,7 @@ describe('buildAggregateQuery', () => {
       kostenstellen: [],
       meterTypes: [],
       measuringPointIds: [],
+      virtualMeasuringPointIds: [],
     });
     const p = new URLSearchParams(qs);
     expect(p.has('measuring_point_id')).toBe(false);
@@ -266,9 +269,11 @@ describe('buildAggregateQuery', () => {
       kostenstellen: [10001],
       meterTypes: ['electricity', 'water'],
       measuringPointIds: [3, 5],
+      virtualMeasuringPointIds: [9],
     });
     const p = new URLSearchParams(qs);
     expect(p.getAll('measuring_point_id')).toEqual(['3', '5']);
+    expect(p.getAll('virtual_measuring_point_id')).toEqual(['9']);
     expect(p.get('from_at')).toBe('2024-01-01');
     expect(p.getAll('owner_id')).toEqual(['7', '8']);
     expect(p.getAll('kostenstelle')).toEqual(['10001']);
@@ -378,5 +383,15 @@ describe('rowKey', () => {
     };
     expect(rowKey(base)).not.toBe(rowKey({ ...base, is_virtual: true }));
     expect(rowKey(base)).not.toBe(rowKey({ ...base, direction: 'einspeisung' }));
+  });
+});
+
+describe('Messstellen-Auswahl echt/verrechnet', () => {
+  it('trennt gleiche IDs nach Namensraum und setzt sie wieder zusammen', () => {
+    const keys = mpSelectionKeys(new Set([1, 2]), new Set([1]));
+    expect([...keys].sort()).toEqual(['r:1', 'r:2', 'v:1']);
+    const { real, virtual } = splitMpSelection(keys);
+    expect([...real]).toEqual([1, 2]);
+    expect([...virtual]).toEqual([1]);
   });
 });

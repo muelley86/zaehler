@@ -39,6 +39,7 @@ import type {
   ReportDimension,
   ReportGranularity,
   ReportPeriodKind,
+  VirtualMeasuringPointRead,
 } from '@/lib/types';
 import { ComparePeriodFields, DATE_INPUT_CLASS } from './ComparePeriodFields';
 import { ReportResults } from './ReportResults';
@@ -50,12 +51,15 @@ import {
   buildAggregateQuery,
   comparisonCsvRows,
   diffRows,
+  displayGroupLabel,
+  mpSelectionKeys,
   periodLabel,
   resolveComparePeriod,
   resolvePeriod,
   runBlocker,
+  splitMpSelection,
 } from './reportUtils';
-import type { CompareKind, ComparisonPeriods } from './reportUtils';
+import type { CompareKind, ComparisonPeriods, MpSelectionKey } from './reportUtils';
 import { useReportQuery } from './useReportQuery';
 import type { ReportRunInput } from './useReportQuery';
 
@@ -108,6 +112,11 @@ interface NumOption {
   label: string;
 }
 
+interface MpOption {
+  value: MpSelectionKey;
+  label: string;
+}
+
 function numOptions(
   points: MeasuringPointRead[],
   pick: (p: MeasuringPointRead) => [number | null, string | null],
@@ -140,6 +149,7 @@ export function ReportsPage() {
   const isDesktop = useIsDesktop();
 
   const [points, setPoints] = useState<MeasuringPointRead[]>([]);
+  const [virtualPoints, setVirtualPoints] = useState<VirtualMeasuringPointRead[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   // „Filter merken": Reports merkt seine Arbeits-Filter je Seite (sessionStorage).
@@ -187,6 +197,13 @@ export function ReportsPage() {
 
   const [measuringPointFilter, setMeasuringPointFilter] = useStickyState<Set<number>>(
     FILTER_NS + 'measuringPoint',
+    new Set(),
+    rememberFilters,
+    NUM_CODEC,
+  );
+  // Verrechnete Messstellen im selben Dropdown, aber eigener ID-Namensraum.
+  const [virtualPointFilter, setVirtualPointFilter] = useStickyState<Set<number>>(
+    FILTER_NS + 'virtualPoint',
     new Set(),
     rememberFilters,
     NUM_CODEC,
@@ -241,6 +258,12 @@ export function ReportsPage() {
       .catch((err: unknown) => {
         if (err instanceof ApiError) setError(err.problem.detail ?? err.problem.title);
       });
+    api
+      .get<VirtualMeasuringPointRead[]>('/virtual-measuring-points')
+      .then(setVirtualPoints)
+      .catch(() => {
+        /* Verrechnete Messstellen sind optional — Filter bietet dann nur echte an */
+      });
     loadConfigs();
   }, [loadConfigs]);
 
@@ -275,6 +298,7 @@ export function ReportsPage() {
         kostenstellen: [...kostenstelleFilter],
         meterTypes: [...typeFilter],
         measuringPointIds: [...measuringPointFilter],
+        virtualMeasuringPointIds: [...virtualPointFilter],
       }),
     [
       dimension,
@@ -286,6 +310,7 @@ export function ReportsPage() {
       kostenstelleFilter,
       typeFilter,
       measuringPointFilter,
+      virtualPointFilter,
     ],
   );
 
@@ -303,6 +328,7 @@ export function ReportsPage() {
             kostenstellen: [...kostenstelleFilter],
             meterTypes: [...typeFilter],
             measuringPointIds: [...measuringPointFilter],
+            virtualMeasuringPointIds: [...virtualPointFilter],
           })
         : null,
     [
@@ -315,6 +341,7 @@ export function ReportsPage() {
       kostenstelleFilter,
       typeFilter,
       measuringPointFilter,
+      virtualPointFilter,
     ],
   );
 
@@ -348,13 +375,33 @@ export function ReportsPage() {
     () => numOptions(points, (p) => [p.current_owner_id, p.current_owner_name]),
     [points],
   );
-  const measuringPointOptions = useMemo(
-    () =>
-      numOptions(points, (p) => [
-        p.id,
-        p.location_name ? `${p.name} · ${p.location_name}` : p.name,
-      ]),
-    [points],
+  // Echte und verrechnete Messstellen gemischt, alphabetisch; verrechnete mit
+  // „(verrechnet)" wie in der Ergebnistabelle.
+  const measuringPointOptions = useMemo(() => {
+    const withLocation = (name: string, location: string | null): string =>
+      location ? `${name} · ${location}` : name;
+    const real = numOptions(points, (p) => [p.id, withLocation(p.name, p.location_name)]).map(
+      (o): MpOption => ({ value: `r:${o.id}`, label: o.label }),
+    );
+    const virtual = virtualPoints.map(
+      (v): MpOption => ({
+        value: `v:${v.id}`,
+        label: withLocation(displayGroupLabel(v.name, true), v.location_name),
+      }),
+    );
+    return [...real, ...virtual].sort((a, b) => a.label.localeCompare(b.label));
+  }, [points, virtualPoints]);
+  const measuringPointSelection = useMemo(
+    () => mpSelectionKeys(measuringPointFilter, virtualPointFilter),
+    [measuringPointFilter, virtualPointFilter],
+  );
+  const setMeasuringPointSelection = useCallback(
+    (keys: Set<MpSelectionKey>) => {
+      const { real, virtual } = splitMpSelection(keys);
+      setMeasuringPointFilter(real);
+      setVirtualPointFilter(virtual);
+    },
+    [setMeasuringPointFilter, setVirtualPointFilter],
   );
   const kostenstelleOptions = useMemo(
     () =>
@@ -387,6 +434,7 @@ export function ReportsPage() {
       setTypeFilter(new Set(c.filters.meter_types));
       // Alt-Configs kennen den Messstellen-Filter noch nicht.
       setMeasuringPointFilter(new Set(c.filters.measuring_point_ids ?? []));
+      setVirtualPointFilter(new Set(c.filters.virtual_measuring_point_ids ?? []));
       // Die useStickyState-Setter sind stabile useState-Dispatcher; eslint kennt
       // nur die eingebaute useState-Stabilität, daher hier explizit gelistet.
     },
@@ -402,6 +450,7 @@ export function ReportsPage() {
       setKostenstelleFilter,
       setTypeFilter,
       setMeasuringPointFilter,
+      setVirtualPointFilter,
     ],
   );
 
@@ -423,6 +472,7 @@ export function ReportsPage() {
           kostenstellen: [...kostenstelleFilter],
           meter_types: [...typeFilter],
           measuring_point_ids: [...measuringPointFilter],
+          virtual_measuring_point_ids: [...virtualPointFilter],
         },
       })
       .then(() => loadConfigs())
@@ -441,6 +491,7 @@ export function ReportsPage() {
     kostenstelleFilter,
     typeFilter,
     measuringPointFilter,
+    virtualPointFilter,
     loadConfigs,
   ]);
 
@@ -502,6 +553,7 @@ export function ReportsPage() {
   // (gleiche Pille wie im Dashboard).
   const activeFilterCount =
     measuringPointFilter.size +
+    virtualPointFilter.size +
     mainLocationFilter.size +
     locationFilter.size +
     ownerFilter.size +
@@ -533,6 +585,7 @@ export function ReportsPage() {
     setCompareFrom('');
     setCompareTo('');
     setMeasuringPointFilter(new Set());
+    setVirtualPointFilter(new Set());
     setTypeFilter(new Set());
     setKostenstelleFilter(new Set());
     setOwnerFilter(new Set());
@@ -665,9 +718,9 @@ export function ReportsPage() {
                 {measuringPointOptions.length > 0 ? (
                   <MultiSelectDropdown
                     label="Messstellen"
-                    options={measuringPointOptions.map((o) => ({ value: o.id, label: o.label }))}
-                    selected={measuringPointFilter}
-                    onChange={setMeasuringPointFilter}
+                    options={measuringPointOptions}
+                    selected={measuringPointSelection}
+                    onChange={setMeasuringPointSelection}
                   />
                 ) : null}
                 {typeOptions.length > 0 ? (

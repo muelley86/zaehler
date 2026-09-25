@@ -1040,6 +1040,8 @@ export interface ReportFilter {
   meter_types: MeterType[];
   /** Explizite Messstellen-Auswahl (nur echte MPs); fehlt in Alt-Configs. */
   measuring_point_ids?: number[];
+  /** Explizite Auswahl verrechneter Messstellen; fehlt in Alt-Configs. */
+  virtual_measuring_point_ids?: number[];
 }
 
 export interface ReportRow {

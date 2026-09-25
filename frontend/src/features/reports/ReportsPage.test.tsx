@@ -43,7 +43,7 @@ vi.mock('./ReportChart', () => ({
 
 import { ReportsPage } from './ReportsPage';
 import { periodLabel, previousYearRange } from './reportUtils';
-import { mockEndpoints, response, runReport } from './reportsTestUtils';
+import { VMP, mockEndpoints, response, runReport } from './reportsTestUtils';
 
 const SAVED: ReportConfigRead = {
   id: 1,
@@ -330,6 +330,37 @@ describe('ReportsPage — Filter', () => {
 
     await runReport();
     await waitFor(() => expect(urls.some((u) => u.includes('measuring_point_id=1'))).toBe(true));
+  });
+
+  it('bietet verrechnete Messstellen im Messstellen-Filter an (eigener Parameter)', async () => {
+    // VMP hat dieselbe ID wie die echte MP — die Auswahl darf sie nicht verwechseln.
+    const { urls } = mockEndpoints({ virtualPoints: [VMP] });
+    const user = userEvent.setup();
+    renderWithRouter(<ReportsPage />);
+    await screen.findByRole('button', { name: 'Auswerten' });
+
+    await user.click(screen.getByRole('button', { name: /Messstellen eingrenzen/ }));
+    const filterSection = screen.getByText('Messstellen eingrenzen').closest('section')!;
+    await user.click(within(filterSection).getByRole('button', { name: 'Messstellen' }));
+    await user.click(await screen.findByRole('checkbox', { name: 'PV-Saldo (verrechnet)' }));
+    expect(await screen.findByText('1 aktiv')).toBeInTheDocument();
+
+    await runReport();
+    await waitFor(() => expect(urls).toHaveLength(1));
+    const params = new URL(urls[0]!).searchParams;
+    expect(params.getAll('virtual_measuring_point_id')).toEqual(['1']);
+    expect(params.has('measuring_point_id')).toBe(false);
+  });
+
+  it('gespeicherte Auswertung mit verrechneter Messstelle setzt den Filter', async () => {
+    mockEndpoints({
+      virtualPoints: [VMP],
+      configs: [{ ...SAVED, filters: { ...SAVED.filters, virtual_measuring_point_ids: [1] } }],
+    });
+    renderWithRouter(<ReportsPage />);
+    fireEvent.click(await screen.findByRole('button', { name: /^Jahresübersicht/ }));
+    // Zählerart (aus SAVED) + verrechnete Messstelle.
+    expect(await screen.findByText('2 aktiv')).toBeInTheDocument();
   });
 
   it('gespeicherte Auswertung mit Messstellen setzt den Filter', async () => {

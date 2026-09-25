@@ -63,6 +63,7 @@ def _to_filter(
     kostenstelle: list[int],
     meter_type: list[MeterType],
     measuring_point_id: list[int],
+    virtual_measuring_point_id: list[int],
 ) -> ReportFilter:
     """Wiederholbare Query-Parameter -> ReportFilter. Leere Liste = kein Filter.
     Der "ohne ..."-Bucket erscheint unverfiltert automatisch (NULL-im-Filter wird
@@ -74,6 +75,9 @@ def _to_filter(
         kostenstellen=set(kostenstelle) if kostenstelle else None,
         meter_types=set(meter_type) if meter_type else None,
         measuring_point_ids=set(measuring_point_id) if measuring_point_id else None,
+        virtual_measuring_point_ids=(
+            set(virtual_measuring_point_id) if virtual_measuring_point_id else None
+        ),
     )
 
 
@@ -112,9 +116,16 @@ def aggregate(
     kostenstelle: list[int] = Query(default_factory=list),
     meter_type: list[MeterType] = Query(default_factory=list),
     measuring_point_id: list[int] = Query(default_factory=list),
+    virtual_measuring_point_id: list[int] = Query(default_factory=list),
 ) -> ReportAggregateResponse:
     filters = _to_filter(
-        main_location_id, location_id, owner_id, kostenstelle, meter_type, measuring_point_id
+        main_location_id,
+        location_id,
+        owner_id,
+        kostenstelle,
+        meter_type,
+        measuring_point_id,
+        virtual_measuring_point_id,
     )
     rows = _run(db, user, dimension, granularity, from_at, to_at, filters)
     return ReportAggregateResponse(
@@ -141,9 +152,16 @@ def aggregate_csv(
     kostenstelle: list[int] = Query(default_factory=list),
     meter_type: list[MeterType] = Query(default_factory=list),
     measuring_point_id: list[int] = Query(default_factory=list),
+    virtual_measuring_point_id: list[int] = Query(default_factory=list),
 ) -> StreamingResponse:
     filters = _to_filter(
-        main_location_id, location_id, owner_id, kostenstelle, meter_type, measuring_point_id
+        main_location_id,
+        location_id,
+        owner_id,
+        kostenstelle,
+        meter_type,
+        measuring_point_id,
+        virtual_measuring_point_id,
     )
     rows = _run(db, user, dimension, granularity, from_at, to_at, filters)
     # Nur im Export: Seriennummer + Staende an den Periodengrenzen, damit sich

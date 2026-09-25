@@ -35,6 +35,7 @@ export function Dropdown({
   hideChevron = false,
   id,
   ariaLabelledBy,
+  panelWidth = PANEL_WIDTH,
 }: {
   label: ReactNode;
   /** Aktiv-Zähler (nur ``pill``). > 0 → Trigger aktiv gestylt und zeigt das Badge. */
@@ -51,6 +52,8 @@ export function Dropdown({
   id?: string;
   /** ``aria-labelledby`` des Trigger-Buttons — verknüpft ein sichtbares Feld-Label. */
   ariaLabelledBy?: string | undefined;
+  /** Mindestbreite des Panels in px (am Handy begrenzt ``max-w`` auf den Viewport). */
+  panelWidth?: number;
 }) {
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState<{
@@ -69,7 +72,7 @@ export function Dropdown({
     const el = triggerRef.current;
     if (!el) return;
     const r = el.getBoundingClientRect();
-    const width = Math.max(PANEL_WIDTH, r.width);
+    const width = Math.max(panelWidth, r.width);
     const rawLeft = align === 'right' ? r.right - width : r.left;
     const left = Math.max(8, Math.min(rawLeft, window.innerWidth - width - 8));
 
@@ -87,7 +90,7 @@ export function Dropdown({
       const maxHeight = Math.max(160, Math.min(spaceBelow, maxHeightCap));
       setPos({ top: r.bottom + 4, left, width, maxHeight });
     }
-  }, [align]);
+  }, [align, panelWidth]);
 
   useEffect(() => {
     if (!open) return;

@@ -30,8 +30,10 @@
   CSV-Export auf dieser Seite (dafür der Export-Bereich).
 - Auswertungen (`features/reports/`, Route `/auswertungen`): **kein Auto-Load**
   — Filter setzen (Gruppierung, Zeitraum, Auflösung, Vergleich, kategoriale
-  Filter inkl. expliziter **Messstellen**-Mehrfachauswahl → Query-Param
-  `measuring_point_id`, in Report-Configs als `measuring_point_ids`; alle
+  Filter inkl. expliziter **Messstellen**-Mehrfachauswahl, echte und
+  verrechnete gemischt (Label „(verrechnet)", Dropdown-Keys `r:<id>`/`v:<id>`)
+  → Query-Params `measuring_point_id`/`virtual_measuring_point_id`, in
+  Report-Configs als `measuring_point_ids`/`virtual_measuring_point_ids`; alle
   haben Standardwerte) und explizit **„Auswerten"** drücken, erst dann
   `GET /reports/aggregate` (`useReportQuery`: anstehende vs. ausgeführte
   Query, Abort des Vorgängers). **„Filter zurücksetzen"** (Aktionszeile)

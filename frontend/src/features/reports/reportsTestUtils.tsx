@@ -8,7 +8,12 @@ import { http, HttpResponse } from 'msw';
 import { fireEvent, screen } from '@testing-library/react';
 
 import { server } from '@/tests/server';
-import type { MeasuringPointRead, ReportAggregateResponse, ReportConfigRead } from '@/lib/types';
+import type {
+  MeasuringPointRead,
+  ReportAggregateResponse,
+  ReportConfigRead,
+  VirtualMeasuringPointRead,
+} from '@/lib/types';
 
 export const MP: MeasuringPointRead = {
   id: 1,
@@ -34,6 +39,18 @@ export const MP: MeasuringPointRead = {
   current_mieter_name: null,
   kostenstelle: 10001,
   physical_meters: [],
+};
+
+export const VMP: VirtualMeasuringPointRead = {
+  id: 1,
+  name: 'PV-Saldo',
+  note: null,
+  type: 'electricity',
+  location_id: null,
+  location_name: null,
+  main_location_id: null,
+  main_location_name: null,
+  components: [],
 };
 
 export function response(partial = false): ReportAggregateResponse {
@@ -67,6 +84,8 @@ export interface AggregateCalls {
 export interface MockEndpointOptions {
   partial?: boolean;
   configs?: ReportConfigRead[];
+  /** Verrechnete Messstellen für den Messstellen-Filter (Default: keine). */
+  virtualPoints?: VirtualMeasuringPointRead[];
   /** Antwort-Body je Aggregat-Call (Default: `response()`). */
   body?: ReportAggregateResponse;
 }
@@ -76,6 +95,7 @@ export function mockEndpoints(opts: MockEndpointOptions = {}): AggregateCalls {
   server.use(
     http.get('/api/v1/measuring-points', () => HttpResponse.json([MP])),
     http.get('/api/v1/report-configs', () => HttpResponse.json(opts.configs ?? [])),
+    http.get('/api/v1/virtual-measuring-points', () => HttpResponse.json(opts.virtualPoints ?? [])),
     http.get('/api/v1/reports/aggregate', ({ request }) => {
       const sp = new URL(request.url).searchParams;
       calls.urls.push(request.url);

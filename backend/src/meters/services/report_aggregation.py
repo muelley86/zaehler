@@ -72,9 +72,16 @@ class ReportFilter:
     owner_ids: set[int | None] | None = None
     kostenstellen: set[int | None] | None = None
     meter_types: set[MeterType] | None = None
-    # Explizite Messstellen-Auswahl (nur echte MPs; virtuelle haben einen
-    # eigenen Key-Namensraum und entfallen bei gesetztem Filter).
+    # Explizite Messstellen-Auswahl, getrennt nach echten und virtuellen
+    # (verrechneten) MPs — deren IDs leben in eigenen Namensraeumen. Ist
+    # EINE der beiden Listen gesetzt, gilt die Auswahl fuer beide: nicht
+    # gewaehlte echte bzw. virtuelle MPs entfallen.
     measuring_point_ids: set[int] | None = None
+    virtual_measuring_point_ids: set[int] | None = None
+
+    @property
+    def has_mp_selection(self) -> bool:
+        return self.measuring_point_ids is not None or self.virtual_measuring_point_ids is not None
 
 
 ReportDirection = Literal["bezug", "einspeisung"]
@@ -173,7 +180,7 @@ def aggregate_report(
 
         # Kategoriale Filter (unabhaengig von der Gruppierungs-Dimension).
         main_id = mp.location.main_location_id if mp.location is not None else None
-        if filters.measuring_point_ids is not None and mp.id not in filters.measuring_point_ids:
+        if filters.has_mp_selection and mp.id not in (filters.measuring_point_ids or set()):
             continue
         if not _matches(mp.kostenstelle, filters.kostenstellen):
             continue
@@ -265,22 +272,20 @@ def _virtual_rows(
     wuerden die Komponenten doppelt zaehlen. Standort-, Hauptstandort- und
     ``meter_type``-Filter greifen wie bei echten MPs (vmp hat Standort und Typ;
     ohne Standort faellt sie in den "ohne ..."-Bucket). Eigentuemer und
-    Kostenstelle hat eine vmp nicht — bei diesen Filtern entfallen die Zeilen;
-    ebenso bei der expliziten Messstellen-Auswahl (vmp-IDs leben in einem
-    eigenen Namensraum). Richtung ist immer ``bezug``: die Zeile ist ein
-    Netto-Wert, keine Einspeise-Reihe.
+    Kostenstelle hat eine vmp nicht — bei diesen Filtern entfallen die Zeilen.
+    Bei expliziter Messstellen-Auswahl bleiben nur die gewaehlten vmps
+    (``virtual_measuring_point_ids``, eigener ID-Namensraum). Richtung ist
+    immer ``bezug``: die Zeile ist ein Netto-Wert, keine Einspeise-Reihe.
     """
     if dimension is not ReportDimension.MEASURING_POINT:
         return []
-    has_unsupported_filter = (
-        filters.owner_ids is not None
-        or filters.kostenstellen is not None
-        or filters.measuring_point_ids is not None
-    )
-    if has_unsupported_filter:
+    if filters.owner_ids is not None or filters.kostenstellen is not None:
         return []
     rows: list[GroupBucketRow] = []
+    selected_vmps = filters.virtual_measuring_point_ids or set()
     for vmp in visible_virtual_mps(db, user):
+        if filters.has_mp_selection and vmp.id not in selected_vmps:
+            continue
         if filters.meter_types is not None and vmp.type not in filters.meter_types:
             continue
         main_id = vmp.location.main_location_id if vmp.location is not None else None

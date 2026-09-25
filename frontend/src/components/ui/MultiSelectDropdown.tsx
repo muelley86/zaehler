@@ -4,6 +4,10 @@ import { Search } from 'lucide-react';
 import { Dropdown } from './Dropdown';
 import { TextField } from './TextField';
 
+// Breiter als das Standard-Panel (256 px): Messstellen-Labels tragen oft
+// „Name · Standort" und sollen möglichst in eine, höchstens wenige Zeilen passen.
+const PANEL_WIDTH = 360;
+
 export interface DropdownOption<T> {
   value: T;
   label: string;
@@ -59,7 +63,7 @@ export function MultiSelectDropdown<T extends string | number | null>({
   }
 
   return (
-    <Dropdown label={label} badge={selected.size}>
+    <Dropdown label={label} badge={selected.size} panelWidth={PANEL_WIDTH}>
       <div className="flex flex-col">
         {showSearch ? (
           <div className="border-b-hairline border-separator p-2">
@@ -94,14 +98,18 @@ export function MultiSelectDropdown<T extends string | number | null>({
           ) : (
             visible.map((o) => (
               <li key={String(o.value)}>
-                <label className="flex cursor-pointer items-center gap-2.5 px-3 py-2 hover:bg-fill">
+                <label className="flex cursor-pointer items-start gap-2.5 px-3 py-2 hover:bg-fill">
                   <input
                     type="checkbox"
                     checked={selected.has(o.value)}
                     onChange={() => toggle(o.value)}
-                    className="h-4 w-4 shrink-0 accent-primary"
+                    className="mt-0.5 h-4 w-4 shrink-0 accent-primary"
                   />
-                  <span className="min-w-0 flex-1 truncate text-body-sm text-label">{o.label}</span>
+                  {/* Umbrechen statt kürzen: lange Messstellen-Namen („… · Standort")
+                      müssen vollständig lesbar bleiben. */}
+                  <span className="min-w-0 flex-1 break-words text-body-sm text-label [overflow-wrap:anywhere]">
+                    {o.label}
+                  </span>
                 </label>
               </li>
             ))
