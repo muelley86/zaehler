@@ -19,6 +19,13 @@ export function eur(v: string | null | undefined): string {
     : `${formatDe(v, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`;
 }
 
+/** Differenz mit Vorzeichen: "+2.101,32 €", "−3,00 €", "0,00 €". */
+export function eurDiff(v: string | null | undefined): string {
+  return v === null || v === undefined
+    ? '—'
+    : `${formatDe(v, { minimumFractionDigits: 2, maximumFractionDigits: 2, signDisplay: 'exceptZero' })} €`;
+}
+
 export function num(v: string | null | undefined): string {
   return v === null || v === undefined ? '' : formatDe(v);
 }

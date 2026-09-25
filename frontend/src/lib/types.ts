@@ -537,6 +537,24 @@ export interface BillingRunResult {
   gruppen: BillingRunGroupResult[];
 }
 
+/** Kennzahlen der Ergebnisübersicht (Backend leitet sie mit Decimal aus dem Snapshot ab).
+ *  `differenz_eur` = weiterberechnet − Gesamtkosten (+ = mehr weiterberechnet); `rahmen_eur` =
+ *  größte durch die Cent-Aufrundung des Preises erklärbare Differenz. */
+export interface BillingRunTotals {
+  rechnungsbetrag_eur: string;
+  zusatzkosten_eur: string;
+  gesamtkosten_eur: string;
+  extern_kwh: string;
+  extern_eur: string;
+  intern_kwh: string;
+  intern_eur: string;
+  gesamt_kwh: string;
+  gesamt_eur: string;
+  differenz_eur: string;
+  rahmen_eur: string;
+  im_rahmen: boolean;
+}
+
 export interface BillingRunSummary {
   id: number;
   circle_id: number;
@@ -552,6 +570,7 @@ export interface BillingRunSummary {
   preis_eur: string | null;
   gesamt_eur: string | null;
   saldo_eur: string | null;
+  differenz_eur: string | null;
   blocking_count: number;
 }
 
@@ -560,6 +579,7 @@ export interface BillingRunRead extends BillingRunSummary {
   aufschlag_prozent: string;
   aufschlag_ct: string;
   result: BillingRunResult | null;
+  totals: BillingRunTotals | null;
   befunde: BillingRunFinding[];
   lines: BillingRunLineRead[];
 }

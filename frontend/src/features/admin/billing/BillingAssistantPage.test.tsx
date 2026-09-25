@@ -74,6 +74,7 @@ function lauf(status: string, blocking: boolean) {
     preis_eur: '0.25',
     gesamt_eur: '250.00',
     saldo_eur: '0.00',
+    differenz_eur: '0.00',
     blocking_count: blocking ? 1 : 0,
     zusatzkosten: '0',
     aufschlag_prozent: '0',
@@ -149,6 +150,8 @@ describe('BillingAssistantPage', () => {
 
     await waitFor(() => expect(gesendet).toEqual({ monat: '2026-08' }));
     expect(await screen.findByText('0,25 €/kWh')).toBeInTheDocument();
+    expect(screen.getByText('Differenz')).toBeInTheDocument();
+    expect(screen.queryByText('Saldo')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Festschreiben' })).toBeEnabled();
   });
 

@@ -84,6 +84,28 @@ class BillingRunLineRead(APIModel):
     pruefung: str | None
 
 
+class BillingRunTotals(APIModel):
+    """Kennzahlen des Ergebnisses, beim Ausliefern aus dem Snapshot ``result`` abgeleitet.
+
+    ``differenz_eur`` = Summe Betraege - Gesamtkosten (= -Saldo; positiv = mehr weiterberechnet),
+    ``rahmen_eur`` = Saldo-Grenze (Cent-Aufrundung des Preises), ``im_rahmen`` wie Befund
+    ``saldo_grenze``. Extern = Empfaenger mit Rechnung, intern = interne Umlage (KOST).
+    """
+
+    rechnungsbetrag_eur: DecimalStr
+    zusatzkosten_eur: DecimalStr
+    gesamtkosten_eur: DecimalStr
+    extern_kwh: DecimalStr
+    extern_eur: DecimalStr
+    intern_kwh: DecimalStr
+    intern_eur: DecimalStr
+    gesamt_kwh: DecimalStr
+    gesamt_eur: DecimalStr
+    differenz_eur: DecimalStr
+    rahmen_eur: DecimalStr
+    im_rahmen: bool
+
+
 class BillingRunSummary(APIModel):
     id: int
     circle_id: int
@@ -99,6 +121,7 @@ class BillingRunSummary(APIModel):
     preis_eur: str | None = None
     gesamt_eur: str | None = None
     saldo_eur: str | None = None
+    differenz_eur: str | None = None
     blocking_count: int = 0
 
 
@@ -107,5 +130,6 @@ class BillingRunRead(BillingRunSummary):
     aufschlag_prozent: DecimalStr
     aufschlag_ct: DecimalStr
     result: dict[str, Any] | None
+    totals: BillingRunTotals | None = None
     befunde: list[BillingRunFinding]
     lines: list[BillingRunLineRead]

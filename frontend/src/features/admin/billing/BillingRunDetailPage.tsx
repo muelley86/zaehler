@@ -1,6 +1,6 @@
 /**
- * Abrechnungslauf: Parameter (Zusatzkosten, Aufschläge), Ergebnis (Preis, Summen, Saldo, Empfänger),
- * Befunde (blockierend/Hinweis), Zeilen mit Ständen und manuellen Werten; Aktualisieren aus der App,
+ * Abrechnungslauf: Parameter (Zusatzkosten, Aufschläge), Ergebnis (Bezugsrechnung, Weiterberechnet,
+ * Differenz, Preis, Empfänger mit Summenzeilen), Befunde (blockierend/Hinweis), Zeilen mit Ständen und manuellen Werten; Aktualisieren aus der App,
  * Festschreiben, Entwurf löschen. Festgeschriebene Läufe sind nur lesbar.
  */
 import { useEffect, useState } from 'react';
@@ -11,7 +11,7 @@ import { ArrowLeft, Download, FileText, Pencil } from 'lucide-react';
 import { Button, LargeTitle, Section, Sheet, TextField } from '@/components/ui';
 import { api } from '@/lib/api';
 import { formatDateTimeDe, formatDe, parseDe } from '@/lib/format';
-import type { BillingRunLineRead, BillingRunRead } from '@/lib/types';
+import type { BillingRunLineRead, BillingRunRead, BillingRunTotals } from '@/lib/types';
 
 import { errorText } from './circleForm';
 import { ExcelImportSection } from './ExcelImportSection';
@@ -20,11 +20,62 @@ import { TransferSection } from './TransferSection';
 import {
   anteilZuProzent,
   eur,
+  eurDiff,
   num,
   prozentZuAnteil,
   RUN_STATUS_CLASS,
   RUN_STATUS_LABEL,
 } from './runFormat';
+
+/** Kopf der Ergebnisübersicht: Bezugsrechnung, weiterberechnet, Differenz auf einen Blick. */
+function Kennzahlen({
+  totals: t,
+  bezugsmengeKwh,
+}: {
+  totals: BillingRunTotals;
+  bezugsmengeKwh: string;
+}) {
+  const mitZusatz = Number(t.zusatzkosten_eur) !== 0;
+  const rahmen = `der Cent-Aufrundung (max. ${eur(t.rahmen_eur)})`;
+  return (
+    <div className="space-y-2" role="group" aria-label="Kennzahlen">
+      <dl className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+        <div className="rounded-card bg-fill px-3 py-2">
+          <dt className="text-tertiary">Bezugsrechnung netto</dt>
+          <dd className="text-title-3 font-semibold tabular-nums text-label">
+            {eur(t.rechnungsbetrag_eur)}
+          </dd>
+          <dd className="tabular-nums text-tertiary">{num(bezugsmengeKwh)} kWh</dd>
+          {mitZusatz ? (
+            <dd className="tabular-nums text-tertiary">
+              + Zusatzkosten {eur(t.zusatzkosten_eur)} = Gesamtkosten {eur(t.gesamtkosten_eur)}
+            </dd>
+          ) : null}
+        </div>
+        <div className="rounded-card bg-fill px-3 py-2">
+          <dt className="text-tertiary">Weiterberechnet</dt>
+          <dd className="text-title-3 font-semibold tabular-nums text-label">
+            {eur(t.gesamt_eur)}
+          </dd>
+          <dd className="tabular-nums text-tertiary">{num(t.gesamt_kwh)} kWh</dd>
+        </div>
+        <div className="rounded-card bg-fill px-3 py-2">
+          <dt className="text-tertiary">Differenz</dt>
+          <dd className="text-title-3 font-semibold tabular-nums text-label">
+            {eurDiff(t.differenz_eur)}
+          </dd>
+          <dd className={t.im_rahmen ? 'text-success' : 'text-danger'}>
+            {t.im_rahmen ? `im Rahmen ${rahmen}` : `über dem Rahmen ${rahmen}`}
+          </dd>
+        </div>
+      </dl>
+      <p className="text-tertiary">
+        Der Abrechnungspreis wird auf volle Cent aufgerundet, daher wird meist etwas mehr
+        weiterberechnet, als die Bezugsrechnung kostet. Rahmen = 1 ct × Zählersumme + 0,50 €.
+      </p>
+    </div>
+  );
+}
 
 function Stand({
   wert,
@@ -131,7 +182,7 @@ export function BillingRunDetailPage() {
   const blockierend = run.befunde.filter((b) => b.blocking);
   const hinweise = run.befunde.filter((b) => !b.blocking);
   const r = run.result;
-  const saldoRot = r !== null && Math.abs(Number(r.saldo_eur)) > Number(r.saldo_grenze_eur);
+  const t = run.totals;
 
   return (
     <>
@@ -215,6 +266,7 @@ export function BillingRunDetailPage() {
           </div>
         ) : (
           <div className="space-y-3 p-5 text-caption">
+            {t ? <Kennzahlen totals={t} bezugsmengeKwh={r.bezugsmenge} /> : null}
             <dl className="grid grid-cols-2 gap-x-4 gap-y-1">
               <dt className="text-tertiary">Abrechnungspreis</dt>
               <dd className="tabular-nums">
@@ -228,14 +280,6 @@ export function BillingRunDetailPage() {
               <dt className="text-tertiary">Bezugsmenge / Zählersumme</dt>
               <dd className="tabular-nums">
                 {formatDe(r.bezugsmenge)} kWh / {formatDe(r.zaehlersumme)} kWh
-              </dd>
-              <dt className="text-tertiary">Gesamtkosten / Summe Beträge</dt>
-              <dd className="tabular-nums">
-                {eur(r.gesamtkosten)} / {eur(r.gesamt_eur)}
-              </dd>
-              <dt className="text-tertiary">Saldo</dt>
-              <dd className={`tabular-nums ${saldoRot ? 'text-danger' : ''}`}>
-                {eur(r.saldo_eur)} (Grenze {eur(r.saldo_grenze_eur)})
               </dd>
             </dl>
             <table className="w-full text-left" aria-label="Empfänger">
@@ -258,6 +302,35 @@ export function BillingRunDetailPage() {
                   </tr>
                 ))}
               </tbody>
+              {t ? (
+                <tfoot className="border-t-2 border-separator">
+                  {r.gruppen.some((g) => g.intern) ? (
+                    <>
+                      <tr>
+                        <th scope="row" className="py-1 pr-3 font-normal text-secondary">
+                          Summe per Rechnung
+                        </th>
+                        <td className="py-1 pr-3 text-right tabular-nums">{num(t.extern_kwh)}</td>
+                        <td className="py-1 text-right tabular-nums">{eur(t.extern_eur)}</td>
+                      </tr>
+                      <tr>
+                        <th scope="row" className="py-1 pr-3 font-normal text-secondary">
+                          Interne Umlage
+                        </th>
+                        <td className="py-1 pr-3 text-right tabular-nums">{num(t.intern_kwh)}</td>
+                        <td className="py-1 text-right tabular-nums">{eur(t.intern_eur)}</td>
+                      </tr>
+                    </>
+                  ) : null}
+                  <tr className="font-semibold text-label">
+                    <th scope="row" className="py-1 pr-3">
+                      Summe gesamt
+                    </th>
+                    <td className="py-1 pr-3 text-right tabular-nums">{num(t.gesamt_kwh)}</td>
+                    <td className="py-1 text-right tabular-nums">{eur(t.gesamt_eur)}</td>
+                  </tr>
+                </tfoot>
+              ) : null}
             </table>
           </div>
         )}
