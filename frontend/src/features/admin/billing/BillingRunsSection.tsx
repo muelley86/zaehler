@@ -1,5 +1,5 @@
 /**
- * Abrechnungsläufe eines Kreises: Liste (Monat, Version, Status, Preis, Summe, Saldo) und Anlegen
+ * Abrechnungsläufe eines Kreises: Liste (Monat, Version, Status, Preis, Summe, Differenz) und Anlegen
  * eines Entwurfs für einen Monat. Details und Festschreiben auf der Seite des Laufs.
  */
 import { useEffect, useState } from 'react';
@@ -12,7 +12,7 @@ import { formatDe } from '@/lib/format';
 import type { BillingRunRead, BillingRunSummary } from '@/lib/types';
 
 import { errorText, lastDayOfPreviousMonth } from './circleForm';
-import { eur, RUN_STATUS_CLASS, RUN_STATUS_LABEL } from './runFormat';
+import { eur, eurDiff, RUN_STATUS_CLASS, RUN_STATUS_LABEL } from './runFormat';
 
 export function BillingRunsSection({ circleId }: { circleId: number }) {
   const navigate = useNavigate();
@@ -93,7 +93,7 @@ export function BillingRunsSection({ circleId }: { circleId: number }) {
                 <th className="py-1 pr-3">Status</th>
                 <th className="py-1 pr-3 text-right">Preis</th>
                 <th className="py-1 pr-3 text-right">Summe</th>
-                <th className="py-1 pr-3 text-right">Saldo</th>
+                <th className="py-1 pr-3 text-right">Differenz</th>
                 <th className="py-1 text-right">Blockierend</th>
               </tr>
             </thead>
@@ -117,7 +117,7 @@ export function BillingRunsSection({ circleId }: { circleId: number }) {
                     {r.preis_eur === null ? '—' : `${formatDe(r.preis_eur)} €/kWh`}
                   </td>
                   <td className="py-1 pr-3 text-right tabular-nums">{eur(r.gesamt_eur)}</td>
-                  <td className="py-1 pr-3 text-right tabular-nums">{eur(r.saldo_eur)}</td>
+                  <td className="py-1 pr-3 text-right tabular-nums">{eurDiff(r.differenz_eur)}</td>
                   <td
                     className={`py-1 text-right tabular-nums ${
                       r.blocking_count > 0 ? 'text-danger' : ''

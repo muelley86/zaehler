@@ -52,6 +52,7 @@ from meters.models import (
     BillingRunLine,
     BillingRunStatus,
 )
+from meters.schemas.billing_run import BillingRunTotals
 from meters.services.billing_circle import check_circle
 from meters.services.billing_readings import monatsgrenzen, readings_for_month
 
@@ -237,6 +238,69 @@ def _json(wert: Any) -> Any:
 def saldo_grenze(erg: Ergebnis) -> Decimal:
     """Fachkonzept /5: Warnung ab |Saldo| > Zaehlersumme x 1 ct + 0,50 EUR."""
     return (abs(erg.zaehlersumme) * Decimal("0.01") + Decimal("0.50")).quantize(Decimal("0.01"))
+
+
+def _dec(daten: dict[str, Any], key: str) -> Decimal | None:
+    wert = daten.get(key)
+    return None if wert is None else Decimal(str(wert))
+
+
+def differenz_eur(result: dict[str, Any] | None) -> Decimal | None:
+    """Summe Betraege - Gesamtkosten (= -Saldo; positiv = mehr weiterberechnet), ohne ``-0.00``."""
+    saldo = None if result is None else _dec(result, "saldo_eur")
+    return None if saldo is None else Decimal(0) - saldo
+
+
+def ergebnis_summen(run: BillingRun) -> BillingRunTotals | None:
+    """Kennzahlen fuer die Ergebnisuebersicht aus dem eingefrorenen Snapshot ``run.result``.
+
+    Wird beim Ausliefern abgeleitet statt gespeichert, damit auch alte festgeschriebene Laeufe sie
+    haben. Rechnungsbetrag = Gesamtkosten - Zusatzkosten (``berechne``: Gesamtkosten =
+    Rechnungsbetrag + Zusatzkosten). Fehlt im Snapshot ein benoetigter Wert, gibt es keine
+    Kennzahlen (``None``) statt eines Fehlers - der Lauf bleibt lesbar.
+    """
+    erg = run.result
+    if erg is None:
+        return None
+    saldo = _dec(erg, "saldo_eur")
+    grenze = _dec(erg, "saldo_grenze_eur")
+    gesamtkosten = _dec(erg, "gesamtkosten")
+    zaehlersumme = _dec(erg, "zaehlersumme")
+    gesamt_eur = _dec(erg, "gesamt_eur")
+    gruppen = erg.get("gruppen")
+    if (
+        saldo is None
+        or grenze is None
+        or gesamtkosten is None
+        or zaehlersumme is None
+        or gesamt_eur is None
+        or not isinstance(gruppen, list)
+    ):
+        return None
+    extern_kwh = extern_eur = intern_kwh = intern_eur = Decimal(0)
+    for g in gruppen:
+        kwh, eur = _dec(g, "kwh"), _dec(g, "eur")
+        if kwh is None or eur is None:
+            return None
+        if g.get("intern"):
+            intern_kwh, intern_eur = intern_kwh + kwh, intern_eur + eur
+        else:
+            extern_kwh, extern_eur = extern_kwh + kwh, extern_eur + eur
+    return BillingRunTotals(
+        rechnungsbetrag_eur=gesamtkosten - run.zusatzkosten,
+        zusatzkosten_eur=run.zusatzkosten,
+        gesamtkosten_eur=gesamtkosten,
+        extern_kwh=extern_kwh,
+        extern_eur=extern_eur,
+        intern_kwh=intern_kwh,
+        intern_eur=intern_eur,
+        gesamt_kwh=zaehlersumme,
+        gesamt_eur=gesamt_eur,
+        differenz_eur=Decimal(0) - saldo,
+        rahmen_eur=grenze,
+        # Gleiche Bedingung wie der Befund ``saldo_grenze`` (dort: > Grenze = Hinweis).
+        im_rahmen=abs(saldo) <= grenze,
+    )
 
 
 def ergebnis_json(kreis: Kreis, erg: Ergebnis) -> dict[str, Any]:

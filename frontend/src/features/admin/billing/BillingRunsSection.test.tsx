@@ -32,6 +32,7 @@ const LAUF = {
   preis_eur: '0.25',
   gesamt_eur: '1250.00',
   saldo_eur: '-1.50',
+  differenz_eur: '1.50',
   blocking_count: 0,
 };
 
@@ -53,6 +54,10 @@ describe('BillingRunsSection', () => {
     expect(await screen.findByRole('link', { name: '2026-08 · V1' })).toBeInTheDocument();
     expect(screen.getByText('Festgeschrieben')).toBeInTheDocument();
     expect(screen.getByText('1.250,00 €')).toBeInTheDocument();
+    // Differenz statt Saldo, mit Vorzeichen aus Nutzersicht (+ = mehr weiterberechnet).
+    expect(screen.getByRole('columnheader', { name: 'Differenz' })).toBeInTheDocument();
+    expect(screen.queryByRole('columnheader', { name: 'Saldo' })).not.toBeInTheDocument();
+    expect(screen.getByText('+1,50 €')).toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText(/Abrechnungsmonat/), { target: { value: '2026-08' } });
     const grund = await screen.findByLabelText(/Begründung neue Version/);

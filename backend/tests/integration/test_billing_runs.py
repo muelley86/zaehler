@@ -177,10 +177,33 @@ def test_entwurf_berechnen_und_festschreiben(
     ]
     assert run["blocking_count"] == 0
     assert _codes(run) == [("Vormonat", "kein_vorlauf", False)]
+    t = run["totals"]
+    assert (t["rechnungsbetrag_eur"], t["zusatzkosten_eur"], t["gesamtkosten_eur"]) == (
+        "250.00",
+        "0",
+        "250.00",
+    )
+    assert (t["extern_eur"], t["intern_eur"], t["gesamt_eur"]) == ("225.00", "25.00", "250.00")
+    assert Decimal(t["extern_kwh"]) + Decimal(t["intern_kwh"]) == Decimal(t["gesamt_kwh"])
+    assert (t["differenz_eur"], t["im_rahmen"]) == ("0.00", True)
+    assert run["differenz_eur"] == "0.00"
 
     rid = run["id"]
     teurer = _ok(admin_client.patch(f"{BASE}/{cid}/runs/{rid}", json={"aufschlag_ct": "1"}))
     assert teurer["result"]["preis_eur"] == "0.26"
+    # 1 ct mehr je kWh: 10 EUR mehr weiterberechnet, noch im Rahmen (1 ct x 1000 kWh + 0,50 EUR).
+    tt = teurer["totals"]
+    assert (tt["differenz_eur"], tt["rahmen_eur"], tt["im_rahmen"]) == ("10.00", "10.50", True)
+    assert teurer["differenz_eur"] == "10.00"
+    mit_zusatz = _ok(admin_client.patch(f"{BASE}/{cid}/runs/{rid}", json={"zusatzkosten": "20"}))[
+        "totals"
+    ]
+    # Zusatzkosten erhoehen die Gesamtkosten, nicht den Rechnungsbetrag.
+    assert (mit_zusatz["rechnungsbetrag_eur"], mit_zusatz["gesamtkosten_eur"]) == (
+        "250.00",
+        "270.00",
+    )
+    _ok(admin_client.patch(f"{BASE}/{cid}/runs/{rid}", json={"zusatzkosten": "0"}))
     zurueck = _ok(admin_client.patch(f"{BASE}/{cid}/runs/{rid}", json={"aufschlag_ct": "0"}))
     assert zurueck["result"]["preis_eur"] == "0.25"
 
@@ -243,6 +266,21 @@ def test_festgeschrieben_ist_unveraenderlich_und_neue_version_ersetzt(
     _ok(admin_client.post(f"{BASE}/{cid}/runs/{v2['id']}/finalize"))
     status = {r["version"]: r["status"] for r in admin_client.get(f"{BASE}/{cid}/runs").json()}
     assert status == {1: "ersetzt", 2: "festgeschrieben"}
+
+
+def test_kennzahlen_fehlen_bei_unvollstaendigem_snapshot(
+    admin_client: TestClient, admin_user: User, db: Session
+) -> None:
+    """Alter/unvollstaendiger ``result``-Snapshot: Lauf bleibt lesbar, nur ohne Kennzahlen."""
+    cid, _ = _setup(admin_client, db, admin_user)
+    rid = _ok(admin_client.post(f"{BASE}/{cid}/runs", json={"monat": "2026-08"}), 201)["id"]
+    lauf = db.get(BillingRun, rid)
+    assert lauf is not None and lauf.result is not None
+    lauf.result = {k: v for k, v in lauf.result.items() if k != "saldo_grenze_eur"}
+    db.commit()
+    run = _ok(admin_client.get(f"{BASE}/{cid}/runs/{rid}"))
+    assert run["totals"] is None
+    assert run["differenz_eur"] == "0.00"
 
 
 def test_entwurf_loeschen(admin_client: TestClient, admin_user: User, db: Session) -> None:

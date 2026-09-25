@@ -52,6 +52,36 @@ const ZEILE = {
   pruefung: 'OK',
 };
 
+const TOTALS = {
+  rechnungsbetrag_eur: '125.00',
+  zusatzkosten_eur: '0',
+  gesamtkosten_eur: '125.00',
+  extern_kwh: '500',
+  extern_eur: '125.00',
+  intern_kwh: '0',
+  intern_eur: '0',
+  gesamt_kwh: '500.000',
+  gesamt_eur: '125.00',
+  differenz_eur: '0.00',
+  rahmen_eur: '5.50',
+  im_rahmen: true,
+};
+
+function transferLeer() {
+  return http.get('/api/v1/billing-circles/1/runs/7/transfer', () =>
+    HttpResponse.json({
+      run_id: 7,
+      monat: '2026-08',
+      monatsname: 'August 2026',
+      stichtag: '2026-08-31',
+      kopfsatz: 'Text',
+      preis_eur: '0.25',
+      umsatzsteuer: '19.0',
+      empfaenger: [],
+    }),
+  );
+}
+
 function lauf(status: string, extra: Record<string, unknown> = {}) {
   return {
     id: 7,
@@ -68,6 +98,7 @@ function lauf(status: string, extra: Record<string, unknown> = {}) {
     preis_eur: '0.25',
     gesamt_eur: '125.00',
     saldo_eur: '0.00',
+    differenz_eur: '0.00',
     blocking_count: 0,
     zusatzkosten: '0',
     aufschlag_prozent: '0',
@@ -88,6 +119,7 @@ function lauf(status: string, extra: Record<string, unknown> = {}) {
         { name: 'Muster A KG', intern: false, kwh: '500', eur: '125.00', kostenstellen: [] },
       ],
     },
+    totals: TOTALS,
     befunde: [
       {
         position_id: null,
@@ -212,5 +244,96 @@ describe('BillingRunDetailPage', () => {
     renderWithRouter(<BillingRunDetailPage />);
     expect(await screen.findByText(/1 blockierend/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Festschreiben' })).toBeDisabled();
+  });
+
+  it('zeigt Bezugsrechnung, Weiterberechnet, Differenz und Summenzeilen extern/intern', async () => {
+    const basis = lauf('entwurf');
+    const mitIntern = lauf('entwurf', {
+      result: {
+        ...basis.result,
+        bezugsmenge: '520',
+        gruppen: [
+          { name: 'Muster A KG', intern: false, kwh: '400', eur: '104.00', kostenstellen: [] },
+          { name: 'Muster Intern', intern: true, kwh: '100', eur: '26.00', kostenstellen: [] },
+        ],
+      },
+      totals: {
+        ...TOTALS,
+        zusatzkosten_eur: '5.00',
+        gesamtkosten_eur: '125.00',
+        rechnungsbetrag_eur: '120.00',
+        extern_kwh: '400',
+        extern_eur: '104.00',
+        intern_kwh: '100',
+        intern_eur: '26.00',
+        gesamt_eur: '130.00',
+        differenz_eur: '5.00',
+      },
+    });
+    server.use(
+      http.get('/api/v1/billing-circles/1/runs/7', () => HttpResponse.json(mitIntern)),
+      transferLeer(),
+    );
+    renderWithRouter(<BillingRunDetailPage />);
+
+    const kennzahlen = await screen.findByRole('group', { name: 'Kennzahlen' });
+    expect(within(kennzahlen).getByText('120,00 €')).toBeInTheDocument();
+    // Bezogene Menge unter der Bezugsrechnung, gelieferte unter Weiterberechnet.
+    expect(within(kennzahlen).getByText('520 kWh')).toBeInTheDocument();
+    expect(within(kennzahlen).getByText('500 kWh')).toBeInTheDocument();
+    expect(
+      within(kennzahlen).getByText(/Zusatzkosten 5,00 € = Gesamtkosten 125,00 €/),
+    ).toBeInTheDocument();
+    expect(within(kennzahlen).getByText('130,00 €')).toBeInTheDocument();
+    expect(within(kennzahlen).getByText('+5,00 €')).toBeInTheDocument();
+    expect(
+      within(kennzahlen).getByText(/im Rahmen der Cent-Aufrundung \(max\. 5,50 €\)/),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/Grenze/)).not.toBeInTheDocument();
+
+    const tabelle = screen.getByRole('table', { name: 'Empfänger' });
+    expect(
+      within(tabelle).getByRole('row', { name: /Summe per Rechnung 400 104,00 €/ }),
+    ).toBeInTheDocument();
+    expect(
+      within(tabelle).getByRole('row', { name: /Interne Umlage 100 26,00 €/ }),
+    ).toBeInTheDocument();
+    expect(
+      within(tabelle).getByRole('row', { name: /Summe gesamt 500 130,00 €/ }),
+    ).toBeInTheDocument();
+  });
+
+  it('zeigt das Ergebnis ohne Kennzahlen und Summenzeilen, wenn keine Summen vorliegen', async () => {
+    server.use(
+      http.get('/api/v1/billing-circles/1/runs/7', () =>
+        HttpResponse.json(lauf('entwurf', { totals: null })),
+      ),
+      transferLeer(),
+    );
+    renderWithRouter(<BillingRunDetailPage />);
+    expect(await screen.findByText(/0,25 €\/kWh/)).toBeInTheDocument();
+    expect(screen.queryByRole('group', { name: 'Kennzahlen' })).not.toBeInTheDocument();
+    const tabelle = screen.getByRole('table', { name: 'Empfänger' });
+    expect(within(tabelle).getByText('Muster A KG')).toBeInTheDocument();
+    expect(within(tabelle).queryByText('Summe gesamt')).not.toBeInTheDocument();
+  });
+
+  it('meldet eine Differenz über dem Rahmen und zeigt ohne interne Umlage nur die Gesamtsumme', async () => {
+    server.use(
+      http.get('/api/v1/billing-circles/1/runs/7', () =>
+        HttpResponse.json(
+          lauf('entwurf', { totals: { ...TOTALS, differenz_eur: '-9.00', im_rahmen: false } }),
+        ),
+      ),
+      transferLeer(),
+    );
+    renderWithRouter(<BillingRunDetailPage />);
+    expect(await screen.findByText(/über dem Rahmen der Cent-Aufrundung/)).toHaveClass(
+      'text-danger',
+    );
+    expect(screen.getByText('-9,00 €')).toBeInTheDocument();
+    const tabelle = screen.getByRole('table', { name: 'Empfänger' });
+    expect(within(tabelle).queryByText('Summe per Rechnung')).not.toBeInTheDocument();
+    expect(within(tabelle).getByRole('row', { name: /Summe gesamt/ })).toBeInTheDocument();
   });
 });

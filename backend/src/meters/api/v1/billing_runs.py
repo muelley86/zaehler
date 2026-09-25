@@ -45,6 +45,8 @@ from meters.services.billing_run import (
     berechne_lauf,
     blocking,
     create_run,
+    differenz_eur,
+    ergebnis_summen,
     finalize_run,
     refresh_run,
 )
@@ -75,10 +77,12 @@ def _run(db: DbDep, circle_id: int, run_id: int) -> BillingRun:
 
 def _kopf(run: BillingRun) -> dict[str, Any]:
     ergebnis = run.result or {}
+    diff = differenz_eur(run.result)
     return {
         "preis_eur": ergebnis.get("preis_eur"),
         "gesamt_eur": ergebnis.get("gesamt_eur"),
         "saldo_eur": ergebnis.get("saldo_eur"),
+        "differenz_eur": None if diff is None else format(diff, "f"),
         "blocking_count": len(blocking(run)),
     }
 
@@ -88,7 +92,9 @@ def _summary(run: BillingRun) -> BillingRunSummary:
 
 
 def _read(run: BillingRun) -> BillingRunRead:
-    return BillingRunRead.model_validate(run).model_copy(update=_kopf(run))
+    return BillingRunRead.model_validate(run).model_copy(
+        update={**_kopf(run), "totals": ergebnis_summen(run)}
+    )
 
 
 def _json(value: Any) -> Any:

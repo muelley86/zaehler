@@ -25,7 +25,7 @@ import type {
 import { errorText, lastDayOfPreviousMonth } from './circleForm';
 import { InvoiceUpload } from './InvoiceUpload';
 import { MonthReadingsView } from './MonthReadingsView';
-import { eur } from './runFormat';
+import { eur, eurDiff } from './runFormat';
 
 /** Kopfzeile eines Schritts: Nummer, Titel, Haken wenn erledigt. */
 function Schritt({
@@ -246,8 +246,8 @@ export function BillingAssistantPage() {
               </dd>
               <dt className="text-tertiary">Summe</dt>
               <dd className="tabular-nums">{eur(ergebnis?.gesamt_eur)}</dd>
-              <dt className="text-tertiary">Saldo</dt>
-              <dd className="tabular-nums">{eur(ergebnis?.saldo_eur)}</dd>
+              <dt className="text-tertiary">Differenz</dt>
+              <dd className="tabular-nums">{eurDiff(run.differenz_eur)}</dd>
               <dt className="text-tertiary">Version</dt>
               <dd className="tabular-nums">{run.version}</dd>
             </dl>
