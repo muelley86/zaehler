@@ -306,6 +306,8 @@ export interface AggregateQuery {
   kostenstellen: number[];
   meterTypes: MeterType[];
   measuringPointIds: number[];
+  /** Verrechnete Messstellen — eigener ID-Namensraum, eigener Parameter. */
+  virtualMeasuringPointIds: number[];
 }
 
 /** Baut den Query-String für `/reports/aggregate(.csv)`. */
@@ -321,7 +323,38 @@ export function buildAggregateQuery(q: AggregateQuery): string {
   for (const k of q.kostenstellen) p.append('kostenstelle', String(k));
   for (const t of q.meterTypes) p.append('meter_type', t);
   for (const id of q.measuringPointIds) p.append('measuring_point_id', String(id));
+  for (const id of q.virtualMeasuringPointIds) {
+    p.append('virtual_measuring_point_id', String(id));
+  }
   return p.toString();
+}
+
+/**
+ * Schlüssel im gemeinsamen Messstellen-Dropdown: echte und verrechnete
+ * Messstellen haben getrennte ID-Namensräume, daher `r:<id>` / `v:<id>`.
+ */
+export type MpSelectionKey = `r:${number}` | `v:${number}`;
+
+export function mpSelectionKeys(
+  real: ReadonlySet<number>,
+  virtual: ReadonlySet<number>,
+): Set<MpSelectionKey> {
+  return new Set<MpSelectionKey>([
+    ...[...real].map((id): MpSelectionKey => `r:${id}`),
+    ...[...virtual].map((id): MpSelectionKey => `v:${id}`),
+  ]);
+}
+
+export function splitMpSelection(keys: ReadonlySet<MpSelectionKey>): {
+  real: Set<number>;
+  virtual: Set<number>;
+} {
+  const real = new Set<number>();
+  const virtual = new Set<number>();
+  for (const k of keys) {
+    (k.startsWith('v:') ? virtual : real).add(Number(k.slice(2)));
+  }
+  return { real, virtual };
 }
 
 export interface RunGateInput {

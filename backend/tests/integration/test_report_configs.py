@@ -37,6 +37,7 @@ def test_create_and_list(admin_client: TestClient, db: Session) -> None:
     assert body["filters"]["owner_ids"] == []
     # Alt-Configs ohne den Schluessel validieren zum leeren Filter.
     assert body["filters"]["measuring_point_ids"] == []
+    assert body["filters"]["virtual_measuring_point_ids"] == []
 
     listed = admin_client.get("/api/v1/report-configs")
     assert listed.status_code == 200
@@ -154,3 +155,15 @@ def test_filters_roundtrip_measuring_point_ids(admin_client: TestClient) -> None
     assert resp.json()["filters"]["measuring_point_ids"] == [3, 5]
     listed = admin_client.get("/api/v1/report-configs").json()
     assert listed[0]["filters"]["measuring_point_ids"] == [3, 5]
+
+
+def test_filters_roundtrip_virtual_measuring_point_ids(admin_client: TestClient) -> None:
+    resp = _create(
+        admin_client,
+        filters={"measuring_point_ids": [3], "virtual_measuring_point_ids": [7]},
+    )
+    assert resp.status_code == 201, resp.text
+    assert resp.json()["filters"]["virtual_measuring_point_ids"] == [7]
+    listed = admin_client.get("/api/v1/report-configs").json()
+    assert listed[0]["filters"]["measuring_point_ids"] == [3]
+    assert listed[0]["filters"]["virtual_measuring_point_ids"] == [7]

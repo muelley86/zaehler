@@ -68,12 +68,14 @@ Alle Endpoints unter `/api/v1`. Fehler im RFC-7807-Format
 - `GET /reports/aggregate?dimension=…&granularity=total|day|week|month|year&from_at=&to_at=`
   und `GET /reports/aggregate.csv` (gleiche Parameter). Kategoriale Filter als
   wiederholbare Query-Params: `main_location_id`, `location_id`, `owner_id`,
-  `kostenstelle`, `meter_type`, `measuring_point_id` (explizite Messstellen-
-  Auswahl). Verrechnete/virtuelle Zeilen (nur `dimension=measuring_point`)
-  respektieren `main_location_id`, `location_id` und `meter_type` wie echte
-  Messstellen; bei `owner_id`, `kostenstelle` oder `measuring_point_id`
-  entfallen sie (keine solchen Attribute bzw. eigener ID-Namensraum). Der
-  Response echot `from_date`/`to_date`.
+  `kostenstelle`, `meter_type`, `measuring_point_id` und
+  `virtual_measuring_point_id` (explizite Messstellen-Auswahl, echte bzw.
+  verrechnete — getrennte ID-Namensräume). Ist einer der beiden gesetzt, gilt
+  die Auswahl für beide: nicht gewählte echte und verrechnete Messstellen
+  entfallen. Verrechnete Zeilen (nur `dimension=measuring_point`) respektieren
+  `main_location_id`, `location_id` und `meter_type` wie echte Messstellen;
+  bei `owner_id` oder `kostenstelle` entfallen sie (keine solchen Attribute).
+  Der Response echot `from_date`/`to_date`.
   Kostenstelle und Eigentümer gruppieren/filtern nach dem **aktuellen** Wert
   (offene Periode), nicht zeitraumgenau.
   CSV-Spalten: `Dimension;Gruppe;Gruppen_ID;Seriennummer;Zählerart;Richtung;
@@ -90,7 +92,8 @@ Alle Endpoints unter `/api/v1`. Fehler im RFC-7807-Format
   einer Zeile summiert. Bei Zählerwechsel im Zeitraum: Seriennummern `alt / neu`,
   Beginn vom alten, Ende vom neuen Gerät (Differenz geht dann nicht auf).
 - `GET|POST /report-configs`, `PATCH|DELETE /report-configs/{id}`: `filters`
-  enthält u. a. `measuring_point_ids` (fehlt in Alt-Configs → leer).
+  enthält u. a. `measuring_point_ids` und `virtual_measuring_point_ids`
+  (fehlen in Alt-Configs → leer).
 
 ## Readings
 

@@ -554,7 +554,7 @@ def test_reports_include_virtual_rows(admin_client: TestClient) -> None:
     ).json()
     assert [r for r in filtered["rows"] if r["is_virtual"]] == []
 
-    # Auch der Messstellen-Filter zaehlt als kategorial: virtuelle Zeilen entfallen.
+    # Nur echte Messstellen gewaehlt: nicht gewaehlte virtuelle Zeilen entfallen.
     real_id = next(r["group_key"] for r in data["rows"] if not r["is_virtual"])
     by_mp = admin_client.get(
         "/api/v1/reports/aggregate?dimension=measuring_point&granularity=total"
@@ -599,6 +599,67 @@ def test_reports_csv_marks_virtual_group_id(admin_client: TestClient) -> None:
     assert vrow["Zählerstand_Ende"] == ""
     # Echte Komponenten derselben Auswertung tragen ihre Seriennummer.
     assert any(r["Seriennummer"] for r in rows if not r["Gruppen_ID"].startswith("V"))
+
+
+_MP_REPORT = "/api/v1/reports/aggregate?dimension=measuring_point&granularity=total"
+
+
+def _row_keys(data: dict[str, Any]) -> set[tuple[bool, int]]:
+    return {(r["is_virtual"], r["group_key"]) for r in data["rows"]}
+
+
+def test_reports_filter_on_virtual_measuring_point(admin_client: TestClient) -> None:
+    mps = _setup_biogas_scenario(admin_client)
+    vmp = _create_vmp(admin_client, "Filter-vmp", _biogas_components(mps))
+    other = _create_vmp(admin_client, "Andere-vmp", _biogas_components(mps))
+
+    # Nur eine vmp gewaehlt: nur deren Zeile, keine echten MPs, keine andere vmp.
+    only = admin_client.get(f"{_MP_REPORT}&virtual_measuring_point_id={vmp['id']}").json()
+    assert _row_keys(only) == {(True, vmp["id"])}
+    assert Decimal(only["rows"][0]["consumption"]) == Decimal("380")
+
+    # Gemischt: echte MP + vmp.
+    real_id = mps["biogas"]["id"]
+    mixed = admin_client.get(
+        f"{_MP_REPORT}&measuring_point_id={real_id}&virtual_measuring_point_id={vmp['id']}"
+    ).json()
+    assert _row_keys(mixed) == {(False, real_id), (True, vmp["id"])}
+    assert (True, other["id"]) not in _row_keys(mixed)
+
+    # Auch der CSV-Export respektiert die Auswahl.
+    csv_resp = admin_client.get(
+        f"/api/v1/reports/aggregate.csv?dimension=measuring_point&granularity=total"
+        f"&virtual_measuring_point_id={vmp['id']}"
+    )
+    rows = list(csv.DictReader(io.StringIO(csv_resp.text.lstrip("﻿")), delimiter=";"))
+    assert [r["Gruppen_ID"] for r in rows] == [f"V{vmp['id']}"]
+
+
+def test_reports_virtual_filter_keeps_id_namespaces_apart(admin_client: TestClient) -> None:
+    mps = _setup_biogas_scenario(admin_client)
+    vmp = _create_vmp(admin_client, "Namensraum-vmp", _biogas_components(mps))
+    # Dieselbe Zahl als vmp-ID waehlt nicht die gleichnamige echte MP-ID mit.
+    data = admin_client.get(f"{_MP_REPORT}&virtual_measuring_point_id={vmp['id']}").json()
+    assert all(r["is_virtual"] for r in data["rows"])
+    # ... und als echte MP-ID nicht die vmp.
+    data = admin_client.get(f"{_MP_REPORT}&measuring_point_id={vmp['id']}").json()
+    assert all(not r["is_virtual"] for r in data["rows"])
+
+
+def test_reports_virtual_filter_respects_recorder_visibility(
+    admin_client: TestClient,
+    recorder_client: TestClient,
+    recorder_user: User,
+    admin_user: User,
+) -> None:
+    mps = _setup_biogas_scenario(admin_client)
+    vmp = _create_vmp(admin_client, "Geheim-vmp", _biogas_components(mps))
+    # Recorder mit Teilzugriff: vmp unsichtbar, auch wenn ihre ID explizit kommt.
+    with SessionLocal() as db:
+        _grant_access(db, recorder=recorder_user, granted_by=admin_user, mp_id=mps["biogas"]["id"])
+    resp = recorder_client.get(f"{_MP_REPORT}&virtual_measuring_point_id={vmp['id']}")
+    assert resp.status_code == 200
+    assert resp.json()["rows"] == []
 
 
 # ---------------------------------------------------------------------------

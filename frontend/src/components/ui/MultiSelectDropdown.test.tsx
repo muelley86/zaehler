@@ -60,6 +60,20 @@ describe('MultiSelectDropdown', () => {
     expect(screen.getByRole('checkbox', { name: 'Beta' })).not.toBeChecked();
   });
 
+  it('bricht lange Labels um statt sie zu kürzen und öffnet ein breites Panel', async () => {
+    const user = userEvent.setup();
+    const long = 'JH - BGA Σ Stromverbrauch (verrechnet) · JH - Trafo BGA & Solar PV';
+    render(<Harness options={[{ value: 'x', label: long }]} />);
+
+    await user.click(screen.getByRole('button', { name: 'Test' }));
+    const text = screen.getByText(long);
+    expect(text).not.toHaveClass('truncate');
+    expect(text).toHaveClass('break-words');
+    // jsdom: innerWidth 1024 → Panel bekommt die volle Mindestbreite.
+    const panel = text.closest<HTMLElement>('.glass');
+    expect(panel?.style.width).toBe('360px');
+  });
+
   it('"Alle"/"Keine" wählt alle bzw. keine', async () => {
     const user = userEvent.setup();
     render(<Harness options={ABC} />);
