@@ -27,6 +27,27 @@ def _create(client: TestClient, **overrides: Any) -> Any:
     return client.post("/api/v1/report-configs", json=payload)
 
 
+def test_shared_range_period_kind_roundtrip(admin_client: TestClient) -> None:
+    # „Aktueller Zeitraum" ist der Standard der Auswertungsseite — Speichern
+    # damit darf nicht mit 422 scheitern.
+    resp = _create(admin_client, period_kind="shared_range")
+    assert resp.status_code == 201, resp.text
+    assert resp.json()["period_kind"] == "shared_range"
+    listed = admin_client.get("/api/v1/report-configs").json()
+    assert listed[0]["period_kind"] == "shared_range"
+    assert listed[0]["from_date"] is None
+
+
+def test_shared_range_rejects_fixed_dates(admin_client: TestClient) -> None:
+    resp = _create(
+        admin_client,
+        period_kind="shared_range",
+        from_date="2025-01-01",
+        to_date="2025-12-31",
+    )
+    assert resp.status_code == 422
+
+
 def test_create_and_list(admin_client: TestClient, db: Session) -> None:
     resp = _create(admin_client)
     assert resp.status_code == 201, resp.text
