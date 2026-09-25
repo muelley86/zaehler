@@ -10,6 +10,13 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.87.0](https://github.com/muelley86/zaehler/compare/v2.86.0...v2.87.0) (2026-09-25)
+
+
+### Funktionen
+
+* **abrechnung:** Kennzahlen und Summenzeilen im Ergebnis des Abrechnungslaufs ([#377](https://github.com/muelley86/zaehler/issues/377)) ([f972433](https://github.com/muelley86/zaehler/commit/f972433ba05694b05738749936c7c9ca25c296de))
+
 ## [2.86.0](https://github.com/muelley86/zaehler/compare/v2.85.0...v2.86.0) (2026-09-25)
 
 
