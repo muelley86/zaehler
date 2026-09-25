@@ -2,9 +2,10 @@
  * Positionsliste eines Abrechnungskreises, gruppiert nach heutigem Empfänger. Gruppen und
  * Positionen innerhalb einer Gruppe werden per Griff verschoben (Drag & Drop via @dnd-kit, per
  * Tastatur: Leertaste, Pfeiltasten, Leertaste). Eine Position wechselt die Gruppe nicht — der
- * Empfänger kommt aus der Messstelle; die interne Umlage bleibt immer am Ende.
+ * Empfänger kommt aus der Messstelle; die interne Umlage bleibt immer am Ende. Gruppen sind
+ * standardmäßig eingeklappt; eingeklappt lassen sie sich weiter als Ganzes verschieben.
  */
-import { useMemo } from 'react';
+import { useId, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import {
   DndContext,
@@ -22,7 +23,7 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { GripVertical, Pencil, Trash2 } from 'lucide-react';
+import { ChevronDown, ChevronRight, GripVertical, Pencil, Trash2 } from 'lucide-react';
 
 import { cx } from '@/components/ui/cx';
 import { formatDateDe } from '@/lib/format';
@@ -79,6 +80,16 @@ export interface PositionsListProps {
 
 export function PositionsList({ positions, onReorder, onEdit, onRemove }: PositionsListProps) {
   const groups = useMemo(() => groupPositions(positions), [positions]);
+  // Gruppen-Keys bleiben über Neuladen und Umsortieren stabil, der Klappzustand also auch.
+  const [openGroups, setOpenGroups] = useState<ReadonlySet<string>>(() => new Set());
+  function toggleGroup(key: string) {
+    setOpenGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }
   const labelById = useMemo(() => new Map(positions.map((p) => [p.id, p.label])), [positions]);
   // Pointer erst ab 5 px, damit ein Tipp auf den Griff kein Drag startet (wie im Dashboard).
   const sensors = useSensors(
@@ -124,7 +135,12 @@ export function PositionsList({ positions, onReorder, onEdit, onRemove }: Positi
       <SortableContext items={groups.map((g) => g.key)} strategy={verticalListSortingStrategy}>
         <div className="space-y-3 px-3 pb-3">
           {groups.map((g) => (
-            <SortableGroup key={g.key} group={g}>
+            <SortableGroup
+              key={g.key}
+              group={g}
+              open={openGroups.has(g.key)}
+              onToggle={() => toggleGroup(g.key)}
+            >
               {/* Eigener Kontext je Gruppe: Positionen bleiben in ihrer Gruppe. */}
               <DndContext
                 sensors={sensors}
@@ -164,7 +180,18 @@ export function PositionsList({ positions, onReorder, onEdit, onRemove }: Positi
   );
 }
 
-function SortableGroup({ group, children }: { group: PositionGroup; children: ReactNode }) {
+function SortableGroup({
+  group,
+  open,
+  onToggle,
+  children,
+}: {
+  group: PositionGroup;
+  open: boolean;
+  onToggle: () => void;
+  children: ReactNode;
+}) {
+  const panelId = useId();
   const {
     attributes,
     listeners,
@@ -206,7 +233,22 @@ function SortableGroup({ group, children }: { group: PositionGroup; children: Re
         >
           <GripVertical size={16} aria-hidden />
         </button>
-        <h2 className="min-w-0 flex-1 truncate text-body-sm font-semibold text-label">{title}</h2>
+        <h2 className="min-w-0 flex-1 text-body-sm font-semibold text-label">
+          <button
+            type="button"
+            onClick={onToggle}
+            aria-expanded={open}
+            aria-controls={panelId}
+            className="flex w-full min-w-0 items-center gap-1 text-left"
+          >
+            {open ? (
+              <ChevronDown size={16} aria-hidden className="shrink-0" />
+            ) : (
+              <ChevronRight size={16} aria-hidden className="shrink-0" />
+            )}
+            <span className="truncate">{title}</span>
+          </button>
+        </h2>
         <span className="shrink-0 rounded-full bg-surface-solid px-2 py-0.5 text-caption text-secondary">
           {group.positions.length} {group.positions.length === 1 ? 'Position' : 'Positionen'}
         </span>
@@ -221,7 +263,7 @@ function SortableGroup({ group, children }: { group: PositionGroup; children: Re
           </span>
         ) : null}
       </div>
-      {children}
+      <div id={panelId}>{open ? children : null}</div>
     </section>
   );
 }

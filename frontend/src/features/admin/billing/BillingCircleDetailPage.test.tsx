@@ -1,10 +1,11 @@
 /**
- * Abrechnungskreis-Detail: Positionen, Prüfbericht mit Befunden, Anlegen einer Restposition und
+ * Abrechnungskreis-Detail: Reihenfolge der Abschnitte, Einklappen (Prüfabschnitte nach Befund,
+ * Empfängergruppen immer), Positionen, Prüfbericht mit Befunden, Anlegen einer Restposition und
  * einer Messstellen-Position über die Suchauswahl.
  */
 import { http, HttpResponse } from 'msw';
 import { describe, expect, it, vi } from 'vitest';
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import { renderWithRouter } from '@/tests/render';
@@ -104,10 +105,48 @@ function mockApi() {
 }
 
 describe('BillingCircleDetailPage', () => {
+  it('ordnet Läufe, Rechnungen, Verlauf, Zählerstände, Prüfbericht und Positionen', async () => {
+    mockApi();
+    const { container } = renderWithRouter(<BillingCircleDetailPage />);
+    await screen.findByRole('button', { name: /Prüfbericht/ });
+    const text = container.textContent ?? '';
+    const order = [
+      'Abrechnungsläufe',
+      'Rechnungen',
+      'Verlauf',
+      'Zählerstände zum Monatsende',
+      'Prüfbericht',
+      'Position hinzufügen',
+    ].map((t) => text.indexOf(t));
+    expect(order.every((i) => i >= 0)).toBe(true);
+    expect([...order].sort((a, b) => a - b)).toEqual(order);
+  });
+
+  it('klappt Zählerstände ohne Befund zu und den Prüfbericht mit Befund auf', async () => {
+    mockApi();
+    renderWithRouter(<BillingCircleDetailPage />);
+    const zaehler = await screen.findByRole('button', { name: /Zählerstände zum Monatsende/ });
+    await waitFor(() => expect(zaehler).toHaveTextContent('in Ordnung'));
+    expect(zaehler).toHaveAttribute('aria-expanded', 'false');
+    // Auch die Abrechnungsläufe haben ein Monatsfeld — nur im eigenen Abschnitt suchen.
+    const abschnitt = within(zaehler.closest('section') ?? document.body);
+    expect(abschnitt.queryByLabelText(/Abrechnungsmonat/)).not.toBeInTheDocument();
+    const pruef = screen.getByRole('button', { name: /Prüfbericht/ });
+    await waitFor(() => expect(pruef).toHaveTextContent('1 Befund'));
+    expect(pruef).toHaveAttribute('aria-expanded', 'true');
+
+    fireEvent.click(zaehler);
+    expect(zaehler).toHaveAttribute('aria-expanded', 'true');
+    expect(abschnitt.getByLabelText(/Abrechnungsmonat/)).toBeInTheDocument();
+    fireEvent.click(pruef);
+    expect(screen.queryByText(/Kein Eigentuemer/)).not.toBeInTheDocument();
+  });
+
   it('zeigt Positionen, aufgelöste Rechnungszeile und Befunde', async () => {
     mockApi();
     renderWithRouter(<BillingCircleDetailPage />);
     expect(await screen.findByText('SUED – Musterhof Nord')).toBeInTheDocument();
+    fireEvent.click(await screen.findByRole('button', { name: 'Nord KG' }));
     expect(await screen.findByText(/Messstelle: SUED - Pumpe/)).toBeInTheDocument();
     expect(await screen.findByText('Strom (gewerblich) Kostenstelle 10108')).toBeInTheDocument();
     expect(screen.getByText(/Kein Eigentuemer/)).toBeInTheDocument();
@@ -120,6 +159,11 @@ describe('BillingCircleDetailPage', () => {
     expect(
       screen.getByRole('button', { name: 'Empfänger „Nord KG“ verschieben' }),
     ).toBeInTheDocument();
+    // Standardmäßig eingeklappt: Positionen erst nach Klick auf den Empfänger.
+    const kopf = screen.getByRole('button', { name: 'Nord KG' });
+    expect(kopf).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByRole('button', { name: 'Position „Pumpe“ verschieben' })).toBeNull();
+    fireEvent.click(kopf);
     expect(
       screen.getByRole('button', { name: 'Position „Pumpe“ verschieben' }),
     ).toBeInTheDocument();
