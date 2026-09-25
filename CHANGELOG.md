@@ -10,6 +10,13 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.85.0](https://github.com/muelley86/zaehler/compare/v2.84.0...v2.85.0) (2026-09-25)
+
+
+### Funktionen
+
+* **abrechnung:** Kreise unter der Neuanlage, offene Messstellen eingeklappt, Messstellen-Suche in Positionen ([#372](https://github.com/muelley86/zaehler/issues/372)) ([d8e592d](https://github.com/muelley86/zaehler/commit/d8e592daf2501d7a70411009e6c8347fbfa78ebb))
+
 ## [2.84.0](https://github.com/muelley86/zaehler/compare/v2.83.0...v2.84.0) (2026-09-24)
 
 
