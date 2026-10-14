@@ -336,4 +336,44 @@ describe('BillingRunDetailPage', () => {
     expect(within(tabelle).queryByText('Summe per Rechnung')).not.toBeInTheDocument();
     expect(within(tabelle).getByRole('row', { name: /Summe gesamt/ })).toBeInTheDocument();
   });
+
+  it('zeigt bei jedem Hauptzähler den Abzug seines Unterzählers', async () => {
+    const zeile = (id: number, label: string, kwh: string, parent: string | null = null) => ({
+      ...ZEILE,
+      id,
+      position_id: id,
+      label,
+      kwh,
+      parent_label: parent,
+    });
+    server.use(
+      http.get('/api/v1/billing-circles/1/runs/7', () =>
+        HttpResponse.json(
+          lauf('entwurf', {
+            lines: [
+              zeile(1, 'Haupt A', '300'),
+              zeile(2, 'Unter A', '1200', 'Haupt A'),
+              zeile(3, 'Haupt B', '80'),
+              zeile(4, 'Unter B', '20', 'Haupt B'),
+              zeile(5, 'Einzeln', '50'),
+            ],
+          }),
+        ),
+      ),
+      transferLeer(),
+    );
+    renderWithRouter(<BillingRunDetailPage />);
+    const tabelle = await screen.findByRole('table', { name: 'Zeilen' });
+    const zeileVon = (label: string) =>
+      within(tabelle)
+        .getAllByRole('row')
+        .find((tr) => tr.firstElementChild?.textContent?.startsWith(label));
+
+    expect(zeileVon('Haupt A')).toHaveTextContent('abzgl. Unterzähler Unter A: −1.200 kWh');
+    expect(zeileVon('Haupt B')).toHaveTextContent('abzgl. Unterzähler Unter B: −20 kWh');
+    expect(zeileVon('Haupt A')).not.toHaveTextContent('Unter B');
+    expect(within(tabelle).getAllByText(/abzgl\. Unterzähler/)).toHaveLength(2);
+    expect(zeileVon('Unter A')).toHaveTextContent('Unterzähler von Haupt A');
+    expect(zeileVon('Einzeln')).not.toHaveTextContent('Unterzähler');
+  });
 });

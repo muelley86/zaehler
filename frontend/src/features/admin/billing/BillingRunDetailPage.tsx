@@ -183,6 +183,13 @@ export function BillingRunDetailPage() {
   const hinweise = run.befunde.filter((b) => !b.blocking);
   const r = run.result;
   const t = run.totals;
+  // Hauptzähler -> Unterzähler: deren kWh zieht der Rechenkern vom Hauptzähler ab.
+  const unterzaehler = new Map<string, BillingRunLineRead[]>();
+  for (const z of run.lines) {
+    if (z.parent_label) {
+      unterzaehler.set(z.parent_label, [...(unterzaehler.get(z.parent_label) ?? []), z]);
+    }
+  }
 
   return (
     <>
@@ -377,6 +384,11 @@ export function BillingRunDetailPage() {
                     {z.parent_label ? (
                       <div className="text-tertiary">Unterzähler von {z.parent_label}</div>
                     ) : null}
+                    {unterzaehler.get(z.label)?.map((u) => (
+                      <div key={u.id} className="text-tertiary">
+                        abzgl. Unterzähler {u.label}: −{num(u.kwh)} kWh
+                      </div>
+                    ))}
                     {z.pruefung && z.pruefung !== 'OK' ? (
                       <div className="text-danger">{z.pruefung}</div>
                     ) : null}
