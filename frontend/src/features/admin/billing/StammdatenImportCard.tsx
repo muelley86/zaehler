@@ -5,11 +5,12 @@
 import { useState } from 'react';
 import type { ChangeEvent } from 'react';
 
-import { Button, Section } from '@/components/ui';
+import { Button } from '@/components/ui';
 import { api } from '@/lib/api';
 import type { BillingImportLevel, BillingImportReport } from '@/lib/types';
 
 import { errorText } from './circleForm';
+import { ToggleSection } from './ToggleSection';
 
 const MAX_BYTES = 1_000_000;
 
@@ -82,7 +83,7 @@ export function StammdatenImportCard({ onApplied }: { onApplied: () => void }) {
   }
 
   return (
-    <Section header="Stammdaten importieren">
+    <ToggleSection title="Stammdaten importieren">
       <div className="space-y-3 p-5">
         <p className="text-caption text-tertiary">
           Datei aus der Stromabrechnung (<code>export_app</code>). Positionen werden über die
@@ -141,6 +142,6 @@ export function StammdatenImportCard({ onApplied }: { onApplied: () => void }) {
           </>
         ) : null}
       </div>
-    </Section>
+    </ToggleSection>
   );
 }

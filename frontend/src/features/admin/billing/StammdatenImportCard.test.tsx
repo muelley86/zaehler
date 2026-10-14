@@ -37,6 +37,7 @@ describe('StammdatenImportCard', () => {
     );
     const onApplied = vi.fn();
     renderWithRouter(<StammdatenImportCard onApplied={onApplied} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Stammdaten importieren' }));
     const datei = new File([JSON.stringify(DATEI)], 'import.json', { type: 'application/json' });
     fireEvent.change(screen.getByLabelText('Import-Datei'), { target: { files: [datei] } });
 
@@ -60,6 +61,7 @@ describe('StammdatenImportCard', () => {
       }),
     );
     renderWithRouter(<StammdatenImportCard onApplied={() => {}} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Stammdaten importieren' }));
     const datei = new File(['kein json'], 'x.json', { type: 'application/json' });
     fireEvent.change(screen.getByLabelText('Import-Datei'), { target: { files: [datei] } });
     expect(await screen.findByText(/kein gültiges JSON/)).toBeInTheDocument();
