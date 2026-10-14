@@ -11,6 +11,10 @@ const PANEL_WIDTH = 360;
 export interface DropdownOption<T> {
   value: T;
   label: string;
+  /** Grauer Zusatz rechts neben dem Label (z. B. Zählernummer); wird mit durchsucht. */
+  hint?: string;
+  /** Zusätzlicher, nicht angezeigter Suchtext (z. B. Nummern ausgebauter Zähler). */
+  searchText?: string;
 }
 
 /**

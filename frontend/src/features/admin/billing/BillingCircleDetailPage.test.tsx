@@ -210,9 +210,9 @@ describe('BillingCircleDetailPage', () => {
     server.use(
       http.get('/api/v1/measuring-points', () =>
         HttpResponse.json([
-          { id: 7, name: 'Stall B', type: 'electricity' },
-          { id: 8, name: 'Werkstatt', type: 'electricity' },
-          { id: 9, name: 'Brunnen', type: 'water' },
+          { id: 7, name: 'Stall B', type: 'electricity', physical_meters: [] },
+          { id: 8, name: 'Werkstatt', type: 'electricity', physical_meters: [] },
+          { id: 9, name: 'Brunnen', type: 'water', physical_meters: [] },
         ]),
       ),
       http.post('/api/v1/billing-circles/1/positions', async ({ request }) => {
@@ -235,6 +235,53 @@ describe('BillingCircleDetailPage', () => {
     await user.click(screen.getByRole('button', { name: /^Speichern$/ }));
     await waitFor(() => expect(body).not.toBeNull());
     expect(body).toMatchObject({ kind: 'meter', measuring_point_id: 8 });
+  });
+
+  it('findet die Messstelle auch über die Zählernummer, auch eines ausgebauten Zählers', async () => {
+    mockApi();
+    const zaehler = (serial_number: string, removed_at: string | null) => ({
+      id: serial_number.length,
+      serial_number,
+      installed_at: '2020-01-01',
+      removed_at,
+      transformer_factor: null,
+      registers: [],
+    });
+    server.use(
+      http.get('/api/v1/measuring-points', () =>
+        HttpResponse.json([
+          {
+            id: 7,
+            name: 'Stall B',
+            type: 'electricity',
+            physical_meters: [zaehler('TEST-NEU-1', null), zaehler('TEST-ALT-9', '2024-05-01')],
+          },
+          {
+            id: 8,
+            name: 'Werkstatt',
+            type: 'electricity',
+            physical_meters: [zaehler('TEST-2', null)],
+          },
+        ]),
+      ),
+    );
+    const user = userEvent.setup();
+    renderWithRouter(<BillingCircleDetailPage />);
+    await user.click(await screen.findByRole('button', { name: /Position hinzufügen/ }));
+    await user.click(await screen.findByRole('button', { name: /Messstelle/ }));
+    // Eingebaute Nummer steht in der Zeile, die ausgebaute nicht.
+    expect(screen.getByText('TEST-NEU-1')).toBeInTheDocument();
+    expect(screen.queryByText(/TEST-ALT-9/)).not.toBeInTheDocument();
+
+    await user.keyboard('test-neu');
+    expect(screen.getByRole('button', { name: /Stall B/ })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Werkstatt/ })).not.toBeInTheDocument();
+
+    const suche = screen.getByPlaceholderText('Suchen…');
+    await user.clear(suche);
+    await user.type(suche, 'alt-9');
+    expect(screen.getByRole('button', { name: /Stall B/ })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Werkstatt/ })).not.toBeInTheDocument();
   });
 
   it('verlangt eine Messstelle, bevor gespeichert wird', async () => {

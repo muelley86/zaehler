@@ -14,6 +14,8 @@ import { SingleSelectDropdown } from './SingleSelectDropdown';
 interface Opt {
   value: number;
   label: string;
+  hint?: string;
+  searchText?: string;
 }
 
 function Harness({ options, searchThreshold = 8 }: { options: Opt[]; searchThreshold?: number }) {
@@ -64,6 +66,28 @@ describe('SingleSelectDropdown', () => {
     await user.type(screen.getByPlaceholderText('Suchen…'), 'Item 3');
     expect(screen.getByRole('button', { name: 'Item 3' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Item 0' })).toBeNull();
+  });
+
+  it('zeigt den Hint und findet Optionen über Hint und Suchtext', async () => {
+    const opts = [
+      { value: 1, label: 'Stall', hint: 'NR-111', searchText: 'NR-111 ALT-999' },
+      { value: 2, label: 'Pumpe', hint: 'NR-222', searchText: 'NR-222' },
+    ];
+    const user = userEvent.setup();
+    render(<Harness options={opts} searchThreshold={0} />);
+
+    await user.click(screen.getByRole('button', { name: 'Wählen' }));
+    expect(screen.getByText('NR-111')).toBeInTheDocument();
+
+    const suche = screen.getByPlaceholderText('Suchen…');
+    await user.type(suche, 'nr-222');
+    expect(screen.getByRole('button', { name: /Pumpe/ })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Stall/ })).toBeNull();
+
+    await user.clear(suche);
+    await user.type(suche, 'alt-999');
+    expect(screen.getByRole('button', { name: /Stall/ })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Pumpe/ })).toBeNull();
   });
 
   it('schließt bei Escape und bei Klick außerhalb', async () => {

@@ -341,7 +341,16 @@ function PositionForm({
     () =>
       [...meters]
         .sort((a, b) => a.name.localeCompare(b.name, 'de'))
-        .map((m) => ({ value: m.id, label: m.name })),
+        .map((m) => ({
+          value: m.id,
+          label: m.name,
+          // Angezeigt werden die eingebauten Zähler, gesucht wird auch über ausgebaute.
+          hint: m.physical_meters
+            .filter((p) => p.removed_at === null)
+            .map((p) => p.serial_number)
+            .join(' / '),
+          searchText: m.physical_meters.map((p) => p.serial_number).join(' '),
+        })),
     [meters],
   );
 

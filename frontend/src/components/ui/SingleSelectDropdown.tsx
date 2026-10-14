@@ -41,7 +41,9 @@ export function SingleSelectDropdown<T extends string | number>({
   const visible = useMemo(() => {
     const needle = search.trim().toLowerCase();
     if (!needle) return options;
-    return options.filter((o) => o.label.toLowerCase().includes(needle));
+    return options.filter((o) =>
+      [o.label, o.hint, o.searchText].some((t) => t?.toLowerCase().includes(needle)),
+    );
   }, [options, search]);
 
   const selectedLabel = options.find((o) => o.value === value)?.label ?? placeholder;
@@ -86,6 +88,15 @@ export function SingleSelectDropdown<T extends string | number>({
                     )}
                   >
                     <span className="min-w-0 flex-1 truncate">{o.label}</span>
+                    {/* Leerzeichen trennt Label und Hint im zugänglichen Namen. */}{' '}
+                    {o.hint ? (
+                      <span
+                        title={o.hint}
+                        className="ml-2 max-w-[50%] truncate text-caption text-tertiary"
+                      >
+                        {o.hint}
+                      </span>
+                    ) : null}
                   </button>
                 </li>
               ))
