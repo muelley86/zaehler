@@ -1,5 +1,6 @@
 /**
- * Abrechnungskreise der Stromabrechnung: Liste und Anlegen.
+ * Abrechnungskreise der Stromabrechnung: Monatsübersicht, Liste, darunter eingeklappt Anlegen und
+ * Stammdaten-Import.
  * Stammdaten, Positionen und Prüfbericht liegen auf `/admin/abrechnungskreise/:id`.
  */
 import { useEffect, useState } from 'react';
@@ -15,6 +16,7 @@ import { CircleFields } from './CircleFields';
 import { circleBody, circleFormState, errorText } from './circleForm';
 import { MonthOverviewCard } from './MonthOverviewCard';
 import { StammdatenImportCard } from './StammdatenImportCard';
+import { ToggleSection } from './ToggleSection';
 import { UnassignedMetersCard } from './UnassignedMetersCard';
 import type { CircleFormState } from './circleForm';
 
@@ -47,8 +49,6 @@ export function BillingCirclesAdminPage() {
         </div>
       ) : null}
       <MonthOverviewCard tick={tick} />
-      <StammdatenImportCard onApplied={() => setTick((t) => t + 1)} />
-      <CreateForm onCreated={() => setTick((t) => t + 1)} />
       <Section header="Kreise">
         {items === null ? (
           <div className="p-5 text-caption text-tertiary">Lade…</div>
@@ -81,6 +81,8 @@ export function BillingCirclesAdminPage() {
           </ul>
         )}
       </Section>
+      <CreateForm onCreated={() => setTick((t) => t + 1)} />
+      <StammdatenImportCard onApplied={() => setTick((t) => t + 1)} />
       <UnassignedMetersCard tick={tick} />
     </>
   );
@@ -107,7 +109,7 @@ function CreateForm({ onCreated }: { onCreated: () => void }) {
   }
 
   return (
-    <Section header="Neuer Abrechnungskreis">
+    <ToggleSection title="Neuer Abrechnungskreis">
       <form onSubmit={(e) => void submit(e)} className="space-y-3 p-5">
         <CircleFields state={state} onChange={setState} />
         {error ? <div className="text-caption text-danger">{error}</div> : null}
@@ -115,6 +117,6 @@ function CreateForm({ onCreated }: { onCreated: () => void }) {
           {busy ? 'Speichere…' : 'Anlegen'}
         </Button>
       </form>
-    </Section>
+    </ToggleSection>
   );
 }
