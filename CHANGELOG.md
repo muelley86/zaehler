@@ -10,6 +10,13 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.90.0](https://github.com/muelley86/zaehler/compare/v2.89.0...v2.90.0) (2026-10-14)
+
+
+### Funktionen
+
+* **abrechnung:** Messstellen-Suche bei Positionen auch nach Zählernummer ([#386](https://github.com/muelley86/zaehler/issues/386)) ([52395b3](https://github.com/muelley86/zaehler/commit/52395b3883c6e7331dd88e71812fcd6551044b9a))
+
 ## [2.89.0](https://github.com/muelley86/zaehler/compare/v2.88.1...v2.89.0) (2026-10-14)
 
 
