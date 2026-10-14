@@ -10,6 +10,13 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.89.0](https://github.com/muelley86/zaehler/compare/v2.88.1...v2.89.0) (2026-10-14)
+
+
+### Funktionen
+
+* **abrechnung:** Unterzähler-Abzug im Lauf sichtbar, Abrechnungskreise-Seite umsortiert ([#383](https://github.com/muelley86/zaehler/issues/383)) ([d1499a3](https://github.com/muelley86/zaehler/commit/d1499a3cc5452bacfe047e4491c63665b988d63d))
+
 ## [2.88.1](https://github.com/muelley86/zaehler/compare/v2.88.0...v2.88.1) (2026-09-25)
 
 
