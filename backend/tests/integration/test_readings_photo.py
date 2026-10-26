@@ -239,6 +239,20 @@ def test_reject_decompression_bomb(
     assert resp.status_code == 413, resp.text
 
 
+def test_reject_jpeg2000_disguised_as_jpeg(admin_client: TestClient) -> None:
+    """Der MIME-Type kommt vom Client — der Inhalt darf trotzdem nur durch die
+    Decoder der erlaubten Formate laufen (JPEG-2000-Decoder hatte Heap-Overflows)."""
+    register_id = _setup_water_mp(admin_client)
+    rid = _create_reading(admin_client, register_id)
+    buf = BytesIO()
+    Image.new("RGB", (64, 64), color=(10, 20, 30)).save(buf, format="JPEG2000")
+    resp = admin_client.post(
+        f"/api/v1/readings/{rid}/photos",
+        files={"photo": ("meter.jpg", buf.getvalue(), "image/jpeg")},
+    )
+    assert resp.status_code == 422, resp.text
+
+
 # --- Berechtigungen --------------------------------------------------------
 
 

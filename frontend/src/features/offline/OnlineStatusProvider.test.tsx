@@ -15,6 +15,7 @@ import { AuthContext } from '@/features/auth/auth-context';
 import type { AuthState } from '@/features/auth/auth-context';
 import { reportOffline, reportOnline } from '@/lib/offline/connectivity';
 import { resetOfflineDbForTests } from '@/lib/offline/db';
+import { RETRY_BASE_MS } from '@/lib/offline/syncScheduler';
 import { enqueueGroup, listItems, updateItem } from '@/lib/offline/outbox';
 import type { Me } from '@/lib/types';
 import { server } from '@/tests/server';
@@ -153,6 +154,7 @@ describe('OnlineStatusProvider oldestPendingAt', () => {
     // Fake timers ab Mount, sonst liefe der Scheduler-Timeout in Echtzeit;
     // shouldAdvanceTime lässt waitFor/msw parallel normal weiterlaufen.
     vi.useFakeTimers({ shouldAdvanceTime: true });
+    const timeoutSpy = vi.spyOn(globalThis, 'setTimeout');
     try {
       render(
         <AuthContext.Provider value={AUTH}>
@@ -163,9 +165,17 @@ describe('OnlineStatusProvider oldestPendingAt', () => {
       );
       await waitFor(() => expect(posts).toBe(1));
 
-      // 30 s vorspulen — der Scheduler muss den nächsten Versuch anstoßen.
-      await vi.advanceTimersByTimeAsync(30_000);
-      await waitFor(() => expect(posts).toBe(2));
+      // Scharf geschaltet wird der Scheduler erst nach dem asynchronen
+      // Outbox-Update auf den Fehlschlag — ein Vorspulen direkt nach dem
+      // ersten POST kann unter Last davor liegen und verpuffen. Darum erst auf
+      // den Retry-Timer mit genau RETRY_BASE_MS warten, dann exakt so weit
+      // vorspulen: binnen dieser 30 s muss ein weiterer Versuch kommen (nicht
+      // "irgendwann"); auch der Konnektivitäts-Probe darf parallel feuern.
+      await waitFor(() =>
+        expect(timeoutSpy.mock.calls.some((args) => args[1] === RETRY_BASE_MS)).toBe(true),
+      );
+      await vi.advanceTimersByTimeAsync(RETRY_BASE_MS);
+      await waitFor(() => expect(posts).toBeGreaterThanOrEqual(2));
     } finally {
       vi.useRealTimers();
     }

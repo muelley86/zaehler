@@ -25,6 +25,10 @@ dependencies = [
     "itsdangerous>=2.2",
     "pyotp>=2.9",
     "qrcode[pil]>=7.4",
+    # Direkt genutzt (Foto-Upload, reading_photo.py), nicht nur transitiv über
+    # qrcode/pdfplumber. Untergrenze wegen Heap-Overflow im gebündelten
+    # libopenjp2 (GHSA-78g4-xqwv-q3g8) und weiterer Decoder-CVEs in 12.x.
+    "pillow>=13.0.0",
     "openpyxl>=3.1",
     # Zoneinfo-Datenbank: auf Windows zwingend (kein System-tzdata, sonst faellt
     # ZoneInfo("Europe/Berlin") und damit der Settings-Validator beim Start um),

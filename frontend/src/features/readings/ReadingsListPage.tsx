@@ -1,6 +1,6 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router';
 import {
   Camera,
   Download,
@@ -57,6 +57,7 @@ import { cx } from '@/components/ui/cx';
 import { TYPE_LABELS } from '@/lib/meterLabels';
 import { useFilterPrefs } from '@/features/prefs/filter-prefs-context';
 import { setCodec, stringCodec, useStickyState } from '@/lib/useStickyState';
+import { useObjectUrl } from '@/lib/useObjectUrl';
 
 type ItemKind = 'reading' | 'correction' | 'delivery';
 
@@ -629,9 +630,10 @@ export function ReadingsListPage() {
             <MultiSelectDropdown
               label="Standorte"
               options={[
-                ...locations.map(
-                  ([id, name]): DropdownOption<number | null> => ({ value: id, label: name }),
-                ),
+                ...locations.map(([id, name]): DropdownOption<number | null> => ({
+                  value: id,
+                  label: name,
+                })),
                 { value: null, label: 'ohne Standort' },
               ]}
               selected={locationFilter}
@@ -696,7 +698,7 @@ export function ReadingsListPage() {
       </Section>
 
       {selectMode ? (
-        <div className="bg-surface-solid/95 shadow-card sticky top-2 z-20 flex flex-wrap items-center gap-2 rounded-card border-hairline border-border p-3 backdrop-blur">
+        <div className="shadow-card sticky top-2 z-20 flex flex-wrap items-center gap-2 rounded-card border-hairline border-border bg-surface-solid/95 p-3 backdrop-blur-sm">
           <span className="text-body-sm font-semibold text-label">{selected.size} ausgewählt</span>
           <div className="ml-auto flex flex-wrap items-center gap-2">
             <Button
@@ -1274,7 +1276,7 @@ function PhotoEditField({
     onAdd(Array.from(picked).slice(0, MAX_PHOTOS_PER_READING - total));
   }
 
-  function open(ref: React.RefObject<HTMLInputElement>) {
+  function open(ref: React.RefObject<HTMLInputElement | null>) {
     if (!ref.current) return;
     ref.current.value = '';
     ref.current.click();
@@ -1282,7 +1284,7 @@ function PhotoEditField({
 
   return (
     <div className="space-y-2">
-      <div className="text-caption-bold uppercase text-tertiary">Fotos ({total}/6)</div>
+      <div className="text-caption-bold text-tertiary uppercase">Fotos ({total}/6)</div>
       <input
         ref={cameraInputRef}
         type="file"
@@ -1319,7 +1321,7 @@ function PhotoEditField({
                 onClick={() => onToggleExisting(p.id)}
                 aria-label={markedForRemoval ? 'Doch behalten' : 'Foto entfernen'}
                 className={cx(
-                  'absolute -right-1.5 -top-1.5 inline-flex h-6 w-6 items-center justify-center rounded-full text-white shadow',
+                  'absolute -top-1.5 -right-1.5 inline-flex h-6 w-6 items-center justify-center rounded-full text-white shadow-sm',
                   markedForRemoval ? 'bg-secondary' : 'bg-danger',
                 )}
               >
@@ -1359,17 +1361,16 @@ function PhotoEditField({
 }
 
 function PendingThumb({ file, onRemove }: { file: File; onRemove: () => void }) {
-  const [url, setUrl] = useState<string | null>(null);
+  const url = useObjectUrl(file);
   // HEIC/HEIF (iPhone-Standard) kann von Desktop-/Android-Browsern nicht im
   // ``<img>`` dekodiert werden → ohne Abfangen erscheint das Broken-Image-Icon
   // (rotes X). Wir zeigen stattdessen einen Platzhalter (analog PhotoThumb).
   const [error, setError] = useState(false);
-  useEffect(() => {
-    const u = URL.createObjectURL(file);
-    setUrl(u);
+  const [errorFile, setErrorFile] = useState(file);
+  if (file !== errorFile) {
+    setErrorFile(file);
     setError(false);
-    return () => URL.revokeObjectURL(u);
-  }, [file]);
+  }
   return (
     <div className="relative">
       {url && !error ? (
@@ -1390,7 +1391,7 @@ function PendingThumb({ file, onRemove }: { file: File; onRemove: () => void }) 
         type="button"
         onClick={onRemove}
         aria-label="Verwerfen"
-        className="absolute -right-1.5 -top-1.5 inline-flex h-6 w-6 items-center justify-center rounded-full bg-danger text-white shadow"
+        className="absolute -top-1.5 -right-1.5 inline-flex h-6 w-6 items-center justify-center rounded-full bg-danger text-white shadow-sm"
       >
         <X size={13} />
       </button>

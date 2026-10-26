@@ -5,7 +5,7 @@
  */
 
 import { BarChart3 } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 
 import { EmptyState, Section } from '@/components/ui';
 import { formatDe } from '@/lib/format';
@@ -75,7 +75,7 @@ export function ResultTable({
   return (
     <Section>
       <table className="w-full text-body-sm">
-        <thead className="text-caption-bold uppercase text-tertiary">
+        <thead className="text-caption-bold text-tertiary uppercase">
           <tr className="border-b border-border">
             <th className="p-2 text-left">{groupHeader}</th>
             <th className="p-2 text-left">Zählerart</th>
@@ -89,7 +89,7 @@ export function ResultTable({
             return (
               <tr
                 key={`${r.is_virtual ? 'v' : 'r'}-${r.group_key}-${r.meter_type}-${r.unit}-${r.direction}-${r.period_end ?? ''}`}
-                className="border-border/50 border-b"
+                className="border-b border-border/50"
               >
                 <td className="p-2 text-label">
                   <GroupLabelCell
@@ -101,7 +101,7 @@ export function ResultTable({
                 </td>
                 <td className="p-2 text-secondary">{TYPE_LABELS[r.meter_type]}</td>
                 {showPeriod ? <td className="p-2 text-secondary">{r.period_end ?? ''}</td> : null}
-                <td className="p-2 text-right tabular-nums text-label">
+                <td className="p-2 text-right text-label tabular-nums">
                   {formatDe(r.consumption)} {r.unit}
                 </td>
               </tr>
@@ -140,7 +140,7 @@ export function ComparisonTable({
           Tabelle horizontal, statt die Daten mitten im Datum umzubrechen. */}
       <div className="overflow-x-auto">
         <table className="w-full text-body-sm">
-          <thead className="text-caption-bold uppercase text-tertiary">
+          <thead className="text-caption-bold text-tertiary uppercase">
             <tr className="border-b border-border">
               <th scope="col" className="p-2 text-left">
                 {groupHeader}
@@ -148,16 +148,16 @@ export function ComparisonTable({
               <th scope="col" className="p-2 text-left">
                 Zählerart
               </th>
-              <th scope="col" className="whitespace-nowrap p-2 text-right">
+              <th scope="col" className="p-2 text-right whitespace-nowrap">
                 {periods.a}
               </th>
-              <th scope="col" className="whitespace-nowrap p-2 text-right">
+              <th scope="col" className="p-2 text-right whitespace-nowrap">
                 {periods.b}
               </th>
               <th scope="col" className="p-2 text-right">
                 Δ
               </th>
-              <th scope="col" className="whitespace-nowrap p-2 text-right">
+              <th scope="col" className="p-2 text-right whitespace-nowrap">
                 Δ %
               </th>
             </tr>
@@ -166,7 +166,7 @@ export function ComparisonTable({
             {rows.slice(0, REPORT_ROW_CAP).map((r) => {
               const suffix = directionSuffix(r, bidiGroups);
               return (
-                <tr key={r.key} className="border-border/50 border-b">
+                <tr key={r.key} className="border-b border-border/50">
                   <td className="p-2 text-label">
                     <GroupLabelCell
                       label={r.group_label}
@@ -176,16 +176,16 @@ export function ComparisonTable({
                     {suffix ? <span className="text-secondary"> · {suffix}</span> : null}
                   </td>
                   <td className="p-2 text-secondary">{TYPE_LABELS[r.meter_type]}</td>
-                  <td className="whitespace-nowrap p-2 text-right tabular-nums text-label">
+                  <td className="p-2 text-right whitespace-nowrap text-label tabular-nums">
                     {formatDe(r.a)} {r.unit}
                   </td>
-                  <td className="whitespace-nowrap p-2 text-right tabular-nums text-label">
+                  <td className="p-2 text-right whitespace-nowrap text-label tabular-nums">
                     {formatDe(r.b)} {r.unit}
                   </td>
-                  <td className="whitespace-nowrap p-2 text-right tabular-nums">
+                  <td className="p-2 text-right whitespace-nowrap tabular-nums">
                     {formatDe(r.delta)} {r.unit}
                   </td>
-                  <td className="whitespace-nowrap p-2 text-right tabular-nums text-secondary">
+                  <td className="p-2 text-right whitespace-nowrap text-secondary tabular-nums">
                     {r.pct === null ? '—' : `${formatDe(r.pct, { maximumFractionDigits: 1 })} %`}
                   </td>
                 </tr>

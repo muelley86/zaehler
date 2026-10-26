@@ -133,7 +133,16 @@ def _raw_get(client: TestClient, raw_path: str) -> tuple[int, bytes]:
     status: list[int] = []
     body = bytearray()
 
+    request_sent = False
+
     async def receive() -> MutableMapping[str, Any]:
+        # Wie uvicorn: einmal den (leeren) Body, danach blockiert ``receive``
+        # bis zum Disconnect. Starlette >= 1.4 pollt nach dem Body erneut und
+        # wirft bei einer zweiten ``http.request``-Nachricht einen RuntimeError.
+        nonlocal request_sent
+        if request_sent:
+            await asyncio.Event().wait()
+        request_sent = True
         return {"type": "http.request", "body": b"", "more_body": False}
 
     async def send(message: MutableMapping[str, Any]) -> None:

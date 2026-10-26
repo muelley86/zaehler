@@ -15,7 +15,8 @@ auf eigener Hardware. Keine Cloud, keine externen Abhängigkeiten zur Laufzeit.
 
 - Backend: Python 3.13, FastAPI, SQLAlchemy 2.x, Alembic, Pydantic v2, openpyxl (Excel-Import)
 - DB: SQLite (Datei unter ./data/meters.db)
-- Frontend: React 18 + Vite + TypeScript, Tailwind CSS
+- Frontend: React 19 + Vite 8 + TypeScript, Tailwind CSS 4 (Theme als `@theme` in
+  `frontend/src/styles/index.css` — es gibt keine `tailwind.config` mehr)
 - Charts: Recharts
 - Auth: bcrypt (Passwort-Hash), Session-Cookie (httpOnly, SameSite=Strict, Secure)
 - Tests: pytest + httpx (Backend), Vitest + React Testing Library (Frontend)

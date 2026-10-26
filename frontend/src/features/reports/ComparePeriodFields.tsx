@@ -38,7 +38,7 @@ export function ComparePeriodFields({
   onToChange,
 }: ComparePeriodFieldsProps) {
   return (
-    <div className="bg-fill/60 space-y-2 rounded-card p-3">
+    <div className="space-y-2 rounded-card bg-fill/60 p-3">
       <div className="flex flex-wrap items-baseline gap-x-2 text-body-sm">
         <span className="text-label">Periode 1</span>
         <span className="text-secondary">{periodLabel(period.from, period.to)}</span>

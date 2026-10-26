@@ -16,7 +16,7 @@ export function Section({
   return (
     <section className={cx('space-y-2', className)}>
       {header ? (
-        <div className="px-1 text-caption-bold uppercase text-tertiary">{header}</div>
+        <div className="px-1 text-caption-bold text-tertiary uppercase">{header}</div>
       ) : null}
       <div className="glass overflow-hidden rounded-card border-hairline border-border bg-surface shadow-glass dark:shadow-glass-dark">
         {children}

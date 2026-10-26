@@ -389,11 +389,7 @@ export interface BillingHistory {
 
 /** Monatsübersicht: Fortschritt eines Kreises in einem Monat. */
 export type BillingMonthStatus =
-  | 'leer'
-  | 'rechnung'
-  | 'entwurf'
-  | 'festgeschrieben'
-  | 'uebertragen';
+  'leer' | 'rechnung' | 'entwurf' | 'festgeschrieben' | 'uebertragen';
 
 export interface BillingMonthCell {
   monat: string;
@@ -586,12 +582,7 @@ export interface BillingRunRead extends BillingRunSummary {
 
 /** Übernahme eines Monats-JSON (Excel-Weg) in einen Entwurf: Vorschau bzw. Ergebnis. */
 export type ExcelImportStatus =
-  | 'gleich'
-  | 'abweichend'
-  | 'unbekannt'
-  | 'nicht_uebernehmbar'
-  | 'fehlt_in_datei'
-  | 'rest';
+  'gleich' | 'abweichend' | 'unbekannt' | 'nicht_uebernehmbar' | 'fehlt_in_datei' | 'rest';
 
 export interface ExcelImportLine {
   label: string;
@@ -1016,12 +1007,7 @@ export interface QrTokenResolveResponse {
 // --- Auswertungen (Reports) -------------------------------------------------
 
 export type ReportDimension =
-  | 'kostenstelle'
-  | 'owner'
-  | 'location'
-  | 'main_location'
-  | 'meter_type'
-  | 'measuring_point';
+  'kostenstelle' | 'owner' | 'location' | 'main_location' | 'meter_type' | 'measuring_point';
 export type ReportGranularity = 'day' | 'week' | 'month' | 'year' | 'total';
 export type ReportPeriodKind =
   | 'fixed'

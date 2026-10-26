@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 import { cx } from './cx';
 
 /**
- * Liquid-Glass-Karte. `solid` deaktiviert backdrop-blur (für Bereiche, in
+ * Liquid-Glass-Karte. `solid` deaktiviert backdrop-blur-sm (für Bereiche, in
  * denen kein Hintergrund-Glow durchschimmert oder die Karte über einer
  * anderen Glas-Schicht liegt).
  */

@@ -30,7 +30,7 @@ def ensure_location_exists(db: DbSession, location_id: int | None) -> None:
         raise ProblemError(status_code=404, title="Location not found")
 
 
-def _with_eager_state(stmt: Select[tuple[MeasuringPoint]]) -> Select[tuple[MeasuringPoint]]:
+def _with_eager_state(stmt: Select[MeasuringPoint]) -> Select[MeasuringPoint]:
     """Eager-Load Location + Zaehler/Register, damit ``to_measuring_point_read``
     und ``state_for_measuring_point`` ohne N+1 serialisieren koennen."""
     return stmt.options(
@@ -39,7 +39,7 @@ def _with_eager_state(stmt: Select[tuple[MeasuringPoint]]) -> Select[tuple[Measu
     ).order_by(MeasuringPoint.name)
 
 
-def select_measuring_points_for_location(location_id: int) -> Select[tuple[MeasuringPoint]]:
+def select_measuring_points_for_location(location_id: int) -> Select[MeasuringPoint]:
     """Select auf alle MPs, die direkt auf ``location_id`` zeigen."""
     return _with_eager_state(
         select(MeasuringPoint).where(MeasuringPoint.location_id == location_id)
@@ -48,7 +48,7 @@ def select_measuring_points_for_location(location_id: int) -> Select[tuple[Measu
 
 def select_measuring_points_for_main_location(
     main_location_id: int,
-) -> Select[tuple[MeasuringPoint]]:
+) -> Select[MeasuringPoint]:
     """Select auf alle MPs, deren Zaehlerstandort zu ``main_location_id`` gehoert.
 
     Aggregiert ueber den Join MeasuringPoint -> Location: MPs ohne Standort oder

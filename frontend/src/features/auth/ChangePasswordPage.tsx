@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { KeyRound } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 
 import { Button, Card, LargeTitle, TextField } from '@/components/ui';
 import { PageGlows } from '@/components/PageGlows';
@@ -32,7 +32,7 @@ export function ChangePasswordPage() {
         new_password: next,
       });
       await refresh();
-      navigate('/', { replace: true });
+      void navigate('/', { replace: true });
     } catch (err) {
       if (err instanceof ApiError) setError(err.problem.detail ?? err.problem.title);
       else setError('Konnte Passwort nicht ändern.');
@@ -47,8 +47,8 @@ export function ChangePasswordPage() {
       <div className="relative flex min-h-full items-center justify-center overflow-hidden bg-bg p-4 pt-safe-top">
         <PageGlows accent="electricity" />
         <Card className="relative z-10 w-full max-w-sm" padded={false}>
-          <div className="flex flex-col items-center gap-3 px-6 pb-2 pt-8 text-center">
-            <div className="bg-gradient-primary shadow-glow-primary flex h-14 w-14 items-center justify-center rounded-card text-white">
+          <div className="flex flex-col items-center gap-3 px-6 pt-8 pb-2 text-center">
+            <div className="flex h-14 w-14 items-center justify-center rounded-card text-white shadow-glow-primary bg-gradient-primary">
               <KeyRound size={26} strokeWidth={2.5} />
             </div>
             <div>
@@ -118,7 +118,7 @@ function FormBody({
   onSubmit: (e: FormEvent<HTMLFormElement>) => void;
 }) {
   return (
-    <form onSubmit={onSubmit} className="space-y-4 px-6 pb-6 pt-4">
+    <form onSubmit={onSubmit} className="space-y-4 px-6 pt-4 pb-6">
       <TextField
         label="Aktuelles Passwort"
         type="password"

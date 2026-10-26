@@ -12,11 +12,7 @@ import {
 } from './useMeasuringPointFilters';
 
 export type MasterDataResource =
-  | 'owners'
-  | 'suppliers'
-  | 'mieters'
-  | 'locations'
-  | 'main-locations';
+  'owners' | 'suppliers' | 'mieters' | 'locations' | 'main-locations';
 
 // Die zur Detailseite gehörende Dimension wird im Filter ausgeblendet — auf der
 // Hauptstandort-Seite kein Hauptstandort-Filter, auf der Eigentümer-Seite kein
@@ -56,10 +52,17 @@ export function RelatedMeasuringPoints({
   const [items, setItems] = useState<MeasuringPointWithStateRead[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    let active = true;
+  // Anderer Datensatz: alte Liste beim Rendern verwerfen, nicht im Effekt.
+  const loadKey = `${resource}/${id}`;
+  const [loadedKey, setLoadedKey] = useState(loadKey);
+  if (loadKey !== loadedKey) {
+    setLoadedKey(loadKey);
     setItems(null);
     setError(null);
+  }
+
+  useEffect(() => {
+    let active = true;
     api
       .get<MeasuringPointWithStateRead[]>(`/${resource}/${id}/measuring-points`)
       .then((data) => {

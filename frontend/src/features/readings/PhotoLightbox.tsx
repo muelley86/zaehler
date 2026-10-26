@@ -55,7 +55,7 @@ export function PhotoLightbox({
         type="button"
         onClick={onClose}
         aria-label="Schließen"
-        className="absolute right-4 top-4 inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20"
+        className="absolute top-4 right-4 inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20"
       >
         <X size={20} />
       </button>
@@ -69,7 +69,7 @@ export function PhotoLightbox({
               e.stopPropagation();
               setIndex((i) => (i - 1 + count) % count);
             }}
-            className="absolute left-4 top-1/2 inline-flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20"
+            className="absolute top-1/2 left-4 inline-flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20"
           >
             <ChevronLeft size={22} />
           </button>
@@ -80,11 +80,11 @@ export function PhotoLightbox({
               e.stopPropagation();
               setIndex((i) => (i + 1) % count);
             }}
-            className="absolute right-4 top-1/2 inline-flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20"
+            className="absolute top-1/2 right-4 inline-flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20"
           >
             <ChevronRight size={22} />
           </button>
-          <div className="absolute left-1/2 top-4 -translate-x-1/2 rounded-pill bg-black/60 px-3 py-1 text-caption text-white">
+          <div className="absolute top-4 left-1/2 -translate-x-1/2 rounded-pill bg-black/60 px-3 py-1 text-caption text-white">
             {safeIndex + 1} / {count}
           </div>
         </>
@@ -99,7 +99,7 @@ export function PhotoLightbox({
       {hasGps ? (
         <div
           data-testid="photo-lightbox-gps"
-          className="absolute bottom-[calc(env(safe-area-inset-bottom)+1rem)] left-1/2 flex max-w-[calc(100%-1rem)] -translate-x-1/2 flex-wrap items-center justify-center gap-2 rounded-card bg-black/70 px-4 py-3 text-caption text-white backdrop-blur"
+          className="absolute bottom-[calc(env(safe-area-inset-bottom)+1rem)] left-1/2 flex max-w-[calc(100%-1rem)] -translate-x-1/2 flex-wrap items-center justify-center gap-2 rounded-card bg-black/70 px-4 py-3 text-caption text-white backdrop-blur-sm"
           onClick={(e) => e.stopPropagation()}
         >
           <span className="flex items-center gap-1.5">

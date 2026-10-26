@@ -12,7 +12,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
 import { Pencil, Plus, Sigma, Trash2 } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 
 import {
   Button,
@@ -151,7 +151,7 @@ function VmpCard({
     <Card>
       <div className="flex items-start justify-between gap-3">
         <div className="flex min-w-0 items-start gap-3">
-          <div className="bg-gradient-primary shadow-glow-primary flex h-11 w-11 shrink-0 items-center justify-center rounded-card text-white">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-card text-white shadow-glow-primary bg-gradient-primary">
             <Sigma size={20} strokeWidth={2} />
           </div>
           <div className="min-w-0">
@@ -194,7 +194,7 @@ function VmpCard({
         {vmp.components.map((c) => (
           <li
             key={c.id}
-            className="bg-fill/40 flex items-center gap-2 rounded-pill border-hairline border-border px-3 py-1.5 text-body-sm"
+            className="flex items-center gap-2 rounded-pill border-hairline border-border bg-fill/40 px-3 py-1.5 text-body-sm"
           >
             <span
               className={`num w-4 shrink-0 text-center font-semibold ${
@@ -347,7 +347,7 @@ function VmpForm({
       </Select>
 
       <div className="space-y-2">
-        <div className="text-caption-bold uppercase text-tertiary">Komponenten</div>
+        <div className="text-caption-bold text-tertiary uppercase">Komponenten</div>
         {components.length === 0 ? (
           <div className="text-caption text-tertiary">
             Diese Verrechnung hat keine Komponenten — sie liefert keine Werte, bis Komponenten

@@ -118,7 +118,7 @@ export function ExcelImportSection({ base, onApplied }: { base: string; onApplie
           Vorschau.
         </p>
         <label className="block">
-          <span className="mb-1.5 block text-caption-bold uppercase text-tertiary">
+          <span className="mb-1.5 block text-caption-bold text-tertiary uppercase">
             Monats-JSON wählen
           </span>
           <input

@@ -11,8 +11,8 @@ import { server } from '@/tests/server';
 
 import { BillingAttachmentPage } from './BillingAttachmentPage';
 
-vi.mock('react-router-dom', async () => {
-  const actual = await vi.importActual<typeof import('react-router-dom')>('react-router-dom');
+vi.mock('react-router', async () => {
+  const actual = await vi.importActual<typeof import('react-router')>('react-router');
   const params = { id: '1', runId: '7' };
   return { ...actual, useParams: () => params };
 });

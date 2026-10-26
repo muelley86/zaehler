@@ -293,7 +293,7 @@ function SortablePosition({
       ref={setNodeRef}
       style={{ transform: CSS.Translate.toString(transform), transition }}
       className={cx(
-        'flex items-center gap-2 py-3 pl-3 pr-5',
+        'flex items-center gap-2 py-3 pr-5 pl-3',
         // Gebändert: jede zweite Position hinterlegt. Beim Ziehen aus, sonst schlüge
         // `even:` (höhere Spezifität) den festen Drag-Hintergrund.
         isDragging ? cx(DRAGGING, 'bg-surface-solid') : 'even:bg-fill',

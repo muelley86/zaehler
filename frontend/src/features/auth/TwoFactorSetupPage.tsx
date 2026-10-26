@@ -19,7 +19,7 @@ export function TwoFactorSetupPage() {
       <PageGlows accent="electricity" />
       <div className="relative z-10 mx-auto max-w-md space-y-5 p-4 pt-safe-top md:p-7">
         <div className="flex flex-col items-center gap-3 pt-6 text-center">
-          <div className="bg-gradient-primary shadow-glow-primary flex h-14 w-14 items-center justify-center rounded-card text-white">
+          <div className="flex h-14 w-14 items-center justify-center rounded-card text-white shadow-glow-primary bg-gradient-primary">
             <ShieldAlert size={26} strokeWidth={2.5} />
           </div>
           <div>

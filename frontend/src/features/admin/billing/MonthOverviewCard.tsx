@@ -4,7 +4,7 @@
  * führt per Klick zum Lauf bzw. zum Kreis. Der Zeitraum lässt sich jahrweise verschieben.
  */
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 import { Button, Section } from '@/components/ui';
@@ -142,7 +142,7 @@ export function MonthOverviewCard({ tick = 0 }: { tick?: number }) {
                           }
                           title={`${k.code} ${kurz(z.monat)}: ${titel(z)}`}
                           aria-label={`${k.code} ${kurz(z.monat)}: ${titel(z)}`}
-                          className={`inline-block w-7 rounded px-1 py-0.5 ${STATUS_CLASS[z.status]}`}
+                          className={`inline-block w-7 rounded-sm px-1 py-0.5 ${STATUS_CLASS[z.status]}`}
                         >
                           {STATUS_LABEL[z.status]}
                         </Link>

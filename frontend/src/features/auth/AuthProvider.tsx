@@ -23,34 +23,41 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [me, setMe] = useState<Me | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const refresh = useCallback(async () => {
-    try {
-      const data = await api.get<Me>('/auth/me');
-      setMe(data);
-      saveMeSnapshot(data);
-    } catch (err) {
-      if (err instanceof ApiError && err.status === 401) {
-        // Server sagt explizit "nicht angemeldet" — Snapshot ist damit
-        // ungültig und darf keinen Offline-Kaltstart mehr ermöglichen.
-        setMe(null);
-        clearMeSnapshot();
-        // Dashboard-Cache mitpurgen — sonst kann ein späterer Login als
-        // anderer User (MP-Zugriffsfilter!) im ersten Frame noch die
-        // Aggregate des vorherigen Users sehen (siehe `logout` unten).
-        clearDashboardCache();
-      } else if (err instanceof NetworkError) {
-        // Server nicht erreichbar (unterwegs, Server nur im Heimnetz):
-        // letzten bekannten User wiederherstellen, damit die App mit
-        // gecachten Daten rendert statt auf "Lade…" zu hängen. Ohne
-        // Snapshot bleibt es bei der Login-Seite.
-        setMe(loadMeSnapshot());
-      } else {
-        throw err;
-      }
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  // Als Promise-Kette statt try/await: der Initial-Aufruf aus dem Effekt setzt
+  // State so nachweislich erst im Callback (react-hooks/set-state-in-effect).
+  const refresh = useCallback(
+    (): Promise<void> =>
+      api
+        .get<Me>('/auth/me')
+        .then(
+          (data) => {
+            setMe(data);
+            saveMeSnapshot(data);
+          },
+          (err: unknown) => {
+            if (err instanceof ApiError && err.status === 401) {
+              // Server sagt explizit "nicht angemeldet" — Snapshot ist damit
+              // ungültig und darf keinen Offline-Kaltstart mehr ermöglichen.
+              setMe(null);
+              clearMeSnapshot();
+              // Dashboard-Cache mitpurgen — sonst kann ein späterer Login als
+              // anderer User (MP-Zugriffsfilter!) im ersten Frame noch die
+              // Aggregate des vorherigen Users sehen (siehe `logout` unten).
+              clearDashboardCache();
+            } else if (err instanceof NetworkError) {
+              // Server nicht erreichbar (unterwegs, Server nur im Heimnetz):
+              // letzten bekannten User wiederherstellen, damit die App mit
+              // gecachten Daten rendert statt auf "Lade…" zu hängen. Ohne
+              // Snapshot bleibt es bei der Login-Seite.
+              setMe(loadMeSnapshot());
+            } else {
+              throw err;
+            }
+          },
+        )
+        .finally(() => setLoading(false)),
+    [],
+  );
 
   useEffect(() => {
     void refresh();

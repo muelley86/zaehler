@@ -72,7 +72,7 @@ export function DashboardTile({
         >
           <GripVertical size={16} aria-hidden />
         </button>
-        <h2 className="flex-1 truncate px-1 text-caption-bold uppercase text-tertiary">
+        <h2 className="flex-1 truncate px-1 text-caption-bold text-tertiary uppercase">
           {count !== undefined && count > 0 ? `${title} · ${count}` : title}
         </h2>
         <button

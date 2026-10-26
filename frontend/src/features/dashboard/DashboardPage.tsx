@@ -32,7 +32,7 @@ import {
   sortableKeyboardCoordinates,
 } from '@dnd-kit/sortable';
 import { Filter, Loader2, Plus } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 
 import { Button, Card, EmptyState, LargeTitle, Section } from '@/components/ui';
 import { PageGlows } from '@/components/PageGlows';
@@ -257,7 +257,7 @@ export function DashboardPage() {
           {data?.partial ? (
             <div
               role="note"
-              className="bg-fill/60 rounded-card border-hairline border-border px-4 py-3 text-caption text-secondary"
+              className="rounded-card border-hairline border-border bg-fill/60 px-4 py-3 text-caption text-secondary"
             >
               {PARTIAL_HINT}
             </div>

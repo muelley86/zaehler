@@ -86,13 +86,13 @@ describe('useMediaQuery', () => {
     vi.spyOn(window, 'matchMedia').mockImplementation(() => {
       throw new Error('matchMedia sollte nicht aufgerufen werden');
     });
-    const original = window.matchMedia;
+    const original = Object.getOwnPropertyDescriptor(window, 'matchMedia');
     Object.defineProperty(window, 'matchMedia', { value: undefined, configurable: true });
 
     const { result } = renderHook(() => useMediaQuery(DESKTOP_QUERY));
     expect(result.current).toBe(false);
 
-    Object.defineProperty(window, 'matchMedia', { value: original, configurable: true });
+    if (original) Object.defineProperty(window, 'matchMedia', original);
   });
 
   it('useIsDesktop nutzt die Desktop-Breakpoint-Query (Tailwind md)', () => {

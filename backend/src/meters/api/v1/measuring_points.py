@@ -243,7 +243,7 @@ def _to_state_read(s: RegisterState) -> RegisterStateRead:
 
 def measuring_points_with_state(
     db: DbSession,
-    stmt: Select[tuple[MeasuringPoint]],
+    stmt: Select[MeasuringPoint],
     user: User,
 ) -> list[MeasuringPointWithStateRead]:
     """Fuehrt ``stmt`` (Select auf MeasuringPoint) unter Zugriffs-Restriktion aus

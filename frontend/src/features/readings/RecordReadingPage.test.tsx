@@ -15,7 +15,7 @@ import { http, HttpResponse } from 'msw';
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 
 import { resetOfflineDbForTests } from '@/lib/offline/db';
 import { enqueueGroup, listItems } from '@/lib/offline/outbox';
@@ -194,7 +194,7 @@ describe('RecordReadingPage', () => {
     renderWithRouter(<RecordReadingPage />, { initialEntries: ['/erfassen?mp=999'] });
     expect(await screen.findByTestId('record-param-warning')).toHaveTextContent(/999/);
     // Default-MP greift trotzdem.
-    expect(screen.getByText('Bezug')).toBeInTheDocument();
+    expect(await screen.findByText('Bezug')).toBeInTheDocument();
   });
 
   it('haengt ein Foto an erfolgreiche Readings an und meldet Erfolg', async () => {
@@ -439,7 +439,7 @@ describe('RecordReadingPage', () => {
     function ScanTrigger() {
       const navigate = useNavigate();
       return (
-        <button type="button" onClick={() => navigate('/erfassen?mp=2')}>
+        <button type="button" onClick={() => void navigate('/erfassen?mp=2')}>
           simulate-scan
         </button>
       );

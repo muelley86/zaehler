@@ -18,9 +18,10 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 import { Camera, X } from 'lucide-react';
 
+import { useLatestRef } from '@/lib/useLatestRef';
 import { parseScannedUrl } from './parseScannedUrl';
 
 /** Minimaler Subtype der ``html5-qrcode``-API, damit der dynamische Import
@@ -96,10 +97,8 @@ export function QrScanSheet({ open, onClose }: QrScanSheetProps) {
 
   // Refs für Callbacks, die der Parent pro Render möglicherweise neu erzeugt.
   // Damit bleibt der Camera-Effect unabhängig vom Render-Zyklus stabil.
-  const navigateRef = useRef(navigate);
-  navigateRef.current = navigate;
-  const onCloseRef = useRef(onClose);
-  onCloseRef.current = onClose;
+  const navigateRef = useLatestRef(navigate);
+  const onCloseRef = useLatestRef(onClose);
 
   // Stop & clear in einem zentralen Helper, damit Unmount, manueller Close
   // und Erfolgs-Pfad alle dieselbe Cleanup-Sequenz verwenden.
@@ -119,11 +118,20 @@ export function QrScanSheet({ open, onClose }: QrScanSheetProps) {
     }
   }, []);
 
+  // Beim Öffnen frisch starten: alten Fehler weg, Start-Hinweis an. Während
+  // des Renders (Prop-Wechsel), damit schon der erste Frame stimmt.
+  const [wasOpen, setWasOpen] = useState(false);
+  if (open !== wasOpen) {
+    setWasOpen(open);
+    if (open) {
+      setError(null);
+      setStarting(true);
+    }
+  }
+
   useEffect(() => {
     if (!open) return;
     let cancelled = false;
-    setError(null);
-    setStarting(true);
 
     void (async () => {
       try {
@@ -204,7 +212,7 @@ export function QrScanSheet({ open, onClose }: QrScanSheetProps) {
               result.kind === 'token'
                 ? `/erfassen?token=${result.token}`
                 : `/erfassen?mp=${result.mp}`;
-            navigateRef.current(target);
+            void navigateRef.current(target);
             onCloseRef.current();
           },
           () => {
@@ -311,7 +319,7 @@ export function QrScanSheet({ open, onClose }: QrScanSheetProps) {
     };
     // navigate und onClose absichtlich NICHT in den Deps — wir lesen sie
     // über die Refs und vermeiden dadurch unnötige Stream-Neustarts.
-  }, [open, teardown]);
+  }, [open, teardown, navigateRef, onCloseRef]);
 
   // Body-Scroll-Lock + ESC analog zur Sheet-Komponente. Der Scanner braucht
   // ein eigenes Layout (Vollbild Video), darum kein Re-Use des Sheet-UI.
@@ -327,7 +335,7 @@ export function QrScanSheet({ open, onClose }: QrScanSheetProps) {
       document.removeEventListener('keydown', onKey);
       document.body.style.overflow = previous;
     };
-  }, [open]);
+  }, [open, onCloseRef]);
 
   if (!open) return null;
 
@@ -372,14 +380,14 @@ export function QrScanSheet({ open, onClose }: QrScanSheetProps) {
         {unknownDecoded ? (
           <div
             data-testid="qr-scan-unknown"
-            className="absolute bottom-4 left-1/2 max-w-[calc(100%-1rem)] -translate-x-1/2 rounded-card bg-black/80 px-4 py-2 text-caption text-white backdrop-blur"
+            className="absolute bottom-4 left-1/2 max-w-[calc(100%-1rem)] -translate-x-1/2 rounded-card bg-black/80 px-4 py-2 text-caption text-white backdrop-blur-sm"
           >
             Code erkannt, aber nicht zuordenbar: <span className="num">„{unknownDecoded}"</span>
           </div>
         ) : null}
       </div>
 
-      <div className="px-4 pb-[env(safe-area-inset-bottom)] pt-3 text-center text-caption text-white/80">
+      <div className="px-4 pt-3 pb-[env(safe-area-inset-bottom)] text-center text-caption text-white/80">
         {error ? (
           <div className="mx-auto max-w-md rounded-card border-hairline border-white/20 bg-white/5 p-3 text-white">
             {error}

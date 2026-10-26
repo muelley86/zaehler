@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { Gauge, ShieldCheck } from 'lucide-react';
-import { Navigate, useLocation, useNavigate } from 'react-router-dom';
+import { Navigate, useLocation, useNavigate } from 'react-router';
 
 import { Button, Card, TextField } from '@/components/ui';
 import { PageGlows } from '@/components/PageGlows';
@@ -41,7 +41,7 @@ export function LoginPage() {
         setCode('');
         setStep('totp');
       } else {
-        navigate(result.me.force_password_change ? '/passwort-aendern' : '/', {
+        void navigate(result.me.force_password_change ? '/passwort-aendern' : '/', {
           replace: true,
         });
       }
@@ -61,7 +61,7 @@ export function LoginPage() {
     setError(null);
     try {
       const next = await verifyTotp(challengeToken, code);
-      navigate(next.force_password_change ? '/passwort-aendern' : '/', {
+      void navigate(next.force_password_change ? '/passwort-aendern' : '/', {
         replace: true,
       });
     } catch (err) {
@@ -84,8 +84,8 @@ export function LoginPage() {
     <div className="relative flex min-h-full items-center justify-center overflow-hidden bg-bg p-4 pt-safe-top">
       <PageGlows accent="electricity" />
       <Card className="relative z-10 w-full max-w-sm" padded={false}>
-        <div className="flex flex-col items-center gap-3 px-6 pb-2 pt-8 text-center">
-          <div className="bg-gradient-primary shadow-glow-primary flex h-14 w-14 items-center justify-center rounded-card text-white">
+        <div className="flex flex-col items-center gap-3 px-6 pt-8 pb-2 text-center">
+          <div className="flex h-14 w-14 items-center justify-center rounded-card text-white shadow-glow-primary bg-gradient-primary">
             {step === 'credentials' ? (
               <Gauge size={28} strokeWidth={2.5} />
             ) : (
@@ -103,7 +103,7 @@ export function LoginPage() {
         {step === 'credentials' ? (
           <form
             onSubmit={(e) => void handleSubmitCredentials(e)}
-            className="space-y-4 px-6 pb-6 pt-4"
+            className="space-y-4 px-6 pt-4 pb-6"
           >
             <TextField
               label="Benutzername"
@@ -127,7 +127,7 @@ export function LoginPage() {
             </Button>
           </form>
         ) : (
-          <form onSubmit={(e) => void handleSubmitTotp(e)} className="space-y-4 px-6 pb-6 pt-4">
+          <form onSubmit={(e) => void handleSubmitTotp(e)} className="space-y-4 px-6 pt-4 pb-6">
             <div className="text-body-sm text-secondary">
               Gib den 6-stelligen Code aus deiner Authenticator-App ein. Alternativ funktioniert
               auch ein 16-stelliger Backup-Code.

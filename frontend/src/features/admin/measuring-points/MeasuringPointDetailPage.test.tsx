@@ -11,7 +11,7 @@
  *    Register-Section (HeatingRegisterEditor); Strom nicht.
  *
  * Mocking-Notizen:
- * - vi.mock('react-router-dom', ...) muss STABILE Referenzen zurückgeben
+ * - vi.mock('react-router', ...) muss STABILE Referenzen zurückgeben
  *   (kein vi.fn() in der Factory) — sonst sieht React bei jedem Render
  *   neue navigate-Identity, useEffect mit [navigate] als Dep läuft endlos.
  * - LocationMapSheet (Leaflet) und QrCodeCard / MpAccessCard sind als
@@ -39,8 +39,8 @@ vi.mock('@/features/auth/auth-context', () => ({
   }),
 }));
 
-vi.mock('react-router-dom', async () => {
-  const actual = await vi.importActual<typeof import('react-router-dom')>('react-router-dom');
+vi.mock('react-router', async () => {
+  const actual = await vi.importActual<typeof import('react-router')>('react-router');
   // STABILE Referenzen für useParams/useNavigate, sonst sieht React bei
   // jedem Render eine neue navigate-Identity und der useEffect mit
   // [mpId, navigate, tick] läuft endlos. Dependency-Stable-Mocks sind
@@ -83,6 +83,14 @@ const _baseRegister = {
   max_value: '0',
   accepts_deliveries: false,
 };
+
+// Die Picker-Buttons bleiben disabled, bis die Master-Liste geladen ist —
+// ein Klick davor ist ein No-op. Deshalb erst auf "enabled" warten.
+async function _clickWhenEnabled(name: string | RegExp) {
+  const button = await screen.findByRole('button', { name });
+  await waitFor(() => expect(button).toBeEnabled());
+  fireEvent.click(button);
+}
 
 /** Wählt im durchsuchbaren Zuordnungs-Dropdown (Feld ``label``, noch leer) die Option. */
 async function _pickOption(label: string, option: string) {
@@ -462,7 +470,7 @@ describe('MeasuringPointDetailPage Eigentümer-Historie', () => {
     renderWithRouter(<MeasuringPointDetailPage />, {
       initialEntries: ['/admin/messstellen/1'],
     });
-    fireEvent.click(await screen.findByRole('button', { name: /^Periode hinzufügen$/ }));
+    await _clickWhenEnabled(/^Periode hinzufügen$/);
     await _pickOption('Eigentümer', 'Bob AG');
     fireEvent.change(screen.getByLabelText(/Gültig ab/i), { target: { value: '2020-01-01' } });
     fireEvent.change(screen.getByLabelText(/Gültig bis/i), { target: { value: '2021-01-01' } });
@@ -548,7 +556,7 @@ describe('MeasuringPointDetailPage Eigentümer-Historie', () => {
     renderWithRouter(<MeasuringPointDetailPage />, {
       initialEntries: ['/admin/messstellen/1'],
     });
-    fireEvent.click(await screen.findByRole('button', { name: /^Periode hinzufügen$/ }));
+    await _clickWhenEnabled(/^Periode hinzufügen$/);
     await _pickOption('Eigentümer', 'Alice GmbH');
     fireEvent.change(screen.getByLabelText(/Gültig ab/i), { target: { value: '2024-06-01' } });
     fireEvent.click(screen.getByRole('button', { name: /Speichern/i }));
@@ -618,7 +626,7 @@ describe('MeasuringPointDetailPage Lieferanten-Historie', () => {
     renderWithRouter(<MeasuringPointDetailPage />, {
       initialEntries: ['/admin/messstellen/1'],
     });
-    fireEvent.click(await screen.findByRole('button', { name: /Lieferant wechseln/i }));
+    await _clickWhenEnabled(/Lieferant wechseln/i);
     await _pickOption('Neuer Lieferant', 'Regionalwerk');
     fireEvent.change(screen.getByLabelText(/Wechsel zum/i), { target: { value: '2025-06-01' } });
     fireEvent.click(screen.getByRole('button', { name: /^Wechseln$/ }));
@@ -648,7 +656,7 @@ describe('MeasuringPointDetailPage Lieferanten-Historie', () => {
     renderWithRouter(<MeasuringPointDetailPage />, {
       initialEntries: ['/admin/messstellen/1'],
     });
-    fireEvent.click(await screen.findByRole('button', { name: 'Lieferanten-Periode hinzufügen' }));
+    await _clickWhenEnabled('Lieferanten-Periode hinzufügen');
     await _pickOption('Lieferant', 'Regionalwerk');
     fireEvent.change(screen.getByLabelText(/Gültig ab/i), { target: { value: '2020-01-01' } });
     fireEvent.change(screen.getByLabelText(/Gültig bis/i), { target: { value: '2021-01-01' } });

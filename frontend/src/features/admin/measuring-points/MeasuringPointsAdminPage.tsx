@@ -14,7 +14,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 
 import {
   Button,
@@ -335,9 +335,10 @@ export function MeasuringPointsAdminPage() {
             <MultiSelectDropdown
               label="Eigentümer"
               options={[
-                ...ownerOptions.map(
-                  ([id, name]): DropdownOption<number | null> => ({ value: id, label: name }),
-                ),
+                ...ownerOptions.map(([id, name]): DropdownOption<number | null> => ({
+                  value: id,
+                  label: name,
+                })),
                 { value: null, label: 'ohne Eigentümer' } satisfies DropdownOption<number | null>,
               ]}
               selected={ownerFilter}
@@ -348,9 +349,10 @@ export function MeasuringPointsAdminPage() {
             <MultiSelectDropdown
               label="Lieferant"
               options={[
-                ...supplierOptions.map(
-                  ([id, name]): DropdownOption<number | null> => ({ value: id, label: name }),
-                ),
+                ...supplierOptions.map(([id, name]): DropdownOption<number | null> => ({
+                  value: id,
+                  label: name,
+                })),
                 { value: null, label: 'ohne Lieferant' } satisfies DropdownOption<number | null>,
               ]}
               selected={supplierFilter}
@@ -361,9 +363,10 @@ export function MeasuringPointsAdminPage() {
             <MultiSelectDropdown
               label="Mieter"
               options={[
-                ...mieterOptions.map(
-                  ([id, name]): DropdownOption<number | null> => ({ value: id, label: name }),
-                ),
+                ...mieterOptions.map(([id, name]): DropdownOption<number | null> => ({
+                  value: id,
+                  label: name,
+                })),
                 { value: null, label: 'ohne Mieter' } satisfies DropdownOption<number | null>,
               ]}
               selected={mieterFilter}
@@ -374,9 +377,10 @@ export function MeasuringPointsAdminPage() {
             <MultiSelectDropdown
               label="Hauptstandort"
               options={[
-                ...mainLocationOptions.map(
-                  ([id, name]): DropdownOption<number | null> => ({ value: id, label: name }),
-                ),
+                ...mainLocationOptions.map(([id, name]): DropdownOption<number | null> => ({
+                  value: id,
+                  label: name,
+                })),
                 {
                   value: null,
                   label: 'ohne Hauptstandort',
@@ -390,9 +394,10 @@ export function MeasuringPointsAdminPage() {
             <MultiSelectDropdown
               label="Standort"
               options={[
-                ...locationOptions.map(
-                  ([id, name]): DropdownOption<number | null> => ({ value: id, label: name }),
-                ),
+                ...locationOptions.map(([id, name]): DropdownOption<number | null> => ({
+                  value: id,
+                  label: name,
+                })),
                 { value: null, label: 'ohne Standort' } satisfies DropdownOption<number | null>,
               ]}
               selected={locationFilter}
@@ -473,7 +478,7 @@ function MPCard({
     <Card padded={false}>
       <Link
         to={`/admin/messstellen/${mp.id}`}
-        className="hover:bg-fill/40 flex items-center gap-2 px-5 py-4 transition-colors"
+        className="flex items-center gap-2 px-5 py-4 transition-colors hover:bg-fill/40"
         aria-label={`Messstelle ${mp.name} öffnen`}
       >
         <TypeBadge type={mp.type} size="sm" />
@@ -511,7 +516,7 @@ function MPCard({
 function DueBadge({ lastReadingAt, now }: { lastReadingAt: string | null | undefined; now: Date }) {
   const days = daysSince(lastReadingAt, now);
   return (
-    <span className="shrink-0 whitespace-nowrap rounded-full bg-warning/15 px-2 py-0.5 text-caption font-medium text-warning">
+    <span className="shrink-0 rounded-full bg-warning/15 px-2 py-0.5 text-caption font-medium whitespace-nowrap text-warning">
       {days === null ? 'nie abgelesen' : `fällig · ${days} Tage`}
     </span>
   );
@@ -543,7 +548,7 @@ function CreateForm({
           type="button"
           onClick={() => setOpen(true)}
           className={cx(
-            'hover:bg-fill/40 flex w-full items-center gap-2 px-5 py-3.5 text-left text-body font-semibold text-primary-deep transition-colors',
+            'flex w-full items-center gap-2 px-5 py-3.5 text-left text-body font-semibold text-primary-deep transition-colors hover:bg-fill/40',
           )}
         >
           <Plus size={16} strokeWidth={2.5} />
@@ -551,7 +556,7 @@ function CreateForm({
         </button>
       ) : type === null ? (
         <div className="space-y-2 p-5">
-          <div className="text-caption-bold uppercase text-tertiary">Welcher Messstellen-Typ?</div>
+          <div className="text-caption-bold text-tertiary uppercase">Welcher Messstellen-Typ?</div>
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
             {(['electricity', 'water', 'heating'] as MeterType[]).map((t) => (
               <button
@@ -939,7 +944,7 @@ function RegisterDraftList({
   }
   return (
     <div className="space-y-2">
-      <div className="text-caption-bold uppercase text-tertiary">Register</div>
+      <div className="text-caption-bold text-tertiary uppercase">Register</div>
       {registers.map((r, idx) => (
         <div key={idx} className="space-y-2 rounded-card border-hairline border-border bg-fill p-3">
           <div className="flex items-start gap-2">

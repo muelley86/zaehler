@@ -42,10 +42,16 @@ export function MeasuringPointNotes({ mpId, variant }: MeasuringPointNotesProps)
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
 
-  useEffect(() => {
-    let cancelled = false;
+  // Andere Messstelle: alte Notizen beim Rendern verwerfen, nicht im Effekt.
+  const [loadedMpId, setLoadedMpId] = useState(mpId);
+  if (mpId !== loadedMpId) {
+    setLoadedMpId(mpId);
     setNotes(null);
     setLoadError(null);
+  }
+
+  useEffect(() => {
+    let cancelled = false;
     api
       .get<MeasuringPointNoteRead[]>(`/measuring-points/${mpId}/notes`)
       .then((rows) => {
@@ -99,14 +105,14 @@ export function MeasuringPointNotes({ mpId, variant }: MeasuringPointNotesProps)
       <div className="text-body-sm text-tertiary">Lade…</div>
     ) : notes.length === 0 ? (
       variant === 'card' ? (
-        <div className="text-caption italic text-quaternary">Noch keine Notizen.</div>
+        <div className="text-caption text-quaternary italic">Noch keine Notizen.</div>
       ) : null
     ) : (
-      <ul className="bg-fill/60 divide-y divide-separator overflow-hidden rounded-card border-hairline border-border">
+      <ul className="divide-y divide-separator overflow-hidden rounded-card border-hairline border-border bg-fill/60">
         {notes.map((n) => (
           <li key={n.id} className="flex items-start gap-3 px-4 py-3">
             <div className="min-w-0 flex-1">
-              <div className="whitespace-pre-wrap break-words text-body-sm text-label">
+              <div className="text-body-sm break-words whitespace-pre-wrap text-label">
                 {n.text}
               </div>
               <div className="mt-1 text-caption text-tertiary">
@@ -140,7 +146,7 @@ export function MeasuringPointNotes({ mpId, variant }: MeasuringPointNotesProps)
           maxLength={NOTE_MAX_LENGTH}
           rows={3}
           placeholder="Notiz zur Messstelle …"
-          className="w-full resize-y rounded-card border-hairline border-border bg-fill px-3.5 py-2.5 text-body text-label outline-none transition-colors placeholder:text-quaternary focus:border-primary focus:bg-surface-solid"
+          className="w-full resize-y rounded-card border-hairline border-border bg-fill px-3.5 py-2.5 text-body text-label outline-hidden transition-colors placeholder:text-quaternary focus:border-primary focus:bg-surface-solid"
         />
       </label>
       <div className="flex items-center justify-between gap-2">
@@ -203,7 +209,7 @@ export function MeasuringPointNotes({ mpId, variant }: MeasuringPointNotesProps)
   return (
     <Card>
       <div className="flex items-center justify-between">
-        <div className="text-caption-bold uppercase text-tertiary">Notizen</div>
+        <div className="text-caption-bold text-tertiary uppercase">Notizen</div>
         {notes !== null ? (
           <div className="inline-flex items-center gap-1.5 text-caption text-tertiary">
             <StickyNote size={14} />

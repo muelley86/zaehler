@@ -4,7 +4,7 @@
  * die Anzahl steht auch eingeklappt im Kopf.
  */
 import { useEffect, useId, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 
 import { Section, TextField } from '@/components/ui';

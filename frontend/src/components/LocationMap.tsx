@@ -125,7 +125,7 @@ function LayerSwitcher({ value, onChange }: { value: LayerId; onChange: (l: Laye
   ];
   return (
     <div
-      className="absolute right-2 top-2 z-[1000] flex gap-0.5 rounded-pill border-hairline border-border bg-surface-high p-0.5 shadow-sm"
+      className="absolute top-2 right-2 z-[1000] flex gap-0.5 rounded-pill border-hairline border-border bg-surface-high p-0.5 shadow-xs"
       role="radiogroup"
       aria-label="Karten-Stil"
     >

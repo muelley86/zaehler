@@ -9,6 +9,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { ApiError, api } from '@/lib/api';
 import type { ReportAggregateResponse, ReportDimension, ReportGranularity } from '@/lib/types';
+import { useLatestRef } from '@/lib/useLatestRef';
 
 /** Alles, was ein Lauf braucht — Query-Strings plus die Anzeige-Parameter dazu. */
 export interface ReportRunInput {
@@ -54,8 +55,7 @@ export function useReportQuery(pending: ReportRunInput): ReportQueryState {
 
   // Latest-Ref: `execute` behält eine stabile Identität und liest trotzdem
   // immer die aktuellen Filter.
-  const pendingRef = useRef(pending);
-  pendingRef.current = pending;
+  const pendingRef = useLatestRef(pending);
 
   const execute = useCallback(() => {
     controllerRef.current?.abort();
@@ -83,7 +83,7 @@ export function useReportQuery(pending: ReportRunInput): ReportQueryState {
         setLoading(false);
         setError(errorMessage(err));
       });
-  }, []);
+  }, [pendingRef]);
 
   useEffect(() => () => controllerRef.current?.abort(), []);
 

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 
 import type { DropdownOption } from '@/components/ui';
 import { TYPE_LABELS, TYPE_ORDER } from '@/lib/meterLabels';
@@ -76,13 +76,16 @@ export function useMeasuringPointFilters(
 
   // Filter zurücksetzen, sobald eine neue Liste geladen wird (anderer Datensatz)
   // — sonst überschwappt eine Auswahl beim Wechsel zwischen Entitäten.
-  useEffect(() => {
+  // Während des Renders statt im Effekt: kein Frame mit alter Auswahl.
+  const [filteredItems, setFilteredItems] = useState(items);
+  if (items !== filteredItems) {
+    setFilteredItems(items);
     setType(new Set());
     setOwner(new Set());
     setSupplier(new Set());
     setMieter(new Set());
     setMainLocation(new Set());
-  }, [items]);
+  }
 
   const list = useMemo(() => items ?? [], [items]);
 

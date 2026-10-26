@@ -4,7 +4,7 @@
  */
 import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router';
 
 import { Button, Section, TextField } from '@/components/ui';
 import { api } from '@/lib/api';
@@ -48,7 +48,7 @@ export function BillingRunsSection({ circleId }: { circleId: number }) {
         monat,
         begruendung: begruendung.trim() || null,
       });
-      navigate(`/admin/abrechnungskreise/${circleId}/laeufe/${run.id}`);
+      void navigate(`/admin/abrechnungskreise/${circleId}/laeufe/${run.id}`);
     } catch (err) {
       setError(errorText(err, 'Anlegen fehlgeschlagen.'));
     } finally {

@@ -158,9 +158,10 @@ export function QrCodesAdminPage() {
   // Filter-Wechsel resetet die Pagination auf Seite 0 — sonst koennte der
   // User auf einer leeren Seite landen, wenn der neue Filter weniger
   // Tokens hat.
-  useEffect(() => {
+  function changeFilter(next: Filter) {
+    setFilter(next);
     setPage(0);
-  }, [filter]);
+  }
 
   useEffect(() => {
     api
@@ -348,13 +349,13 @@ export function QrCodesAdminPage() {
       </Section>
 
       <div className="flex flex-wrap items-center gap-1.5">
-        <Pill active={filter === 'all'} onClick={() => setFilter('all')}>
+        <Pill active={filter === 'all'} onClick={() => changeFilter('all')}>
           Alle · {counts.all}
         </Pill>
-        <Pill active={filter === 'assigned'} onClick={() => setFilter('assigned')}>
+        <Pill active={filter === 'assigned'} onClick={() => changeFilter('assigned')}>
           Zugeordnet · {counts.assigned}
         </Pill>
-        <Pill active={filter === 'unassigned'} onClick={() => setFilter('unassigned')}>
+        <Pill active={filter === 'unassigned'} onClick={() => changeFilter('unassigned')}>
           Frei · {counts.unassigned}
         </Pill>
 
@@ -507,7 +508,7 @@ function CreateForm({ onCreated }: { onCreated: () => void }) {
         <button
           type="button"
           onClick={() => setOpen(true)}
-          className="hover:bg-fill/40 flex w-full items-center gap-2 px-5 py-3.5 text-left text-body font-semibold text-primary-deep transition-colors"
+          className="flex w-full items-center gap-2 px-5 py-3.5 text-left text-body font-semibold text-primary-deep transition-colors hover:bg-fill/40"
         >
           <Plus size={16} strokeWidth={2.5} />
           QR-Codes auf Vorrat erzeugen
@@ -588,9 +589,9 @@ function PrintParamsPanel({
   }
 
   return (
-    <div className="bg-fill/40 rounded-card border-hairline border-border p-4">
+    <div className="rounded-card border-hairline border-border bg-fill/40 p-4">
       <div className="mb-3 flex items-center justify-between">
-        <span className="text-caption-bold uppercase text-tertiary">
+        <span className="text-caption-bold text-tertiary uppercase">
           Druckparameter — {layout.name}
         </span>
         {override ? (

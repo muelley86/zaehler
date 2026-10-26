@@ -17,7 +17,7 @@
  */
 
 import { http, HttpResponse } from 'msw';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
@@ -123,8 +123,10 @@ function _mockEndpoints(initial: ReturnType<typeof _reading>[]) {
 }
 
 describe('ReadingsListPage — Mehrfach-Löschen', () => {
+  let confirmSpy: MockInstance<typeof window.confirm>;
+
   beforeEach(() => {
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
     vi.spyOn(window, 'alert').mockImplementation(() => {});
     // AbortSignal unter jsdom strippen (siehe Datei-Kommentar).
     const realGet = api.get;
@@ -155,7 +157,7 @@ describe('ReadingsListPage — Mehrfach-Löschen', () => {
 
     await waitFor(() => expect(bulkBody).not.toBeNull());
     expect(bulkBody).toEqual({ ids: [501] });
-    expect(window.confirm).toHaveBeenCalledOnce();
+    expect(confirmSpy).toHaveBeenCalledOnce();
   });
 
   it('"Alle auswählen" sendet alle löschbaren IDs', async () => {

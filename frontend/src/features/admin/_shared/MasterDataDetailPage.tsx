@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import { ArrowLeft } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 
 import { LargeTitle, Section, cx } from '@/components/ui';
 import { ApiError, api } from '@/lib/api';
@@ -53,17 +53,23 @@ export function MasterDataDetailPage<T>({
   afterRows,
 }: MasterDataDetailPageProps<T>) {
   const [entity, setEntity] = useState<T | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const validId = Number.isFinite(id);
+  const error = validId ? loadError : 'Ungültige Adresse.';
+
+  // Anderer Datensatz: alten Stand sofort verwerfen (während des Renders,
+  // nicht im Effekt — sonst blitzt ein Frame lang der alte Datensatz auf).
+  const loadKey = `${resource}/${id}`;
+  const [loadedKey, setLoadedKey] = useState(loadKey);
+  if (loadKey !== loadedKey) {
+    setLoadedKey(loadKey);
+    setEntity(null);
+    setLoadError(null);
+  }
 
   useEffect(() => {
-    if (!validId) {
-      setError('Ungültige Adresse.');
-      return;
-    }
+    if (!validId) return;
     let active = true;
-    setEntity(null);
-    setError(null);
     api
       .get<T>(`/${resource}/${id}`)
       .then((data) => {
@@ -71,8 +77,8 @@ export function MasterDataDetailPage<T>({
       })
       .catch((err: unknown) => {
         if (!active) return;
-        if (err instanceof ApiError) setError(err.problem.detail ?? err.problem.title);
-        else setError('Datensatz konnte nicht geladen werden.');
+        if (err instanceof ApiError) setLoadError(err.problem.detail ?? err.problem.title);
+        else setLoadError('Datensatz konnte nicht geladen werden.');
       });
     return () => {
       active = false;

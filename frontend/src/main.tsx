@@ -1,6 +1,6 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import { BrowserRouter } from 'react-router-dom';
+import { BrowserRouter } from 'react-router';
 
 // Self-hosted Fonts via @fontsource — kein externer CDN-Aufruf zu Google.
 // `latin-`-Subset spart gegenüber dem Default-Import (alle Subsets) etwa

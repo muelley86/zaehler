@@ -80,8 +80,8 @@ def _fehler(detail: str) -> ProblemError:
 
 
 def _ueberlappend(
-    stmt: Select[tuple[BillingPosition]], valid_from: date, valid_to: date | None
-) -> Select[tuple[BillingPosition]]:
+    stmt: Select[BillingPosition], valid_from: date, valid_to: date | None
+) -> Select[BillingPosition]:
     """Filter auf Positionen, deren Zeitraum ``[valid_from, valid_to)`` schneidet."""
     stmt = stmt.where(
         or_(BillingPosition.valid_to.is_(None), BillingPosition.valid_to > valid_from)

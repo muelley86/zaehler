@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 
 import { Card, TypeBadge } from '@/components/ui';
 import { formatDateDe, formatDe } from '@/lib/format';
@@ -17,7 +17,7 @@ export function MeasuringPointSummaryCard({ item }: { item: MeasuringPointWithSt
     <Card padded={false}>
       <Link
         to={`/admin/messstellen/${mp.id}`}
-        className="hover:bg-fill/40 flex items-start gap-2 px-5 py-4 transition-colors"
+        className="flex items-start gap-2 px-5 py-4 transition-colors hover:bg-fill/40"
         aria-label={`Messstelle ${mp.name} öffnen`}
       >
         <TypeBadge type={mp.type} size="sm" />
@@ -35,7 +35,7 @@ export function MeasuringPointSummaryCard({ item }: { item: MeasuringPointWithSt
                   className="flex items-baseline justify-between gap-2 text-caption"
                 >
                   <span className="truncate text-tertiary">{reg.label}</span>
-                  <span className="shrink-0 tabular-nums text-label">
+                  <span className="shrink-0 text-label tabular-nums">
                     {reg.current_value !== null
                       ? `${formatDe(reg.current_value)} ${reg.unit}`
                       : '—'}

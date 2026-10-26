@@ -10,7 +10,7 @@
 
 import { useEffect, useState } from 'react';
 import { ArrowLeft } from 'lucide-react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router';
 
 import { EmptyState, LargeTitle, Section } from '@/components/ui';
 import { PageGlows } from '@/components/PageGlows';
@@ -36,12 +36,21 @@ export function VirtualPointDetailPage() {
   const [from, setFrom] = useState(dateRange.from);
   const [to, setTo] = useState(dateRange.to);
 
+  // Fehler aus dem vorherigen Request-Zyklus nicht stehen lassen — sonst
+  // klebt die Fehlerbox neben frisch geladenen Daten. Neuer Zyklus = andere
+  // Messstelle oder anderer Zeitraum; zurückgesetzt wird beim Rendern.
+  const loadKey = `${vmpId}|${from}|${to}`;
+  const [loadedKey, setLoadedKey] = useState(loadKey);
+  if (loadKey !== loadedKey) {
+    setLoadedKey(loadKey);
+    setError(null);
+  }
+
   useEffect(() => {
     if (!Number.isFinite(vmpId)) {
-      navigate('/', { replace: true });
+      void navigate('/', { replace: true });
       return;
     }
-    setError(null);
     api
       .get<VirtualMeasuringPointRead>(`/virtual-measuring-points/${vmpId}`)
       .then(setVmp)
@@ -55,9 +64,6 @@ export function VirtualPointDetailPage() {
   // `cancelled`-Flag verwirft veraltete Antworten bei schnellem Umstellen.
   useEffect(() => {
     if (!Number.isFinite(vmpId)) return;
-    // Fehler aus dem vorherigen Request-Zyklus nicht stehen lassen — sonst
-    // klebt die Fehlerbox neben frisch geladenen Daten.
-    setError(null);
     let cancelled = false;
     const p = new URLSearchParams();
     if (from) p.set('from_at', from);
@@ -163,7 +169,7 @@ export function VirtualPointDetailPage() {
                         (Komponente, Einheit) — bei gemischten Einheiten (Wärme)
                         kann dieselbe component_id mehrfach vorkommen. */}
                     {breakdown.components.map((c) => (
-                      <tr key={`${c.component_id}-${c.unit}`} className="border-border/50 border-b">
+                      <tr key={`${c.component_id}-${c.unit}`} className="border-b border-border/50">
                         <td
                           className={`num p-2 text-center font-semibold ${
                             c.sign < 0 ? 'text-danger' : 'text-primary'
@@ -177,7 +183,7 @@ export function VirtualPointDetailPage() {
                             {c.direction === 'einspeisung' ? 'Einspeisung' : 'Bezug'}
                           </td>
                         ) : null}
-                        <td className="p-2 text-right tabular-nums text-label">
+                        <td className="p-2 text-right text-label tabular-nums">
                           {formatDe(c.consumption)} {c.unit}
                         </td>
                         <td

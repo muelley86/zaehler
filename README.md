@@ -71,7 +71,7 @@ Die fachliche Spezifikation steht in [`CLAUDE.md`](./CLAUDE.md).
 
 ```
 backend/    FastAPI + SQLAlchemy 2 + Alembic, verwaltet mit uv
-frontend/   React 18 + Vite + TypeScript + Tailwind, gebaut mit pnpm
+frontend/   React 19 + Vite 8 + TypeScript + Tailwind 4, gebaut mit pnpm
 docs/       Architektur-, Datenmodell-, Auth-, API-, Deployment-Notizen
 deploy/     systemd-Unit + Bootstrap-/Update-/Backup-Skripte für LXC
 data/       SQLite-DB zur Laufzeit (Inhalte git-ignoriert)

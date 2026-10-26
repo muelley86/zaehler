@@ -110,7 +110,7 @@ export function SingleSelectDropdown<T extends string | number>({
   if (!label) return dropdown;
   return (
     <div className="block">
-      <span id={labelId} className="mb-1.5 block text-caption-bold uppercase text-tertiary">
+      <span id={labelId} className="mb-1.5 block text-caption-bold text-tertiary uppercase">
         {label}
       </span>
       {dropdown}

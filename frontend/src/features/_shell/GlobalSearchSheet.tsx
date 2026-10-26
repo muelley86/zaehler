@@ -13,7 +13,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { Search, X } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 
 import { Sheet } from '@/components/ui';
 import { ApiError, api } from '@/lib/api';
@@ -51,21 +51,37 @@ export function GlobalSearchSheet({ open, onClose }: Props) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const [prevOpen, setPrevOpen] = useState(open);
 
-  // Beim Oeffnen: State zuruecksetzen + Autofocus. Beim Schliessen: Query
-  // weglassen — beim naechsten Aufruf ist das Feld leer, das ist klarer
-  // als ein „letzter Suchbegriff", weil der Use-Case meist eine andere
-  // Rechnung ist.
+  // Beim Schliessen: Query weglassen — beim naechsten Aufruf ist das Feld
+  // leer, das ist klarer als ein „letzter Suchbegriff", weil der Use-Case
+  // meist eine andere Rechnung ist. Zurueckgesetzt wird waehrend des Renders
+  // (State an Prop-Wechsel anpassen), nicht in einem Effekt.
+  if (open !== prevOpen) {
+    setPrevOpen(open);
+    if (!open) resetSearch('');
+  }
+
+  // Beim Oeffnen: Autofocus.
   useEffect(() => {
-    if (!open) {
-      setQuery('');
-      setResults([]);
-      setError(null);
-      return;
-    }
+    if (!open) return;
     const t = window.setTimeout(() => inputRef.current?.focus(), 50);
     return () => window.clearTimeout(t);
   }, [open]);
+
+  function resetSearch(nextQuery: string) {
+    setQuery(nextQuery);
+    setResults([]);
+    setLoading(false);
+    setError(null);
+  }
+
+  // Unter der Mindestlaenge gibt es keine Suche — alte Treffer/Fehler direkt
+  // beim Tippen verwerfen statt nachtraeglich im Such-Effekt.
+  function updateQuery(nextQuery: string) {
+    if (nextQuery.trim().length < MIN_QUERY_LEN) resetSearch(nextQuery);
+    else setQuery(nextQuery);
+  }
 
   // Debounced Backend-Call. Ein InFlight-Request wird abgebrochen, wenn
   // der User weitertippt — sonst koennte eine veraltete Antwort die
@@ -73,12 +89,7 @@ export function GlobalSearchSheet({ open, onClose }: Props) {
   useEffect(() => {
     if (!open) return;
     const trimmed = query.trim();
-    if (trimmed.length < MIN_QUERY_LEN) {
-      setResults([]);
-      setLoading(false);
-      setError(null);
-      return;
-    }
+    if (trimmed.length < MIN_QUERY_LEN) return;
     const controller = new AbortController();
     const handle = window.setTimeout(() => {
       setLoading(true);
@@ -107,7 +118,7 @@ export function GlobalSearchSheet({ open, onClose }: Props) {
       ? `/admin/messstellen/${hit.measuring_point_id}`
       : `/erfassen?mp=${hit.measuring_point_id}`;
     onClose();
-    navigate(target);
+    void navigate(target);
   }
 
   const trimmed = query.trim();
@@ -120,24 +131,24 @@ export function GlobalSearchSheet({ open, onClose }: Props) {
         <div className="relative">
           <Search
             size={18}
-            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-tertiary"
+            className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-tertiary"
             aria-hidden
           />
           <input
             ref={inputRef}
             type="search"
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => updateQuery(e.target.value)}
             placeholder="Zählernummer, Messstelle, Standort, Notiz …"
             aria-label="Suchbegriff"
-            className="block w-full rounded-pill border-hairline border-border bg-fill py-2 pl-9 pr-9 text-body-sm text-label"
+            className="block w-full rounded-pill border-hairline border-border bg-fill py-2 pr-9 pl-9 text-body-sm text-label"
           />
           {query ? (
             <button
               type="button"
-              onClick={() => setQuery('')}
+              onClick={() => resetSearch('')}
               aria-label="Eingabe leeren"
-              className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full p-1 text-tertiary hover:bg-fill-strong"
+              className="absolute top-1/2 right-2 -translate-y-1/2 rounded-full p-1 text-tertiary hover:bg-fill-strong"
             >
               <X size={14} />
             </button>
@@ -168,7 +179,7 @@ export function GlobalSearchSheet({ open, onClose }: Props) {
                 <button
                   type="button"
                   onClick={() => handlePick(hit)}
-                  className="bg-fill/40 hover:bg-fill/70 flex w-full flex-col gap-1 rounded-card border-hairline border-border px-3 py-2.5 text-left transition-colors"
+                  className="flex w-full flex-col gap-1 rounded-card border-hairline border-border bg-fill/40 px-3 py-2.5 text-left transition-colors hover:bg-fill/70"
                 >
                   <span className="text-body-sm font-semibold text-label">
                     {hit.measuring_point_name}

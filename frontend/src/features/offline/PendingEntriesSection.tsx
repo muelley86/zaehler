@@ -6,7 +6,7 @@
  */
 
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 
 import { Section } from '@/components/ui';
 import { useAuth } from '@/features/auth/auth-context';
@@ -22,11 +22,15 @@ export function PendingEntriesSection() {
   const meId = me?.id ?? null;
   const [items, setItems] = useState<OutboxReading[]>([]);
 
+  // User-Wechsel/Logout: fremde Einträge sofort verwerfen (beim Rendern).
+  const [itemsFor, setItemsFor] = useState(meId);
+  if (meId !== itemsFor) {
+    setItemsFor(meId);
+    setItems([]);
+  }
+
   useEffect(() => {
-    if (meId === null) {
-      setItems([]);
-      return;
-    }
+    if (meId === null) return;
     let cancelled = false;
     const reload = () => {
       void listItems(meId)
@@ -54,7 +58,7 @@ export function PendingEntriesSection() {
           <Link
             key={item.id}
             to="/sync"
-            className="hover:bg-fill/40 flex items-center gap-3 px-4 py-3 transition-colors"
+            className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-fill/40"
           >
             <div className="min-w-0 flex-1">
               <div className="truncate text-body font-medium text-label">
