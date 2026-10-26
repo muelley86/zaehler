@@ -23,7 +23,7 @@ export function PageGlows({
     <>
       <div
         aria-hidden
-        className="pointer-events-none absolute -right-24 -top-48 h-[500px] w-[500px] rounded-full blur-[80px]"
+        className="pointer-events-none absolute -top-48 -right-24 h-[500px] w-[500px] rounded-full blur-[80px]"
         style={{
           background:
             'radial-gradient(circle, color-mix(in oklch, var(--primary), transparent 70%), transparent 70%)',

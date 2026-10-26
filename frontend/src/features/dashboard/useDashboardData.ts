@@ -8,10 +8,11 @@
  * ab — nur die jüngste Antwort schreibt State/Cache.
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 import { ApiError, api } from '@/lib/api';
 import type { DashboardGranularity, DashboardResponse } from '@/lib/types';
+import { useLatestRef } from '@/lib/useLatestRef';
 
 interface CacheEntry {
   data: DashboardResponse;
@@ -71,29 +72,40 @@ export function useDashboardData(from: string, to: string): DashboardData {
   const key = dashboardCacheKey(from, to);
   const [data, setData] = useState<DashboardResponse | null>(() => cache.get(key)?.data ?? null);
   const [servedAt, setServedAt] = useState<Date | null>(() => cache.get(key)?.servedAt ?? null);
-  const [refreshing, setRefreshing] = useState(false);
+  // true ab Mount: der Lade-Effekt startet sofort einen Request.
+  const [refreshing, setRefreshing] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [retryTick, setRetryTick] = useState(0);
+
+  // Neuer Zeitraum: Cache-Treffer sofort zeigen (sonst vorhandene Daten eines
+  // anderen Keys stehen lassen) und als "lädt" markieren — beim Rendern statt
+  // im Effekt, damit kein Frame den alten Zustand zeigt.
+  const [loadedKey, setLoadedKey] = useState(key);
+  if (key !== loadedKey) {
+    setLoadedKey(key);
+    const hit = cache.get(key);
+    if (hit) {
+      setData(hit.data);
+      setServedAt(hit.servedAt);
+    }
+    setRefreshing(true);
+    setError(null);
+  }
 
   // "Latest ref" — der Fehler-Zweig im Effekt braucht den AKTUELLEN
   // Daten-Stand (nicht den zum Effekt-Start erfassten), um zu entscheiden,
   // ob ein Fehler angezeigt oder verworfen wird.
-  const dataRef = useRef(data);
-  dataRef.current = data;
+  const dataRef = useLatestRef(data);
 
-  const retry = useCallback(() => setRetryTick((t) => t + 1), []);
-
-  useEffect(() => {
-    const hit = cache.get(key);
-    if (hit) {
-      // Cache-Hit: sofort anzeigen, im Hintergrund trotzdem neu laden.
-      setData(hit.data);
-      setServedAt(hit.servedAt);
-    }
-    // Cache-Miss: vorhandene Daten (von einem anderen Key) stehen lassen.
+  const retry = useCallback(() => {
     setRefreshing(true);
     setError(null);
+    setRetryTick((t) => t + 1);
+  }, []);
 
+  // Lädt im Hintergrund immer neu — auch bei Cache-Treffer (der steht dann
+  // schon über den Initial-State bzw. den Key-Wechsel oben in der Anzeige).
+  useEffect(() => {
     const controller = new AbortController();
     const params = new URLSearchParams({ granularity: DASHBOARD_GRANULARITY });
     if (from) params.set('from_at', from);
@@ -116,7 +128,7 @@ export function useDashboardData(from: string, to: string): DashboardData {
       });
 
     return () => controller.abort();
-  }, [key, from, to, retryTick]);
+  }, [key, from, to, retryTick, dataRef]);
 
   const loading = data === null && error === null;
   return { data, servedAt, loading, refreshing, error, retry };

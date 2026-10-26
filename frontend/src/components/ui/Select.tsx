@@ -13,7 +13,7 @@ export function Select({ label, hint, className, children, ...rest }: SelectProp
   return (
     <label className={cx('block', className)}>
       {label ? (
-        <span className="mb-1.5 block text-caption-bold uppercase text-tertiary">{label}</span>
+        <span className="mb-1.5 block text-caption-bold text-tertiary uppercase">{label}</span>
       ) : null}
       <span
         className={cx(
@@ -22,7 +22,7 @@ export function Select({ label, hint, className, children, ...rest }: SelectProp
         )}
       >
         <select
-          className="h-11 w-full appearance-none bg-transparent pr-7 text-body text-label outline-none"
+          className="h-11 w-full appearance-none bg-transparent pr-7 text-body text-label outline-hidden"
           {...rest}
         >
           {children}

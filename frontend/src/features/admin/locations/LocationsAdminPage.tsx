@@ -124,12 +124,10 @@ export function LocationsAdminPage() {
         <MultiSelectDropdown
           label="Hauptstandort"
           options={[
-            ...mainLocationPills.map(
-              ([id, name]): DropdownOption<number | null> => ({
-                value: id,
-                label: name,
-              }),
-            ),
+            ...mainLocationPills.map(([id, name]): DropdownOption<number | null> => ({
+              value: id,
+              label: name,
+            })),
             ...(hasUnassigned
               ? [
                   { value: null, label: 'ohne Hauptstandort' } satisfies DropdownOption<

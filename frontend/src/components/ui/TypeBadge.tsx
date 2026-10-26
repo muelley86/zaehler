@@ -47,7 +47,7 @@ export function TypeBadge({
       role="img"
       aria-label={meta.label}
       className={cx(
-        'flex shrink-0 items-center justify-center font-semibold leading-none text-white',
+        'flex shrink-0 items-center justify-center leading-none font-semibold text-white',
         size === 'sm' && 'h-7 w-7 rounded-[9px] text-[13px]',
         size === 'md' && 'h-9 w-9 rounded-[11.5px] text-base',
         size === 'lg' && 'h-12 w-12 rounded-[15.4px] text-[22px]',

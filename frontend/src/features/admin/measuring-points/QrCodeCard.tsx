@@ -11,7 +11,7 @@
  */
 
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { ExternalLink, Printer, QrCode, Unlink } from 'lucide-react';
 
 import { Button, Card } from '@/components/ui';
@@ -62,7 +62,7 @@ export function QrCodeCard({ mp }: QrCodeCardProps) {
   return (
     <Card>
       <div className="flex items-center justify-between">
-        <div className="text-caption-bold uppercase text-tertiary">QR-Codes</div>
+        <div className="text-caption-bold text-tertiary uppercase">QR-Codes</div>
         <Link
           to="/admin/qr-codes"
           className="inline-flex items-center gap-1 text-caption font-semibold text-primary-deep hover:underline"
@@ -87,7 +87,7 @@ export function QrCodeCard({ mp }: QrCodeCardProps) {
           </div>
           <Link
             to="/admin/qr-codes"
-            className="bg-gradient-primary shadow-glow-primary inline-flex h-8 items-center gap-2 rounded-pill px-3 text-caption font-semibold text-white transition-[filter] hover:brightness-105"
+            className="inline-flex h-8 items-center gap-2 rounded-pill px-3 text-caption font-semibold text-white shadow-glow-primary transition-[filter] bg-gradient-primary hover:brightness-105"
           >
             <QrCode size={14} />
             Zur QR-Code-Verwaltung

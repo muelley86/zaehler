@@ -73,13 +73,13 @@ _CORRECTION_CASE = case(
 
 
 def _apply_common_filters(
-    sel: Select[Any],
+    sel: Select[*tuple[Any, ...]],
     *,
     user: User,
     filters: EntryFilters,
     ts_col: InstrumentedAttribute[datetime],
     note_col: InstrumentedAttribute[str | None],
-) -> Select[Any]:
+) -> Select[*tuple[Any, ...]]:
     """Join-Kette + Zugriffs-/Kategorial-/Such-/Datums-Filter, identisch für
     Reading- und Delivery-Kandidaten (nur ``ts_col``/``note_col`` unterscheiden sich)."""
     sel = restrict_mp_query(sel, user, mp_id_column=MeasuringPoint.id)
@@ -114,7 +114,7 @@ def _apply_common_filters(
     return sel
 
 
-def _join_chain(sel: Select[Any], base: Any) -> Select[Any]:
+def _join_chain(sel: Select[*tuple[Any, ...]], base: Any) -> Select[*tuple[Any, ...]]:
     return (
         sel.join(Register, base.register_id == Register.id)
         .join(PhysicalMeter, Register.physical_meter_id == PhysicalMeter.id)
@@ -130,7 +130,7 @@ def build_entries(
     include_readings = (not kinds) or bool(kinds & {"reading", "correction"})
     include_deliveries = (not kinds) or ("delivery" in kinds)
 
-    candidates: list[Select[Any]] = []
+    candidates: list[Select[*tuple[Any, ...]]] = []
 
     if include_readings:
         r_sel = _join_chain(
@@ -220,8 +220,10 @@ def build_entries(
             .where(Reading.register_id.in_(reg_ids))
             .subquery("w")
         )
-        for row in db.execute(select(win.c.id, win.c.prev).where(win.c.id.in_(reading_ids))).all():
-            prev_by_id[row.id] = row.prev
+        for win_row in db.execute(
+            select(win.c.id, win.c.prev).where(win.c.id.in_(reading_ids))
+        ).all():
+            prev_by_id[win_row.id] = win_row.prev
 
     out: list[EntryRow] = []
     for row in page:

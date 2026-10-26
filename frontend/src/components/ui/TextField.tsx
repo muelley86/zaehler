@@ -21,7 +21,7 @@ export const TextField = forwardRef<HTMLInputElement, TextFieldProps>(function T
   return (
     <label className={cx('block', className)}>
       {label ? (
-        <span className="mb-1.5 block text-caption-bold uppercase text-tertiary">{label}</span>
+        <span className="mb-1.5 block text-caption-bold text-tertiary uppercase">{label}</span>
       ) : null}
       <span
         className={cx(
@@ -34,7 +34,7 @@ export const TextField = forwardRef<HTMLInputElement, TextFieldProps>(function T
         <input
           ref={ref}
           className={cx(
-            'h-11 w-full bg-transparent text-body text-label outline-none placeholder:text-quaternary',
+            'h-11 w-full bg-transparent text-body text-label outline-hidden placeholder:text-quaternary',
             numeric && 'num',
             inputClassName,
           )}

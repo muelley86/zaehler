@@ -76,7 +76,7 @@ function ChartView({
   return (
     <div className="space-y-5">
       {totalSeries > MAX_CHART_SERIES_HINT ? (
-        <div className="bg-fill/60 rounded-card border-hairline border-border px-4 py-3 text-caption text-secondary">
+        <div className="rounded-card border-hairline border-border bg-fill/60 px-4 py-3 text-caption text-secondary">
           {totalSeries} Serien im Diagramm — zur besseren Lesbarkeit die Auswahl über die Filter
           eingrenzen.
         </div>

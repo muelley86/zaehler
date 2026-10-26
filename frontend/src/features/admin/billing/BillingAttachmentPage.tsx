@@ -13,7 +13,7 @@
  * (dann ggf. zwei Seiten) – die Werte bleiben in jedem Fall richtig.
  */
 import { Fragment, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router';
 import { ArrowLeft, Printer } from 'lucide-react';
 
 import { Button } from '@/components/ui';
@@ -406,7 +406,7 @@ function Blatt({
                 </tr>
                 {a.positionen.map((p, i) => (
                   <tr key={`${a.name}-${p.name}`} className={band(i)}>
-                    <td className="py-0.5 pl-3 pr-2">{p.name}</td>
+                    <td className="py-0.5 pr-2 pl-3">{p.name}</td>
                     <td className="py-0.5 pr-2 text-right tabular-nums">{zwei(recipient.kwh)}</td>
                     <td className="py-0.5 pr-2 text-right tabular-nums">
                       {formatDe(p.ct, { maximumFractionDigits: 4 })}
@@ -415,7 +415,7 @@ function Blatt({
                   </tr>
                 ))}
                 <tr className="border-b border-black/20">
-                  <td className="py-0.5 pl-3 pr-2">Gesamtbetrag (netto)</td>
+                  <td className="py-0.5 pr-2 pl-3">Gesamtbetrag (netto)</td>
                   <td />
                   <td className="py-0.5 pr-2 text-right tabular-nums">
                     {formatDe(a.ct, { maximumFractionDigits: 4 })}

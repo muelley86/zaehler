@@ -27,7 +27,7 @@ from meters.services.assignment_guard import open_period_guard
 from meters.services.audit import record
 
 
-def select_measuring_points_for_owner(owner_id: int) -> Select[tuple[MeasuringPoint]]:
+def select_measuring_points_for_owner(owner_id: int) -> Select[MeasuringPoint]:
     """Select auf alle MPs, deren **aktueller** Eigentuemer ``owner_id`` ist.
 
     Aktuell = offene Periode (``valid_to IS NULL``). Eager-Load von Location +

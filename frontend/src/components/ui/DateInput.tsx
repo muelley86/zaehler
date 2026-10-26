@@ -18,7 +18,7 @@ export function DateInput({
       type="date"
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="num rounded-pill border-hairline border-border bg-fill px-3 py-1.5 text-body-sm text-label outline-none focus:border-primary focus:bg-surface-solid"
+      className="num rounded-pill border-hairline border-border bg-fill px-3 py-1.5 text-body-sm text-label outline-hidden focus:border-primary focus:bg-surface-solid"
       {...rest}
     />
   );

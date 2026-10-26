@@ -239,7 +239,7 @@ function Recipient({
                 <td className="py-1 pr-3 text-danger" colSpan={5}>
                   Abweichung zur Summe je Zähler ({eur(recipient.netto_lauf)})
                 </td>
-                <td className="py-1 text-right tabular-nums text-danger">
+                <td className="py-1 text-right text-danger tabular-nums">
                   {eur(recipient.differenz)}
                 </td>
               </tr>

@@ -12,11 +12,11 @@ import { Section } from '@/components/ui';
 import type { FindingsState } from './findingsDisclosure';
 
 function StatusBadge({ state }: { state: FindingsState }) {
-  if (state === null) return <span className="normal-case text-tertiary">· Lade…</span>;
-  if (state.error) return <span className="normal-case text-danger">· Fehler</span>;
-  if (state.findings === 0) return <span className="normal-case text-success">· in Ordnung</span>;
+  if (state === null) return <span className="text-tertiary normal-case">· Lade…</span>;
+  if (state.error) return <span className="text-danger normal-case">· Fehler</span>;
+  if (state.findings === 0) return <span className="text-success normal-case">· in Ordnung</span>;
   return (
-    <span className="num normal-case text-danger">
+    <span className="num text-danger normal-case">
       · {state.findings} {state.findings === 1 ? 'Befund' : 'Befunde'}
     </span>
   );

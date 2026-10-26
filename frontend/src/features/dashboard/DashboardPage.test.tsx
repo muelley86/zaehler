@@ -178,8 +178,14 @@ describe('DashboardPage — Datenabruf', () => {
 
     renderWithRouter(<DashboardPage />);
     expect(await screen.findByText('Aktualisiere…')).toBeInTheDocument();
-    expect(screen.getByText('Wasser · m³')).toBeInTheDocument();
+    // Der Cache-Treffer steht, sobald der Zeitraum aus den Filter-Prefs
+    // feststeht — "Aktualisiere…" kann schon einen Frame früher da sein.
+    expect(await screen.findByText('Wasser · m³')).toBeInTheDocument();
+    expect(screen.getByText('Aktualisiere…')).toBeInTheDocument();
 
+    // Erst freigeben, wenn der Refetch am Handler angekommen ist — sonst ist
+    // `release` unter Last noch der No-op und der Request hängt für immer.
+    await waitFor(() => expect(calls).toBe(2));
     release();
     await waitFor(() => expect(screen.queryByText('Aktualisiere…')).toBeNull());
   });

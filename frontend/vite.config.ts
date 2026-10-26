@@ -1,5 +1,6 @@
 import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
+import tailwindcss from '@tailwindcss/vite';
 import { VitePWA } from 'vite-plugin-pwa';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -13,7 +14,10 @@ const BACKEND = process.env.VITE_DEV_API ?? 'http://localhost:8000';
 function readAppVersion(): string {
   try {
     const manifest = JSON.parse(
-      fs.readFileSync(path.resolve(__dirname, '../.release-please-manifest.json'), 'utf-8'),
+      fs.readFileSync(
+        path.resolve(import.meta.dirname, '../.release-please-manifest.json'),
+        'utf-8',
+      ),
     ) as Record<string, string>;
     return manifest['.'] ?? 'dev';
   } catch {
@@ -56,6 +60,7 @@ export default defineConfig({
       },
     },
     react(),
+    tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
       // Manifest liegt schon unter public/ — wir lassen ihn da und
@@ -117,7 +122,7 @@ export default defineConfig({
   ],
   resolve: {
     alias: {
-      '@': path.resolve(__dirname, 'src'),
+      '@': path.resolve(import.meta.dirname, 'src'),
     },
   },
   server: {
@@ -136,15 +141,25 @@ export default defineConfig({
     // Komponentenstruktur im public Repo. Für Dev (`pnpm dev`) erzeugt Vite
     // ohnehin transparente Maps zur Laufzeit.
     sourcemap: false,
-    rollupOptions: {
+    rolldownOptions: {
       output: {
         // Vendor-Chunks separieren, damit App-Updates nicht den Browser-Cache
         // der schweren Libraries (recharts, leaflet) invalidieren. Die hier
         // gelisteten Pakete bekommen jeweils einen eigenen, langlebigen Chunk.
-        manualChunks: {
-          recharts: ['recharts'],
-          leaflet: ['leaflet', 'react-leaflet'],
-          'react-vendor': ['react', 'react-dom', 'react-router-dom'],
+        // (Vite 8 bündelt mit Rolldown — die Objekt-Form von ``manualChunks``
+        // gibt es dort nicht mehr, ``codeSplitting.groups`` ersetzt sie.)
+        codeSplitting: {
+          groups: [
+            { name: 'recharts', test: /[\\/]node_modules[\\/]recharts[\\/]/ },
+            {
+              name: 'leaflet',
+              test: /[\\/]node_modules[\\/](leaflet|react-leaflet|@react-leaflet[\\/]core)[\\/]/,
+            },
+            {
+              name: 'react-vendor',
+              test: /[\\/]node_modules[\\/](react|react-dom|react-router|scheduler)[\\/]/,
+            },
+          ],
         },
       },
     },

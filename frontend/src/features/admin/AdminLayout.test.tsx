@@ -13,7 +13,7 @@ import { describe, expect, it, vi } from 'vitest';
 vi.mock('@/features/auth/auth-context', () => ({
   useAuth: () => ({ me: { id: 1, username: 'admin', role: 'admin', can_billing: false } }),
 }));
-import { Route, Routes } from 'react-router-dom';
+import { Route, Routes } from 'react-router';
 import { screen } from '@testing-library/react';
 
 import { renderWithRouter } from '@/tests/render';

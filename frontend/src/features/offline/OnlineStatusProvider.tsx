@@ -17,7 +17,15 @@
  * Stammdaten-Snapshot erneuert.
  */
 
-import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from 'react';
 import type { ReactNode } from 'react';
 
 import { AuthContext } from '@/features/auth/auth-context';
@@ -36,6 +44,7 @@ import { getSyncPhase, runSync, subscribeSyncState } from '@/lib/offline/syncEng
 import type { SyncPhase } from '@/lib/offline/syncEngine';
 import { createSyncScheduler } from '@/lib/offline/syncScheduler';
 import type { SyncScheduler } from '@/lib/offline/syncScheduler';
+import { useLatestRef } from '@/lib/useLatestRef';
 import { OnlineStatusContext } from './offline-context';
 import type { OnlineStatusState } from './offline-context';
 
@@ -46,13 +55,14 @@ export function OnlineStatusProvider({ children }: { children: ReactNode }) {
   const auth = useContext(AuthContext);
   const userId = auth?.me?.id ?? null;
 
-  const [isOnline, setIsOnline] = useState(() => getIsOnline());
+  // Konnektivität ist ein externer Store (connectivity.ts) — direkt abonnieren
+  // statt in einen eigenen State zu spiegeln und im Effekt nachzuziehen.
+  const isOnline = useSyncExternalStore(subscribeConnectivity, getIsOnline);
   const [pendingCount, setPendingCount] = useState(0);
   const [oldestPendingAt, setOldestPendingAt] = useState<string | null>(null);
   const [syncPhase, setSyncPhase] = useState<SyncPhase>(() => getSyncPhase());
   const [lastSyncAt, setLastSyncAt] = useState<Date | null>(null);
-  const userIdRef = useRef(userId);
-  userIdRef.current = userId;
+  const userIdRef = useLatestRef(userId);
   const schedulerRef = useRef<SyncScheduler | null>(null);
 
   const doSync = useCallback(async () => {
@@ -67,7 +77,7 @@ export function OnlineStatusProvider({ children }: { children: ReactNode }) {
     // Nach dem await kann inzwischen ein ANDERER User angemeldet sein —
     // dessen Scheduler darf das veraltete Ergebnis nicht sehen.
     if (userIdRef.current === id) schedulerRef.current?.onRunFinished(result);
-  }, []);
+  }, [userIdRef]);
 
   // Retry-Scheduler: lebt solange ein User angemeldet ist.
   useEffect(() => {
@@ -80,9 +90,8 @@ export function OnlineStatusProvider({ children }: { children: ReactNode }) {
     };
   }, [userId, doSync]);
 
-  // Konnektivitäts-Signal + Browser-Events.
+  // Browser-Events → Konnektivitäts-Store + Sync anstoßen.
   useEffect(() => {
-    const unsubscribe = subscribeConnectivity(setIsOnline);
     const handleOnline = () => {
       reportOnline();
       schedulerRef.current?.resetBackoff();
@@ -98,10 +107,7 @@ export function OnlineStatusProvider({ children }: { children: ReactNode }) {
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
     document.addEventListener('visibilitychange', handleVisibility);
-    // Zustand könnte sich zwischen Initial-Render und Effect geändert haben.
-    setIsOnline(getIsOnline());
     return () => {
-      unsubscribe();
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
       document.removeEventListener('visibilitychange', handleVisibility);
@@ -111,13 +117,18 @@ export function OnlineStatusProvider({ children }: { children: ReactNode }) {
   // Sync-Phase spiegeln.
   useEffect(() => subscribeSyncState(setSyncPhase), []);
 
+  // User-Wechsel/Logout: Badge des vorherigen Users sofort verwerfen (beim
+  // Rendern, nicht im Effekt).
+  const [badgeFor, setBadgeFor] = useState(userId);
+  if (userId !== badgeFor) {
+    setBadgeFor(userId);
+    setPendingCount(0);
+    setOldestPendingAt(null);
+  }
+
   // Badge-Zähler + Alter: bei jeder Outbox-Mutation neu ermitteln.
   useEffect(() => {
-    if (userId === null) {
-      setPendingCount(0);
-      setOldestPendingAt(null);
-      return;
-    }
+    if (userId === null) return;
     let cancelled = false;
     const update = () => {
       void openSummary(userId)

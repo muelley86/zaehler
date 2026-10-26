@@ -383,12 +383,10 @@ export function ReportsPage() {
     const real = numOptions(points, (p) => [p.id, withLocation(p.name, p.location_name)]).map(
       (o): MpOption => ({ value: `r:${o.id}`, label: o.label }),
     );
-    const virtual = virtualPoints.map(
-      (v): MpOption => ({
-        value: `v:${v.id}`,
-        label: withLocation(displayGroupLabel(v.name, true), v.location_name),
-      }),
-    );
+    const virtual = virtualPoints.map((v): MpOption => ({
+      value: `v:${v.id}`,
+      label: withLocation(displayGroupLabel(v.name, true), v.location_name),
+    }));
     return [...real, ...virtual].sort((a, b) => a.label.localeCompare(b.label));
   }, [points, virtualPoints]);
   const measuringPointSelection = useMemo(

@@ -25,12 +25,12 @@ export function Pill({
       title={title}
       aria-pressed={active}
       className={cx(
-        'whitespace-nowrap rounded-full border-hairline font-medium tracking-tight transition-[background,color,border-color]',
+        'rounded-full border-hairline font-medium tracking-tight whitespace-nowrap transition-[background,color,border-color]',
         size === 'sm' ? 'px-2.5 py-1 text-caption' : 'px-3 py-1.5 text-body-sm',
         disabled
           ? 'cursor-not-allowed border-border bg-fill text-tertiary opacity-40'
           : active
-            ? 'bg-gradient-primary shadow-glow-primary border-transparent text-white'
+            ? 'border-transparent text-white shadow-glow-primary bg-gradient-primary'
             : 'border-border bg-fill text-secondary hover:bg-fill-strong',
       )}
     >

@@ -25,7 +25,7 @@ import {
   Search,
   Settings,
 } from 'lucide-react';
-import { NavLink, useLocation, useNavigate } from 'react-router-dom';
+import { NavLink, useLocation, useNavigate } from 'react-router';
 
 import { GlobalSearchSheet } from '@/features/_shell/GlobalSearchSheet';
 import { useAuth } from '@/features/auth/auth-context';
@@ -74,7 +74,7 @@ function LogoLockup({ size = 'md' }: { size?: 'sm' | 'md' }) {
     <div className="flex items-center gap-2.5" data-testid="logo-lockup">
       <div
         className={cx(
-          'bg-gradient-primary shadow-glow-primary flex items-center justify-center rounded-[9px] text-white',
+          'flex items-center justify-center rounded-[9px] text-white shadow-glow-primary bg-gradient-primary',
           square,
         )}
       >
@@ -89,7 +89,7 @@ function Avatar({ name, role }: { name: string; role: string }) {
   const initial = (name[0] ?? '?').toUpperCase();
   return (
     <div className="flex min-w-0 items-center gap-2.5">
-      <div className="bg-gradient-primary flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-body-sm font-bold text-white">
+      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-body-sm font-bold text-white bg-gradient-primary">
         {initial}
       </div>
       <div className="min-w-0 flex-1">
@@ -123,7 +123,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       return;
     }
     await logout();
-    navigate('/login', { replace: true });
+    void navigate('/login', { replace: true });
   }
 
   const sidebarLink = ({ isActive }: { isActive: boolean }) =>
@@ -138,7 +138,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     isActive ? (
       <span
         aria-hidden
-        className="absolute -left-1.5 bottom-2 top-2 w-[3px] rounded-full bg-primary"
+        className="absolute top-2 bottom-2 -left-1.5 w-[3px] rounded-full bg-primary"
       />
     ) : null;
 
@@ -156,7 +156,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         className={cx(
           'hidden md:flex md:w-60 md:shrink-0 md:flex-col',
           'md:glass md:border-r-hairline md:border-border md:bg-surface',
-          'md:px-3 md:pb-3 md:pt-5 md:pt-safe-top',
+          'md:px-3 md:pt-5 md:pt-safe-top md:pb-3',
         )}
       >
         <div className="px-2 pb-4">
@@ -170,7 +170,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           onClick={() => setSearchOpen(true)}
           data-testid="sidebar-search"
           aria-label="Suche öffnen"
-          className="bg-fill/50 mb-2 flex items-center gap-2.5 rounded-pill border-hairline border-border px-2.5 py-2 text-body-sm font-medium text-secondary transition-colors hover:bg-fill hover:text-label"
+          className="mb-2 flex items-center gap-2.5 rounded-pill border-hairline border-border bg-fill/50 px-2.5 py-2 text-body-sm font-medium text-secondary transition-colors hover:bg-fill hover:text-label"
         >
           <Search size={18} className="shrink-0 opacity-70" />
           Suchen
@@ -198,7 +198,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
           {isAdmin && (
             <>
-              <div className="px-2.5 pb-1.5 pt-4 text-caption-bold uppercase text-tertiary">
+              <div className="px-2.5 pt-4 pb-1.5 text-caption-bold text-tertiary uppercase">
                 Administration
               </div>
               {ADMIN_NAV.map((n) => (
@@ -241,7 +241,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             </NavLink>
           ) : null}
 
-          <div className="px-2.5 pb-1.5 pt-4 text-caption-bold uppercase text-tertiary">Profil</div>
+          <div className="px-2.5 pt-4 pb-1.5 text-caption-bold text-tertiary uppercase">Profil</div>
           {SECONDARY_NAV.map((n) => (
             <NavLink key={n.to} to={n.to} className={sidebarLink}>
               {(state) => (
@@ -260,7 +260,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <div className="mt-auto border-t-hairline border-separator px-1 pt-3">
           <div
             data-testid="sidebar-version"
-            className="px-1 pb-2 text-micro uppercase tracking-tight text-quaternary"
+            className="px-1 pb-2 text-micro tracking-tight text-quaternary uppercase"
           >
             v{__APP_VERSION__}
           </div>
@@ -293,7 +293,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         {/* Mobile-Header */}
         <header
           data-testid="app-mobile-header"
-          className="glass sticky top-0 z-20 flex items-center justify-between gap-2 border-b-hairline border-border bg-surface px-4 pb-2.5 pt-safe-top md:hidden"
+          className="glass sticky top-0 z-20 flex items-center justify-between gap-2 border-b-hairline border-border bg-surface px-4 pt-safe-top pb-2.5 md:hidden"
         >
           <div className="pt-3">
             <LogoLockup size="sm" />
@@ -322,7 +322,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
         <OfflineBanner />
 
-        <main className="min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden pb-24 md:pb-8">
+        <main className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto pb-24 md:pb-8">
           {children}
         </main>
 
@@ -330,7 +330,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <nav
           data-testid="app-tabbar"
           className={cx(
-            'fixed bottom-0 left-0 right-0 z-20 grid grid-cols-4',
+            'fixed right-0 bottom-0 left-0 z-20 grid grid-cols-4',
             'glass border-t-hairline border-border bg-surface-high',
             'pb-safe-bottom md:hidden',
           )}
@@ -344,14 +344,14 @@ export function AppShell({ children }: { children: ReactNode }) {
           <NavLink
             to="/erfassen"
             aria-label="Neue Erfassung"
-            className="flex flex-col items-center gap-1 pb-1.5 pt-1.5"
+            className="flex flex-col items-center gap-1 pt-1.5 pb-1.5"
           >
             {({ isActive }) => (
               <>
                 <span
                   className={cx(
                     'flex h-9 w-9 items-center justify-center rounded-[12px]',
-                    'bg-gradient-primary shadow-glow-primary text-white',
+                    'text-white shadow-glow-primary bg-gradient-primary',
                     isActive && 'ring-2 ring-primary ring-offset-2 ring-offset-surface-high',
                   )}
                 >
@@ -380,7 +380,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 <span
                   data-testid="tabbar-sync-badge"
                   className={cx(
-                    'absolute -right-2.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-pill px-1 text-[9px] font-bold text-white',
+                    'absolute -top-1.5 -right-2.5 flex h-4 min-w-4 items-center justify-center rounded-pill px-1 text-[9px] font-bold text-white',
                     pendingBadge,
                   )}
                 >

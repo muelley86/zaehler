@@ -5,7 +5,7 @@
  */
 import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router';
 import { ArrowLeft, Download, FileText, Pencil } from 'lucide-react';
 
 import { Button, LargeTitle, Section, Sheet, TextField } from '@/components/ui';
@@ -42,26 +42,26 @@ function Kennzahlen({
       <dl className="grid grid-cols-1 gap-2 sm:grid-cols-3">
         <div className="rounded-card bg-fill px-3 py-2">
           <dt className="text-tertiary">Bezugsrechnung netto</dt>
-          <dd className="text-title-3 font-semibold tabular-nums text-label">
+          <dd className="text-title-3 font-semibold text-label tabular-nums">
             {eur(t.rechnungsbetrag_eur)}
           </dd>
-          <dd className="tabular-nums text-tertiary">{num(bezugsmengeKwh)} kWh</dd>
+          <dd className="text-tertiary tabular-nums">{num(bezugsmengeKwh)} kWh</dd>
           {mitZusatz ? (
-            <dd className="tabular-nums text-tertiary">
+            <dd className="text-tertiary tabular-nums">
               + Zusatzkosten {eur(t.zusatzkosten_eur)} = Gesamtkosten {eur(t.gesamtkosten_eur)}
             </dd>
           ) : null}
         </div>
         <div className="rounded-card bg-fill px-3 py-2">
           <dt className="text-tertiary">Weiterberechnet</dt>
-          <dd className="text-title-3 font-semibold tabular-nums text-label">
+          <dd className="text-title-3 font-semibold text-label tabular-nums">
             {eur(t.gesamt_eur)}
           </dd>
-          <dd className="tabular-nums text-tertiary">{num(t.gesamt_kwh)} kWh</dd>
+          <dd className="text-tertiary tabular-nums">{num(t.gesamt_kwh)} kWh</dd>
         </div>
         <div className="rounded-card bg-fill px-3 py-2">
           <dt className="text-tertiary">Differenz</dt>
-          <dd className="text-title-3 font-semibold tabular-nums text-label">
+          <dd className="text-title-3 font-semibold text-label tabular-nums">
             {eurDiff(t.differenz_eur)}
           </dd>
           <dd className={t.im_rahmen ? 'text-success' : 'text-danger'}>
@@ -169,7 +169,7 @@ export function BillingRunDetailPage() {
     if (!window.confirm('Entwurf löschen?')) return;
     void aktion(async () => {
       await api.delete(base);
-      navigate(`/admin/abrechnungskreise/${circleId}`);
+      void navigate(`/admin/abrechnungskreise/${circleId}`);
       return null;
     }, 'Löschen fehlgeschlagen.');
   }

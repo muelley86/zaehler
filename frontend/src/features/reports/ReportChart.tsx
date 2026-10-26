@@ -21,6 +21,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
+import type { TooltipValueType } from 'recharts';
 
 import { formatDateTickDe, formatDe } from '@/lib/format';
 import { useChartTheme } from '@/lib/useChartTheme';
@@ -99,11 +100,16 @@ export const ReportChart = memo(function ReportChart({
   const tooltipLabelStyle = useMemo(() => ({ color: theme.label }), [theme.label]);
   const legendWrapperStyle = useMemo(() => ({ fontSize: 12, color: theme.label }), [theme.label]);
   const tooltipFormatter = useCallback(
-    (value: number | string, name: string): [string, string] => [
-      `${formatDe(value)}${unit ? ' ' + unit : ''}`,
-      labelOf[name] ?? name,
+    (value: TooltipValueType | undefined, name: number | string | undefined): [string, string] => [
+      `${typeof value === 'number' || typeof value === 'string' ? formatDe(value) : ''}${unit ? ' ' + unit : ''}`,
+      labelOf[String(name)] ?? String(name),
     ],
     [unit, labelOf],
+  );
+  const tooltipLabelFormatter = useCallback(
+    (label: ReactNode) =>
+      typeof label === 'string' || typeof label === 'number' ? xFormatter(String(label)) : label,
+    [xFormatter],
   );
   const legendFormatter = useCallback((name: string) => labelOf[name] ?? name, [labelOf]);
 
@@ -143,7 +149,7 @@ export const ReportChart = memo(function ReportChart({
         contentStyle={tooltipContentStyle}
         labelStyle={tooltipLabelStyle}
         formatter={tooltipFormatter}
-        labelFormatter={xFormatter}
+        labelFormatter={tooltipLabelFormatter}
       />,
       showLegend ? (
         <Legend key="lg" formatter={legendFormatter} wrapperStyle={legendWrapperStyle} />
@@ -155,6 +161,7 @@ export const ReportChart = memo(function ReportChart({
       showLegend,
       compact,
       xFormatter,
+      tooltipLabelFormatter,
       tooltipContentStyle,
       tooltipLabelStyle,
       tooltipFormatter,
@@ -164,8 +171,8 @@ export const ReportChart = memo(function ReportChart({
   );
 
   const color = useCallback(
-    (idx: number) => theme.palette[idx % theme.palette.length],
-    [theme.palette],
+    (idx: number) => theme.palette[idx % theme.palette.length] ?? theme.axis,
+    [theme.palette, theme.axis],
   );
 
   return (
@@ -196,7 +203,7 @@ export const ReportChart = memo(function ReportChart({
                 name={key}
                 stroke={color(idx)}
                 strokeWidth={strokeWidth}
-                strokeDasharray={DASH[idx % DASH.length] || undefined}
+                {...(DASH[idx % DASH.length] ? { strokeDasharray: DASH[idx % DASH.length] } : {})}
                 dot={showDots}
                 isAnimationActive={false}
                 connectNulls

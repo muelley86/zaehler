@@ -7,7 +7,7 @@
  */
 
 import { CloudUpload, RefreshCw, WifiOff } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 
 import { useOnlineStatus } from '@/features/offline/offline-context';
 

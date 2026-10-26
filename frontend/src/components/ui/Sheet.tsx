@@ -108,7 +108,7 @@ export function Sheet({
         type="button"
         aria-label="Sheet schließen"
         onClick={onClose}
-        className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+        className="absolute inset-0 bg-black/40 backdrop-blur-xs"
       />
       <div
         ref={panelRef}
@@ -125,7 +125,7 @@ export function Sheet({
         )}
       >
         {/* Handle-Bar nur auf Mobile sichtbar */}
-        <div className="bg-surface-high/95 glass sticky top-0 z-10">
+        <div className="glass sticky top-0 z-10 bg-surface-high/95">
           <div className="flex justify-center pt-2 md:hidden">
             <div className="h-1 w-9 rounded-full bg-fill-strong" />
           </div>

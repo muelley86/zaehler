@@ -50,7 +50,7 @@ export function InvoiceUpload({
   return (
     <div className="space-y-2">
       <label className="block">
-        <span className="mb-1.5 block text-caption-bold uppercase text-tertiary">{label}</span>
+        <span className="mb-1.5 block text-caption-bold text-tertiary uppercase">{label}</span>
         {/* Kein aria-label: das umschließende <label> trägt den sichtbaren, je nach Ort
             unterschiedlichen Text (im Assistenten steht dort der Monat). */}
         <input

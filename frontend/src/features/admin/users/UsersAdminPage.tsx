@@ -108,7 +108,7 @@ export function UsersAdminPage() {
         <Card padded={false}>
           {/* Desktop-Tabelle */}
           <div className="hidden md:block">
-            <div className="grid grid-cols-[40px_1.4fr_1.6fr_1fr_1fr_1.1fr_120px] items-center gap-3 border-b-hairline border-separator px-5 py-3 text-micro uppercase text-tertiary">
+            <div className="grid grid-cols-[40px_1.4fr_1.6fr_1fr_1fr_1.1fr_120px] items-center gap-3 border-b-hairline border-separator px-5 py-3 text-micro text-tertiary uppercase">
               <div />
               <div>Benutzer</div>
               <div>E-Mail</div>
@@ -168,7 +168,7 @@ function RoleBadge({ role }: { role: UserRole }) {
   return (
     <span
       className={cx(
-        'rounded-badge px-2 py-0.5 text-caption font-semibold uppercase tracking-tight',
+        'rounded-badge px-2 py-0.5 text-caption font-semibold tracking-tight uppercase',
         role === 'admin' ? 'bg-primary-soft text-primary-deep' : 'bg-fill text-secondary',
       )}
     >
@@ -229,7 +229,7 @@ function UserRow({
           <div className="flex items-baseline gap-2">
             <span className="truncate text-body font-semibold text-label">{user.username}</span>
             {isSelf ? (
-              <span className="rounded-badge bg-primary-soft px-1.5 py-0.5 text-micro font-semibold uppercase text-primary-deep">
+              <span className="rounded-badge bg-primary-soft px-1.5 py-0.5 text-micro font-semibold text-primary-deep uppercase">
                 Du
               </span>
             ) : null}
@@ -243,7 +243,7 @@ function UserRow({
         <div
           className={cx(
             'truncate text-body-sm',
-            user.email ? 'text-secondary' : 'italic text-quaternary',
+            user.email ? 'text-secondary' : 'text-quaternary italic',
           )}
         >
           {user.email ?? '—'}
@@ -353,7 +353,7 @@ function UserListItem({
             <span className="truncate text-body font-semibold text-label">{user.username}</span>
             <RoleBadge role={user.role} />
             {isSelf ? (
-              <span className="rounded-badge bg-primary-soft px-1.5 py-0.5 text-micro font-semibold uppercase text-primary-deep">
+              <span className="rounded-badge bg-primary-soft px-1.5 py-0.5 text-micro font-semibold text-primary-deep uppercase">
                 Du
               </span>
             ) : null}
@@ -460,7 +460,7 @@ function CreateUserForm({ onCreated }: { onCreated: () => void }) {
         <button
           type="button"
           onClick={() => setOpen(true)}
-          className="hover:bg-fill/40 flex w-full items-center gap-2 px-5 py-3.5 text-left text-body font-semibold text-primary-deep transition-colors"
+          className="flex w-full items-center gap-2 px-5 py-3.5 text-left text-body font-semibold text-primary-deep transition-colors hover:bg-fill/40"
         >
           <Plus size={16} strokeWidth={2.5} />
           Benutzer anlegen

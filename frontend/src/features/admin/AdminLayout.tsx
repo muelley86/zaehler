@@ -11,7 +11,7 @@
  */
 
 import { LayoutGrid } from 'lucide-react';
-import { NavLink, Outlet } from 'react-router-dom';
+import { NavLink, Outlet } from 'react-router';
 
 import { PageGlows } from '@/components/PageGlows';
 import { cx } from '@/components/ui/cx';
@@ -46,7 +46,7 @@ export function AdminLayout() {
           data-testid="admin-sub-sidebar"
           className="hidden md:block md:w-52 md:shrink-0 md:border-r-hairline md:border-border md:p-4"
         >
-          <div className="px-2 pb-2 text-caption-bold uppercase text-tertiary">Verwaltung</div>
+          <div className="px-2 pb-2 text-caption-bold text-tertiary uppercase">Verwaltung</div>
           <nav className="flex flex-col gap-0.5">
             <NavLink to="/admin" end className={subNavLink}>
               <LayoutGrid size={18} className="shrink-0 opacity-70" />
@@ -64,7 +64,7 @@ export function AdminLayout() {
         {/* Mobile/schmal: horizontaler Tab-Strip oben (sticky, scrollbar) */}
         <div
           data-testid="admin-tab-strip"
-          className="bg-surface/80 sticky top-0 z-10 mb-1 overflow-x-auto border-b-hairline border-border backdrop-blur md:hidden"
+          className="sticky top-0 z-10 mb-1 overflow-x-auto border-b-hairline border-border bg-surface/80 backdrop-blur-sm md:hidden"
         >
           <nav className="flex gap-1 px-4 py-2">
             <NavLink to="/admin" end className={chipLink}>

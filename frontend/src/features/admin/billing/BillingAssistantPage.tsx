@@ -8,7 +8,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { Link, useParams, useSearchParams } from 'react-router-dom';
+import { Link, useParams, useSearchParams } from 'react-router';
 import { ArrowLeft, Check, Circle } from 'lucide-react';
 
 import { Button, LargeTitle, Section, TextField } from '@/components/ui';
@@ -95,25 +95,34 @@ export function BillingAssistantPage() {
   }, [basis, monat]);
 
   /** Stände getrennt laden: ein Fehler dort darf Rechnung, Entwurf und Kopf nicht verdecken. */
-  const staendeLaden = useCallback(async () => {
+  const staendeLaden = useCallback((): Promise<void> => {
     const meine = anfrage.current;
-    try {
-      const bericht = await api.get<BillingReadingsRead>(
-        `${basis}/readings?monat=${encodeURIComponent(monat)}`,
+    return api
+      .get<BillingReadingsRead>(`${basis}/readings?monat=${encodeURIComponent(monat)}`)
+      .then(
+        (bericht) => {
+          if (meine !== anfrage.current) return;
+          setReadings(bericht);
+          setReadingsError(null);
+        },
+        (err: unknown) => {
+          if (meine !== anfrage.current) return;
+          setReadings(null);
+          setReadingsError(errorText(err, 'Zählerstände konnten nicht ermittelt werden.'));
+        },
       );
-      if (meine !== anfrage.current) return;
-      setReadings(bericht);
-      setReadingsError(null);
-    } catch (err) {
-      if (meine !== anfrage.current) return;
-      setReadings(null);
-      setReadingsError(errorText(err, 'Zählerstände konnten nicht ermittelt werden.'));
-    }
   }, [basis, monat]);
+
+  // Monats-/Kreiswechsel: alten Fehler beim Rendern verwerfen, nicht im Effekt.
+  const ladeKey = `${basis}|${monat}`;
+  const [geladenKey, setGeladenKey] = useState(ladeKey);
+  if (ladeKey !== geladenKey) {
+    setGeladenKey(ladeKey);
+    setError(null);
+  }
 
   useEffect(() => {
     if (!/^\d{4}-\d{2}$/.test(monat)) return;
-    setError(null);
     laden().catch((err: unknown) => setError(errorText(err, 'Konnte den Monat nicht laden.')));
     void staendeLaden();
   }, [laden, staendeLaden, monat]);

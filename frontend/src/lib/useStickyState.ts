@@ -9,8 +9,9 @@
  * zurueck statt zu werfen.
  */
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
+import { useLatestRef } from './useLatestRef';
 
 export interface StickyCodec<T> {
   serialize: (value: T) => string;
@@ -26,8 +27,7 @@ export function useStickyState<T>(
 ): [T, Dispatch<SetStateAction<T>>] {
   // „Latest ref" — so haengt der Schreib-Effekt nicht an der (oft pro Render
   // neu erzeugten) Codec-Referenz und schreibt nicht bei jedem Render.
-  const codecRef = useRef(codec);
-  codecRef.current = codec;
+  const codecRef = useLatestRef(codec);
 
   const [value, setValue] = useState<T>(() => {
     if (!enabled) return defaultValue;
@@ -47,7 +47,7 @@ export function useStickyState<T>(
     } catch {
       /* QuotaExceeded / SecurityError ignorieren — non-fatal UX-State */
     }
-  }, [enabled, key, value]);
+  }, [enabled, key, value, codecRef]);
 
   return [value, setValue];
 }

@@ -1,6 +1,6 @@
 import { lazy, memo, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router';
 import { Camera, Check, Gauge, ImageIcon, ImageOff, QrCode, X } from 'lucide-react';
 
 import {
@@ -29,6 +29,7 @@ import { enqueueGroup, latestPendingByRegister, subscribeOutbox } from '@/lib/of
 import type { PendingRegisterValue } from '@/lib/offline/outbox';
 import { SYNCED_EVENT } from '@/lib/offline/syncEngine';
 import { describeMeterType } from '@/lib/meterLabels';
+import { useObjectUrl } from '@/lib/useObjectUrl';
 import type {
   DeliveryRead,
   MeasuringPointRead,
@@ -77,6 +78,10 @@ function monthEndInput(month: string): string {
   const pad = (n: number) => String(n).padStart(2, '0');
   return `${y}-${pad(m)}-${pad(lastDay)}T23:59:59`;
 }
+
+/** ``?token=`` mit ungültigem Format — läuft wie ein Resolve-Fehler durch die
+ * Promise-Kette des Token-Effekts, ohne dass ein Request abgeht. */
+class InvalidQrTokenError extends Error {}
 
 export function RecordReadingPage() {
   const { me } = useAuth();
@@ -178,11 +183,14 @@ export function RecordReadingPage() {
   const [pendingByRegister, setPendingByRegister] = useState<Map<number, PendingRegisterValue>>(
     () => new Map(),
   );
+  // User-Wechsel/Logout: fremde Offline-Werte sofort verwerfen (beim Rendern).
+  const [pendingFor, setPendingFor] = useState(meId);
+  if (meId !== pendingFor) {
+    setPendingFor(meId);
+    setPendingByRegister(new Map());
+  }
   useEffect(() => {
-    if (meId === null) {
-      setPendingByRegister(new Map());
-      return;
-    }
+    if (meId === null) return;
     let cancelled = false;
     const update = () => {
       void latestPendingByRegister(meId)
@@ -247,14 +255,11 @@ export function RecordReadingPage() {
     // manipulierter Query-Param (z. B. `..%2f..`) darf den Fetch-Pfad nicht
     // verschieben. Gleiche Prüfung wie beim gescannten QR-Code.
     const token = tokenParam.trim();
-    if (!isValidToken(token)) {
-      setParamWarning('Ungültiger QR-Code.');
-      setSearchParams(next, { replace: true });
-      return;
-    }
+    const resolve = isValidToken(token)
+      ? api.get<QrTokenResolveResponse>(`/qr-tokens/${encodeURIComponent(token)}/resolve`)
+      : Promise.reject(new InvalidQrTokenError());
 
-    api
-      .get<QrTokenResolveResponse>(`/qr-tokens/${encodeURIComponent(token)}/resolve`)
+    resolve
       .then((resolved) => {
         if (resolved.measuring_point_id !== null) {
           setMpId(resolved.measuring_point_id);
@@ -267,7 +272,9 @@ export function RecordReadingPage() {
         }
       })
       .catch((err: unknown) => {
-        if (err instanceof ApiError && err.status === 404) {
+        if (err instanceof InvalidQrTokenError) {
+          setParamWarning('Ungültiger QR-Code.');
+        } else if (err instanceof ApiError && err.status === 404) {
           setParamWarning('Ungültiger QR-Code — keine Zuordnung gefunden.');
         } else {
           setParamWarning('QR-Code konnte nicht aufgelöst werden.');
@@ -281,10 +288,12 @@ export function RecordReadingPage() {
   // navigate() den Param setzt während wir bereits auf /erfassen sind).
   // Der Param wird nach Anwendung aus der URL entfernt, damit er beim
   // nächsten manuellen Wechsel nicht zurückspringt.
-  useEffect(() => {
-    if (!points) return;
-
-    const mpParam = searchParams.get('mp');
+  // Auswahl und Hinweis werden beim Rendern aus URL + Liste abgeleitet (State
+  // an geänderte Eingaben anpassen); der Effekt darunter räumt nur die URL auf.
+  const mpParam = searchParams.get('mp');
+  const [appliedMpParam, setAppliedMpParam] = useState<string | null>(null);
+  if (points && mpParam !== appliedMpParam) {
+    setAppliedMpParam(mpParam);
     if (mpParam !== null) {
       const parsed = Number.parseInt(mpParam, 10);
       const target = Number.isFinite(parsed)
@@ -299,17 +308,22 @@ export function RecordReadingPage() {
             : `Messstelle mit ID ${mpParam} wurde nicht gefunden.`,
         );
       }
-      const next = new URLSearchParams(searchParams);
-      next.delete('mp');
-      setSearchParams(next, { replace: true });
-      return;
     }
+  }
 
-    // Default: erste MP mit aktiven Registern, falls noch keine ausgewählt
-    if (mpId !== null && points.some((mp) => mp.id === mpId)) return;
+  // Default: erste MP mit aktiven Registern, falls noch keine (gültige) gewählt
+  // ist. Solange ein ?mp= ansteht, hat der Vorrang.
+  if (points && mpParam === null && !(mpId !== null && points.some((mp) => mp.id === mpId))) {
     const first = points.find((mp) => activeRegistersOf(mp).length > 0);
     if (first) setMpId(first.id);
-  }, [points, mpId, searchParams, setSearchParams]);
+  }
+
+  useEffect(() => {
+    if (!points || mpParam === null) return;
+    const next = new URLSearchParams(searchParams);
+    next.delete('mp');
+    setSearchParams(next, { replace: true });
+  }, [points, mpParam, searchParams, setSearchParams]);
 
   // Stabiler Close-Callback — verhindert, dass der QrScanSheet-Effect bei
   // jedem Parent-Re-Render neu startet (sonst neuer getUserMedia-Aufruf
@@ -411,7 +425,7 @@ export function RecordReadingPage() {
               </div>
             ) : null}
             {selectedMP && selectedMP.transformer_factor !== null ? (
-              <div className="border-primary/40 mt-3 rounded-card border-hairline bg-primary-soft p-3 text-caption text-primary-deep">
+              <div className="mt-3 rounded-card border-hairline border-primary/40 bg-primary-soft p-3 text-caption text-primary-deep">
                 Wandlerfaktor ×{selectedMP.transformer_factor} — gib hier den Sekundärwert vom
                 Zähler ein. Verbräuche werden mit diesem Faktor multipliziert.
               </div>
@@ -502,8 +516,11 @@ function ReadingsForm({
   const [success, setSuccess] = useState<string | null>(null);
   const [photoWarning, setPhotoWarning] = useState<string | null>(null);
 
-  // Reset, wenn die MP wechselt.
-  useEffect(() => {
+  // Reset, wenn die MP wechselt — beim Rendern, damit keine Eingabe der alten
+  // MP einen Frame lang an der neuen hängt.
+  const [formMpId, setFormMpId] = useState(mp.id);
+  if (mp.id !== formMpId) {
+    setFormMpId(mp.id);
     setValues({});
     setReadingAt(nowForInput());
     setReadingMode('current');
@@ -513,7 +530,7 @@ function ReadingsForm({
     setSuccess(null);
     setError(null);
     setPhotoWarning(null);
-  }, [mp.id]);
+  }
 
   // Stabile Referenz, damit React.memo in RegisterRow greift und nur die
   // tatsächlich getippte Zeile re-rendert (wichtig bei mehreren Registern).
@@ -642,7 +659,7 @@ function ReadingsForm({
           parsed.push({ ar, numeric: parseDe(raw) });
         } catch (err) {
           if (err instanceof RangeError) {
-            throw new Error(`${ar.register.label}: ${err.message}`);
+            throw new Error(`${ar.register.label}: ${err.message}`, { cause: err });
           }
           throw err;
         }
@@ -779,7 +796,7 @@ function ReadingsForm({
       <Section header="Zeitpunkt & Notiz">
         <div className="space-y-3 p-5">
           <div>
-            <span className="mb-1.5 block text-caption-bold uppercase text-tertiary">Ablesung</span>
+            <span className="mb-1.5 block text-caption-bold text-tertiary uppercase">Ablesung</span>
             <div className="flex gap-1.5">
               <button
                 type="button"
@@ -875,18 +892,17 @@ function ReadingsForm({
 const MAX_PHOTOS = 6;
 
 function PhotoThumb({ file, onRemove }: { file: File; onRemove: () => void }) {
-  const [url, setUrl] = useState<string | null>(null);
+  const url = useObjectUrl(file);
   // HEIC/HEIF (iPhone-Standard) kann von Desktop-/Android-Browsern nicht im
   // ``<img>`` dekodiert werden → ohne Abfangen erscheint das Broken-Image-Icon
   // (rotes X). Wir zeigen stattdessen einen Platzhalter; Upload + spätere
   // Server-JPEG-Ansicht sind davon unberührt.
   const [error, setError] = useState(false);
-  useEffect(() => {
-    const u = URL.createObjectURL(file);
-    setUrl(u);
+  const [errorFile, setErrorFile] = useState(file);
+  if (file !== errorFile) {
+    setErrorFile(file);
     setError(false);
-    return () => URL.revokeObjectURL(u);
-  }, [file]);
+  }
   return (
     <div className="relative">
       {url && !error ? (
@@ -907,7 +923,7 @@ function PhotoThumb({ file, onRemove }: { file: File; onRemove: () => void }) {
         type="button"
         onClick={onRemove}
         aria-label="Foto entfernen"
-        className="absolute -right-1.5 -top-1.5 inline-flex h-6 w-6 items-center justify-center rounded-full bg-danger text-white shadow"
+        className="absolute -top-1.5 -right-1.5 inline-flex h-6 w-6 items-center justify-center rounded-full bg-danger text-white shadow-sm"
       >
         <X size={13} />
       </button>
@@ -930,7 +946,7 @@ function PhotoPicker({ photos, onChange }: { photos: File[]; onChange: (files: F
     onChange([...photos, ...Array.from(picked).slice(0, room)]);
   }
 
-  function open(ref: React.RefObject<HTMLInputElement>) {
+  function open(ref: React.RefObject<HTMLInputElement | null>) {
     if (!ref.current) return;
     ref.current.value = '';
     ref.current.click();
@@ -1090,7 +1106,7 @@ function DeliveryForm({
   registers: ActiveRegister[];
   onSaved: () => void;
 }) {
-  const [registerId, setRegisterId] = useState<number | null>(null);
+  const [chosenRegisterId, setRegisterId] = useState<number | null>(null);
   const [amount, setAmount] = useState('');
   const [deliveryAt, setDeliveryAt] = useState(nowForInput());
   const [note, setNote] = useState('');
@@ -1098,16 +1114,11 @@ function DeliveryForm({
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (registers.length === 0) {
-      setRegisterId(null);
-      return;
-    }
-    if (!registers.some((ar) => ar.register.id === registerId)) {
-      const first = registers[0];
-      if (first) setRegisterId(first.register.id);
-    }
-  }, [registers, registerId]);
+  // Gewähltes Register gilt nur, solange es zur Liste gehört — sonst das
+  // erste (abgeleitet statt per Effekt nachgezogen).
+  const registerId = registers.some((ar) => ar.register.id === chosenRegisterId)
+    ? chosenRegisterId
+    : (registers[0]?.register.id ?? null);
 
   const selected = registers.find((ar) => ar.register.id === registerId) ?? null;
 
@@ -1207,7 +1218,7 @@ function DeliveryForm({
 
 function StickySave({ busy, disabled }: { busy: boolean; disabled: boolean }) {
   return (
-    <div className="glass fixed bottom-[calc(env(safe-area-inset-bottom)+72px)] left-0 right-0 z-30 border-t-hairline border-border bg-surface-high px-4 py-3 md:static md:bottom-auto md:border-0 md:bg-transparent md:p-0 md:pt-2">
+    <div className="glass fixed right-0 bottom-[calc(env(safe-area-inset-bottom)+72px)] left-0 z-30 border-t-hairline border-border bg-surface-high px-4 py-3 md:static md:bottom-auto md:border-0 md:bg-transparent md:p-0 md:pt-2">
       <Button
         type="submit"
         variant="filled"

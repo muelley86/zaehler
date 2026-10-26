@@ -256,7 +256,7 @@ export function KostenstelleHistoryCard({
           history.map((a) => (
             <div
               key={a.id}
-              className="bg-fill/40 flex items-center justify-between gap-2 rounded-pill border-hairline border-border px-3 py-2"
+              className="flex items-center justify-between gap-2 rounded-pill border-hairline border-border bg-fill/40 px-3 py-2"
             >
               <div className="min-w-0">
                 <div className="num truncate text-body-sm font-semibold text-label">

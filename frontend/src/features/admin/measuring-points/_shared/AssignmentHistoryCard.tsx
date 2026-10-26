@@ -137,7 +137,7 @@ function CreateMasterView<TAssignment, TMaster>({
   if (!config.createMaster) return null;
   return (
     <div className="space-y-3">
-      <div className="text-caption-bold uppercase text-tertiary">{config.createMaster.label}</div>
+      <div className="text-caption-bold text-tertiary uppercase">{config.createMaster.label}</div>
       {config.createMaster.render({
         onCreated: (m) => {
           onMasterCreated(m);
@@ -455,7 +455,7 @@ export function AssignmentHistoryCard<TAssignment, TMaster>({
             return (
               <div
                 key={config.getAssignmentId(a)}
-                className="bg-fill/40 flex items-center justify-between gap-2 rounded-pill border-hairline border-border px-3 py-2"
+                className="flex items-center justify-between gap-2 rounded-pill border-hairline border-border bg-fill/40 px-3 py-2"
               >
                 <div className="min-w-0">
                   <div className="truncate text-body-sm font-semibold text-label">

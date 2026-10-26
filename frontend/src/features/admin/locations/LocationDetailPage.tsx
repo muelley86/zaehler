@@ -1,5 +1,5 @@
 import { ExternalLink } from 'lucide-react';
-import { useParams } from 'react-router-dom';
+import { useParams } from 'react-router';
 
 import { Section } from '@/components/ui';
 import { LocationMap } from '@/components/LocationMap';

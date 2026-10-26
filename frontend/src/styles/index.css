@@ -1,6 +1,138 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import 'tailwindcss';
+
+/* Dark-Mode per Klasse am <html> (wie bisher ``darkMode: 'class'``). */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ===========================================================
+   Tailwind-Theme (vormals tailwind.config.ts)
+   =========================================================== */
+@theme {
+  --font-sans: 'Inter Tight', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
+  --color-bg: var(--bg);
+  --color-bg-wash: var(--bg-wash);
+  --color-surface: var(--surface);
+  --color-surface-solid: var(--surface-solid);
+  --color-surface-high: var(--surface-high);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-label: var(--label);
+  --color-secondary: var(--secondary);
+  --color-tertiary: var(--tertiary);
+  --color-quaternary: var(--quaternary);
+  --color-fill: var(--fill);
+  --color-fill-strong: var(--fill-strong);
+  --color-separator: var(--separator);
+
+  --color-primary: var(--primary);
+  --color-primary-deep: var(--primary-deep);
+  --color-primary-soft: var(--primary-soft);
+  --color-accent-tint: var(--accent-tint);
+
+  --color-electricity: var(--electricity);
+  --color-gas: var(--gas);
+  --color-water: var(--water);
+  --color-oil: var(--oil);
+  /* Werte = --green/--yellow/--red unten — bei Änderung beide Stellen pflegen. */
+  --color-success: oklch(0.72 0.15 150);
+  --color-warning: oklch(0.75 0.16 70);
+  --color-danger: oklch(0.65 0.2 25);
+
+  --radius-card: 20px;
+  --radius-sheet: 28px;
+  --radius-pill: 10px;
+  --radius-badge: 6px;
+
+  --shadow-glass:
+    0 1px 0 rgba(255, 255, 255, 0.6) inset, 0 1px 2px rgba(60, 40, 20, 0.04),
+    0 8px 24px rgba(60, 40, 20, 0.06);
+  --shadow-glass-dark: 0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 8px 24px rgba(0, 0, 0, 0.3);
+
+  --text-display: 2.25rem;
+  --text-display--line-height: 2.5rem;
+  --text-display--font-weight: 700;
+  --text-display--letter-spacing: -0.025em;
+  --text-title-1: 2rem;
+  --text-title-1--line-height: 2.375rem;
+  --text-title-1--font-weight: 700;
+  --text-title-1--letter-spacing: -0.025em;
+  --text-title-2: 1.75rem;
+  --text-title-2--line-height: 2.125rem;
+  --text-title-2--font-weight: 700;
+  --text-title-2--letter-spacing: -0.025em;
+  --text-title-3: 1.375rem;
+  --text-title-3--line-height: 1.75rem;
+  --text-title-3--font-weight: 700;
+  --text-title-3--letter-spacing: -0.02em;
+  --text-headline: 1.125rem;
+  --text-headline--line-height: 1.5rem;
+  --text-headline--font-weight: 700;
+  --text-headline--letter-spacing: -0.02em;
+  --text-body: 0.875rem;
+  --text-body--line-height: 1.25rem;
+  --text-body--font-weight: 500;
+  --text-body--letter-spacing: -0.005em;
+  --text-body-sm: 0.8125rem;
+  --text-body-sm--line-height: 1.125rem;
+  --text-body-sm--font-weight: 500;
+  --text-caption: 0.75rem;
+  --text-caption--line-height: 1rem;
+  --text-caption--font-weight: 500;
+  --text-caption-bold: 0.75rem;
+  --text-caption-bold--line-height: 1rem;
+  --text-caption-bold--font-weight: 600;
+  --text-caption-bold--letter-spacing: 0.08em;
+  --text-micro: 0.6875rem;
+  --text-micro--line-height: 0.875rem;
+  --text-micro--font-weight: 600;
+  --text-micro--letter-spacing: 0.08em;
+
+  --spacing-safe-bottom: env(safe-area-inset-bottom);
+  --spacing-safe-top: env(safe-area-inset-top);
+}
+
+/* Haarlinie (0.5px) — v4 kennt keine benannten Rahmenbreiten im Theme. */
+@utility border-hairline {
+  border-width: 0.5px;
+}
+@utility border-t-hairline {
+  border-top-width: 0.5px;
+}
+@utility border-r-hairline {
+  border-right-width: 0.5px;
+}
+@utility border-b-hairline {
+  border-bottom-width: 0.5px;
+}
+@utility border-l-hairline {
+  border-left-width: 0.5px;
+}
+
+/* ===========================================================
+   v3-Kompatibilität (Tailwind-4-Upgrade-Guide): v4 setzt Rahmen auf
+   currentColor, Buttons auf cursor:default und Placeholder auf 50 %
+   der Textfarbe. Die bisherigen Defaults bleiben so unverändert.
+   =========================================================== */
+@layer base {
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-gray-200, currentColor);
+  }
+
+  button:not(:disabled),
+  [role='button']:not(:disabled) {
+    cursor: pointer;
+  }
+
+  input::placeholder,
+  textarea::placeholder {
+    color: var(--color-gray-400);
+  }
+}
 
 /* ===========================================================
    Liquid-Glass-Tokens — Light Mode (Default)
@@ -103,51 +235,56 @@
 }
 
 /* ===========================================================
-   Body-Defaults
+   Body-Defaults — in @layer base: CSS ohne Layer schlägt in Tailwind 4
+   JEDE Utility (Layer-Reihenfolge vor Spezifität). Ohne Layer würde
+   z. B. ``button { font: inherit }`` alle Schrift- und Farbklassen auf
+   Buttons aushebeln; in v3 gewannen hier noch die spezifischeren Klassen.
    =========================================================== */
-html,
-body,
-#root {
-  height: 100%;
-}
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
 
-/*
- * iOS-Safari rendert die Seite initial herausgezoomt, sobald irgendein
- * Kind über die Viewport-Breite hinausragt. `overflow-x: clip` schneidet
- * solche Ausreißer ab, ohne (anders als overflow: hidden) einen scroll-
- * Container zu erzeugen — sticky/fixed bleiben relativ zum Viewport.
- */
-html,
-body {
-  overflow-x: clip;
-}
+  /*
+   * iOS-Safari rendert die Seite initial herausgezoomt, sobald irgendein
+   * Kind über die Viewport-Breite hinausragt. `overflow-x: clip` schneidet
+   * solche Ausreißer ab, ohne (anders als overflow: hidden) einen scroll-
+   * Container zu erzeugen — sticky/fixed bleiben relativ zum Viewport.
+   */
+  html,
+  body {
+    overflow-x: clip;
+  }
 
-body {
-  background-color: var(--bg);
-  color: var(--label);
-  font-family:
-    'Inter Tight',
-    system-ui,
-    -apple-system,
-    BlinkMacSystemFont,
-    'Segoe UI',
-    sans-serif;
-  -webkit-tap-highlight-color: transparent;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
+  body {
+    background-color: var(--bg);
+    color: var(--label);
+    font-family:
+      'Inter Tight',
+      system-ui,
+      -apple-system,
+      BlinkMacSystemFont,
+      'Segoe UI',
+      sans-serif;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
 
-input,
-select,
-textarea,
-button {
-  font: inherit;
-  color: inherit;
-}
+  input,
+  select,
+  textarea,
+  button {
+    font: inherit;
+    color: inherit;
+  }
 
-input[type='date'] {
-  /* iOS-Safari spacing fix */
-  min-height: 1.5rem;
+  input[type='date'] {
+    /* iOS-Safari spacing fix */
+    min-height: 1.5rem;
+  }
 }
 
 /* ===========================================================
@@ -183,76 +320,62 @@ input[type='date'] {
 /* ===========================================================
    Liquid-Glass Component-Layer — Type-Gradients und -Glows
    =========================================================== */
-@layer components {
-  /* Linear-Gradients für TypeBadge (135deg, color → 70 % alpha) */
-  .bg-type-electricity {
-    background: linear-gradient(
-      135deg,
-      var(--electricity),
-      color-mix(in oklch, var(--electricity), transparent 30%)
-    );
-  }
-  .bg-type-gas {
-    background: linear-gradient(
-      135deg,
-      var(--gas),
-      color-mix(in oklch, var(--gas), transparent 30%)
-    );
-  }
-  .bg-type-water {
-    background: linear-gradient(
-      135deg,
-      var(--water),
-      color-mix(in oklch, var(--water), transparent 30%)
-    );
-  }
-  .bg-type-oil {
-    background: linear-gradient(
-      135deg,
-      var(--oil),
-      color-mix(in oklch, var(--oil), transparent 30%)
-    );
-  }
-  .bg-type-heating {
-    background: linear-gradient(
-      135deg,
-      var(--oil),
-      color-mix(in oklch, var(--oil), transparent 30%)
-    );
-  }
-  .bg-gradient-primary {
-    background: linear-gradient(135deg, var(--primary), var(--primary-deep));
-  }
+/* Linear-Gradients für TypeBadge (135deg, color → 70 % alpha) */
+@utility bg-type-electricity {
+  background: linear-gradient(
+    135deg,
+    var(--electricity),
+    color-mix(in oklch, var(--electricity), transparent 30%)
+  );
+}
+@utility bg-type-gas {
+  background: linear-gradient(135deg, var(--gas), color-mix(in oklch, var(--gas), transparent 30%));
+}
+@utility bg-type-water {
+  background: linear-gradient(
+    135deg,
+    var(--water),
+    color-mix(in oklch, var(--water), transparent 30%)
+  );
+}
+@utility bg-type-oil {
+  background: linear-gradient(135deg, var(--oil), color-mix(in oklch, var(--oil), transparent 30%));
+}
+@utility bg-type-heating {
+  background: linear-gradient(135deg, var(--oil), color-mix(in oklch, var(--oil), transparent 30%));
+}
+@utility bg-gradient-primary {
+  background: linear-gradient(135deg, var(--primary), var(--primary-deep));
+}
 
-  /* Type-Glows: warmer Drop-Shadow + Inset-Highlight */
-  .shadow-glow-primary {
-    box-shadow:
-      0 4px 12px oklch(0.72 0.17 55 / 0.55),
-      0 1px 0 rgba(255, 255, 255, 0.3) inset;
-  }
-  .shadow-glow-electricity {
-    box-shadow:
-      0 4px 12px oklch(0.78 0.16 80 / 0.4),
-      0 1px 0 rgba(255, 255, 255, 0.3) inset;
-  }
-  .shadow-glow-gas {
-    box-shadow:
-      0 4px 12px oklch(0.72 0.14 35 / 0.4),
-      0 1px 0 rgba(255, 255, 255, 0.3) inset;
-  }
-  .shadow-glow-water {
-    box-shadow:
-      0 4px 12px oklch(0.7 0.13 220 / 0.4),
-      0 1px 0 rgba(255, 255, 255, 0.3) inset;
-  }
-  .shadow-glow-oil {
-    box-shadow:
-      0 4px 12px oklch(0.55 0.1 40 / 0.4),
-      0 1px 0 rgba(255, 255, 255, 0.3) inset;
-  }
-  .shadow-glow-heating {
-    box-shadow:
-      0 4px 12px oklch(0.55 0.1 40 / 0.4),
-      0 1px 0 rgba(255, 255, 255, 0.3) inset;
-  }
+/* Type-Glows: warmer Drop-Shadow + Inset-Highlight */
+@utility shadow-glow-primary {
+  box-shadow:
+    0 4px 12px oklch(0.72 0.17 55 / 0.55),
+    0 1px 0 rgba(255, 255, 255, 0.3) inset;
+}
+@utility shadow-glow-electricity {
+  box-shadow:
+    0 4px 12px oklch(0.78 0.16 80 / 0.4),
+    0 1px 0 rgba(255, 255, 255, 0.3) inset;
+}
+@utility shadow-glow-gas {
+  box-shadow:
+    0 4px 12px oklch(0.72 0.14 35 / 0.4),
+    0 1px 0 rgba(255, 255, 255, 0.3) inset;
+}
+@utility shadow-glow-water {
+  box-shadow:
+    0 4px 12px oklch(0.7 0.13 220 / 0.4),
+    0 1px 0 rgba(255, 255, 255, 0.3) inset;
+}
+@utility shadow-glow-oil {
+  box-shadow:
+    0 4px 12px oklch(0.55 0.1 40 / 0.4),
+    0 1px 0 rgba(255, 255, 255, 0.3) inset;
+}
+@utility shadow-glow-heating {
+  box-shadow:
+    0 4px 12px oklch(0.55 0.1 40 / 0.4),
+    0 1px 0 rgba(255, 255, 255, 0.3) inset;
 }

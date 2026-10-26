@@ -222,7 +222,7 @@ export function ImportReadingsPage() {
               <Card key={row.index} className={cx('p-3', !mapped && 'opacity-60')}>
                 <div className="grid gap-2 md:grid-cols-[1fr_1fr_1fr_auto] md:items-end">
                   <div className="min-w-0">
-                    <div className="text-caption-bold uppercase text-tertiary">Aus Datei</div>
+                    <div className="text-caption-bold text-tertiary uppercase">Aus Datei</div>
                     <div className="truncate text-body text-label">{row.raw_name}</div>
                   </div>
                   <Select

@@ -17,7 +17,7 @@ from __future__ import annotations
 from datetime import date
 
 from sqlalchemy import func, select
-from sqlalchemy.orm import Session, noload
+from sqlalchemy.orm import Session, lazyload
 
 from meters.core.problem import ProblemError
 from meters.models import (
@@ -117,7 +117,7 @@ def overview(db: Session, von: str | None, bis: str | None) -> BillingMonthOverv
         select(BillingRun)
         .where(BillingRun.monat.in_(monate), BillingRun.status != BillingRunStatus.ERSETZT)
         # ``lines`` haengt mit lazy="selectin" am Lauf; die Uebersicht braucht keine Zeilen.
-        .options(noload(BillingRun.lines))
+        .options(lazyload(BillingRun.lines))
         .order_by(BillingRun.version)
     ):
         laeufe[(gefunden.circle_id, gefunden.monat)] = gefunden

@@ -46,7 +46,7 @@ export function MpAccessCard({ mpId }: MpAccessCardProps) {
   if (error) {
     return (
       <Card>
-        <div className="text-caption-bold uppercase text-tertiary">Zugriff</div>
+        <div className="text-caption-bold text-tertiary uppercase">Zugriff</div>
         <div className="mt-3 rounded-card border-hairline border-danger/40 bg-danger/10 p-3 text-caption text-danger">
           {error}
         </div>
@@ -57,7 +57,7 @@ export function MpAccessCard({ mpId }: MpAccessCardProps) {
   if (users === null) {
     return (
       <Card>
-        <div className="text-caption-bold uppercase text-tertiary">Zugriff</div>
+        <div className="text-caption-bold text-tertiary uppercase">Zugriff</div>
         <div className="mt-3 text-body-sm text-tertiary">Lade…</div>
       </Card>
     );
@@ -69,7 +69,7 @@ export function MpAccessCard({ mpId }: MpAccessCardProps) {
   return (
     <Card>
       <div className="flex items-center justify-between">
-        <div className="text-caption-bold uppercase text-tertiary">Zugriff</div>
+        <div className="text-caption-bold text-tertiary uppercase">Zugriff</div>
         <div className="inline-flex items-center gap-1.5 text-caption text-tertiary">
           <Users size={14} />
           <span>{users.length}</span>
@@ -79,7 +79,7 @@ export function MpAccessCard({ mpId }: MpAccessCardProps) {
         <div>
           <div className="mb-1 text-caption text-tertiary">Admins (impliziter Zugriff)</div>
           {admins.length === 0 ? (
-            <div className="text-caption italic text-quaternary">keine</div>
+            <div className="text-caption text-quaternary italic">keine</div>
           ) : (
             <ul className="flex flex-wrap gap-1.5">
               {admins.map((u) => (
@@ -97,7 +97,7 @@ export function MpAccessCard({ mpId }: MpAccessCardProps) {
         <div>
           <div className="mb-1 text-caption text-tertiary">Recorder (zugewiesen)</div>
           {recorders.length === 0 ? (
-            <div className="text-caption italic text-quaternary">
+            <div className="text-caption text-quaternary italic">
               Niemand zugewiesen — Zugriff in der Benutzer-Verwaltung vergeben.
             </div>
           ) : (

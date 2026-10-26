@@ -12,9 +12,9 @@
  * landen so nicht im Initial-Chunk).
  */
 
-import { Navigate, Route, Routes, useLocation, useParams } from 'react-router-dom';
+import { Navigate, Route, Routes, useLocation, useParams } from 'react-router';
 import { Suspense, lazy } from 'react';
-import type { ReactNode } from 'react';
+import type { JSX, ReactNode } from 'react';
 
 import { AppShell } from '@/components/AppShell';
 import { useAuth } from '@/features/auth/auth-context';

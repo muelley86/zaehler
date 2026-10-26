@@ -6,7 +6,7 @@
  */
 
 import { Minus, TrendingDown, TrendingUp } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 
 import { Section } from '@/components/ui';
 import { formatDe } from '@/lib/format';
@@ -67,7 +67,7 @@ export function KpiTiles({ tiles, compareLabel }: KpiTilesProps) {
       <ul className="grid grid-cols-2 gap-px bg-separator md:grid-cols-4">
         {tiles.map((tile) => (
           <li key={tile.key} className="space-y-1 bg-surface p-4">
-            <div className="text-caption-bold uppercase text-tertiary">
+            <div className="text-caption-bold text-tertiary uppercase">
               <TileLabel tile={tile} />
             </div>
             <div className="num text-title-3 text-label">

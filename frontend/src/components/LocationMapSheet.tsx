@@ -67,7 +67,7 @@ export function LocationMapSheet({ open, onClose, latitude, longitude, name }: P
           {latitude.toFixed(6)}, {longitude.toFixed(6)}
         </div>
         <div>
-          <div className="mb-1.5 text-caption-bold uppercase text-tertiary">
+          <div className="mb-1.5 text-caption-bold text-tertiary uppercase">
             In Kartendienst öffnen
           </div>
           <div className="flex flex-wrap gap-2">

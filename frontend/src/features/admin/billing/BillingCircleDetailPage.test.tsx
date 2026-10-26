@@ -13,8 +13,8 @@ import { server } from '@/tests/server';
 
 import { BillingCircleDetailPage } from './BillingCircleDetailPage';
 
-vi.mock('react-router-dom', async () => {
-  const actual = await vi.importActual<typeof import('react-router-dom')>('react-router-dom');
+vi.mock('react-router', async () => {
+  const actual = await vi.importActual<typeof import('react-router')>('react-router');
   const params = { id: '1' };
   const navigate = vi.fn();
   return { ...actual, useParams: () => params, useNavigate: () => navigate };

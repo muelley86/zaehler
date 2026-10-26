@@ -6,7 +6,7 @@
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router';
 import { ArrowLeft, Plus } from 'lucide-react';
 
 import {
@@ -96,7 +96,7 @@ export function BillingCircleDetailPage() {
     if (!circle || !window.confirm(`Abrechnungskreis "${circle.code}" wirklich löschen?`)) return;
     try {
       await api.delete(`/billing-circles/${circle.id}`);
-      navigate('/admin/abrechnungskreise');
+      void navigate('/admin/abrechnungskreise');
     } catch (err) {
       setError(errorText(err, 'Löschen fehlgeschlagen.'));
     }

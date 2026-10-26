@@ -157,7 +157,7 @@ export function PendingSyncPage() {
                 key={item.id}
                 type="button"
                 onClick={() => setDetailId(item.id)}
-                className="hover:bg-fill/40 flex w-full items-center gap-3 px-4 py-3 text-left transition-colors"
+                className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-fill/40"
                 data-testid="pending-sync-item"
               >
                 <div className="min-w-0 flex-1">
@@ -191,7 +191,7 @@ export function PendingSyncPage() {
               </div>
             </div>
 
-            <div className="bg-fill/40 rounded-card border-hairline border-border p-3">
+            <div className="rounded-card border-hairline border-border bg-fill/40 p-3">
               <div className="text-caption text-tertiary">Eigener Wert</div>
               <div className="num text-title-3 text-label">
                 {formatDe(detail.value)} {detail.registerUnit}

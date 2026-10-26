@@ -105,7 +105,7 @@ export function DeliveriesSheet({
 
         <div>
           <div className="mb-2 flex items-baseline justify-between">
-            <div className="text-caption-bold uppercase text-tertiary">Bisherige Lieferungen</div>
+            <div className="text-caption-bold text-tertiary uppercase">Bisherige Lieferungen</div>
             {items.length > 0 ? (
               <div className="num text-caption text-tertiary">
                 Σ {formatDe(totalRefilled)} {register.unit}
@@ -117,7 +117,7 @@ export function DeliveriesSheet({
               Noch keine Lieferungen erfasst.
             </div>
           ) : (
-            <ul className="bg-fill/60 divide-y divide-separator overflow-hidden rounded-card border-hairline border-border">
+            <ul className="divide-y divide-separator overflow-hidden rounded-card border-hairline border-border bg-fill/60">
               {items.map((d) => (
                 <li key={d.id} className="flex items-center gap-3 px-4 py-3">
                   <div className="min-w-0 flex-1">

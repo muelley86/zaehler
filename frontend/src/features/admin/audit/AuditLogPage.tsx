@@ -101,7 +101,7 @@ export function AuditLogPage() {
                     <div className="flex items-baseline justify-between gap-2">
                       <span
                         className={cx(
-                          'rounded-full px-2 py-0.5 text-caption font-semibold uppercase tracking-tight',
+                          'rounded-full px-2 py-0.5 text-caption font-semibold tracking-tight uppercase',
                           actionTone(r.action),
                         )}
                       >
@@ -121,7 +121,7 @@ export function AuditLogPage() {
                       ) : null}
                     </div>
                     {r.diff ? (
-                      <pre className="num bg-fill/60 mt-2 overflow-x-auto whitespace-pre-wrap break-words rounded-card border-hairline border-border p-3 text-caption text-secondary">
+                      <pre className="num mt-2 overflow-x-auto rounded-card border-hairline border-border bg-fill/60 p-3 text-caption break-words whitespace-pre-wrap text-secondary">
                         {JSON.stringify(r.diff, null, 2)}
                       </pre>
                     ) : null}

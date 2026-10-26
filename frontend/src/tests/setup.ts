@@ -47,8 +47,9 @@ if (!('ResizeObserver' in globalThis)) {
 }
 
 // msw als API-Mock-Server (nur in Tests aktiv). Tests, die keine HTTP-Requests
-// machen, sind davon nicht betroffen — onUnhandledRequest='error' fängt
-// versehentlich nicht gemockte Requests in neuen Tests früh ab.
-beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
+// machen, sind davon nicht betroffen — onUnhandledFrame='error' fängt
+// versehentlich nicht gemockte Requests in neuen Tests früh ab (MSW 3; bis
+// MSW 2 hieß die Option onUnhandledRequest).
+beforeAll(() => server.listen({ onUnhandledFrame: 'error' }));
 afterEach(() => server.resetHandlers());
 afterAll(() => server.close());

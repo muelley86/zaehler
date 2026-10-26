@@ -39,6 +39,12 @@ logger = logging.getLogger(__name__)
 # bei ``capture="environment"`` ohnehin JPEG, nicht HEIC).
 _ACCEPTED_MIME = frozenset({"image/jpeg", "image/png", "image/webp"})
 
+# Decoder-Whitelist für ``Image.open``. Der MIME-Type oben stammt vom Client und
+# beweist nichts über den Inhalt — ohne ``formats=`` würde Pillow per Magic
+# Bytes jeden eingebauten Decoder wählen (u. a. JPEG 2000 mit bekannten
+# Heap-Overflows in libopenjp2).
+_ACCEPTED_PIL_FORMATS = ("JPEG", "PNG", "WEBP")
+
 # Längste Kante des reencodierten JPEGs. 2000 px ist Detail genug für
 # einen ablesbaren Zählerstand und bringt die Datei auf typ. 200-400 KB.
 MAX_DIMENSION = 2000
@@ -147,7 +153,7 @@ def save_photo(reading_id: int, upload: UploadFile) -> tuple[str, tuple[float, f
 
     try:
         upload.file.seek(0)
-        opened = Image.open(upload.file)
+        opened = Image.open(upload.file, formats=_ACCEPTED_PIL_FORMATS)
         opened.load()
     except Image.DecompressionBombError as exc:
         # Pillows eingebauter Schutz: Bild überschreitet das Pixel-Limit

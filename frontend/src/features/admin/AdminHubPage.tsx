@@ -14,7 +14,7 @@
  */
 
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 
 import { LargeTitle } from '@/components/ui';
 import { api } from '@/lib/api';
@@ -104,7 +104,7 @@ function HubCard({ section, counter }: { section: AdminNavItem; counter: number 
     <Link
       to={section.to}
       data-testid={`admin-hub-card-${section.to}`}
-      className="hover:shadow-glow-primary group rounded-card border-hairline border-border bg-surface p-5 transition-shadow"
+      className="group rounded-card border-hairline border-border bg-surface p-5 transition-shadow hover:shadow-glow-primary"
     >
       <div className="flex items-start justify-between">
         <div

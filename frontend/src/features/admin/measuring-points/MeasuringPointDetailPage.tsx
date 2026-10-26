@@ -11,7 +11,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import type { FormEvent } from 'react';
+import type { FormEvent, ReactNode } from 'react';
 import {
   ArrowLeft,
   ChevronRight,
@@ -22,7 +22,7 @@ import {
   Trash2,
   X,
 } from 'lucide-react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router';
 import {
   Area,
   AreaChart,
@@ -33,6 +33,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
+import type { TooltipValueType } from 'recharts';
 
 import {
   Button,
@@ -94,7 +95,11 @@ export function MeasuringPointDetailPage() {
 
   const [mp, setMp] = useState<MeasuringPointRead | null>(null);
   const [locations, setLocations] = useState<LocationRead[]>([]);
-  const [location, setLocation] = useState<LocationRead | null>(null);
+  const [loadedLocation, setLoadedLocation] = useState<LocationRead | null>(null);
+  // Standort nur, wenn er zur aktuellen MP gehört — ohne location_id (oder
+  // solange der neue noch lädt) gibt es keinen, statt den alten zu zeigen.
+  const location =
+    mp?.location_id != null && loadedLocation?.id === mp.location_id ? loadedLocation : null;
   const [consumption, setConsumption] = useState<ConsumptionPoint[]>([]);
   const [states, setStates] = useState<RegisterStateRead[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -125,7 +130,7 @@ export function MeasuringPointDetailPage() {
 
   useEffect(() => {
     if (!Number.isFinite(mpId)) {
-      navigate('/admin/messstellen', { replace: true });
+      void navigate('/admin/messstellen', { replace: true });
       return;
     }
     // Stammdaten + Locations + Register-State parallel — keine Cascade. Die
@@ -179,16 +184,21 @@ export function MeasuringPointDetailPage() {
   // Standort-Detail nur laden, wenn die MP einen hat. Optional, daher
   // schluckt der Catch leise.
   useEffect(() => {
-    if (mp?.location_id == null) {
-      setLocation(null);
-      return;
-    }
+    if (mp?.location_id == null) return;
+    // Bei schnellem MP-Wechsel darf eine späte Antwort den neueren Standort
+    // nicht überschreiben.
+    let active = true;
     api
       .get<LocationRead>(`/locations/${mp.location_id}`)
-      .then(setLocation)
+      .then((loaded) => {
+        if (active) setLoadedLocation(loaded);
+      })
       .catch(() => {
         /* nicht kritisch - Standort-Detail optional */
       });
+    return () => {
+      active = false;
+    };
   }, [mp?.location_id]);
 
   if (error) {
@@ -313,7 +323,7 @@ function MeasuringPointTitle({
     <div className="flex items-start gap-3">
       <TypeBadge type={mp.type} size="lg" />
       <div className="min-w-0 flex-1">
-        <div className="text-caption-bold uppercase text-tertiary">Messstelle</div>
+        <div className="text-caption-bold text-tertiary uppercase">Messstelle</div>
         {editing ? (
           <form onSubmit={(e) => void save(e)} className="mt-1 space-y-2">
             <TextField
@@ -386,7 +396,7 @@ function StammdatenCard({
   return (
     <Card>
       <div className="flex items-start justify-between gap-2">
-        <div className="text-caption-bold uppercase text-tertiary">Stammdaten</div>
+        <div className="text-caption-bold text-tertiary uppercase">Stammdaten</div>
         {!editing ? (
           <Button
             type="button"
@@ -438,7 +448,7 @@ function StammdatenReadView({
               <button
                 type="button"
                 onClick={onMapOpen}
-                className="hover:bg-primary/20 inline-flex items-center gap-1.5 rounded-pill bg-primary-soft px-2 py-0.5 font-semibold text-primary-deep transition-colors"
+                className="inline-flex items-center gap-1.5 rounded-pill bg-primary-soft px-2 py-0.5 font-semibold text-primary-deep transition-colors hover:bg-primary/20"
               >
                 <MapIcon size={14} />
                 {mp.location_name}
@@ -1113,7 +1123,7 @@ function ReplaceMeterForm({
         />
       ) : null}
       <div>
-        <div className="mb-2 text-caption-bold uppercase text-tertiary">Endstände (alt)</div>
+        <div className="mb-2 text-caption-bold text-tertiary uppercase">Endstände (alt)</div>
         <div className="space-y-2">
           {obis.map((code) => (
             <TextField
@@ -1129,7 +1139,7 @@ function ReplaceMeterForm({
         </div>
       </div>
       <div>
-        <div className="mb-2 text-caption-bold uppercase text-tertiary">Anfangsstände (neu)</div>
+        <div className="mb-2 text-caption-bold text-tertiary uppercase">Anfangsstände (neu)</div>
         <div className="space-y-2">
           {obis.map((code) => (
             <TextField
@@ -1234,11 +1244,16 @@ function ConsumptionChart({
   const tooltipLabelStyle = useMemo(() => ({ color: theme.label }), [theme.label]);
   const legendWrapperStyle = useMemo(() => ({ fontSize: 12, color: theme.label }), [theme.label]);
   const tooltipFormatter = useCallback(
-    (value: number | string, name: string) => [
-      `${formatDe(value as number)}${unit ? ' ' + unit : ''}`,
+    (value: TooltipValueType | undefined, name: number | string | undefined): [string, string] => [
+      `${typeof value === 'number' || typeof value === 'string' ? formatDe(value) : ''}${unit ? ' ' + unit : ''}`,
       labelByObis.get(String(name)) ?? String(name),
     ],
     [unit, labelByObis],
+  );
+  const tooltipLabelFormatter = useCallback(
+    (label: ReactNode) =>
+      typeof label === 'string' || typeof label === 'number' ? formatDateTickDe(label) : label,
+    [],
   );
   const legendFormatter = useCallback(
     (name: string) => labelByObis.get(String(name)) ?? String(name),
@@ -1313,7 +1328,7 @@ function ConsumptionChart({
                 contentStyle={tooltipContentStyle}
                 labelStyle={tooltipLabelStyle}
                 formatter={tooltipFormatter}
-                labelFormatter={formatDateTickDe}
+                labelFormatter={tooltipLabelFormatter}
               />
               <Legend formatter={legendFormatter} wrapperStyle={legendWrapperStyle} />
               {obisCodes.map((code, idx) => (
@@ -1322,7 +1337,7 @@ function ConsumptionChart({
                   type="monotone"
                   dataKey={code}
                   name={code}
-                  stroke={theme.palette[idx % theme.palette.length]}
+                  stroke={theme.palette[idx % theme.palette.length] ?? theme.axis}
                   fill={`url(#mpd-grad-${code})`}
                   strokeWidth={2}
                   isAnimationActive={false}
@@ -1480,7 +1495,7 @@ function RegisterTable({
                 <Link
                   to={`/erfassungen?mp=${mp.id}&obis=${encodeURIComponent(register.obis_code)}`}
                   aria-label={`Messungen zu Register ${register.obis_code}`}
-                  className={cx(gridClass, 'hover:bg-fill/40 transition-colors')}
+                  className={cx(gridClass, 'transition-colors hover:bg-fill/40')}
                 >
                   {cells}
                   <ChevronRight size={16} className="hidden text-tertiary md:block" />
@@ -1574,7 +1589,7 @@ function HeatingRegisterEditor({
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between gap-2">
-        <div className="text-caption-bold uppercase text-tertiary">
+        <div className="text-caption-bold text-tertiary uppercase">
           Register am aktiven Zähler verwalten
         </div>
         <Button

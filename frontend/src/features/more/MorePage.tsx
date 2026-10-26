@@ -9,7 +9,7 @@ import {
   Sun,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 
 import { useAuth } from '@/features/auth/auth-context';
 import { TwoFactorSection } from '@/features/auth/TwoFactorSection';
@@ -37,10 +37,10 @@ function getStoredTheme(): ThemeChoice {
 function applyTheme(choice: ThemeChoice) {
   const root = document.documentElement;
   root.classList.remove('light', 'dark');
-  let dark = false;
-  if (choice === 'dark') dark = true;
-  else if (choice === 'light') dark = false;
-  else dark = window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? false;
+  const dark =
+    choice === 'system'
+      ? (window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? false)
+      : choice === 'dark';
   root.classList.add(dark ? 'dark' : 'light');
   try {
     if (choice === 'system') window.localStorage.removeItem('theme');
@@ -79,7 +79,7 @@ export function MorePage() {
       return;
     }
     await logout();
-    navigate('/login', { replace: true });
+    void navigate('/login', { replace: true });
   }
 
   const initial = (me?.username[0] ?? '?').toUpperCase();
@@ -93,7 +93,7 @@ export function MorePage() {
         {/* Profil-Card oben */}
         <Card>
           <div className="flex items-center gap-4">
-            <div className="bg-gradient-primary shadow-glow-primary flex h-14 w-14 shrink-0 items-center justify-center rounded-full text-title-3 font-bold text-white">
+            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full text-title-3 font-bold text-white shadow-glow-primary bg-gradient-primary">
               {initial}
             </div>
             <div className="min-w-0 flex-1">

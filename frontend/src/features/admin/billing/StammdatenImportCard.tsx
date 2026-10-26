@@ -91,7 +91,7 @@ export function StammdatenImportCard({ onApplied }: { onApplied: () => void }) {
           Gültigkeitsdatum nachgetragen, Abweichungen nur gemeldet.
         </p>
         <label className="block">
-          <span className="mb-1.5 block text-caption-bold uppercase text-tertiary">
+          <span className="mb-1.5 block text-caption-bold text-tertiary uppercase">
             Import-Datei
           </span>
           <input

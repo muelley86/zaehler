@@ -13,7 +13,7 @@
 import { Fragment, useId, useState } from 'react';
 import type { ReactNode } from 'react';
 import { AlertTriangle, TrendingDown, TrendingUp } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 
 import { Section } from '@/components/ui';
 import { formatDateDe, formatDe } from '@/lib/format';

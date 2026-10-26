@@ -8,7 +8,7 @@ import { User } from 'lucide-react';
 import { describe, expect, it, vi } from 'vitest';
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { useLocation } from 'react-router-dom';
+import { useLocation } from 'react-router';
 
 import { renderWithRouter } from '@/tests/render';
 

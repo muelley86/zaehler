@@ -177,9 +177,9 @@ function SetupSheet({
           </div>
         </div>
         <div className="rounded-card border-hairline border-border bg-fill p-3">
-          <div className="text-caption-bold uppercase text-tertiary">Secret manuell</div>
+          <div className="text-caption-bold text-tertiary uppercase">Secret manuell</div>
           <div className="mt-1 flex items-center gap-2">
-            <code className="num flex-1 break-all text-body-sm text-label">{data.secret}</code>
+            <code className="num flex-1 text-body-sm break-all text-label">{data.secret}</code>
             <button
               type="button"
               onClick={copySecret}
