@@ -473,8 +473,7 @@ def test_2fa_verify_throttled_per_username(admin_client: TestClient, client: Tes
     assert login.json()["requires_2fa"] is True
     challenge = login.json()["challenge_token"]
 
-    # Username-Bucket hart sperren, ohne den IP-Limiter zu triggern (der
-    # erfolgreiche Passwort-Schritt oben hat beide Buckets geleert).
+    # Username-Bucket hart sperren, ohne den IP-Limiter zu triggern.
     username_limiter._state.clear()
     for _ in range(username_limiter._max):
         username_limiter.record_failure("admin")
@@ -489,6 +488,90 @@ def test_2fa_verify_throttled_per_username(admin_client: TestClient, client: Tes
     finally:
         # username_limiter wird (anders als login_limiter) vom conftest-
         # Cleanup nicht zurückgesetzt — hier selbst aufräumen.
+        username_limiter._state.clear()
+
+
+def test_2fa_bruteforce_not_reset_by_password_step(
+    admin_client: TestClient, client: TestClient
+) -> None:
+    """Ein korrektes Passwort darf die 2FA-Fehlversuchs-Zähler nicht leeren.
+
+    Sonst kann ein Angreifer mit bekanntem Passwort vor jedem Bündel
+    TOTP-Rateversuche neu einloggen und die Sperre nie erreichen
+    (unbegrenzter Brute-Force auf den 6-stelligen Code). Erst ein
+    vollständig erfolgreicher Login (inkl. 2FA) setzt die Buckets zurück.
+    """
+    import time
+
+    import pyotp
+
+    from meters.services.rate_limit import username_limiter
+
+    secret = admin_client.post("/api/v1/auth/2fa/setup").json()["secret"]
+    totp = pyotp.TOTP(secret)
+    activated = admin_client.post("/api/v1/auth/2fa/activate", json={"code": totp.now()})
+    assert activated.status_code == 200, activated.text
+    username_limiter._state.clear()
+
+    counter = int(time.time()) // 30
+    valid = {totp.generate_otp(counter + offset) for offset in range(-2, 3)}
+    invalid_codes = iter(f"{i:06d}" for i in range(100) if f"{i:06d}" not in valid)
+
+    try:
+        statuses: list[int] = []
+        for _ in range(4):
+            login = client.post(
+                "/api/v1/auth/login",
+                json={"username": "admin", "password": "admin-pass-12345"},
+            )
+            statuses.append(login.status_code)
+            if login.status_code != 200:
+                break
+            challenge = login.json()["challenge_token"]
+            for _ in range(4):
+                resp = client.post(
+                    "/api/v1/auth/2fa/verify",
+                    json={"challenge_token": challenge, "code": next(invalid_codes)},
+                )
+                statuses.append(resp.status_code)
+        assert 429 in statuses, statuses
+        # Spätestens nach dem 5. Fehlversuch (IP-Limiter) ist Schluss.
+        assert statuses.count(401) <= 5, statuses
+    finally:
+        username_limiter._state.clear()
+
+
+def test_full_2fa_login_resets_failure_buckets(
+    admin_client: TestClient, client: TestClient
+) -> None:
+    """Gegenprobe: Nach erfolgreichem 2FA-Login sind frühere Fehlversuche vergessen."""
+    import pyotp
+
+    from meters.services.rate_limit import login_limiter, username_limiter
+
+    secret = admin_client.post("/api/v1/auth/2fa/setup").json()["secret"]
+    totp = pyotp.TOTP(secret)
+    admin_client.post("/api/v1/auth/2fa/activate", json={"code": totp.now()})
+    reset_totp_replay_counter()
+    username_limiter._state.clear()
+    login_limiter._state.clear()
+
+    try:
+        for _ in range(3):
+            client.post("/api/v1/auth/login", json={"username": "admin", "password": "falsch"})
+        login = client.post(
+            "/api/v1/auth/login",
+            json={"username": "admin", "password": "admin-pass-12345"},
+        )
+        assert login.status_code == 200, login.text
+        verified = client.post(
+            "/api/v1/auth/2fa/verify",
+            json={"challenge_token": login.json()["challenge_token"], "code": totp.now()},
+        )
+        assert verified.status_code == 200, verified.text
+        assert "admin" not in username_limiter._state
+        assert not login_limiter._state
+    finally:
         username_limiter._state.clear()
 
 
