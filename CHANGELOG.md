@@ -10,6 +10,13 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.90.3](https://github.com/muelley86/zaehler/compare/v2.90.2...v2.90.3) (2026-11-08)
+
+
+### Fehlerbehebungen
+
+* **ui:** Sheet überschreibt keinen bereits gesetzten Fokus ([#398](https://github.com/muelley86/zaehler/issues/398)) ([586e0dd](https://github.com/muelley86/zaehler/commit/586e0dd1ccd4ce42d279eb709e7863e9bc96f287))
+
 ## [2.90.2](https://github.com/muelley86/zaehler/compare/v2.90.1...v2.90.2) (2026-11-08)
 
 
