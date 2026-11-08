@@ -208,6 +208,13 @@ ensure_sudo_rule() {
     fi
 }
 
+# Die systemd-Unit macht das Repo für den Dienst read-only und gibt nur
+# $REPO_DIR/data (Fotos, Restore-Staging) wieder frei. Das Verzeichnis muss
+# deshalb vor dem Start existieren — die App kann es nicht mehr selbst anlegen.
+ensure_runtime_dirs() {
+    as_user "mkdir -p '$REPO_DIR/data/media/photos'"
+}
+
 # Legt einen Wrapper unter /usr/local/bin/zaehler an, damit der User auf
 # einem installierten Container mit `sudo zaehler upgrade-all` auskommt
 # (statt dem Pfad zum Skript). Idempotent — bei jedem upgrade-app neu
@@ -519,6 +526,7 @@ EOF
     ok "Datenbank auf aktuellem Stand"
 
     step "8/10  systemd-Unit + sudo-Regel + CLI-Wrapper"
+    ensure_runtime_dirs
     install -m 0644 "$REPO_DIR/deploy/systemd/$SERVICE_NAME" \
         "/etc/systemd/system/$SERVICE_NAME"
     systemctl daemon-reload
@@ -743,7 +751,7 @@ cmd_upgrade_app() {
     fi
 
     step "1/8  Backup der Datenbank"
-    "$REPO_DIR/deploy/lxc/backup.sh" || warn "Backup fehlgeschlagen — Update wird trotzdem fortgesetzt."
+    cmd_backup || warn "Backup fehlgeschlagen — Update wird trotzdem fortgesetzt."
 
     step "2/8  Code aktualisieren (git fetch + reset)"
     # Idempotent: fetch + hard reset auf den gewünschten Branch (Default main).
@@ -773,6 +781,7 @@ cmd_upgrade_app() {
     as_user "cd '$REPO_DIR/backend' && uv run python -m meters.cli recompute-monthly"
 
     step "6/8  systemd-Unit synchronisieren (falls geändert) + CLI-Wrapper"
+    ensure_runtime_dirs
     local unit_src="$REPO_DIR/deploy/systemd/$SERVICE_NAME"
     local unit_dst="/etc/systemd/system/$SERVICE_NAME"
     if [ -f "$unit_src" ] && ! cmp -s "$unit_src" "$unit_dst" 2>/dev/null; then
@@ -825,6 +834,8 @@ cmd_upgrade_all() {
 # backup — Datenbank-Snapshot
 # -----------------------------------------------------------------------------
 
+# Läuft als root IMMER über as_user: backup.sh liegt im Repo, das dem
+# App-User gehört — root darf von ihm beschreibbare Skripte nicht ausführen.
 cmd_backup() {
     if [ "$(id -u)" -eq 0 ]; then
         as_user "$REPO_DIR/deploy/lxc/backup.sh"
@@ -1452,7 +1463,7 @@ $(as_user "git -C '$REPO_DIR' tag" | tr '\n' ' ')"
     fi
 
     step "1/6  Backup der Datenbank"
-    "$REPO_DIR/deploy/lxc/backup.sh" || warn "Backup fehlgeschlagen — Rollback wird trotzdem fortgesetzt."
+    cmd_backup || warn "Backup fehlgeschlagen — Rollback wird trotzdem fortgesetzt."
 
     step "2/6  Auf '$ref' wechseln (detached HEAD)"
     as_user "git -C '$REPO_DIR' checkout --quiet '$ref'"
@@ -1664,7 +1675,7 @@ _run_meters_repair() {
         die "Unbekanntes Argument '$arg' (nur --apply erlaubt)."
     fi
     if [ "$extra" = "--apply" ]; then
-        "$REPO_DIR/deploy/lxc/backup.sh" || warn "Backup fehlgeschlagen — Reparatur wird trotzdem fortgesetzt."
+        cmd_backup || warn "Backup fehlgeschlagen — Reparatur wird trotzdem fortgesetzt."
     fi
     as_user "cd '$REPO_DIR/backend' && uv run python -m meters.cli $sub $extra"
 }
