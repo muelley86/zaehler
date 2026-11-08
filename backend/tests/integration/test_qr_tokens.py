@@ -275,6 +275,31 @@ def test_admin_can_assign_token(admin_client: TestClient) -> None:
     assert resp.json()["assigned_at"] is not None
 
 
+def test_recorder_assign_on_token_of_inaccessible_mp_does_not_leak(
+    admin_client: TestClient,
+    recorder_client: TestClient,
+    db: Session,
+    admin_user: User,
+    recorder_user: User,
+) -> None:
+    """Token hängt an einer für den Recorder fremden MP → 404 wie bei
+    ``resolve``, kein 409 mit der fremden ``measuring_point_id``."""
+    foreign = _create_water_mp(admin_client, name="Fremd", serial="SN-F")
+    own = _create_water_mp(admin_client, name="Eigen", serial="SN-E")
+    _set_can_assign(db, recorder_user, True)
+    _grant_access(db, user=recorder_user, mp_id=own["id"], granted_by=admin_user)
+    token = admin_client.post("/api/v1/qr-tokens", json={"count": 1}).json()[0]["token"]
+    admin_client.post(
+        f"/api/v1/qr-tokens/{token}/assign", json={"measuring_point_id": foreign["id"]}
+    )
+
+    resp = recorder_client.post(
+        f"/api/v1/qr-tokens/{token}/assign", json={"measuring_point_id": own["id"]}
+    )
+    assert resp.status_code == 404, resp.text
+    assert "measuring_point_id" not in resp.json()
+
+
 def test_assign_already_assigned_returns_409(admin_client: TestClient) -> None:
     mp_a = _create_water_mp(admin_client, name="A", serial="SN-A")
     mp_b = _create_water_mp(admin_client, name="B", serial="SN-B")

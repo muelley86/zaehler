@@ -71,9 +71,20 @@ class TotpActivateResponse(BaseModel):
     backup_codes: list[str]
 
 
-class TotpDisableRequest(BaseModel):
+class TotpReauthRequest(BaseModel):
+    """Re-Authentisierung für sicherheitskritische 2FA-Aktionen.
+
+    ``code`` ist ein TOTP- oder Backup-Code; Pflicht, sobald 2FA aktiv ist
+    (fehlt er, antwortet der Endpoint mit 400 statt 422 — wie bisher bei
+    ``/2fa/disable``).
+    """
+
     current_password: str = Field(min_length=1, max_length=256)
     code: str | None = Field(default=None, min_length=6, max_length=32)
+
+
+class TotpDisableRequest(TotpReauthRequest):
+    pass
 
 
 class TotpVerifyRequest(BaseModel):
