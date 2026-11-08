@@ -10,6 +10,18 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.90.2](https://github.com/muelley86/zaehler/compare/v2.90.1...v2.90.2) (2026-11-08)
+
+
+### Fehlerbehebungen
+
+* **security:** 2FA-Fehlversuche nicht durch Passwort-Schritt zurücksetzen ([#390](https://github.com/muelley86/zaehler/issues/390)) ([0ee3740](https://github.com/muelley86/zaehler/commit/0ee374073c2f36fb6f48360210cbffbc5a7c0ab7))
+* **security:** Backup-Codes nur mit Re-Auth, QR-Assign leakt keine fremde MP ([#391](https://github.com/muelley86/zaehler/issues/391)) ([a2789ce](https://github.com/muelley86/zaehler/commit/a2789ce4806d062ff3289a641f408960c4d60a7f))
+* **security:** Body-Limit vor Auth und Pixel-Limit vor Foto-Decode ([#392](https://github.com/muelley86/zaehler/issues/392)) ([d557b0e](https://github.com/muelley86/zaehler/commit/d557b0edd64869ffc5dd0f198c8d6572f77e8690))
+* **security:** Client-IP aus rechtestem X-Forwarded-For-Element, Proxy-Pinning in proxy-other ([#395](https://github.com/muelley86/zaehler/issues/395)) ([db66949](https://github.com/muelley86/zaehler/commit/db6694944d5c5432d9cc18478572323d14981f27))
+* **security:** Dienst darf Repo nicht beschreiben, root ruft backup.sh nur per as_user ([#394](https://github.com/muelley86/zaehler/issues/394)) ([f5c881e](https://github.com/muelley86/zaehler/commit/f5c881eeb31e1f36e40d973d8a509881b6d5318e))
+* **security:** Logout nur mit Server-Bestätigung, SW-Cache bei User-Wechsel leeren ([#393](https://github.com/muelley86/zaehler/issues/393)) ([1b43cf7](https://github.com/muelley86/zaehler/commit/1b43cf7b0232d01876bb7753954021c4d1ee00a2))
+
 ## [2.90.1](https://github.com/muelley86/zaehler/compare/v2.90.0...v2.90.1) (2026-10-26)
 
 
