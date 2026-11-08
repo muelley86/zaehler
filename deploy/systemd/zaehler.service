@@ -62,18 +62,20 @@ ProtectClock=true
 ProtectHostname=true
 ProtectProc=invisible
 # Härtung des Datei-Zugriffs. Ansatz: ALLES unter /opt/zaehler bleibt schreibbar
-# (ReadWritePaths) — die App-Daten liegen je nach Deploy an mehreren Stellen
-# (DB unter /opt/zaehler/data, Fotos+Restore-Staging unter /opt/zaehler/repo/data,
-# Backups, uv-Cache). Statt diese Schreibpfade fehleranfällig aufzuzählen, machen
-# wir gezielt nur Quellcode + venv read-only (ReadOnlyPaths): eine kompromittierte
-# App kann so keinen Code/kein venv PERSISTENT verändern, ohne dass ein
-# Daten-Schreibpfad riskiert wird. Zur Laufzeit wird der Code nur gelesen (static/
-# ausgeliefert, venv importiert; Build/uv-sync/.pyc passieren zur Deploy-Zeit).
-# ACHTUNG: nur am echten LXC verifizierbar — nach dem Deploy `systemctl restart
-# zaehler` + `status`/Logs prüfen; dass ReadOnlyPaths einen Unterpfad eines
-# ReadWritePaths-Baums read-only macht, vorab per `systemd-run --scope` testen.
-ReadWritePaths=/opt/zaehler
-ReadOnlyPaths=/opt/zaehler/repo/backend /opt/zaehler/repo/frontend
+# (ReadWritePaths) — DB unter /opt/zaehler/data, Backups, uv-Cache —, das
+# komplette Repo aber read-only (ReadOnlyPaths). Einzige Ausnahme im Repo ist
+# /opt/zaehler/repo/data (Fotos + Restore-Staging, verschachteltes
+# ReadWritePaths gewinnt als spezifischerer Pfad).
+# Warum das GANZE Repo und nicht nur backend/ + frontend/: deploy/lxc/*.sh,
+# die Unit-Quelle und .git/config werden bei `sudo zaehler upgrade-app` etc.
+# von root ausgeführt bzw. ausgewertet. Dürfte die App sie schreiben, würde
+# aus einer kompromittierten App root im Container (Security-Audit #3).
+# Zur Laufzeit wird der Code nur gelesen (static/ ausgeliefert, venv importiert;
+# Build/uv-sync/.pyc passieren zur Deploy-Zeit als User zaehler, außerhalb
+# dieser Sandbox). ACHTUNG: nur am echten LXC verifizierbar — nach dem Deploy
+# `systemctl restart zaehler` + `status`/Logs prüfen und einen Foto-Upload testen.
+ReadWritePaths=/opt/zaehler -/opt/zaehler/repo/data
+ReadOnlyPaths=/opt/zaehler/repo
 RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
 RestrictNamespaces=true
 RestrictRealtime=true
