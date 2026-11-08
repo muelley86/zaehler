@@ -10,6 +10,13 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.90.4](https://github.com/muelley86/zaehler/compare/v2.90.3...v2.90.4) (2026-11-08)
+
+
+### Dokumentation
+
+* Security-Audit 2026-11-08 und geänderte Sicherheits-Verhaltensweisen ([#400](https://github.com/muelley86/zaehler/issues/400)) ([56c92fc](https://github.com/muelley86/zaehler/commit/56c92fc1f469c976864377bebed5480a38a06d67))
+
 ## [2.90.3](https://github.com/muelley86/zaehler/compare/v2.90.2...v2.90.3) (2026-11-08)
 
 
