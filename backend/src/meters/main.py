@@ -18,6 +18,7 @@ from starlette.middleware.gzip import GZipMiddleware
 from starlette.types import Scope
 
 from meters.api import router as api_router
+from meters.core.body_limit import BodyLimitMiddleware
 from meters.core.config import (
     assert_secure_production_config,
     assert_secure_secret_key,
@@ -67,6 +68,9 @@ def create_app() -> FastAPI:
     # gebaute JS/CSS um typischerweise 60-75 %. Schwelle 1024 B vermeidet
     # Overhead für kleine Antworten.
     app.add_middleware(GZipMiddleware, minimum_size=1024)
+    # Body-Limit vor Auth und Parsing (s. core/body_limit.py). Innerhalb der
+    # Security-Header-Middleware, damit auch das 413 CSP & Co. trägt.
+    app.add_middleware(BodyLimitMiddleware)
     # Reihenfolge ist relevant: bei Starlette ist die *zuletzt* registrierte
     # Middleware die aeusserste. Der Origin-Check muss deshalb zuerst rein,
     # damit die Security-Header sich um ihn herum legen — sonst ginge seine

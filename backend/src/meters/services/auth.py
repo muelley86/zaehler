@@ -77,6 +77,22 @@ def issue_session(
     return session, token
 
 
+def has_valid_session(db: DbSession, *, token: str) -> bool:
+    """Prüft rein lesend, ob ``token`` zu einer gültigen Session eines aktiven
+    Users gehört — ohne Sliding-Expiration oder Aufräumen (das bleibt
+    ``resolve_session`` in der eigentlichen Route vorbehalten)."""
+    session = db.scalar(select(Session).where(Session.token_hash == hash_session_token(token)))
+    if session is None:
+        return False
+    expires_at = session.expires_at
+    if expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=UTC)
+    if expires_at <= _utcnow():
+        return False
+    user = session.user
+    return user is not None and user.is_active
+
+
 def resolve_session(db: DbSession, *, token: str) -> tuple[User, Session] | None:
     session = db.scalar(select(Session).where(Session.token_hash == hash_session_token(token)))
     if session is None:

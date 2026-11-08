@@ -220,13 +220,14 @@ editieren, am besten geführt anpassen:
 
 **Kern / Secret**
 
-| Variable                        | Default                      | Bedeutung                                                                                  |
-| ------------------------------- | ---------------------------- | ------------------------------------------------------------------------------------------ |
-| `METERS_SECRET_KEY`             | `change-me-in-production`    | Server-Geheimnis für Session-Token-HMAC — **Pflicht in Produktion** (Boot bricht sonst ab) |
-| `METERS_DATABASE_URL`           | `sqlite:///./data/meters.db` | SQLite-Pfad                                                                                |
-| `METERS_DEBUG`                  | `False`                      | Nur Entwicklung. In Produktion `False` lassen (sonst `/docs` + Tracebacks offen)           |
-| `METERS_MEDIA_DIR`              | `…/data/media/photos`        | Ablage der Reading-Fotos                                                                   |
-| `METERS_PHOTO_MAX_UPLOAD_BYTES` | `20971520` (20 MB)           | Max. Roh-Upload pro Foto                                                                   |
+| Variable                        | Default                      | Bedeutung                                                                                           |
+| ------------------------------- | ---------------------------- | --------------------------------------------------------------------------------------------------- |
+| `METERS_SECRET_KEY`             | `change-me-in-production`    | Server-Geheimnis für Session-Token-HMAC — **Pflicht in Produktion** (Boot bricht sonst ab)          |
+| `METERS_DATABASE_URL`           | `sqlite:///./data/meters.db` | SQLite-Pfad                                                                                         |
+| `METERS_DEBUG`                  | `False`                      | Nur Entwicklung. In Produktion `False` lassen (sonst `/docs` + Tracebacks offen)                    |
+| `METERS_MEDIA_DIR`              | `…/data/media/photos`        | Ablage der Reading-Fotos                                                                            |
+| `METERS_PHOTO_MAX_UPLOAD_BYTES` | `20971520` (20 MB)           | Max. Roh-Upload pro Foto                                                                            |
+| `METERS_REQUEST_MAX_BODY_BYTES` | `26214400` (25 MB)           | Max. Request-Body mit Login (mind. Foto-Limit + 1 MB; Restore hat eigenes Limit). Ohne Login: 64 KB |
 
 **Authentifizierung / Session**
 
