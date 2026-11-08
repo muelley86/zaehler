@@ -582,7 +582,8 @@ Phishing in falsche Hände gerät.
 
 Jeder Code funktioniert genau einmal. Sind alle 10 verbraucht oder
 kompromittiert: in **Mehr → 2FA → Backup-Codes neu generieren** klicken,
-alte werden sofort ungültig.
+mit aktuellem Passwort und einem Code aus der Authenticator-App (oder einem
+noch gültigen Backup-Code) bestätigen — alte werden sofort ungültig.
 
 > **Backup-Schutz:** Das TOTP-Geheimnis liegt in `meters.db` als
 > Klartext-Base32 — wer Zugriff auf eine ungeschützte DB-Datei oder

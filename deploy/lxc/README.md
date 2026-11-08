@@ -111,7 +111,10 @@ Vier Optionen im Menü:
 
 - **Nur direkt im LAN per IP** (`lan-only`, HTTP, Standard)
 - **HTTPS-Proxy + offene LAN-IP** (`proxy-other`, NPM/nginx auf anderem Host —
-  App bleibt parallel per IP erreichbar; **nur LAN, nicht fürs Internet**)
+  App bleibt parallel per IP erreichbar; **nur LAN, nicht fürs Internet**).
+  Fragt die Proxy-IP ab und glaubt `X-Forwarded-For` nur von ihr
+  (`trusted_proxy_ips`); leer gelassen wird XFF ignoriert. Bestands-Setups in
+  diesem Modus seit v2.90.2 einmal neu durchlaufen.
 - **Strikt HTTPS via Proxy auf gleichem Host** (`proxy-same`, Caddy/nginx neben
   der App, App nur auf `127.0.0.1` — der saubere Internet-Modus)
 - **Internet via Proxy auf anderem Host** (`proxy-external`, fragt zusätzlich
@@ -208,7 +211,8 @@ versehentlich im Klartext über die Leitung. `proxy-external` setzt zusätzlich
    erzwingen (Default aus — im reinen LAN-Betrieb kein Zwang).
 3. **Limits am Proxy** gegen Überlast/Missbrauch, z. B. bei Caddy/nginx:
    `client_max_body_size 25m;` und ein `limit_req`/Rate-Limit. Greift, bevor
-   ein Request die App erreicht. Ausnahme: soll der **Backup-Restore über die
+   ein Request die App erreicht. (Die App selbst begrenzt seit v2.90.2 Bodies
+   ohne Login auf 64 KiB und mit Login auf `METERS_REQUEST_MAX_BODY_BYTES`.) Ausnahme: soll der **Backup-Restore über die
    App-UI** durch den Proxy laufen, braucht es ein größeres Body-Limit
    (Backup-ZIPs können hunderte MB erreichen) — dann z. B.
    `client_max_body_size 1g;` setzen oder den Restore nur im LAN direkt gegen

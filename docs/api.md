@@ -10,6 +10,11 @@ Alle Endpoints unter `/api/v1`. Fehler im RFC-7807-Format
 - `POST /auth/login`
 - `POST /auth/logout`
 - `POST /auth/change-password`
+- `POST /auth/2fa/verify` — zweiter Login-Schritt (`{code}`)
+- `GET /auth/2fa/status`, `POST /auth/2fa/setup`, `POST /auth/2fa/activate`
+- `POST /auth/2fa/disable` und `POST /auth/2fa/backup-codes/regenerate` —
+  beide mit Re-Auth-Body `{current_password, code}` (`code` = TOTP oder
+  Backup-Code, Pflicht bei aktivem 2FA); falsch → 400
 - `GET /auth/me/dashboard-layout` — Kachel-Layout des angemeldeten Users
   (`{order, collapsed}` mit IDs `kpi|due|insights|top`); ohne gespeichertes
   Layout der Standard, beim Lesen tolerant normalisiert
