@@ -101,20 +101,23 @@ def login(
         db.commit()
         raise ProblemError(status_code=401, title="Invalid credentials")
 
-    login_limiter.record_success(ip)
-    username_limiter.record_success(username_key)
-
     user_agent = request.headers.get("user-agent")
 
     if user.totp_enabled and user.totp_secret:
-        # Zwischenschritt: TOTP-Code verlangen.
+        # Zwischenschritt: TOTP-Code verlangen. Die Fehlversuchs-Buckets
+        # bleiben hier bewusst stehen — erst ein vollständig erfolgreicher
+        # Login in ``verify_2fa`` leert sie. Sonst könnte ein Angreifer mit
+        # bekanntem Passwort sie vor jedem Bündel TOTP-Rateversuche per
+        # Re-Login zurücksetzen und die Sperre nie erreichen.
         _challenge, challenge_token = totp_service.create_pending_challenge(
             db, user=user, user_agent=user_agent, ip_address=ip
         )
         db.commit()
         return LoginResponse(requires_2fa=True, challenge_token=challenge_token)
 
-    # Direkter Login (kein 2FA).
+    # Direkter Login (kein 2FA) — final erfolgreich, Buckets leeren.
+    login_limiter.record_success(ip)
+    username_limiter.record_success(username_key)
     _session, token = auth_service.issue_session(
         db, user=user, user_agent=user_agent, ip_address=ip
     )
