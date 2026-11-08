@@ -226,7 +226,7 @@ editieren, am besten geführt anpassen:
 | `METERS_DATABASE_URL`           | `sqlite:///./data/meters.db` | SQLite-Pfad                                                                                         |
 | `METERS_DEBUG`                  | `False`                      | Nur Entwicklung. In Produktion `False` lassen (sonst `/docs` + Tracebacks offen)                    |
 | `METERS_MEDIA_DIR`              | `…/data/media/photos`        | Ablage der Reading-Fotos                                                                            |
-| `METERS_PHOTO_MAX_UPLOAD_BYTES` | `20971520` (20 MB)           | Max. Roh-Upload pro Foto                                                                            |
+| `METERS_PHOTO_MAX_UPLOAD_BYTES` | `20971520` (20 MB)           | Max. Roh-Upload pro Foto (zusätzlich fest max. 64 Megapixel, geprüft vor dem Decode)               |
 | `METERS_REQUEST_MAX_BODY_BYTES` | `26214400` (25 MB)           | Max. Request-Body mit Login (mind. Foto-Limit + 1 MB; Restore hat eigenes Limit). Ohne Login: 64 KB |
 
 **Authentifizierung / Session**

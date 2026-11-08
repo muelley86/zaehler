@@ -23,6 +23,15 @@ Login:
 - Endpoint: POST /api/v1/auth/login (username, password)
 - Bei Erfolg: Session-Cookie setzen, Session-Eintrag in DB
 - Rate-Limit: 5 Fehlversuche pro Minute pro IP, danach 15 min Sperre
+- Die Fehlversuchs-Zähler (IP und Username) werden erst nach **vollständig**
+  erfolgreichem Login geleert — bei aktivem 2FA also erst nach
+  `/2fa/verify`, nicht schon nach dem korrekten Passwort. Sonst ließe sich
+  der 6-stellige Code per Re-Login unbegrenzt durchprobieren.
+- Client-IP für Rate-Limit und Audit: ohne `trust_proxy` die direkte
+  Verbindung; mit `trust_proxy` das **rechteste** `X-Forwarded-For`-Element,
+  das kein vertrauenswürdiger Proxy ist (nginx/NPM hängen die echte IP
+  hinten an, das linke Element ist vom Client frei wählbar). Mit
+  `trusted_proxy_ips` wird XFF nur von diesen Peers akzeptiert.
 - Logout: POST /api/v1/auth/logout (invalidiert Session in DB)
 
 Session:
@@ -62,7 +71,9 @@ Per-Recorder MP-Zugriff:
   /qr admin-only sowieso), GET /readings, /deliveries und beim POST/PATCH/
   DELETE auf Reading/Delivery via Pre-Check über register_id.
 - Recorder bekommt 404 statt 403 auf nicht-zugeordnete MPs — verhindert
-  Existenz-Leaks.
+  Existenz-Leaks. Das gilt auch für QR-Tokens: `resolve` und `assign`
+  antworten bei einem Token an einer fremden MP mit 404 (kein 409 mit
+  `measuring_point_id`).
 - Verwaltung: GET/PUT /api/v1/users/{id}/measuring-points (admin-only,
   PUT ersetzt das komplette Set, lehnt Admin-Targets mit 422 ab).
   Read-only-Liste pro MP: GET /api/v1/measuring-points/{id}/users.
@@ -108,6 +119,25 @@ TOTP-Replay-Schutz:
 - Springt die Serveruhr zurück (NTP-Korrektur, LXC-Suspend), ist TOTP
   gesperrt, bis die Realzeit aufgeholt hat. Escape-Hatch sind die
   Backup-Codes — sie werden geprüft, nachdem TOTP fehlgeschlagen ist.
+
+Re-Auth für 2FA-Aktionen:
+
+- `/2fa/disable` und `/2fa/backup-codes/regenerate` verlangen das aktuelle
+  Passwort und — bei aktivem 2FA — einen gültigen TOTP- oder Backup-Code
+  (`_require_reauth`). Ein entwendetes Session-Cookie allein reicht damit
+  nicht, um 2FA abzuschalten oder sich frische Backup-Codes als dauerhaften
+  zweiten Faktor zu verschaffen. Regenerate schreibt den Audit-Eintrag
+  `backup_codes_regenerated`.
+
+Logout im Frontend:
+
+- Lokal (Me-Snapshot, Offline-Queue, Dashboard- und SW-Cache `api-get`)
+  wird nur abgemeldet, wenn `POST /auth/logout` erfolgreich war oder mit 401
+  antwortet. Bei Netz-/Serverfehler bleibt der User angemeldet und sieht
+  eine Fehlermeldung — sonst blieben Server-Session und Cookie auf einem
+  geteilten Gerät unbemerkt gültig.
+- Der SW-Cache `api-get` wird außerdem bei 401 von `/auth/me` und beim Login
+  eines **anderen** Users geleert.
 
 ## Gleichzeitige Erfassung (Concurrency)
 
