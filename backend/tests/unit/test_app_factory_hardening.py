@@ -20,6 +20,7 @@ def test_openapi_disabled_in_production(monkeypatch: pytest.MonkeyPatch) -> None
     monkeypatch.setattr(settings, "debug", False)
     monkeypatch.setattr(settings, "cookie_secure", True)
     monkeypatch.setattr(settings, "trust_proxy", True)
+    monkeypatch.setattr(settings, "bind_host", "127.0.0.1")  # proxy-same
 
     app = create_app()
 

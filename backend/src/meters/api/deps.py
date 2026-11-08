@@ -122,6 +122,10 @@ def client_ip(request: Request) -> str | None:
     fehlerhaft konfigurierte Proxies oder manipulierte Header nicht im
     Audit-Log oder den Rate-Limit-Buckets.
 
+    Ausgewertet wird das rechteste Element, das kein vertrauenswürdiger Proxy
+    ist (s. ``_rightmost_untrusted_hop``) — nicht das linke, das bei
+    anhängenden Proxies vom Client stammt.
+
     Optionales Proxy-Pinning: ist ``METERS_TRUSTED_PROXY_IPS`` gesetzt, wird
     ``X-Forwarded-For`` NUR ausgewertet, wenn die unmittelbare Verbindungs-IP
     in dieser Allowlist steht. So kann ein Angreifer, der die App (z. B. im
@@ -136,11 +140,28 @@ def client_ip(request: Request) -> str | None:
         if pinned_ok:
             forwarded = request.headers.get("x-forwarded-for")
             if forwarded:
-                candidate = forwarded.split(",")[0].strip()
-                try:
-                    ipaddress.ip_address(candidate)
-                except ValueError:
-                    pass  # falsch formatiert → fallback
-                else:
+                candidate = _rightmost_untrusted_hop(forwarded)
+                if candidate is not None:
                     return candidate
     return direct
+
+
+def _rightmost_untrusted_hop(forwarded: str) -> str | None:
+    """Rechtestes ``X-Forwarded-For``-Element, das kein vertrauenswürdiger
+    Proxy ist.
+
+    Reverse-Proxies HÄNGEN die Verbindungs-IP an einen vom Client
+    mitgeschickten Header an (nginx/NPM ``$proxy_add_x_forwarded_for``) —
+    alles links davon kann der Client frei wählen. Ein ersetzender Proxy
+    (``$remote_addr``) liefert genau ein Element; das Ergebnis ist dasselbe.
+    Ungültiges Element → ``None`` (Fallback auf die direkte IP).
+    """
+    for hop in reversed(forwarded.split(",")):
+        candidate = hop.strip()
+        try:
+            ipaddress.ip_address(candidate)
+        except ValueError:
+            return None
+        if candidate not in settings.trusted_proxy_ips:
+            return candidate
+    return None
