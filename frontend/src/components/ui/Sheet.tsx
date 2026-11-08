@@ -51,6 +51,12 @@ export function Sheet({
     if (!open) return;
     const opener = document.activeElement;
     const raf = requestAnimationFrame(() => {
+      // Hat der Nutzer den Fokus inzwischen selbst verschoben (z. B. ein
+      // Dropdown im Sheet geöffnet, dessen Suchfeld per autoFocus fokussiert
+      // ist), ihn nicht wieder wegreißen — sonst landen Tastatureingaben
+      // auf dem Schließen-Button statt im Feld.
+      const active = document.activeElement;
+      if (active !== opener && active !== null && active !== document.body) return;
       const panel = panelRef.current;
       const focusable = panel ? getFocusableElements(panel) : [];
       const target = focusable[0] ?? closeButtonRef.current;

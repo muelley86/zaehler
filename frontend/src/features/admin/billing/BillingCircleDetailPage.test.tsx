@@ -58,6 +58,9 @@ function mockApi() {
     ),
     http.get('/api/v1/billing-circles/1/invoices', () => HttpResponse.json([])),
     http.get('/api/v1/billing-circles/1/runs', () => HttpResponse.json([])),
+    http.get('/api/v1/billing-circles/1/verlauf', () =>
+      HttpResponse.json({ monate: [], empfaenger: [], positionen: [] }),
+    ),
     http.get('/api/v1/billing-circles/1/readings', () =>
       HttpResponse.json({
         monat: '2026-08',
