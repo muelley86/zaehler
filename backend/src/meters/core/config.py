@@ -124,6 +124,13 @@ class Settings(BaseSettings):
     # 413 ab, bevor Pillow den Decode startet.
     photo_max_upload_bytes: int = 20 * 1024 * 1024
 
+    # Gesamtlimit für Request-Bodies authentifizierter Requests (außer
+    # Restore-Upload, s. ``backup_max_upload_bytes``). Greift in
+    # ``core/body_limit.py`` BEVOR Starlette den Body parst — muss über
+    # ``photo_max_upload_bytes`` plus Multipart-Overhead liegen.
+    # Ohne gültige Session gilt ein festes, kleines Limit (64 KiB).
+    request_max_body_bytes: int = 25 * 1024 * 1024
+
     # Stromabrechnung: Warnung, wenn ein interpolierter Monatsend-Stand weiter als so viele Tage
     # von der naechsten Ablesung entfernt ist (Entscheidung des Nutzers: 3 Tage, einstellbar).
     billing_max_reading_gap_days: int = 3

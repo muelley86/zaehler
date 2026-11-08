@@ -239,6 +239,29 @@ def test_reject_decompression_bomb(
     assert resp.status_code == 413, resp.text
 
 
+def test_reject_image_above_own_pixel_cap_before_decode(
+    admin_client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Security-Audit #2: Pillow warnt zwischen 1x und 2x ``MAX_IMAGE_PIXELS``
+    nur und decodiert trotzdem (bis ~1,4 GB RAM aus einem < 1 MB PNG). Die
+    App prüft deshalb selbst die Pixelzahl aus dem Header, bevor sie lädt."""
+    from meters.services import reading_photo
+
+    register_id = _setup_water_mp(admin_client)
+    rid = _create_reading(admin_client, register_id)
+    monkeypatch.setattr(reading_photo, "MAX_PIXELS", 100_000)
+    buf = BytesIO()
+    Image.new("RGB", (500, 300)).save(buf, format="PNG")  # 150k px
+    loaded: list[bool] = []
+    monkeypatch.setattr(Image.Image, "load", lambda self: loaded.append(True))
+    resp = admin_client.post(
+        f"/api/v1/readings/{rid}/photos",
+        files={"photo": ("m.png", buf.getvalue(), "image/png")},
+    )
+    assert resp.status_code == 413, resp.text
+    assert loaded == []
+
+
 def test_reject_jpeg2000_disguised_as_jpeg(admin_client: TestClient) -> None:
     """Der MIME-Type kommt vom Client — der Inhalt darf trotzdem nur durch die
     Decoder der erlaubten Formate laufen (JPEG-2000-Decoder hatte Heap-Overflows)."""

@@ -49,6 +49,13 @@ _ACCEPTED_PIL_FORMATS = ("JPEG", "PNG", "WEBP")
 # einen ablesbaren Zählerstand und bringt die Datei auf typ. 200-400 KB.
 MAX_DIMENSION = 2000
 
+# Obergrenze für die Pixelzahl des Eingangsbilds, geprüft aus dem Header
+# VOR dem Decode. Pillows eigener Schutz (``MAX_IMAGE_PIXELS`` ≈ 89 MP) warnt
+# zwischen 1x und 2x nur und decodiert trotzdem — ein < 1 MB großes PNG mit
+# ~170 MP belegt so bis ~1,4 GB RAM im einzigen App-Prozess. 64 MP deckt
+# 48/50-MP-Smartphone-Sensoren ab (RGB-Decode ≤ ~200 MB).
+MAX_PIXELS = 64_000_000
+
 _JPEG_QUALITY = 85
 
 # EXIF-Tag-ID für "Orientation" — von ``exif_transpose`` bereits entfernt;
@@ -122,6 +129,17 @@ def extract_gps(img: Image.Image) -> tuple[float, float] | None:
     return validate_gps(lat, lon)
 
 
+def _reject_oversized(img: Image.Image) -> None:
+    """413, wenn das Bild laut Header mehr als ``MAX_PIXELS`` hat."""
+    width, height = img.size
+    if width * height > MAX_PIXELS:
+        raise ProblemError(
+            status_code=413,
+            title="Photo too large",
+            detail="Bildauflösung zu groß. Bitte ein kleineres Foto hochladen.",
+        )
+
+
 def save_photo(reading_id: int, upload: UploadFile) -> tuple[str, tuple[float, float] | None]:
     """Validiert, reencodiert und speichert das Foto.
 
@@ -154,13 +172,12 @@ def save_photo(reading_id: int, upload: UploadFile) -> tuple[str, tuple[float, f
     try:
         upload.file.seek(0)
         opened = Image.open(upload.file, formats=_ACCEPTED_PIL_FORMATS)
+        _reject_oversized(opened)
         opened.load()
     except Image.DecompressionBombError as exc:
-        # Pillows eingebauter Schutz: Bild überschreitet das Pixel-Limit
-        # (Decompression-Bomb). Wir senken die Schwelle bewusst NICHT — der
-        # Default-Cap deckt reguläre Handyfotos locker ab. Aber wir fangen den
-        # Fehler sauber als 413 ab, statt ihn als unbehandelten 500 mit
-        # Speicher-Spike durchzulassen.
+        # Pillows eingebauter Schutz (> 2x ``MAX_IMAGE_PIXELS``) greift schon
+        # in ``Image.open`` — vor ``_reject_oversized``. Sauber als 413 statt
+        # unbehandeltem 500.
         raise ProblemError(
             status_code=413,
             title="Photo too large",
