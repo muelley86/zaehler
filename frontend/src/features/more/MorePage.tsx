@@ -78,7 +78,16 @@ export function MorePage() {
     ) {
       return;
     }
-    await logout();
+    try {
+      await logout();
+    } catch {
+      // Server nicht erreichbar, obwohl der Browser "online" meldet (z. B.
+      // Heimnetz-Server unterwegs): Session ist nicht widerrufen.
+      window.alert(
+        'Abmelden fehlgeschlagen — Server nicht erreichbar. Bitte später erneut versuchen.',
+      );
+      return;
+    }
     void navigate('/login', { replace: true });
   }
 

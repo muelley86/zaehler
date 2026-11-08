@@ -19,6 +19,28 @@ import { AuthContext } from './auth-context';
 import type { AuthState, LoginResult } from './auth-context';
 import { clearMeSnapshot, loadMeSnapshot, saveMeSnapshot } from './meSnapshot';
 
+/**
+ * Leert die Caches, die API-Antworten eines Users über einen User-Wechsel
+ * hinweg halten können: den modul-weiten Dashboard-Cache und den
+ * NetworkFirst-Cache `api-get` des Service-Workers (Same-Origin, gleiches
+ * Cookie-Bucket — ohne Purge sähe ein Folge-User offline oder bei langsamem
+ * Server die Antworten des Vorgängers, inkl. nicht zugeordneter Messstellen).
+ */
+async function purgeUserCaches(): Promise<void> {
+  clearDashboardCache();
+  if (typeof caches === 'undefined') return;
+  try {
+    await caches.delete('api-get');
+  } catch {
+    /* Cache-API fehlt (Test/SSR/HTTP) — egal. */
+  }
+}
+
+/** Neuer User ≠ zuletzt bekannter User → Caches des Vorgängers verwerfen. */
+function purgeIfUserChanged(next: Me): void {
+  if (loadMeSnapshot()?.id !== next.id) void purgeUserCaches();
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [me, setMe] = useState<Me | null>(null);
   const [loading, setLoading] = useState(true);
@@ -40,10 +62,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               // ungültig und darf keinen Offline-Kaltstart mehr ermöglichen.
               setMe(null);
               clearMeSnapshot();
-              // Dashboard-Cache mitpurgen — sonst kann ein späterer Login als
-              // anderer User (MP-Zugriffsfilter!) im ersten Frame noch die
-              // Aggregate des vorherigen Users sehen (siehe `logout` unten).
-              clearDashboardCache();
+              // Caches mitpurgen — sonst kann ein späterer Login als anderer
+              // User (MP-Zugriffsfilter!) noch Antworten des vorherigen Users
+              // sehen (Dashboard im ersten Frame, SW-Cache offline).
+              void purgeUserCaches();
             } else if (err instanceof NetworkError) {
               // Server nicht erreichbar (unterwegs, Server nur im Heimnetz):
               // letzten bekannten User wiederherstellen, damit die App mit
@@ -69,6 +91,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return { kind: 'totp', challengeToken: data.challenge_token };
     }
     if (data.me) {
+      purgeIfUserChanged(data.me);
       setMe(data.me);
       saveMeSnapshot(data.me);
       return { kind: 'ok', me: data.me };
@@ -81,6 +104,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       challenge_token: challengeToken,
       code,
     });
+    purgeIfUserChanged(data);
     setMe(data);
     saveMeSnapshot(data);
     return data;
@@ -89,34 +113,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = useCallback(async () => {
     try {
       await api.post('/auth/logout');
-    } finally {
-      setMe(null);
-      // Offline-Snapshot mit entfernen — nach explizitem Logout darf kein
-      // Offline-Kaltstart mehr in den Account des vorherigen Users führen.
-      clearMeSnapshot();
-      // Modul-weiter Dashboard-Cache mitpurgen: er überlebt sonst einen
-      // User-Wechsel im selben Tab — der nächste Login (z. B. ein
-      // MP-Zugriffsgefilterter Recorder) würde im ersten Frame sonst
-      // synchron die Aggregate des vorherigen Users sehen.
-      clearDashboardCache();
-      // Offline-Queue + Stammdaten-Snapshot ebenfalls purgen (die UI hat
-      // bei offenen Einträgen vorher einen Confirm gezeigt).
-      try {
-        await clearOfflineData();
-      } catch {
-        /* IndexedDB fehlt (Test/alte Umgebung) — egal. */
-      }
-      // SW-Cache leeren — sonst serviert der NetworkFirst-Cache
-      // beim nächsten Login auf demselben Gerät noch alte API-Antworten
-      // des vorherigen Users (Same-Origin, gleiches Cookie-Bucket).
-      if (typeof caches !== 'undefined') {
-        try {
-          await caches.delete('api-get');
-        } catch {
-          /* Cache-API fehlt (Test/SSR/HTTP) — egal. */
-        }
-      }
+    } catch (err) {
+      // 401: Server-Session ist ohnehin ungültig → lokal aufräumen ist korrekt.
+      // Jeder andere Fehler (Netz, 5xx): Die Session ist NICHT widerrufen und
+      // das httpOnly-Cookie bleibt gültig — ein lokaler "Erfolg" würde den
+      // User täuschen (nächster App-Start wäre wieder angemeldet). Also
+      // Fehler an die UI durchreichen und nichts verwerfen.
+      if (!(err instanceof ApiError && err.status === 401)) throw err;
     }
+    setMe(null);
+    // Offline-Snapshot mit entfernen — nach explizitem Logout darf kein
+    // Offline-Kaltstart mehr in den Account des vorherigen Users führen.
+    clearMeSnapshot();
+    // Offline-Queue + Stammdaten-Snapshot ebenfalls purgen (die UI hat
+    // bei offenen Einträgen vorher einen Confirm gezeigt).
+    try {
+      await clearOfflineData();
+    } catch {
+      /* IndexedDB fehlt (Test/alte Umgebung) — egal. */
+    }
+    await purgeUserCaches();
   }, []);
 
   const value = useMemo<AuthState>(
