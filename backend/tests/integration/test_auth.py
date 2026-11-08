@@ -176,6 +176,45 @@ def test_2fa_disable_requires_password_and_code(admin_client: TestClient) -> Non
     assert ok.json()["totp_enabled"] is False
 
 
+def test_regenerate_backup_codes_requires_password_and_code(
+    admin_client: TestClient, db: Session
+) -> None:
+    """Neue Backup-Codes nur mit Passwort + zweitem Faktor.
+
+    Sonst macht ein entwendetes Session-Cookie den Angreifer dauerhaft zum
+    Besitzer eines zweiten Faktors (frische Backup-Codes → 2FA abschaltbar).
+    """
+    import pyotp
+    from sqlalchemy import select
+
+    from meters.models import AuditAction, AuditLog
+
+    secret = admin_client.post("/api/v1/auth/2fa/setup").json()["secret"]
+    totp = pyotp.TOTP(secret)
+    activated = admin_client.post("/api/v1/auth/2fa/activate", json={"code": totp.now()})
+    old_codes = activated.json()["backup_codes"]
+    reset_totp_replay_counter()
+
+    url = "/api/v1/auth/2fa/backup-codes/regenerate"
+    assert admin_client.post(url).status_code == 422
+    no_code = admin_client.post(url, json={"current_password": "admin-pass-12345"})
+    assert no_code.status_code == 400
+    bad_pw = admin_client.post(url, json={"current_password": "falsch-1234", "code": totp.now()})
+    assert bad_pw.status_code == 400
+    bad_code = admin_client.post(
+        url, json={"current_password": "admin-pass-12345", "code": "000000"}
+    )
+    assert bad_code.status_code == 400
+
+    ok = admin_client.post(url, json={"current_password": "admin-pass-12345", "code": old_codes[0]})
+    assert ok.status_code == 200, ok.text
+    assert len(ok.json()["backup_codes"]) == 10
+    assert set(ok.json()["backup_codes"]).isdisjoint(old_codes)
+
+    actions = db.scalars(select(AuditLog.action)).all()
+    assert AuditAction.BACKUP_CODES_REGENERATED in actions
+
+
 def test_2fa_challenge_expires_after_ttl(admin_client: TestClient) -> None:
     """Audit 5.4: Pending-Challenge wird nach 5 Min abgelehnt.
 

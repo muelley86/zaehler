@@ -17,19 +17,14 @@ import { Copy, Printer, ShieldAlert, ShieldCheck } from 'lucide-react';
 import { Button, Row, RowGroup, Section, Sheet, TextField } from '@/components/ui';
 import { ApiError, api } from '@/lib/api';
 import { useAuth } from '@/features/auth/auth-context';
-import type { BackupCodesResponse, Me, TotpSetupResponse, TotpStatusResponse } from '@/lib/types';
+import type { BackupCodesResponse, TotpSetupResponse, TotpStatusResponse } from '@/lib/types';
 
 type SheetMode =
   | { kind: 'closed' }
   | { kind: 'setup'; data: TotpSetupResponse; code: string; busy: boolean; error: string | null }
   | { kind: 'codes'; codes: string[] }
-  | {
-      kind: 'disable';
-      currentPassword: string;
-      code: string;
-      busy: boolean;
-      error: string | null;
-    };
+  | { kind: 'disable' }
+  | { kind: 'regenerate' };
 
 export function TwoFactorSection() {
   const { me, refresh } = useAuth();
@@ -55,18 +50,21 @@ export function TwoFactorSection() {
     }
   }
 
-  async function regenerateCodes() {
+  function startRegenerate() {
     if (!window.confirm('Alte Backup-Codes werden ungültig. Fortfahren?')) return;
-    try {
-      const data = await api.post<BackupCodesResponse>('/auth/2fa/backup-codes/regenerate');
-      setSheet({ kind: 'codes', codes: data.backup_codes });
-    } catch (err) {
-      if (err instanceof ApiError) setError(err.problem.detail ?? err.problem.title);
-    }
+    setSheet({ kind: 'regenerate' });
   }
 
-  function startDisable() {
-    setSheet({ kind: 'disable', currentPassword: '', code: '', busy: false, error: null });
+  async function regenerateCodes(body: { current_password: string; code: string }) {
+    const data = await api.post<BackupCodesResponse>('/auth/2fa/backup-codes/regenerate', body);
+    void refresh();
+    setSheet({ kind: 'codes', codes: data.backup_codes });
+  }
+
+  async function disable(body: { current_password: string; code: string }) {
+    await api.post('/auth/2fa/disable', body);
+    void refresh();
+    setSheet({ kind: 'closed' });
   }
 
   return (
@@ -80,11 +78,11 @@ export function TwoFactorSection() {
             sublabel={status ? `${status.backup_codes_remaining} Backup-Codes übrig` : '—'}
           />
           <Row
-            onClick={() => void regenerateCodes()}
+            onClick={startRegenerate}
             label="Backup-Codes neu generieren"
             sublabel="Alte werden sofort ungültig"
           />
-          <Row onClick={startDisable} label="2FA deaktivieren" destructive />
+          <Row onClick={() => setSheet({ kind: 'disable' })} label="2FA deaktivieren" destructive />
         </RowGroup>
       ) : (
         <RowGroup>
@@ -112,14 +110,26 @@ export function TwoFactorSection() {
         <BackupCodesSheet codes={sheet.codes} onClose={() => setSheet({ kind: 'closed' })} />
       ) : null}
 
-      {sheet.kind === 'disable' && me ? (
-        <DisableSheet
-          me={me}
+      {sheet.kind === 'regenerate' ? (
+        <ReauthSheet
+          title="Backup-Codes neu generieren"
+          submitLabel="Neu generieren"
+          busyLabel="Generiere…"
+          failureMessage="Neu-Generierung fehlgeschlagen."
           onClose={() => setSheet({ kind: 'closed' })}
-          onDisabled={() => {
-            void refresh();
-            setSheet({ kind: 'closed' });
-          }}
+          onConfirm={regenerateCodes}
+        />
+      ) : null}
+
+      {sheet.kind === 'disable' ? (
+        <ReauthSheet
+          title="2FA deaktivieren"
+          submitLabel="2FA deaktivieren"
+          busyLabel="Deaktiviere…"
+          failureMessage="Deaktivierung fehlgeschlagen."
+          destructive
+          onClose={() => setSheet({ kind: 'closed' })}
+          onConfirm={disable}
         />
       ) : null}
     </Section>
@@ -286,41 +296,51 @@ function BackupCodesSheet({ codes, onClose }: { codes: string[]; onClose: () => 
   );
 }
 
-function DisableSheet({
-  me,
+/**
+ * Re-Authentisierung für sicherheitskritische 2FA-Aktionen (Deaktivieren,
+ * Backup-Codes neu erzeugen): aktuelles Passwort + gültiger 2FA- oder
+ * Backup-Code. Das Backend verlangt beides — ein entwendetes Session-Cookie
+ * allein reicht nicht.
+ */
+function ReauthSheet({
+  title,
+  submitLabel,
+  busyLabel,
+  failureMessage,
+  destructive,
   onClose,
-  onDisabled,
+  onConfirm,
 }: {
-  me: Me;
+  title: string;
+  submitLabel: string;
+  busyLabel: string;
+  failureMessage: string;
+  destructive?: boolean;
   onClose: () => void;
-  onDisabled: () => void;
+  onConfirm: (body: { current_password: string; code: string }) => Promise<void>;
 }) {
   const [currentPassword, setCurrentPassword] = useState('');
   const [code, setCode] = useState('');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
-  async function disable(e: FormEvent<HTMLFormElement>) {
+  async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setBusy(true);
     setErr(null);
     try {
-      await api.post('/auth/2fa/disable', {
-        current_password: currentPassword,
-        code: me.totp_enabled ? code.trim() : undefined,
-      });
-      onDisabled();
+      await onConfirm({ current_password: currentPassword, code: code.trim() });
     } catch (e) {
       if (e instanceof ApiError) setErr(e.problem.detail ?? e.problem.title);
-      else setErr('Deaktivierung fehlgeschlagen.');
+      else setErr(failureMessage);
     } finally {
       setBusy(false);
     }
   }
 
   return (
-    <Sheet open onClose={onClose} title="2FA deaktivieren">
-      <form onSubmit={(e) => void disable(e)} className="space-y-4">
+    <Sheet open onClose={onClose} title={title}>
+      <form onSubmit={(e) => void submit(e)} className="space-y-4">
         <div className="text-body-sm text-secondary">
           Zur Bestätigung: aktuelles Passwort und ein gültiger 2FA-Code (oder Backup-Code).
         </div>
@@ -346,8 +366,13 @@ function DisableSheet({
           <Button type="button" variant="bordered" onClick={onClose} disabled={busy}>
             Abbrechen
           </Button>
-          <Button type="submit" variant="destructive" fullWidth disabled={busy}>
-            {busy ? 'Deaktiviere…' : '2FA deaktivieren'}
+          <Button
+            type="submit"
+            variant={destructive ? 'destructive' : 'filled'}
+            fullWidth
+            disabled={busy}
+          >
+            {busy ? busyLabel : submitLabel}
           </Button>
         </div>
       </form>

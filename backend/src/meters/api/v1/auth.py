@@ -19,12 +19,13 @@ from __future__ import annotations
 from typing import Literal
 
 from fastapi import APIRouter, Request, Response, status
+from sqlalchemy.orm import Session as DbSession
 
 from meters.api.deps import CurrentUser, DbDep, client_ip
 from meters.core.config import settings
 from meters.core.problem import ProblemError
 from meters.core.security import SESSION_COOKIE_NAME, hash_password, verify_password
-from meters.models import AuditAction, AuditEntityType
+from meters.models import AuditAction, AuditEntityType, User
 from meters.schemas import (
     BackupCodesResponse,
     ChangePasswordRequest,
@@ -35,6 +36,7 @@ from meters.schemas import (
     TotpActivateRequest,
     TotpActivateResponse,
     TotpDisableRequest,
+    TotpReauthRequest,
     TotpSetupResponse,
     TotpStatusResponse,
     TotpVerifyRequest,
@@ -381,6 +383,22 @@ def totp_activate(
     return TotpActivateResponse(backup_codes=backup_codes)
 
 
+def _require_reauth(db: DbSession, *, user: User, payload: TotpReauthRequest) -> None:
+    """Verlangt aktuelles Passwort und — bei aktivem 2FA — einen gültigen
+    TOTP- oder Backup-Code. Schützt sicherheitskritische 2FA-Aktionen davor,
+    allein mit einem entwendeten Session-Cookie ausgelöst zu werden."""
+    if not verify_password(payload.current_password, user.password_hash):
+        raise ProblemError(status_code=400, title="Current password incorrect")
+    if not user.totp_enabled:
+        return
+    if not payload.code:
+        raise ProblemError(status_code=400, title="TOTP code required")
+    code = payload.code.strip()
+    ok = totp_service.consume_totp(db, user=user, code=code)
+    if not ok and not totp_service.consume_backup_code(db, user=user, code=code):
+        raise ProblemError(status_code=400, title="Invalid TOTP / backup code")
+
+
 @router.post("/2fa/disable", response_model=MeResponse)
 def totp_disable(
     payload: TotpDisableRequest,
@@ -388,16 +406,7 @@ def totp_disable(
     db: DbDep,
     user: CurrentUser,
 ) -> MeResponse:
-    if not verify_password(payload.current_password, user.password_hash):
-        raise ProblemError(status_code=400, title="Current password incorrect")
-    if user.totp_enabled:
-        # Bei aktivem 2FA verlangen wir zusätzlich einen gültigen Code (oder
-        # einen Backup-Code) — verhindert Bypass durch entwendetes Cookie.
-        if not payload.code:
-            raise ProblemError(status_code=400, title="TOTP code required")
-        ok = totp_service.consume_totp(db, user=user, code=payload.code)
-        if not ok and not totp_service.consume_backup_code(db, user=user, code=payload.code):
-            raise ProblemError(status_code=400, title="Invalid TOTP / backup code")
+    _require_reauth(db, user=user, payload=payload)
 
     user.totp_enabled = False
     user.totp_secret = None
@@ -419,11 +428,22 @@ def totp_disable(
 
 @router.post("/2fa/backup-codes/regenerate", response_model=BackupCodesResponse)
 def regenerate_backup_codes(
+    payload: TotpReauthRequest,
+    request: Request,
     db: DbDep,
     user: CurrentUser,
 ) -> BackupCodesResponse:
     if not user.totp_enabled:
         raise ProblemError(status_code=400, title="TOTP not enabled")
+    _require_reauth(db, user=user, payload=payload)
     codes = totp_service.issue_backup_codes(db, user=user)
+    record(
+        db,
+        user_id=user.id,
+        action=AuditAction.BACKUP_CODES_REGENERATED,
+        entity_type=AuditEntityType.USER,
+        entity_id=user.id,
+        ip_address=client_ip(request),
+    )
     db.commit()
     return BackupCodesResponse(backup_codes=codes)

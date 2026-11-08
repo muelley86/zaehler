@@ -331,6 +331,12 @@ def assign(
 
     token = _load_or_404(db, token_str)
     if token.measuring_point_id is not None:
+        # Hängt der Token an einer MP, die der Recorder nicht sehen darf,
+        # antworten wir wie ``resolve`` mit 404 — ein 409 samt
+        # ``measuring_point_id`` würde Existenz und ID der fremden MP leaken.
+        accessible = accessible_mp_ids(db, user)
+        if accessible is not None and token.measuring_point_id not in accessible:
+            raise ProblemError(status_code=404, title="Token not found")
         raise ProblemError(
             status_code=409,
             title="Token already assigned",
