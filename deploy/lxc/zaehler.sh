@@ -1014,9 +1014,19 @@ cmd_configure_network() {
             proxy_domain=$(wt_input "Proxy-Domain" \
                 "Hostname/Domain, unter der die App via HTTPS-Proxy erreichbar ist.\n\nHinweis: In diesem Modus bleibt die App ZUSAETZLICH direkt per HTTP-IP im LAN erreichbar — daher NICHT fuer echte Internet-Exposition geeignet. Fuer Internet 'proxy-same' oder 'proxy-external' waehlen." \
                 "zaehler.lan") || die "Abgebrochen."
+            local proxy_ip
+            proxy_ip=$(wt_input "Proxy-Host-IP" \
+                "IP-Adresse des Reverse-Proxys. NUR dieser IP wird X-Forwarded-For geglaubt — der App-Port bleibt im LAN offen, ohne diese Angabe könnte jedes Gerät seine IP fälschen (Rate-Limit-Umgehung).\n\nLeer lassen = X-Forwarded-For ignorieren (Rate-Limit sieht dann nur die Proxy-IP)." \
+                "") || die "Abgebrochen."
             bind_host="0.0.0.0"
             cookie_secure="False"
-            trust_proxy="True"
+            if [ -n "$proxy_ip" ]; then
+                trust_proxy="True"
+                trusted_proxy_ips="$proxy_ip"
+            else
+                trust_proxy="False"
+                warn "Keine Proxy-IP angegeben — X-Forwarded-For wird ignoriert."
+            fi
             # Nicht public_facing: cookie_secure=False (Klartext-IP im LAN
             # weiter offen). Würde public_facing=True den Boot hart abbrechen.
             public_facing="False"

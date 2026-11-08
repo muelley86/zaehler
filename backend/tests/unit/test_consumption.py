@@ -704,6 +704,35 @@ def test_production_config_silent_on_direct_http_lan(
     assert not any("TRUST_PROXY" in str(w.message) for w in recwarn.list)
 
 
+@pytest.mark.parametrize(
+    ("bind_host", "trusted", "expect_warning"),
+    [
+        ("0.0.0.0", [], True),  # proxy-other ohne Pinning: XFF aus dem LAN fälschbar
+        ("0.0.0.0", ["10.0.0.1"], False),
+        ("127.0.0.1", [], False),  # proxy-same: Port nur lokal erreichbar
+    ],
+)
+def test_production_config_warns_on_unpinned_trust_proxy(
+    monkeypatch: pytest.MonkeyPatch,
+    recwarn: pytest.WarningsRecorder,
+    bind_host: str,
+    trusted: list[str],
+    expect_warning: bool,
+) -> None:
+    """Security-Audit #5: trust_proxy + offener Port + leere Allowlist →
+    jeder Client im Netz kann X-Forwarded-For fälschen."""
+    from meters.core import config as cfg
+
+    monkeypatch.setattr(cfg.settings, "debug", False)
+    monkeypatch.setattr(cfg.settings, "cookie_secure", True)
+    monkeypatch.setattr(cfg.settings, "trust_proxy", True)
+    monkeypatch.setattr(cfg.settings, "bind_host", bind_host)
+    monkeypatch.setattr(cfg.settings, "trusted_proxy_ips", trusted)
+    cfg.assert_secure_production_config()
+    warned = any("TRUSTED_PROXY_IPS" in str(w.message) for w in recwarn.list)
+    assert warned is expect_warning
+
+
 def test_dev_config_skips_assertion(monkeypatch: pytest.MonkeyPatch) -> None:
     """Im Dev-Mode (debug=True) sind cookie_secure/trust_proxy egal — keine
     Assertions, keine Warnings."""
@@ -739,6 +768,7 @@ def test_public_facing_with_cookie_secure_boots(monkeypatch: pytest.MonkeyPatch)
     monkeypatch.setattr(cfg.settings, "public_facing", True)
     monkeypatch.setattr(cfg.settings, "cookie_secure", True)
     monkeypatch.setattr(cfg.settings, "trust_proxy", True)
+    monkeypatch.setattr(cfg.settings, "bind_host", "127.0.0.1")
     cfg.assert_secure_production_config()
 
 

@@ -170,6 +170,9 @@ def assert_secure_secret_key() -> None:
             )
 
 
+_LOOPBACK_HOSTS = frozenset({"127.0.0.1", "::1", "localhost"})
+
+
 def assert_secure_production_config() -> None:
     """Warnt im Log, wenn in Production (``debug=False``) sicherheitsrelevante
     Settings auf unsicheren Defaults stehen.
@@ -217,5 +220,19 @@ def assert_secure_production_config() -> None:
             "METERS_TRUST_PROXY ist False, obwohl cookie_secure=True auf einen "
             "Reverse-Proxy-Setup hindeutet. Rate-Limit greift sonst auf die "
             "Proxy-IP zurueck und sperrt alle User gemeinsam. Bitte True setzen.",
+            stacklevel=2,
+        )
+    if (
+        settings.trust_proxy
+        and not settings.trusted_proxy_ips
+        and settings.bind_host not in _LOOPBACK_HOSTS
+    ):
+        warnings.warn(
+            "METERS_TRUST_PROXY ist True, die App lauscht auf "
+            f"{settings.bind_host} und METERS_TRUSTED_PROXY_IPS ist leer: Jeder "
+            "Client, der den App-Port direkt erreicht, kann X-Forwarded-For "
+            "faelschen (Rate-Limit-Umgehung, falsche IPs im Audit-Log). Bitte "
+            "die IP des Reverse-Proxys in METERS_TRUSTED_PROXY_IPS eintragen "
+            "(sudo zaehler configure-network).",
             stacklevel=2,
         )

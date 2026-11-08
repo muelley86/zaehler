@@ -69,3 +69,44 @@ def test_malformed_xff_falls_back_to_direct(monkeypatch: pytest.MonkeyPatch) -> 
     monkeypatch.setattr(cfg.settings, "trusted_proxy_ips", [])
     req = _make_request(client_host="10.0.0.5", xff="not-an-ip")
     assert client_ip(req) == "10.0.0.5"
+
+
+# --- Security-Audit #4: anhängende Proxies -----------------------------------
+# nginx/NPM mit ``$proxy_add_x_forwarded_for`` (und jeder Standard-Proxy)
+# HÄNGEN die echte Client-IP hinten an einen vom Client mitgeschickten Header
+# an. Das linke Element ist damit frei wählbar — maßgeblich ist das rechteste
+# Element, das nicht selbst ein vertrauenswürdiger Proxy ist.
+
+
+def test_appending_proxy_rightmost_element_wins(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(cfg.settings, "trust_proxy", True)
+    monkeypatch.setattr(cfg.settings, "trusted_proxy_ips", [])
+    req = _make_request(client_host="127.0.0.1", xff="198.51.100.1, 203.0.113.7")
+    assert client_ip(req) == "203.0.113.7"
+
+
+def test_appending_proxy_with_pinning_rightmost_element_wins(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(cfg.settings, "trust_proxy", True)
+    monkeypatch.setattr(cfg.settings, "trusted_proxy_ips", ["10.0.0.1"])
+    req = _make_request(client_host="10.0.0.1", xff="198.51.100.1, 203.0.113.7")
+    assert client_ip(req) == "203.0.113.7"
+
+
+def test_trusted_proxy_hops_are_skipped(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Zwei Proxies hintereinander (beide in der Allowlist): der innere hängt
+    die IP des äußeren an — die wird übersprungen."""
+    monkeypatch.setattr(cfg.settings, "trust_proxy", True)
+    monkeypatch.setattr(cfg.settings, "trusted_proxy_ips", ["10.0.0.1", "10.0.0.2"])
+    req = _make_request(client_host="10.0.0.1", xff="198.51.100.1, 203.0.113.7, 10.0.0.2")
+    assert client_ip(req) == "203.0.113.7"
+
+
+def test_malformed_rightmost_element_falls_back_to_direct(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(cfg.settings, "trust_proxy", True)
+    monkeypatch.setattr(cfg.settings, "trusted_proxy_ips", [])
+    req = _make_request(client_host="10.0.0.5", xff="1.2.3.4, kaputt")
+    assert client_ip(req) == "10.0.0.5"
