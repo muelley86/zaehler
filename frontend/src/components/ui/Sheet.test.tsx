@@ -51,6 +51,23 @@ describe('Sheet', () => {
     await waitFor(() => expect(closeBtn).toHaveFocus());
   });
 
+  it('überschreibt keinen Fokus, den der Nutzer vor dem Initial-Fokus schon gesetzt hat', async () => {
+    // Der Initial-Fokus läuft verzögert (requestAnimationFrame). Fokussiert der
+    // Nutzer vorher selbst ein Feld (z. B. das Autofokus-Suchfeld eines
+    // Dropdowns im Sheet), darf das Sheet ihm den Fokus nicht wegnehmen.
+    render(
+      <Sheet open onClose={() => {}} title="T">
+        <input aria-label="Suche" />
+      </Sheet>,
+    );
+    const input = screen.getByRole('textbox', { name: 'Suche' });
+    input.focus();
+
+    await new Promise((resolve) => requestAnimationFrame(() => resolve(undefined)));
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(input).toHaveFocus();
+  });
+
   it('gibt beim Schließen den Fokus an den Opener zurück', async () => {
     const user = userEvent.setup();
     render(<OpenerHarness />);
