@@ -9,22 +9,24 @@ import { cx } from '@/components/ui/cx';
  * Globaler Datumsbereich — immer sichtbares Steuerelement in der Navigation.
  * Zeigt den aktiven Zeitraum, erlaubt Monats-Sprünge per `◀`/`▶` und ein
  * von/bis-Popover. `sidebar` = volle Breite (Desktop-Sidebar), `mobile` =
- * kompakte, zentrierte Leiste.
+ * zentrierte Leiste mit größerer Schrift und 44-px-Tippflächen.
  */
 export function GlobalDateRange({ variant }: { variant: 'sidebar' | 'mobile' }) {
   const { dateRange, setFrom, setTo, stepMonth, resetDateRange } = useFilterPrefs();
+  const isMobile = variant === 'mobile';
 
   return (
     <div
       data-testid={`global-date-range-${variant}`}
-      className={cx('flex items-center gap-0.5', variant === 'mobile' && 'justify-center')}
+      className={cx('flex items-center gap-0.5', isMobile && 'justify-center')}
     >
-      <MonthArrow dir="prev" onClick={() => stepMonth(-1)} />
-      <div className={variant === 'sidebar' ? 'min-w-0 flex-1' : 'min-w-0'}>
+      <MonthArrow dir="prev" large={isMobile} onClick={() => stepMonth(-1)} />
+      <div className={isMobile ? 'min-w-0' : 'min-w-0 flex-1'}>
         <Dropdown
           label={formatRangeShort(dateRange)}
-          variant={variant === 'sidebar' ? 'field' : 'pill'}
-          dense
+          variant={isMobile ? 'pill' : 'field'}
+          dense={!isMobile}
+          large={isMobile}
           hideChevron
         >
           <div className="flex flex-col gap-2 p-3">
@@ -46,21 +48,32 @@ export function GlobalDateRange({ variant }: { variant: 'sidebar' | 'mobile' }) 
           </div>
         </Dropdown>
       </div>
-      <MonthArrow dir="next" onClick={() => stepMonth(1)} />
+      <MonthArrow dir="next" large={isMobile} onClick={() => stepMonth(1)} />
     </div>
   );
 }
 
-function MonthArrow({ dir, onClick }: { dir: 'prev' | 'next'; onClick: () => void }) {
+function MonthArrow({
+  dir,
+  large,
+  onClick,
+}: {
+  dir: 'prev' | 'next';
+  large: boolean;
+  onClick: () => void;
+}) {
   const Icon = dir === 'prev' ? ChevronLeft : ChevronRight;
   return (
     <button
       type="button"
       onClick={onClick}
       aria-label={dir === 'prev' ? 'Einen Monat zurück' : 'Einen Monat vor'}
-      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-tertiary transition-colors hover:bg-fill hover:text-label"
+      className={cx(
+        'flex shrink-0 items-center justify-center rounded-full text-tertiary transition-colors hover:bg-fill hover:text-label',
+        large ? 'h-11 w-11' : 'h-7 w-7',
+      )}
     >
-      <Icon size={16} />
+      <Icon size={large ? 20 : 16} />
     </button>
   );
 }

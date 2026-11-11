@@ -54,4 +54,17 @@ describe('GlobalDateRange', () => {
       screen.getByText(formatRangeShort(currentAndLastMonthRange(new Date()))),
     ).toBeInTheDocument();
   });
+
+  it('mobil: gut lesbarer Zeitraum und Pfeile mit 44-px-Tippfläche', () => {
+    renderWithRouter(<GlobalDateRange variant="mobile" />);
+
+    expect(screen.getByRole('button', { name: /31\.12\.26/ }).className).toContain('text-body ');
+    expect(screen.getByRole('button', { name: 'Einen Monat zurück' }).className).toContain('h-11');
+  });
+
+  it('Sidebar bleibt kompakt', () => {
+    renderWithRouter(<GlobalDateRange variant="sidebar" />);
+
+    expect(screen.getByRole('button', { name: 'Einen Monat zurück' }).className).toContain('h-7');
+  });
 });
