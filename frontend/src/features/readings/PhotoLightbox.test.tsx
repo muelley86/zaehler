@@ -79,3 +79,48 @@ describe('PhotoLightbox GPS-Bar', () => {
     expect(screen.getByText('2 / 2')).toBeInTheDocument();
   });
 });
+
+describe('PhotoLightbox Schließen', () => {
+  it('hängt direkt an document.body, damit Kopf- und Tab-Leiste sie nicht überdecken', () => {
+    renderWithRouter(
+      <div className="relative z-10">
+        <PhotoLightbox
+          readingId={42}
+          photos={[{ id: 1, photo_lat: null, photo_lon: null }]}
+          onClose={vi.fn()}
+        />
+      </div>,
+    );
+
+    expect(screen.getByTestId('photo-lightbox').parentElement).toBe(document.body);
+  });
+
+  it('schließt über den Schließen-Knopf', () => {
+    const onClose = vi.fn();
+    renderWithRouter(
+      <PhotoLightbox
+        readingId={42}
+        photos={[{ id: 1, photo_lat: null, photo_lon: null }]}
+        onClose={onClose}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Schließen' }));
+
+    expect(onClose).toHaveBeenCalled();
+  });
+
+  it('hält den Schließen-Knopf unterhalb der Notch und groß genug zum Tippen', () => {
+    renderWithRouter(
+      <PhotoLightbox
+        readingId={42}
+        photos={[{ id: 1, photo_lat: null, photo_lon: null }]}
+        onClose={vi.fn()}
+      />,
+    );
+
+    const close = screen.getByRole('button', { name: 'Schließen' });
+    expect(close.className).toContain('safe-area-inset-top');
+    expect(close.className).toContain('h-11');
+  });
+});
