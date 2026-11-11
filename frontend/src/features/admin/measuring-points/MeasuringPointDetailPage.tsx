@@ -51,6 +51,7 @@ import { LocationMapSheet } from '@/components/LocationMapSheet';
 import { useAuth } from '@/features/auth/auth-context';
 import { MeasuringPointNotes } from '@/features/measuring-point-notes/MeasuringPointNotes';
 import { useFilterPrefs } from '@/features/prefs/filter-prefs-context';
+import { LocationSelectField } from '@/features/admin/locations/LocationSelectField';
 import { ApiError, api } from '@/lib/api';
 import { formatDateTickDe, formatDateTimeDe, formatDe, parseDe } from '@/lib/format';
 import {
@@ -666,18 +667,7 @@ function StammdatenEditForm({
           {describeMeterType(mp.type, mp.heating_source)}
         </span>
       </div>
-      <Select
-        label="Standort"
-        value={locationId ?? ''}
-        onChange={(e) => setLocationId(e.target.value ? Number(e.target.value) : null)}
-      >
-        <option value="">— kein Standort —</option>
-        {locations.map((loc) => (
-          <option key={loc.id} value={loc.id}>
-            {loc.name}
-          </option>
-        ))}
-      </Select>
+      <LocationSelectField locations={locations} value={locationId} onChange={setLocationId} />
       {mp.type === 'electricity' ? (
         <>
           <ToggleRow label="Bidirektional (Einspeisung)" checked={bidi} onChange={setBidi} />

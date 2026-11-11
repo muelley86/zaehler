@@ -594,4 +594,62 @@ describe('MeasuringPointsAdminPage Ableseintervall', () => {
     await waitFor(() => expect(createBody).not.toBeNull());
     expect(createBody!['reading_interval_days']).toBe(14);
   });
+
+  it('legt einen fehlenden Standort direkt aus dem Anlege-Formular an und wählt ihn aus', async () => {
+    let locationBody: Record<string, unknown> | null = null;
+    let createBody: Record<string, unknown> | null = null;
+    let mpPosts = 0;
+    _mockEmptyData();
+    server.use(
+      http.get('/api/v1/main-locations', () => HttpResponse.json([])),
+      http.post('/api/v1/locations', async ({ request }) => {
+        locationBody = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json(
+          {
+            id: 7,
+            name: 'Scheune',
+            note: null,
+            latitude: null,
+            longitude: null,
+            address_street: null,
+            address_postcode: null,
+            address_city: null,
+            main_location_id: null,
+            main_location_name: null,
+          },
+          { status: 201 },
+        );
+      }),
+      http.post('/api/v1/measuring-points', async ({ request }) => {
+        mpPosts += 1;
+        createBody = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json({ id: 99 }, { status: 201 });
+      }),
+    );
+    const user = userEvent.setup();
+    renderWithRouter(<MeasuringPointsAdminPage />);
+
+    await user.click(await screen.findByRole('button', { name: /Messstelle anlegen/i }));
+    await user.click(await screen.findByRole('button', { name: /Strom/i }));
+    await user.type(screen.getByLabelText('Name'), 'Garten');
+    await user.type(screen.getByLabelText('Seriennummer'), 'W-1');
+
+    await user.click(screen.getByRole('button', { name: 'Neuer Standort' }));
+    const dialog = await screen.findByRole('dialog');
+    await user.type(within(dialog).getByLabelText('Name'), 'Scheune');
+    await user.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
+
+    // Sheet zu, neuer Standort gewählt, bisherige Eingaben erhalten — und das
+    // Standort-Formular hat NICHT das Messstellen-Formular mit abgeschickt.
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(locationBody!['name']).toBe('Scheune');
+    expect(screen.getByRole('option', { name: 'Scheune' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Standort')).toHaveValue('7');
+    expect(screen.getByLabelText('Name')).toHaveValue('Garten');
+    expect(mpPosts).toBe(0);
+
+    await user.click(screen.getByRole('button', { name: 'Anlegen' }));
+    await waitFor(() => expect(createBody).not.toBeNull());
+    expect(createBody!['location_id']).toBe(7);
+  });
 });

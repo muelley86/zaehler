@@ -29,6 +29,7 @@ import {
   TypeBadge,
 } from '@/components/ui';
 import type { DropdownOption } from '@/components/ui';
+import { LocationSelectField } from '@/features/admin/locations/LocationSelectField';
 import { ApiError, api } from '@/lib/api';
 import { parseDe } from '@/lib/format';
 import { HEATING_SOURCE_LABELS, TYPE_LABELS, describeMeterType } from '@/lib/meterLabels';
@@ -739,18 +740,7 @@ function CreateFormFields({
         <span className="font-semibold text-label">{TYPE_LABELS[type]}</span>
       </div>
       <TextField label="Name" value={name} onChange={(e) => setName(e.target.value)} required />
-      <Select
-        label="Standort"
-        value={locationId ?? ''}
-        onChange={(e) => setLocationId(e.target.value ? Number(e.target.value) : null)}
-      >
-        <option value="">— kein Standort —</option>
-        {locations.map((loc) => (
-          <option key={loc.id} value={loc.id}>
-            {loc.name}
-          </option>
-        ))}
-      </Select>
+      <LocationSelectField locations={locations} value={locationId} onChange={setLocationId} />
       <Select
         label="Eigentümer (optional)"
         value={ownerId ?? ''}
