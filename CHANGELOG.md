@@ -10,6 +10,13 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.91.0](https://github.com/muelley86/zaehler/compare/v2.90.4...v2.91.0) (2026-11-11)
+
+
+### Funktionen
+
+* **ui:** Mobile-Feedback – Version unter Mehr, Foto schließen, Standort inline anlegen, größerer Zeitraum ([#402](https://github.com/muelley86/zaehler/issues/402)) ([7475958](https://github.com/muelley86/zaehler/commit/74759589c6eb505238aaca7015d1d9710bef077c))
+
 ## [2.90.4](https://github.com/muelley86/zaehler/compare/v2.90.3...v2.90.4) (2026-11-08)
 
 
