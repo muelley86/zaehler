@@ -229,7 +229,9 @@ export function MorePage() {
         {/* 2FA */}
         <TwoFactorSection />
 
-        <div className="px-4 text-center text-caption text-tertiary">Zählerstand · self-hosted</div>
+        <div data-testid="more-version" className="px-4 text-center text-caption text-tertiary">
+          Zählerstand · self-hosted · v{__APP_VERSION__}
+        </div>
       </div>
     </div>
   );

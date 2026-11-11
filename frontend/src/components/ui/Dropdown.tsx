@@ -32,6 +32,7 @@ export function Dropdown({
   align = 'left',
   variant = 'pill',
   dense = false,
+  large = false,
   hideChevron = false,
   id,
   ariaLabelledBy,
@@ -48,6 +49,8 @@ export function Dropdown({
   hideChevron?: boolean;
   /** Kompaktere Schrift/Höhe für enge Container (z. B. Sidebar). */
   dense?: boolean;
+  /** Größere Schrift/Höhe für Touch-Leisten (nur ``pill``); hat Vorrang vor ``dense``. */
+  large?: boolean;
   /** DOM-id des Trigger-Buttons (z. B. für ``aria-labelledby``). */
   id?: string;
   /** ``aria-labelledby`` des Trigger-Buttons — verknüpft ein sichtbares Feld-Label. */
@@ -144,8 +147,12 @@ export function Dropdown({
                 dense ? 'h-9 px-3 text-body-sm' : 'h-11 px-3.5 text-body',
               )
             : cx(
-                'flex items-center gap-1.5 rounded-pill border-hairline px-3 font-medium tracking-tight transition-[background,color,border-color]',
-                dense ? 'py-1 text-caption' : 'py-1.5 text-body-sm',
+                'flex items-center gap-1.5 rounded-pill border-hairline tracking-tight transition-[background,color,border-color]',
+                large
+                  ? 'px-4 py-2 text-body font-semibold'
+                  : dense
+                    ? 'px-3 py-1 text-caption font-medium'
+                    : 'px-3 py-1.5 text-body-sm font-medium',
                 active
                   ? 'border-primary bg-primary-soft text-primary-deep'
                   : 'border-border bg-fill text-secondary hover:bg-fill-strong',

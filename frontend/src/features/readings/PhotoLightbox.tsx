@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { ChevronLeft, ChevronRight, MapPin, X } from 'lucide-react';
 
 import { MAP_PROVIDERS } from '@/components/LocationMapSheet';
@@ -9,7 +10,10 @@ import type { ReadingPhotoRead } from '@/lib/types';
  *
  * Die Bilder kommen direkt vom Backend
  * (``/api/v1/readings/{id}/photos/{photoId}``); der Browser schickt das
- * Session-Cookie automatisch mit (Same-Origin). Schließt auf Klick außerhalb
+ * Session-Cookie automatisch mit (Same-Origin). Wird per Portal an
+ * ``document.body`` gehängt — sonst läge sie im Stacking-Context der Seite
+ * (``z-10``) unter Mobile-Header und Tab-Bar (``z-20``), die dann den
+ * Schließen-Knopf verdecken. Schließt auf Klick außerhalb
  * des Bildes oder ESC; mit ←/→ bzw. Pfeil-Buttons blättert man. Hatte ein Foto
  * im EXIF GPS, zeigt eine Info-Bar Koordinaten + Karten-Links.
  */
@@ -42,7 +46,7 @@ export function PhotoLightbox({
   const photo = photos[safeIndex]!;
   const hasGps = photo.photo_lat !== null && photo.photo_lon !== null;
 
-  return (
+  return createPortal(
     <div
       role="dialog"
       aria-modal="true"
@@ -55,9 +59,9 @@ export function PhotoLightbox({
         type="button"
         onClick={onClose}
         aria-label="Schließen"
-        className="absolute top-4 right-4 inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20"
+        className="absolute top-[calc(env(safe-area-inset-top)+1rem)] right-4 z-10 inline-flex h-11 w-11 items-center justify-center rounded-full bg-white/15 text-white hover:bg-white/25"
       >
-        <X size={20} />
+        <X size={22} />
       </button>
 
       {count > 1 ? (
@@ -84,7 +88,7 @@ export function PhotoLightbox({
           >
             <ChevronRight size={22} />
           </button>
-          <div className="absolute top-4 left-1/2 -translate-x-1/2 rounded-pill bg-black/60 px-3 py-1 text-caption text-white">
+          <div className="absolute top-[calc(env(safe-area-inset-top)+1.5rem)] left-1/2 -translate-x-1/2 rounded-pill bg-black/60 px-3 py-1 text-caption text-white">
             {safeIndex + 1} / {count}
           </div>
         </>
@@ -122,6 +126,7 @@ export function PhotoLightbox({
           ))}
         </div>
       ) : null}
-    </div>
+    </div>,
+    document.body,
   );
 }

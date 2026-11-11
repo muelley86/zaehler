@@ -667,6 +667,27 @@ function CreateForm({
   onCreated: () => void;
   mainLocations: MainLocationRead[];
 }) {
+  return (
+    <Section header="Neuer Zählerstandort">
+      <div className="p-5">
+        <LocationCreateForm mainLocations={mainLocations} onCreated={onCreated} />
+      </div>
+    </Section>
+  );
+}
+
+/**
+ * Das eigentliche Anlege-Formular — ohne Rahmen, damit es auch außerhalb der
+ * Standort-Verwaltung nutzbar ist (z. B. im Sheet „Neuer Standort" des
+ * Messstellen-Formulars, siehe ``LocationSelectField``).
+ */
+export function LocationCreateForm({
+  onCreated,
+  mainLocations,
+}: {
+  onCreated: (created: LocationRead) => void;
+  mainLocations: MainLocationRead[];
+}) {
   const [name, setName] = useState('');
   const [note, setNote] = useState('');
   const [latitude, setLatitude] = useState('');
@@ -697,7 +718,7 @@ function CreateForm({
       if (postcode.trim()) body['address_postcode'] = postcode.trim();
       if (city.trim()) body['address_city'] = city.trim();
       if (mainLocationId !== null) body['main_location_id'] = mainLocationId;
-      await api.post('/locations', body);
+      const created = await api.post<LocationRead>('/locations', body);
       setName('');
       setNote('');
       setLatitude('');
@@ -706,7 +727,7 @@ function CreateForm({
       setPostcode('');
       setCity('');
       setMainLocationId(null);
-      onCreated();
+      onCreated(created);
     } catch (err) {
       if (err instanceof ApiError) setError(err.problem.detail ?? err.problem.title);
       else setError('Anlegen fehlgeschlagen.');
@@ -716,46 +737,40 @@ function CreateForm({
   }
 
   return (
-    <Section header="Neuer Zählerstandort">
-      <form onSubmit={(e) => void handleSubmit(e)} className="space-y-3 p-5">
-        <TextField
-          label="Name"
-          placeholder="z. B. Keller"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          required
-        />
-        <TextField
-          label="Notiz (optional)"
-          value={note}
-          onChange={(e) => setNote(e.target.value)}
-        />
-        <MainLocationSelect
-          value={mainLocationId}
-          onChange={setMainLocationId}
-          options={mainLocations}
-        />
-        <AddressFields
-          street={street}
-          postcode={postcode}
-          city={city}
-          onChange={(next) => {
-            if (next.street !== undefined) setStreet(next.street);
-            if (next.postcode !== undefined) setPostcode(next.postcode);
-            if (next.city !== undefined) setCity(next.city);
-          }}
-        />
-        <GeoPicker
-          latitude={latitude}
-          longitude={longitude}
-          onLatitudeChange={setLatitude}
-          onLongitudeChange={setLongitude}
-        />
-        {error ? <div className="text-caption text-danger">{error}</div> : null}
-        <Button type="submit" variant="filled" disabled={busy} fullWidth>
-          {busy ? 'Speichere…' : 'Anlegen'}
-        </Button>
-      </form>
-    </Section>
+    <form onSubmit={(e) => void handleSubmit(e)} className="space-y-3">
+      <TextField
+        label="Name"
+        placeholder="z. B. Keller"
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        required
+      />
+      <TextField label="Notiz (optional)" value={note} onChange={(e) => setNote(e.target.value)} />
+      <MainLocationSelect
+        value={mainLocationId}
+        onChange={setMainLocationId}
+        options={mainLocations}
+      />
+      <AddressFields
+        street={street}
+        postcode={postcode}
+        city={city}
+        onChange={(next) => {
+          if (next.street !== undefined) setStreet(next.street);
+          if (next.postcode !== undefined) setPostcode(next.postcode);
+          if (next.city !== undefined) setCity(next.city);
+        }}
+      />
+      <GeoPicker
+        latitude={latitude}
+        longitude={longitude}
+        onLatitudeChange={setLatitude}
+        onLongitudeChange={setLongitude}
+      />
+      {error ? <div className="text-caption text-danger">{error}</div> : null}
+      <Button type="submit" variant="filled" disabled={busy} fullWidth>
+        {busy ? 'Speichere…' : 'Anlegen'}
+      </Button>
+    </form>
   );
 }

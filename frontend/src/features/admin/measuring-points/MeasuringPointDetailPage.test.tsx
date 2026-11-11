@@ -271,6 +271,17 @@ describe('MeasuringPointDetailPage Stammdaten-Card', () => {
     expect(screen.getByLabelText(/Wandlerfaktor/i)).toBeInTheDocument();
   });
 
+  it('bietet im Edit-Formular „Neuer Standort" neben der Standort-Auswahl an', async () => {
+    _mockMp(_strom);
+    renderWithRouter(<MeasuringPointDetailPage />, {
+      initialEntries: ['/admin/messstellen/1'],
+    });
+    const editButtons = await screen.findAllByRole('button', { name: /^Bearbeiten$/ });
+    fireEvent.click(editButtons[0]!);
+
+    expect(screen.getByRole('button', { name: 'Neuer Standort' })).toBeInTheDocument();
+  });
+
   it('zeigt Tankvolumen im Edit-Formular bei Heizöl', async () => {
     _mockMp(_heizung);
     renderWithRouter(<MeasuringPointDetailPage />, {

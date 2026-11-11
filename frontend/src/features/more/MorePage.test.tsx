@@ -51,3 +51,11 @@ describe('MorePage — Abmelden', () => {
     );
   });
 });
+
+describe('MorePage — Version', () => {
+  it('zeigt die App-Version am Ende der Seite (mobil gibt es keine Sidebar)', () => {
+    renderWithRouter(<MorePage />);
+
+    expect(screen.getByTestId('more-version')).toHaveTextContent(`v${__APP_VERSION__}`);
+  });
+});

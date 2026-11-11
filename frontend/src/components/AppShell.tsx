@@ -315,7 +315,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         {/* Mobile Datums-Leiste — nur auf datums-relevanten Seiten, direkt
             unter dem Sticky-Header. */}
         {showMobileDateBar ? (
-          <div className="border-b-hairline border-border bg-surface px-4 py-2 md:hidden">
+          <div className="border-b-hairline border-border bg-surface px-4 py-1 md:hidden">
             <GlobalDateRange variant="mobile" />
           </div>
         ) : null}
