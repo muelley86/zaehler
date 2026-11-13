@@ -88,6 +88,10 @@ class BillingRunTotals(APIModel):
     """Kennzahlen des Ergebnisses, beim Ausliefern aus dem Snapshot ``result`` abgeleitet.
 
     ``differenz_eur`` = Summe Betraege - Gesamtkosten (= -Saldo; positiv = mehr weiterberechnet),
+    ``differenz_prozent`` = Differenz in Prozent der Gesamtkosten; ``differenz_kwh`` =
+    Zaehlersumme - Bezugsmenge (positiv = mehr weiterberechnet als bezogen),
+    ``differenz_kwh_prozent`` in Prozent der Bezugsmenge. Prozentwerte sind ``None``, wenn die
+    Bezugsgroesse 0 ist.
     ``rahmen_eur`` = Saldo-Grenze (Cent-Aufrundung des Preises), ``im_rahmen`` wie Befund
     ``saldo_grenze``. Extern = Empfaenger mit Rechnung, intern = interne Umlage (KOST).
     """
@@ -102,6 +106,9 @@ class BillingRunTotals(APIModel):
     gesamt_kwh: DecimalStr
     gesamt_eur: DecimalStr
     differenz_eur: DecimalStr
+    differenz_prozent: DecimalStr | None
+    differenz_kwh: DecimalStr | None
+    differenz_kwh_prozent: DecimalStr | None
     rahmen_eur: DecimalStr
     im_rahmen: bool
 

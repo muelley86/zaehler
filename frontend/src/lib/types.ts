@@ -547,6 +547,12 @@ export interface BillingRunTotals {
   gesamt_kwh: string;
   gesamt_eur: string;
   differenz_eur: string;
+  /** Differenz in Prozent der Gesamtkosten; `null` ohne Bezugsgröße. */
+  differenz_prozent: string | null;
+  /** Zählersumme − Bezugsmenge (+ = mehr weiterberechnet als bezogen). */
+  differenz_kwh: string | null;
+  /** kWh-Differenz in Prozent der Bezugsmenge. */
+  differenz_kwh_prozent: string | null;
   rahmen_eur: string;
   im_rahmen: boolean;
 }
