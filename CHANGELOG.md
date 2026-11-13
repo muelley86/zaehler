@@ -10,6 +10,13 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.92.0](https://github.com/muelley86/zaehler/compare/v2.91.1...v2.92.0) (2026-11-13)
+
+
+### Funktionen
+
+* **billing:** Differenz in Prozent und kWh-Differenz im Abrechnungsergebnis ([#406](https://github.com/muelley86/zaehler/issues/406)) ([3368409](https://github.com/muelley86/zaehler/commit/3368409bffdd0cb6f4b0797d440d184e8f546b57))
+
 ## [2.91.1](https://github.com/muelley86/zaehler/compare/v2.91.0...v2.91.1) (2026-11-13)
 
 
