@@ -573,6 +573,10 @@ export interface BillingRunSummary {
   gesamt_eur: string | null;
   saldo_eur: string | null;
   differenz_eur: string | null;
+  /** Wie in `BillingRunTotals`: Prozent der Gesamtkosten, kWh = Zählersumme − Bezugsmenge. */
+  differenz_prozent: string | null;
+  differenz_kwh: string | null;
+  differenz_kwh_prozent: string | null;
   blocking_count: number;
 }
 

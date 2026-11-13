@@ -12,7 +12,7 @@ import { formatDe } from '@/lib/format';
 import type { BillingRunRead, BillingRunSummary } from '@/lib/types';
 
 import { errorText, lastDayOfPreviousMonth } from './circleForm';
-import { eur, eurDiff, RUN_STATUS_CLASS, RUN_STATUS_LABEL } from './runFormat';
+import { eur, eurDiff, kwhDiff, mitProzent, RUN_STATUS_CLASS, RUN_STATUS_LABEL } from './runFormat';
 
 export function BillingRunsSection({ circleId }: { circleId: number }) {
   const navigate = useNavigate();
@@ -94,6 +94,7 @@ export function BillingRunsSection({ circleId }: { circleId: number }) {
                 <th className="py-1 pr-3 text-right">Preis</th>
                 <th className="py-1 pr-3 text-right">Summe</th>
                 <th className="py-1 pr-3 text-right">Differenz</th>
+                <th className="py-1 pr-3 text-right">Differenz kWh</th>
                 <th className="py-1 text-right">Blockierend</th>
               </tr>
             </thead>
@@ -117,7 +118,14 @@ export function BillingRunsSection({ circleId }: { circleId: number }) {
                     {r.preis_eur === null ? '—' : `${formatDe(r.preis_eur)} €/kWh`}
                   </td>
                   <td className="py-1 pr-3 text-right tabular-nums">{eur(r.gesamt_eur)}</td>
-                  <td className="py-1 pr-3 text-right tabular-nums">{eurDiff(r.differenz_eur)}</td>
+                  <td className="py-1 pr-3 text-right whitespace-nowrap tabular-nums">
+                    {mitProzent(eurDiff(r.differenz_eur), r.differenz_prozent)}
+                  </td>
+                  <td className="py-1 pr-3 text-right whitespace-nowrap tabular-nums">
+                    {r.differenz_kwh === null
+                      ? '—'
+                      : mitProzent(kwhDiff(r.differenz_kwh), r.differenz_kwh_prozent)}
+                  </td>
                   <td
                     className={`py-1 text-right tabular-nums ${
                       r.blocking_count > 0 ? 'text-danger' : ''

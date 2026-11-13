@@ -33,6 +33,9 @@ const LAUF = {
   gesamt_eur: '1250.00',
   saldo_eur: '-1.50',
   differenz_eur: '1.50',
+  differenz_prozent: '0.12',
+  differenz_kwh: '-20',
+  differenz_kwh_prozent: '-0.40',
   blocking_count: 0,
 };
 
@@ -57,7 +60,9 @@ describe('BillingRunsSection', () => {
     // Differenz statt Saldo, mit Vorzeichen aus Nutzersicht (+ = mehr weiterberechnet).
     expect(screen.getByRole('columnheader', { name: 'Differenz' })).toBeInTheDocument();
     expect(screen.queryByRole('columnheader', { name: 'Saldo' })).not.toBeInTheDocument();
-    expect(screen.getByText('+1,50 €')).toBeInTheDocument();
+    expect(screen.getByText('+1,50 € (+0,12 %)')).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: 'Differenz kWh' })).toBeInTheDocument();
+    expect(screen.getByText('-20 kWh (-0,40 %)')).toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText(/Abrechnungsmonat/), { target: { value: '2026-08' } });
     const grund = await screen.findByLabelText(/Begründung neue Version/);
