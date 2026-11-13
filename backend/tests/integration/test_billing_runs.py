@@ -186,6 +186,11 @@ def test_entwurf_berechnen_und_festschreiben(
     assert (t["extern_eur"], t["intern_eur"], t["gesamt_eur"]) == ("225.00", "25.00", "250.00")
     assert Decimal(t["extern_kwh"]) + Decimal(t["intern_kwh"]) == Decimal(t["gesamt_kwh"])
     assert (t["differenz_eur"], t["im_rahmen"]) == ("0.00", True)
+    assert (t["differenz_prozent"], t["differenz_kwh"], t["differenz_kwh_prozent"]) == (
+        "0.00",
+        "0",
+        "0.00",
+    )
     assert run["differenz_eur"] == "0.00"
 
     rid = run["id"]
@@ -194,6 +199,8 @@ def test_entwurf_berechnen_und_festschreiben(
     # 1 ct mehr je kWh: 10 EUR mehr weiterberechnet, noch im Rahmen (1 ct x 1000 kWh + 0,50 EUR).
     tt = teurer["totals"]
     assert (tt["differenz_eur"], tt["rahmen_eur"], tt["im_rahmen"]) == ("10.00", "10.50", True)
+    # 10 EUR auf 250 EUR Gesamtkosten = 4 %; die kWh bleiben gleich.
+    assert (tt["differenz_prozent"], tt["differenz_kwh_prozent"]) == ("4.00", "0.00")
     assert teurer["differenz_eur"] == "10.00"
     mit_zusatz = _ok(admin_client.patch(f"{BASE}/{cid}/runs/{rid}", json={"zusatzkosten": "20"}))[
         "totals"

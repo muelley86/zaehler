@@ -251,6 +251,16 @@ def differenz_eur(result: dict[str, Any] | None) -> Decimal | None:
     return None if saldo is None else Decimal(0) - saldo
 
 
+_PROZENT_STELLEN = 2
+
+
+def prozent_von(differenz: Decimal, basis: Decimal) -> Decimal | None:
+    """``differenz`` in Prozent von ``basis``, kaufmaennisch gerundet; ohne Basis kein Wert."""
+    if basis == 0:
+        return None
+    return round_half_up(differenz / basis * 100, _PROZENT_STELLEN) + Decimal(0)
+
+
 def ergebnis_summen(run: BillingRun) -> BillingRunTotals | None:
     """Kennzahlen fuer die Ergebnisuebersicht aus dem eingefrorenen Snapshot ``run.result``.
 
@@ -277,6 +287,9 @@ def ergebnis_summen(run: BillingRun) -> BillingRunTotals | None:
         or not isinstance(gruppen, list)
     ):
         return None
+    # Bezugsmenge fehlt nur in Snapshots ohne diesen Wert - dann gibt es keine kWh-Differenz.
+    bezugsmenge = _dec(erg, "bezugsmenge")
+    differenz_kwh = None if bezugsmenge is None else zaehlersumme - bezugsmenge
     extern_kwh = extern_eur = intern_kwh = intern_eur = Decimal(0)
     for g in gruppen:
         kwh, eur = _dec(g, "kwh"), _dec(g, "eur")
@@ -297,6 +310,13 @@ def ergebnis_summen(run: BillingRun) -> BillingRunTotals | None:
         gesamt_kwh=zaehlersumme,
         gesamt_eur=gesamt_eur,
         differenz_eur=Decimal(0) - saldo,
+        differenz_prozent=prozent_von(Decimal(0) - saldo, gesamtkosten),
+        differenz_kwh=differenz_kwh,
+        differenz_kwh_prozent=(
+            None
+            if differenz_kwh is None or bezugsmenge is None
+            else prozent_von(differenz_kwh, bezugsmenge)
+        ),
         rahmen_eur=grenze,
         # Gleiche Bedingung wie der Befund ``saldo_grenze`` (dort: > Grenze = Hinweis).
         im_rahmen=abs(saldo) <= grenze,

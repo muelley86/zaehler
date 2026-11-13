@@ -22,6 +22,8 @@ import {
   eur,
   eurDiff,
   num,
+  kwhDiff,
+  prozentDiff,
   prozentZuAnteil,
   RUN_STATUS_CLASS,
   RUN_STATUS_LABEL,
@@ -63,7 +65,22 @@ function Kennzahlen({
           <dt className="text-tertiary">Differenz</dt>
           <dd className="text-title-3 font-semibold text-label tabular-nums">
             {eurDiff(t.differenz_eur)}
+            {t.differenz_prozent !== null ? (
+              <span className="ml-1.5 text-body font-normal text-secondary">
+                ({prozentDiff(t.differenz_prozent)})
+              </span>
+            ) : null}
           </dd>
+          {t.differenz_kwh !== null ? (
+            <dd className="text-body font-semibold text-label tabular-nums">
+              {kwhDiff(t.differenz_kwh)}
+              {t.differenz_kwh_prozent !== null ? (
+                <span className="ml-1.5 font-normal text-secondary">
+                  ({prozentDiff(t.differenz_kwh_prozent)})
+                </span>
+              ) : null}
+            </dd>
+          ) : null}
           <dd className={t.im_rahmen ? 'text-success' : 'text-danger'}>
             {t.im_rahmen ? `im Rahmen ${rahmen}` : `über dem Rahmen ${rahmen}`}
           </dd>

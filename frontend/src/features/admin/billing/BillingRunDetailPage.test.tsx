@@ -63,6 +63,9 @@ const TOTALS = {
   gesamt_kwh: '500.000',
   gesamt_eur: '125.00',
   differenz_eur: '0.00',
+  differenz_prozent: '0.00',
+  differenz_kwh: '0.000',
+  differenz_kwh_prozent: '0.00',
   rahmen_eur: '5.50',
   im_rahmen: true,
 };
@@ -268,6 +271,9 @@ describe('BillingRunDetailPage', () => {
         intern_eur: '26.00',
         gesamt_eur: '130.00',
         differenz_eur: '5.00',
+        differenz_prozent: '4.00',
+        differenz_kwh: '-20',
+        differenz_kwh_prozent: '-3.85',
       },
     });
     server.use(
@@ -286,6 +292,10 @@ describe('BillingRunDetailPage', () => {
     ).toBeInTheDocument();
     expect(within(kennzahlen).getByText('130,00 €')).toBeInTheDocument();
     expect(within(kennzahlen).getByText('+5,00 €')).toBeInTheDocument();
+    // Differenz zusätzlich in Prozent sowie in kWh absolut und in Prozent.
+    expect(within(kennzahlen).getByText('(+4,00 %)')).toBeInTheDocument();
+    expect(within(kennzahlen).getByText('-20 kWh')).toBeInTheDocument();
+    expect(within(kennzahlen).getByText('(-3,85 %)')).toBeInTheDocument();
     expect(
       within(kennzahlen).getByText(/im Rahmen der Cent-Aufrundung \(max\. 5,50 €\)/),
     ).toBeInTheDocument();
@@ -316,6 +326,29 @@ describe('BillingRunDetailPage', () => {
     const tabelle = screen.getByRole('table', { name: 'Empfänger' });
     expect(within(tabelle).getByText('Muster A KG')).toBeInTheDocument();
     expect(within(tabelle).queryByText('Summe gesamt')).not.toBeInTheDocument();
+  });
+
+  it('lässt Prozent und kWh-Differenz weg, wenn das Backend keine liefert', async () => {
+    server.use(
+      http.get('/api/v1/billing-circles/1/runs/7', () =>
+        HttpResponse.json(
+          lauf('entwurf', {
+            totals: {
+              ...TOTALS,
+              differenz_prozent: null,
+              differenz_kwh: null,
+              differenz_kwh_prozent: null,
+            },
+          }),
+        ),
+      ),
+      transferLeer(),
+    );
+    renderWithRouter(<BillingRunDetailPage />);
+    const kennzahlen = await screen.findByRole('group', { name: 'Kennzahlen' });
+    expect(within(kennzahlen).getByText('0,00 €')).toBeInTheDocument();
+    expect(within(kennzahlen).queryByText(/%\)/)).not.toBeInTheDocument();
+    expect(within(kennzahlen).queryByText(/^[+-]?0 kWh$/)).not.toBeInTheDocument();
   });
 
   it('meldet eine Differenz über dem Rahmen und zeigt ohne interne Umlage nur die Gesamtsumme', async () => {

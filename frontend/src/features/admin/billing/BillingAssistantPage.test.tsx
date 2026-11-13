@@ -103,6 +103,23 @@ function lauf(status: string, blocking: boolean) {
       saldo_grenze_eur: '10.50',
       gruppen: [],
     },
+    totals: {
+      rechnungsbetrag_eur: '250.00',
+      zusatzkosten_eur: '0',
+      gesamtkosten_eur: '250.00',
+      extern_kwh: '1000',
+      extern_eur: '250.00',
+      intern_kwh: '0',
+      intern_eur: '0',
+      gesamt_kwh: '1000',
+      gesamt_eur: '250.00',
+      differenz_eur: '0.00',
+      differenz_prozent: '0.00',
+      differenz_kwh: '-12.5',
+      differenz_kwh_prozent: '-1.25',
+      rahmen_eur: '10.50',
+      im_rahmen: true,
+    },
     lines: [],
   };
 }
@@ -151,6 +168,9 @@ describe('BillingAssistantPage', () => {
     await waitFor(() => expect(gesendet).toEqual({ monat: '2026-08' }));
     expect(await screen.findByText('0,25 €/kWh')).toBeInTheDocument();
     expect(screen.getByText('Differenz')).toBeInTheDocument();
+    expect(screen.getByText('0,00 € (0,00 %)')).toBeInTheDocument();
+    expect(screen.getByText('Differenz kWh')).toBeInTheDocument();
+    expect(screen.getByText('-12,5 kWh (-1,25 %)')).toBeInTheDocument();
     expect(screen.queryByText('Saldo')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Festschreiben' })).toBeEnabled();
   });

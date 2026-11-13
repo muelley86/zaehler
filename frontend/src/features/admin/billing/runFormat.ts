@@ -26,6 +26,16 @@ export function eurDiff(v: string | null | undefined): string {
     : `${formatDe(v, { minimumFractionDigits: 2, maximumFractionDigits: 2, signDisplay: 'exceptZero' })} €`;
 }
 
+/** Prozent-Differenz mit Vorzeichen: "+4,00 %", "-0,22 %", "0,00 %". */
+export function prozentDiff(v: string): string {
+  return `${formatDe(v, { minimumFractionDigits: 2, maximumFractionDigits: 2, signDisplay: 'exceptZero' })} %`;
+}
+
+/** kWh-Differenz mit Vorzeichen: "+12,5 kWh", "-20 kWh", "0 kWh". */
+export function kwhDiff(v: string): string {
+  return `${formatDe(v, { maximumFractionDigits: 3, signDisplay: 'exceptZero' })} kWh`;
+}
+
 export function num(v: string | null | undefined): string {
   return v === null || v === undefined ? '' : formatDe(v);
 }

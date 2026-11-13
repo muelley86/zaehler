@@ -25,7 +25,7 @@ import type {
 import { errorText, lastDayOfPreviousMonth } from './circleForm';
 import { InvoiceUpload } from './InvoiceUpload';
 import { MonthReadingsView } from './MonthReadingsView';
-import { eur, eurDiff } from './runFormat';
+import { eur, eurDiff, kwhDiff, prozentDiff } from './runFormat';
 
 /** Kopfzeile eines Schritts: Nummer, Titel, Haken wenn erledigt. */
 function Schritt({
@@ -256,7 +256,23 @@ export function BillingAssistantPage() {
               <dt className="text-tertiary">Summe</dt>
               <dd className="tabular-nums">{eur(ergebnis?.gesamt_eur)}</dd>
               <dt className="text-tertiary">Differenz</dt>
-              <dd className="tabular-nums">{eurDiff(run.differenz_eur)}</dd>
+              <dd className="tabular-nums">
+                {eurDiff(run.differenz_eur)}
+                {run.totals && run.totals.differenz_prozent !== null
+                  ? ` (${prozentDiff(run.totals.differenz_prozent)})`
+                  : ''}
+              </dd>
+              {run.totals && run.totals.differenz_kwh !== null ? (
+                <>
+                  <dt className="text-tertiary">Differenz kWh</dt>
+                  <dd className="tabular-nums">
+                    {kwhDiff(run.totals.differenz_kwh)}
+                    {run.totals.differenz_kwh_prozent !== null
+                      ? ` (${prozentDiff(run.totals.differenz_kwh_prozent)})`
+                      : ''}
+                  </dd>
+                </>
+              ) : null}
               <dt className="text-tertiary">Version</dt>
               <dd className="tabular-nums">{run.version}</dd>
             </dl>
