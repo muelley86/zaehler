@@ -219,6 +219,13 @@ def test_entwurf_berechnen_und_festschreiben(
     assert fest["finalized_at"] is not None
     liste = admin_client.get(f"{BASE}/{cid}/runs").json()
     assert liste[0]["gesamt_eur"] == "250.00"
+    # Die Liste traegt die Differenz-Kennzahlen fuer die Tabelle der Laeufe.
+    assert (
+        liste[0]["differenz_eur"],
+        liste[0]["differenz_prozent"],
+        liste[0]["differenz_kwh"],
+        liste[0]["differenz_kwh_prozent"],
+    ) == ("0.00", "0.00", "0", "0.00")
 
 
 def test_manuelle_werte_brauchen_begruendung(

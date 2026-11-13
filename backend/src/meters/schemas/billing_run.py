@@ -129,6 +129,10 @@ class BillingRunSummary(APIModel):
     gesamt_eur: str | None = None
     saldo_eur: str | None = None
     differenz_eur: str | None = None
+    # Wie in ``BillingRunTotals``: Prozent der Gesamtkosten, kWh = Zaehlersumme - Bezugsmenge.
+    differenz_prozent: str | None = None
+    differenz_kwh: str | None = None
+    differenz_kwh_prozent: str | None = None
     blocking_count: int = 0
 
 

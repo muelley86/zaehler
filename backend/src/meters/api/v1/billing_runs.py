@@ -7,6 +7,7 @@ Befunde; vorige Version wird ``ersetzt``). Festgeschriebene Laeufe sind unveraen
 
 from __future__ import annotations
 
+from decimal import Decimal
 from typing import Annotated, Any
 
 from fastapi import APIRouter, File, Request, Response, UploadFile, status
@@ -31,6 +32,7 @@ from meters.schemas.billing_run import (
     BillingRunLineUpdate,
     BillingRunRead,
     BillingRunSummary,
+    BillingRunTotals,
     BillingRunUpdate,
 )
 from meters.schemas.billing_transfer import BillingTransferCreate, BillingTransferView
@@ -75,25 +77,32 @@ def _run(db: DbDep, circle_id: int, run_id: int) -> BillingRun:
     return run
 
 
-def _kopf(run: BillingRun) -> dict[str, Any]:
+def _text(wert: Decimal | None) -> str | None:
+    return None if wert is None else format(wert, "f")
+
+
+def _kopf(run: BillingRun, summen: BillingRunTotals | None) -> dict[str, Any]:
     ergebnis = run.result or {}
-    diff = differenz_eur(run.result)
     return {
         "preis_eur": ergebnis.get("preis_eur"),
         "gesamt_eur": ergebnis.get("gesamt_eur"),
         "saldo_eur": ergebnis.get("saldo_eur"),
-        "differenz_eur": None if diff is None else format(diff, "f"),
+        "differenz_eur": _text(differenz_eur(run.result)),
+        "differenz_prozent": _text(summen.differenz_prozent if summen else None),
+        "differenz_kwh": _text(summen.differenz_kwh if summen else None),
+        "differenz_kwh_prozent": _text(summen.differenz_kwh_prozent if summen else None),
         "blocking_count": len(blocking(run)),
     }
 
 
 def _summary(run: BillingRun) -> BillingRunSummary:
-    return BillingRunSummary.model_validate(run).model_copy(update=_kopf(run))
+    return BillingRunSummary.model_validate(run).model_copy(update=_kopf(run, ergebnis_summen(run)))
 
 
 def _read(run: BillingRun) -> BillingRunRead:
+    summen = ergebnis_summen(run)
     return BillingRunRead.model_validate(run).model_copy(
-        update={**_kopf(run), "totals": ergebnis_summen(run)}
+        update={**_kopf(run, summen), "totals": summen}
     )
 
 

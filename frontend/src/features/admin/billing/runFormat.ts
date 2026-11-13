@@ -36,6 +36,11 @@ export function kwhDiff(v: string): string {
   return `${formatDe(v, { maximumFractionDigits: 3, signDisplay: 'exceptZero' })} kWh`;
 }
 
+/** Hängt die Prozent-Differenz an den absoluten Wert: "+6,00 € (+2,40 %)"; ohne Prozent nur der Wert. */
+export function mitProzent(absolut: string, prozent: string | null): string {
+  return prozent === null ? absolut : `${absolut} (${prozentDiff(prozent)})`;
+}
+
 export function num(v: string | null | undefined): string {
   return v === null || v === undefined ? '' : formatDe(v);
 }
