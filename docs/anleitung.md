@@ -358,6 +358,17 @@ ls -la /opt/zaehler/backups/
 sudo bash /opt/zaehler/repo/deploy/lxc/zaehler.sh restore /opt/zaehler/backups/meters-YYYYMMDD-HHMMSS.db.gz
 ```
 
+Das gilt für die `.db.gz`-Sicherungen des Skripts. Ein **Voll-Backup aus der App**
+(ZIP mit Datenbank und Fotos, geladen über Admin ▸ System & Backup ▸ „Backup laden“)
+spielst du in der App wieder ein: Admin ▸ System ▸ Wiederherstellung, ZIP auswählen,
+Vorschau prüfen, bestätigen. Danach neu anmelden — es gelten die Zugangsdaten aus dem Backup.
+
+Meldet der Upload **„Nicht angemeldet oder Sitzung abgelaufen“** (bis v2.93 irreführend
+„Anfrage überschreitet das Limit von 64 KiB“), liegt es nicht an der Dateigröße: Die
+Sitzung im Browser ist nicht mehr gültig. Seite neu laden, anmelden, Upload wiederholen.
+Läuft der Upload über einen Reverse-Proxy, braucht dieser ein ausreichendes Body-Limit
+(siehe `deploy/lxc/README.md`).
+
 ### Container neu aufsetzen
 
 Geht jederzeit gefahrlos, **solange** du die `/opt/zaehler/data/`- und
