@@ -10,6 +10,18 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.94.0](https://github.com/muelley86/zaehler/compare/v2.93.0...v2.94.0) (2026-11-13)
+
+
+### Funktionen
+
+* **billing:** frei gewaehlte Abrechnungslaeufe eines Kreises vergleichen ([#412](https://github.com/muelley86/zaehler/issues/412)) ([38e95cf](https://github.com/muelley86/zaehler/commit/38e95cf43ba07f8bfacce69097970caa5c48eac8))
+
+
+### Fehlerbehebungen
+
+* **security:** 401 statt 64-KiB-Meldung bei grossen Anfragen ohne gueltige Sitzung ([#410](https://github.com/muelley86/zaehler/issues/410)) ([a44f660](https://github.com/muelley86/zaehler/commit/a44f66085b5c0a09ed4b46b23915f310bda9ffbd))
+
 ## [2.93.0](https://github.com/muelley86/zaehler/compare/v2.92.0...v2.93.0) (2026-11-13)
 
 
