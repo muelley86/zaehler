@@ -1,6 +1,7 @@
 /**
  * Abrechnungsläufe eines Kreises: Liste (Monat, Version, Status, Preis, Summe, Differenz) und Anlegen
- * eines Entwurfs für einen Monat. Details und Festschreiben auf der Seite des Laufs.
+ * eines Entwurfs für einen Monat. Details und Festschreiben auf der Seite des Laufs. Zwei bis zwölf
+ * angehakte Läufe lassen sich auf der Vergleichsseite nebeneinanderstellen.
  */
 import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
@@ -14,6 +15,9 @@ import type { BillingRunRead, BillingRunSummary } from '@/lib/types';
 import { errorText, lastDayOfPreviousMonth } from './circleForm';
 import { eur, eurDiff, kwhDiff, mitProzent, RUN_STATUS_CLASS, RUN_STATUS_LABEL } from './runFormat';
 
+const MIN_VERGLEICH = 2;
+const MAX_VERGLEICH = 12;
+
 export function BillingRunsSection({ circleId }: { circleId: number }) {
   const navigate = useNavigate();
   const [runs, setRuns] = useState<BillingRunSummary[]>([]);
@@ -21,6 +25,8 @@ export function BillingRunsSection({ circleId }: { circleId: number }) {
   const [begruendung, setBegruendung] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Zum Vergleich angehakte Läufe, in der Reihenfolge des Anhakens.
+  const [auswahl, setAuswahl] = useState<number[]>([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -36,6 +42,14 @@ export function BillingRunsSection({ circleId }: { circleId: number }) {
       cancelled = true;
     };
   }, [circleId]);
+
+  const vergleichbar = auswahl.length >= MIN_VERGLEICH && auswahl.length <= MAX_VERGLEICH;
+
+  function umschalten(runId: number) {
+    setAuswahl((bisher) =>
+      bisher.includes(runId) ? bisher.filter((id) => id !== runId) : [...bisher, runId],
+    );
+  }
 
   const festgeschrieben = runs.some((r) => r.monat === monat && r.status === 'festgeschrieben');
 
@@ -86,9 +100,31 @@ export function BillingRunsSection({ circleId }: { circleId: number }) {
         <div className="px-5 pb-5 text-caption text-tertiary">Noch keine Abrechnungsläufe.</div>
       ) : (
         <div className="overflow-x-auto px-5 pb-5">
+          <div className="mb-2 flex flex-wrap items-center gap-3">
+            <Button
+              variant="bordered"
+              size="sm"
+              disabled={!vergleichbar}
+              onClick={() =>
+                void navigate(
+                  `/admin/abrechnungskreise/${circleId}/vergleich?laeufe=${auswahl.join(',')}`,
+                )
+              }
+            >
+              {auswahl.length > 0 ? `Vergleichen (${auswahl.length})` : 'Vergleichen'}
+            </Button>
+            <span className="text-caption text-tertiary">
+              {auswahl.length > MAX_VERGLEICH
+                ? `Höchstens ${MAX_VERGLEICH} Läufe lassen sich vergleichen.`
+                : 'Zwei oder mehr Läufe anhaken, um sie nebeneinanderzustellen.'}
+            </span>
+          </div>
           <table className="w-full text-left text-caption" aria-label="Abrechnungsläufe">
             <thead className="text-tertiary">
               <tr>
+                <th className="w-8 py-1 pr-3">
+                  <span className="sr-only">Zum Vergleich auswählen</span>
+                </th>
                 <th className="py-1 pr-3">Monat</th>
                 <th className="py-1 pr-3">Status</th>
                 <th className="py-1 pr-3 text-right">Preis</th>
@@ -101,6 +137,15 @@ export function BillingRunsSection({ circleId }: { circleId: number }) {
             <tbody>
               {runs.map((r) => (
                 <tr key={r.id} className="border-t border-separator even:bg-fill">
+                  <td className="py-1 pr-3">
+                    <input
+                      type="checkbox"
+                      className="accent-primary"
+                      aria-label={`${r.monat} · V${r.version} zum Vergleich auswählen`}
+                      checked={auswahl.includes(r.id)}
+                      onChange={() => umschalten(r.id)}
+                    />
+                  </td>
                   <td className="py-1 pr-3">
                     <Link
                       to={`/admin/abrechnungskreise/${circleId}/laeufe/${r.id}`}

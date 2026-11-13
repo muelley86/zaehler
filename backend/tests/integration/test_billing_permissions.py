@@ -26,6 +26,7 @@ def test_recorder_ohne_merkmal_wird_abgewiesen(recorder_client: TestClient) -> N
         f"{BASE}/1/readings?monat=2026-08",
         f"{BASE}/1/invoices",
         f"{BASE}/1/runs",
+        f"{BASE}/1/runs/vergleich?lauf=1&lauf=2",
         f"{BASE}/1/runs/1/monats-json",
     ):
         assert recorder_client.get(pfad).status_code == 403, pfad

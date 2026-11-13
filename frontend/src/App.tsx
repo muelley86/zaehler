@@ -110,6 +110,11 @@ const BillingRunDetailPage = lazy(() =>
     default: m.BillingRunDetailPage,
   })),
 );
+const BillingComparePage = lazy(() =>
+  import('@/features/admin/billing/BillingComparePage').then((m) => ({
+    default: m.BillingComparePage,
+  })),
+);
 const BillingAssistantPage = lazy(() =>
   import('@/features/admin/billing/BillingAssistantPage').then((m) => ({
     default: m.BillingAssistantPage,
@@ -270,6 +275,7 @@ export function App() {
             <Route path="abrechnungskreise" element={<BillingCirclesAdminPage />} />
             <Route path="abrechnungskreise/:id" element={<BillingCircleDetailPage />} />
             <Route path="abrechnungskreise/:id/assistent" element={<BillingAssistantPage />} />
+            <Route path="abrechnungskreise/:id/vergleich" element={<BillingComparePage />} />
             <Route path="abrechnungskreise/:id/laeufe/:runId" element={<BillingRunDetailPage />} />
             <Route
               path="abrechnungskreise/:id/laeufe/:runId/anhang"
