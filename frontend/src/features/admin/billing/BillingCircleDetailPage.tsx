@@ -155,7 +155,7 @@ export function BillingCircleDetailPage() {
         }
         trailing={
           circle ? (
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <Link
                 to={`/admin/abrechnungskreise/${circleId}/assistent`}
                 className="inline-flex items-center rounded-full bg-primary px-3 py-1.5 text-caption text-white"
