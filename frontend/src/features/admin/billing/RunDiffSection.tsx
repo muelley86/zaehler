@@ -11,7 +11,7 @@ import { formatDe } from '@/lib/format';
 import type { BillingDiffStatus, BillingRunDiff } from '@/lib/types';
 
 import { errorText } from './circleForm';
-import { eur } from './runFormat';
+import { eur, FELD_LABEL } from './runFormat';
 
 const STATUS_LABEL: Record<BillingDiffStatus, string> = {
   gleich: 'unverändert',
@@ -25,20 +25,6 @@ const STATUS_CLASS: Record<BillingDiffStatus, string> = {
   geaendert: 'bg-warning/15 text-warning',
   neu: 'bg-success/10 text-success',
   entfallen: 'bg-danger/10 text-danger',
-};
-
-/** Feldnamen aus dem Vergleich in die Sprache der Oberfläche. */
-const FELD_LABEL: Record<string, string> = {
-  owner_name: 'Empfänger',
-  kostenstelle: 'Kostenstelle',
-  invoice_line: 'Rechnungszeile',
-  serial_numbers: 'Zählernummer',
-  transformer_factor: 'Wandlerfaktor',
-  stand_alt: 'Stand alt',
-  stand_neu: 'Stand neu',
-  korrektur: 'Korrektur',
-  kwh: 'kWh',
-  eur: 'Betrag',
 };
 
 /** Preis einer Seite; ohne Ergebnis (Entwurf mit Fehler) steht dort kein Nullwert, sondern "—". */

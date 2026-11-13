@@ -75,3 +75,23 @@ export function monateVerschieben(von: string, bis: string, schritt: number): [s
   };
   return [rechne(von), rechne(bis)];
 }
+
+/** "2026-08" → "08/26". */
+export function monatKurz(monat: string): string {
+  const [jahr, mon] = monat.split('-');
+  return `${mon ?? ''}/${jahr?.slice(2) ?? ''}`;
+}
+
+/** Feldnamen einer Lauf-Zeile in der Sprache der Oberfläche (Versions- und Lauf-Vergleich). */
+export const FELD_LABEL: Record<string, string> = {
+  owner_name: 'Empfänger',
+  kostenstelle: 'Kostenstelle',
+  invoice_line: 'Rechnungszeile',
+  serial_numbers: 'Zählernummer',
+  transformer_factor: 'Wandlerfaktor',
+  stand_alt: 'Stand alt',
+  stand_neu: 'Stand neu',
+  korrektur: 'Korrektur',
+  kwh: 'kWh',
+  eur: 'Betrag',
+};

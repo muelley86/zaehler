@@ -368,6 +368,45 @@ export interface BillingRunDiff {
   eur_delta: string;
 }
 
+/** Vergleich frei gewählter Abrechnungsläufe eines Kreises (zwei Monate oder eine Reihe). */
+export type BillingCompareUnit = 'eur' | 'kwh' | 'eur_kwh' | 'prozent';
+
+export interface BillingCompareRun {
+  run_id: number;
+  monat: string;
+  version: number;
+  status: BillingRunStatus;
+  hat_ergebnis: boolean;
+}
+
+/** Wert einer Zeile in einem Lauf; `delta` ist die Abweichung zum vorherigen Lauf der Auswahl. */
+export interface BillingCompareValue {
+  wert: string | null;
+  delta: string | null;
+  delta_prozent: string | null;
+}
+
+export interface BillingCompareMetric {
+  key: string;
+  einheit: BillingCompareUnit;
+  werte: BillingCompareValue[];
+}
+
+export interface BillingCompareRow {
+  name: string;
+  internal_allocation: boolean;
+  merkmale_geaendert: string[];
+  kwh: BillingCompareValue[];
+  eur: BillingCompareValue[];
+}
+
+export interface BillingComparison {
+  laeufe: BillingCompareRun[];
+  kennzahlen: BillingCompareMetric[];
+  empfaenger: BillingCompareRow[];
+  positionen: BillingCompareRow[];
+}
+
 export interface BillingHistoryPoint {
   monat: string;
   version: number;

@@ -1,6 +1,7 @@
 /**
  * Abrechnungsläufe: Liste mit Status und Summen; Entwurf anlegen navigiert zur Detailseite;
- * für einen festgeschriebenen Monat ist eine Begründung Pflicht. Nur fiktive Werte.
+ * für einen festgeschriebenen Monat ist eine Begründung Pflicht; ab zwei angehakten Läufen
+ * führt „Vergleichen" zur Vergleichsseite. Nur fiktive Werte.
  */
 import { http, HttpResponse } from 'msw';
 import { describe, expect, it, vi } from 'vitest';
@@ -91,5 +92,49 @@ describe('BillingRunsSection', () => {
     expect(await screen.findByText('Noch keine Abrechnungsläufe.')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Entwurf anlegen' }));
     expect(await screen.findByText('Keine Rechnung importiert.')).toBeInTheDocument();
+  });
+
+  it('führt mit zwei angehakten Läufen zum Vergleich', async () => {
+    // Arrange
+    navigate.mockClear();
+    const september = { ...LAUF, id: 9, monat: '2026-09' };
+    server.use(
+      http.get('/api/v1/billing-circles/1/runs', () => HttpResponse.json([september, LAUF])),
+    );
+    renderWithRouter(<BillingRunsSection circleId={1} />);
+    const vergleichen = await screen.findByRole('button', { name: /Vergleichen/ });
+    expect(vergleichen).toBeDisabled();
+
+    // Act: ein Lauf reicht noch nicht.
+    fireEvent.click(screen.getByRole('checkbox', { name: '2026-09 · V1 zum Vergleich auswählen' }));
+    expect(screen.getByRole('button', { name: 'Vergleichen (1)' })).toBeDisabled();
+    fireEvent.click(screen.getByRole('checkbox', { name: '2026-08 · V1 zum Vergleich auswählen' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Vergleichen (2)' }));
+
+    // Assert
+    expect(navigate).toHaveBeenCalledWith('/admin/abrechnungskreise/1/vergleich?laeufe=9,7');
+  });
+
+  it('lässt sich wieder abwählen und begrenzt die Auswahl auf zwölf Läufe', async () => {
+    // Arrange: dreizehn Läufe.
+    const laeufe = Array.from({ length: 13 }, (_, i) => ({
+      ...LAUF,
+      id: 100 + i,
+      monat: `2025-${String(i + 1).padStart(2, '0')}`.replace('2025-13', '2026-01'),
+    }));
+    server.use(http.get('/api/v1/billing-circles/1/runs', () => HttpResponse.json(laeufe)));
+    renderWithRouter(<BillingRunsSection circleId={1} />);
+    const boxen = await screen.findAllByRole('checkbox');
+
+    // Act
+    for (const box of boxen) fireEvent.click(box);
+
+    // Assert: mehr als zwölf lassen sich nicht vergleichen.
+    expect(screen.getByRole('button', { name: 'Vergleichen (13)' })).toBeDisabled();
+    expect(screen.getByText('Höchstens 12 Läufe lassen sich vergleichen.')).toBeInTheDocument();
+    const erste = boxen[0];
+    if (!erste) throw new Error('keine Checkbox');
+    fireEvent.click(erste);
+    expect(screen.getByRole('button', { name: 'Vergleichen (12)' })).toBeEnabled();
   });
 });

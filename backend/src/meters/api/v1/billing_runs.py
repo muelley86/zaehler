@@ -10,7 +10,7 @@ from __future__ import annotations
 from decimal import Decimal
 from typing import Annotated, Any
 
-from fastapi import APIRouter, File, Request, Response, UploadFile, status
+from fastapi import APIRouter, File, Query, Request, Response, UploadFile, status
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
@@ -25,6 +25,7 @@ from meters.models import (
     BillingRunLine,
 )
 from meters.schemas.billing_attachment import BillingAttachmentRead
+from meters.schemas.billing_compare import BillingComparison
 from meters.schemas.billing_excel import BillingExcelImportRead
 from meters.schemas.billing_history import BillingRunDiff
 from meters.schemas.billing_run import (
@@ -38,6 +39,7 @@ from meters.schemas.billing_run import (
 from meters.schemas.billing_transfer import BillingTransferCreate, BillingTransferView
 from meters.services.audit import record
 from meters.services.billing_attachment import attachment
+from meters.services.billing_compare import compare_series
 from meters.services.billing_excel import dateiname, dumps, monats_json
 from meters.services.billing_excel_import import MAX_JSON_BYTES, excel_import, lies_monats_json
 from meters.services.billing_history import compare_runs, other_version
@@ -151,6 +153,19 @@ def list_runs(circle_id: int, db: DbDep, _user: BillingUser) -> list[BillingRunS
         .order_by(BillingRun.monat.desc(), BillingRun.version.desc())
     )
     return [_summary(r) for r in rows]
+
+
+# Muss vor ``/{circle_id}/runs/{run_id}`` stehen - sonst scheitert "vergleich" dort als run_id.
+@router.get("/{circle_id}/runs/vergleich", response_model=BillingComparison)
+def vergleich_laeufe(
+    circle_id: int,
+    db: DbDep,
+    _user: BillingUser,
+    lauf: Annotated[list[int] | None, Query()] = None,
+) -> BillingComparison:
+    """Frei gewaehlte Laeufe des Kreises nebeneinander: zwei Monate oder eine Reihe."""
+    _circle(db, circle_id)
+    return compare_series(db, circle_id, lauf or [])
 
 
 @router.post(
