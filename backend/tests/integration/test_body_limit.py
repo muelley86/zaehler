@@ -4,6 +4,11 @@ Ohne gültige Session darf ein Client nur kleine Bodies schicken (Login,
 2FA-Verify) — große Uploads werden abgelehnt, BEVOR Starlette sie in den
 Multipart-Spool auf Platte oder als JSON in den RAM liest. Mit Session gilt
 ein Gesamtlimit (Restore: eigenes, größeres Limit).
+
+Die Ablehnung ohne Session lautet 401 ("nicht angemeldet"), nicht 413: Wer mit
+abgelaufener Sitzung ein Backup hochlädt, soll nicht nach einem 64-KiB-Limit
+suchen. Nur die Auth-Endpunkte selbst (dort ist "nicht angemeldet" der
+Normalfall) melden weiter 413.
 """
 
 from __future__ import annotations
@@ -31,19 +36,21 @@ def spooled(monkeypatch: pytest.MonkeyPatch) -> dict[str, int]:
     return written
 
 
-def test_anonymous_large_upload_rejected_before_spooling(
+def test_anonymous_large_upload_is_unauthorized_before_spooling(
     client: TestClient, spooled: dict[str, int]
 ) -> None:
     resp = client.post(
         "/api/v1/restore/upload",
         files={"file": ("x.zip", b"\0" * (8 * 1024 * 1024), "application/zip")},
     )
-    assert resp.status_code == 413, resp.text
+    assert resp.status_code == 401, resp.text
+    assert "angemeldet" in resp.json()["detail"]
+    assert "KiB" not in resp.json()["detail"]
     assert resp.headers["content-type"].startswith("application/problem+json")
     assert spooled["n"] == 0
 
 
-def test_anonymous_large_json_rejected(client: TestClient) -> None:
+def test_oversized_login_body_stays_too_large(client: TestClient) -> None:
     body = b'{"username":"' + b"a" * (1024 * 1024) + b'","password":"x"}'
     resp = client.post(
         "/api/v1/auth/login", content=body, headers={"content-type": "application/json"}
@@ -51,7 +58,9 @@ def test_anonymous_large_json_rejected(client: TestClient) -> None:
     assert resp.status_code == 413, resp.text
 
 
-def test_anonymous_chunked_body_rejected(client: TestClient, spooled: dict[str, int]) -> None:
+def test_anonymous_chunked_body_is_unauthorized(
+    client: TestClient, spooled: dict[str, int]
+) -> None:
     def chunks() -> Iterator[bytes]:
         for _ in range(64):
             yield b"\0" * (64 * 1024)
@@ -61,19 +70,17 @@ def test_anonymous_chunked_body_rejected(client: TestClient, spooled: dict[str, 
         content=chunks(),
         headers={"content-type": "multipart/form-data; boundary=x"},
     )
-    assert resp.status_code == 413, resp.text
+    assert resp.status_code == 401, resp.text
     assert spooled["n"] == 0
 
 
-def test_forged_session_cookie_gets_anonymous_limit(
-    client: TestClient, spooled: dict[str, int]
-) -> None:
+def test_forged_session_cookie_is_unauthorized(client: TestClient, spooled: dict[str, int]) -> None:
     client.cookies.set("meters_session", "gefaelscht")
     resp = client.post(
         "/api/v1/readings/1/photos",
         files={"photo": ("m.jpg", b"\0" * (2 * 1024 * 1024), "image/jpeg")},
     )
-    assert resp.status_code == 413, resp.text
+    assert resp.status_code == 401, resp.text
     assert spooled["n"] == 0
 
 

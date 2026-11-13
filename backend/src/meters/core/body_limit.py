@@ -10,7 +10,10 @@ Diese reine ASGI-Middleware setzt deshalb ein Limit, bevor ein Byte gelesen
 wird:
 
 - Ohne gültige Session: höchstens ``ANONYMOUS_MAX_BODY_BYTES`` (Login und
-  2FA-Verify sind wenige hundert Byte).
+  2FA-Verify sind wenige hundert Byte). Größere Bodies beantwortet die
+  Middleware mit 401 statt 413 — der eigentliche Grund ist die fehlende
+  Anmeldung (abgelaufene Sitzung beim Restore-Upload), nicht die Größe. Nur
+  die Auth-Endpunkte selbst melden 413, dort ist "nicht angemeldet" normal.
 - Mit gültiger Session: ``settings.request_max_body_bytes``, für den
   Restore-Upload ``settings.backup_max_upload_bytes``.
 
@@ -36,6 +39,7 @@ from meters.core.security import SESSION_COOKIE_NAME
 ANONYMOUS_MAX_BODY_BYTES = 64 * 1024
 
 _RESTORE_UPLOAD_PATH = "/api/v1/restore/upload"
+_AUTH_PATH_PREFIX = "/api/v1/auth/"
 _BODY_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
 
 
@@ -94,6 +98,22 @@ async def _send_too_large(send: Send, limit: int) -> None:
     )
 
 
+async def _send_unauthorized(send: Send) -> None:
+    await _send_problem(
+        send,
+        status=401,
+        title="Unauthorized",
+        detail="Nicht angemeldet oder Sitzung abgelaufen. Bitte neu anmelden.",
+    )
+
+
+async def _reject(send: Send, *, limit: int, unauthorized: bool) -> None:
+    if unauthorized:
+        await _send_unauthorized(send)
+    else:
+        await _send_too_large(send, limit)
+
+
 class BodyLimitMiddleware:
     def __init__(self, app: ASGIApp) -> None:
         self.app = app
@@ -114,20 +134,26 @@ class BodyLimitMiddleware:
             await self.app(scope, receive, send)
             return
 
+        path: str = scope["path"]
         limit = ANONYMOUS_MAX_BODY_BYTES
+        authenticated = False
         if content_length is None or content_length > limit:
             token = conn.cookies.get(SESSION_COOKIE_NAME)
             if token:
-                valid: bool = await run_in_threadpool(_session_is_valid, token)
-                if valid:
-                    limit = _authenticated_limit(scope["path"])
+                authenticated = await run_in_threadpool(_session_is_valid, token)
+                if authenticated:
+                    limit = _authenticated_limit(path)
+        # Ohne Sitzung ist "zu groß" die falsche Auskunft — außer beim Login selbst.
+        unauthorized = not authenticated and not path.startswith(_AUTH_PATH_PREFIX)
         if content_length is not None and content_length > limit:
-            await _send_too_large(send, limit)
+            await _reject(send, limit=limit, unauthorized=unauthorized)
             return
 
-        await self._call_counting(scope, receive, send, limit)
+        await self._call_counting(scope, receive, send, limit=limit, unauthorized=unauthorized)
 
-    async def _call_counting(self, scope: Scope, receive: Receive, send: Send, limit: int) -> None:
+    async def _call_counting(
+        self, scope: Scope, receive: Receive, send: Send, *, limit: int, unauthorized: bool
+    ) -> None:
         received = 0
         exceeded = False
         response_started = False
@@ -160,7 +186,7 @@ class BodyLimitMiddleware:
             if not exceeded:
                 raise
         if exceeded and not response_started:
-            await _send_too_large(send, limit)
+            await _reject(send, limit=limit, unauthorized=unauthorized)
 
 
 def _parse_content_length(raw: str | None) -> int | None:

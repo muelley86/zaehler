@@ -212,7 +212,7 @@ versehentlich im Klartext über die Leitung. `proxy-external` setzt zusätzlich
 3. **Limits am Proxy** gegen Überlast/Missbrauch, z. B. bei Caddy/nginx:
    `client_max_body_size 25m;` und ein `limit_req`/Rate-Limit. Greift, bevor
    ein Request die App erreicht. (Die App selbst begrenzt seit v2.90.2 Bodies
-   ohne Login auf 64 KiB und mit Login auf `METERS_REQUEST_MAX_BODY_BYTES`.) Ausnahme: soll der **Backup-Restore über die
+   ohne Login auf 64 KiB — größere Anfragen ohne gültige Sitzung erhalten 401 — und mit Login auf `METERS_REQUEST_MAX_BODY_BYTES`.) Ausnahme: soll der **Backup-Restore über die
    App-UI** durch den Proxy laufen, braucht es ein größeres Body-Limit
    (Backup-ZIPs können hunderte MB erreichen) — dann z. B.
    `client_max_body_size 1g;` setzen oder den Restore nur im LAN direkt gegen

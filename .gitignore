@@ -44,6 +44,8 @@ data/media/
 # echte Daten duerfen nie zu GitHub.
 *.db
 *.db.gz
+# Voll-Backups aus der App-UI (ZIP mit DB und Fotos) fuer lokale Tests
+/Backups/
 
 # --- Sekrete & lokale Configs ---
 .env

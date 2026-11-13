@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { ApiError, NetworkError, api } from './api';
+import { subscribeUnauthorized } from './authEvents';
 import { getIsOnline, reportOnline } from './offline/connectivity';
 
 afterEach(() => {
@@ -128,5 +129,43 @@ describe('api.getWithMeta — Antwort mit Zeitstempel des Servers/Caches', () =>
     const result = await api.getWithMeta<{ id: number }>('/x');
     expect(result.data).toEqual({ id: 1 });
     expect(result.servedAt).toBeNull();
+  });
+});
+
+describe('api — 401 meldet die verlorene Sitzung', () => {
+  it('401 einer gewöhnlichen Anfrage benachrichtigt die Zuhörer', async () => {
+    const listener = vi.fn();
+    const unsubscribe = subscribeUnauthorized(listener);
+    stubFetch(401, { title: 'Unauthorized', status: 401 });
+
+    await expect(api.upload('/restore/upload', new FormData(), 'POST')).rejects.toMatchObject({
+      status: 401,
+    });
+
+    expect(listener).toHaveBeenCalledTimes(1);
+    unsubscribe();
+  });
+
+  it('401 der Auth-Endpunkte selbst meldet nichts (falsches Passwort, /auth/me)', async () => {
+    const listener = vi.fn();
+    const unsubscribe = subscribeUnauthorized(listener);
+    stubFetch(401, { title: 'Unauthorized', status: 401 });
+
+    await expect(api.post('/auth/login', {})).rejects.toMatchObject({ status: 401 });
+    await expect(api.get('/auth/me')).rejects.toMatchObject({ status: 401 });
+
+    expect(listener).not.toHaveBeenCalled();
+    unsubscribe();
+  });
+
+  it('andere Fehler melden nichts', async () => {
+    const listener = vi.fn();
+    const unsubscribe = subscribeUnauthorized(listener);
+    stubFetch(403, { title: 'Forbidden', status: 403 });
+
+    await expect(api.get('/x')).rejects.toMatchObject({ status: 403 });
+
+    expect(listener).not.toHaveBeenCalled();
+    unsubscribe();
   });
 });

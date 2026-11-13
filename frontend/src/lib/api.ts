@@ -6,10 +6,14 @@
  * dem RFC-7807-Format des Backends). 204-Antworten werden zu `undefined`.
  */
 
+import { reportUnauthorized } from './authEvents';
 import { reportOffline, reportOnline } from './offline/connectivity';
 import type { ProblemDetails } from './types';
 
 const API_BASE = '/api/v1';
+
+/** 401 der Auth-Endpunkte ist normal (falsches Passwort, `/auth/me` ohne Sitzung). */
+const AUTH_PATH_PREFIX = '/auth/';
 
 export class ApiError extends Error {
   status: number;
@@ -71,9 +75,10 @@ interface RequestOptions {
 /**
  * Gemeinsames Response-Handling für ``request`` und ``upload``: 204 → undefined,
  * sonst JSON parsen; Fehler-Responses werden zur typisierten ``ApiError``
- * (RFC-7807, Fallback aus statusText/status).
+ * (RFC-7807, Fallback aus statusText/status). Ein 401 außerhalb der
+ * Auth-Endpunkte meldet zusätzlich die verlorene Sitzung (`authEvents`).
  */
-async function parseJsonResponse<T>(resp: Response): Promise<T> {
+async function parseJsonResponse<T>(resp: Response, path: string): Promise<T> {
   if (resp.status === 204) {
     return undefined as T;
   }
@@ -84,6 +89,9 @@ async function parseJsonResponse<T>(resp: Response): Promise<T> {
       data && typeof data === 'object'
         ? (data as ProblemDetails)
         : { title: resp.statusText, status: resp.status };
+    if (resp.status === 401 && !path.startsWith(AUTH_PATH_PREFIX)) {
+      reportUnauthorized();
+    }
     throw new ApiError(problem);
   }
   return data as T;
@@ -106,7 +114,7 @@ function buildRequestInit(options: RequestOptions): RequestInit {
 
 async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const resp = await fetchWithConnectivity(`${API_BASE}${path}`, buildRequestInit(options));
-  return parseJsonResponse<T>(resp);
+  return parseJsonResponse<T>(resp, path);
 }
 
 async function upload<T>(path: string, method: 'PUT' | 'POST', formData: FormData): Promise<T> {
@@ -118,7 +126,7 @@ async function upload<T>(path: string, method: 'PUT' | 'POST', formData: FormDat
     headers: { Accept: 'application/json' },
     body: formData,
   });
-  return parseJsonResponse<T>(resp);
+  return parseJsonResponse<T>(resp, path);
 }
 
 /**
@@ -140,7 +148,7 @@ async function getWithMeta<T>(path: string, signal?: AbortSignal): Promise<WithM
   const dateHeader = resp.headers.get('date');
   const parsed = dateHeader ? new Date(dateHeader) : null;
   const servedAt = parsed !== null && !Number.isNaN(parsed.getTime()) ? parsed : null;
-  const data = await parseJsonResponse<T>(resp);
+  const data = await parseJsonResponse<T>(resp, path);
   return { data, servedAt };
 }
 
