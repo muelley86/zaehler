@@ -10,6 +10,13 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.91.1](https://github.com/muelley86/zaehler/compare/v2.91.0...v2.91.1) (2026-11-13)
+
+
+### Fehlerbehebungen
+
+* **ui:** Rechnungs-Upload als sichtbarer Button, Kopfzeile bricht mobil um ([#404](https://github.com/muelley86/zaehler/issues/404)) ([90112d8](https://github.com/muelley86/zaehler/commit/90112d80e22242490880f6da2173eb4a87f80228))
+
 ## [2.91.0](https://github.com/muelley86/zaehler/compare/v2.90.4...v2.91.0) (2026-11-11)
 
 
