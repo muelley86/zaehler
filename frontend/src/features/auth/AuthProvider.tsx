@@ -12,6 +12,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 
 import { ApiError, NetworkError, api } from '@/lib/api';
+import { subscribeUnauthorized } from '@/lib/authEvents';
 import { clearDashboardCache } from '@/features/dashboard/useDashboardData';
 import { clearAll as clearOfflineData } from '@/lib/offline/outbox';
 import type { LoginResponse, Me } from '@/lib/types';
@@ -84,6 +85,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  // Lehnt der Server eine beliebige Anfrage mit 401 ab, ist die Sitzung weg
+  // (abgelaufen, Server neu aufgesetzt). Neu prüfen statt weiter angemeldet
+  // auszusehen — der 401-Zweig von `refresh` führt dann zur Anmeldung.
+  useEffect(
+    () =>
+      subscribeUnauthorized(() => {
+        void refresh();
+      }),
+    [refresh],
+  );
 
   const login = useCallback(async (username: string, password: string): Promise<LoginResult> => {
     const data = await api.post<LoginResponse>('/auth/login', { username, password });

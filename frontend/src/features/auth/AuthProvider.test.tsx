@@ -17,6 +17,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { useState } from 'react';
 
+import { api } from '@/lib/api';
 import { server } from '@/tests/server';
 import { clearDashboardCache } from '@/features/dashboard/useDashboardData';
 import { AuthProvider } from './AuthProvider';
@@ -325,5 +326,39 @@ describe('AuthProvider — Service-Worker-Cache (api-get)', () => {
 
     await waitFor(() => expect(localStorage.getItem(ME_SNAPSHOT_KEY)).not.toBeNull());
     expect(del).not.toHaveBeenCalled();
+  });
+});
+
+describe('AuthProvider — verlorene Sitzung im laufenden Betrieb', () => {
+  it('401 einer beliebigen Anfrage prüft die Anmeldung neu und führt zur Login-Seite', async () => {
+    // Arrange: angemeldet gestartet, danach kennt der Server die Sitzung nicht mehr
+    // (Backend neu aufgesetzt, Sitzung abgelaufen).
+    let sitzungGueltig = true;
+    server.use(
+      http.get('/api/v1/auth/me', () =>
+        sitzungGueltig
+          ? HttpResponse.json(testMe)
+          : HttpResponse.json({ title: 'Unauthorized', status: 401 }, { status: 401 }),
+      ),
+      http.post('/api/v1/restore/upload', () =>
+        HttpResponse.json({ title: 'Unauthorized', status: 401 }, { status: 401 }),
+      ),
+    );
+    render(
+      <AuthProvider>
+        <Probe />
+      </AuthProvider>,
+    );
+    expect(await screen.findByText('user:katrin')).toBeInTheDocument();
+    sitzungGueltig = false;
+
+    // Act
+    await expect(api.upload('/restore/upload', new FormData(), 'POST')).rejects.toMatchObject({
+      status: 401,
+    });
+
+    // Assert
+    expect(await screen.findByText('kein-user')).toBeInTheDocument();
+    expect(localStorage.getItem(ME_SNAPSHOT_KEY)).toBeNull();
   });
 });
