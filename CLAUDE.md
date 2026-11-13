@@ -38,7 +38,8 @@ Repo-Root hat ein Makefile: `make lint` (ruff + mypy + eslint + prettier + tsc),
 
 Backend (in `backend/`, via `uv`):
 
-- Erststart: `uv sync && uv run alembic upgrade head`
+- Erststart: `uv sync && uv run alembic upgrade head`; dazu einmalig `backend/.env` mit
+  `METERS_SECRET_KEY=<zufällig>` (gitignoriert) — ohne Key bricht der Boot außerhalb des Debug-Modus ab
 - Admin anlegen: `uv run python -m meters.cli create-admin --username admin --password '...'`
 - Server (dev): `uv run uvicorn meters.main:app --reload`
 - Einzelner Test: `uv run pytest tests/integration/test_readings.py::test_create_reading -x`
@@ -52,6 +53,10 @@ Frontend (in `frontend/`, via `pnpm`):
 
 Windows-One-Shot-Setup: `scripts/dev-test.ps1` (idempotent, startet beide Server
 in eigenen Fenstern).
+
+IST-Backup lokal einspielen: ZIP nach `Backups/` (gitignoriert, echte Daten!), lokalen Admin
+anlegen, anmelden, Admin ▸ System ▸ Wiederherstellung. Danach gelten die IST-Zugangsdaten.
+„Nicht angemeldet“ beim Upload heißt: Sitzung im Browser passt nicht zum laufenden Backend → neu anmelden.
 
 ## Invarianten — hier nie danebengreifen
 

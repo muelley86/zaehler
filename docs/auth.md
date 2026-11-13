@@ -139,6 +139,27 @@ Logout im Frontend:
 - Der SW-Cache `api-get` wird außerdem bei 401 von `/auth/me` und beim Login
   eines **anderen** Users geleert.
 
+Verlorene Sitzung im laufenden Betrieb:
+
+- Die Oberfläche kann angemeldet aussehen, obwohl der Server die Sitzung nicht
+  (mehr) kennt: Sitzung abgelaufen, Server mit anderer Datenbank oder anderem
+  `METERS_SECRET_KEY` neu gestartet, oder nach einem Netzfehler aus dem
+  Me-Snapshot wiederhergestellt.
+- `lib/api.ts` meldet deshalb jedes 401 außerhalb der Endpunkte unter `/auth/`
+  über `lib/authEvents.ts` (`reportUnauthorized`). Der `AuthProvider` hört
+  darauf (`subscribeUnauthorized`), prüft `/auth/me` neu und landet über den
+  401-Zweig von `refresh` auf der Anmeldung (Snapshot und Caches werden geleert).
+  401 der Auth-Endpunkte selbst (falsches Passwort, `/auth/me` ohne Sitzung)
+  lösen nichts aus.
+- Große Anfragen ohne gültige Sitzung: Das Body-Limit (`core/body_limit.py`)
+  läuft **vor** der Auth und lässt ohne Sitzung nur 64 KiB zu. Größere Bodies
+  beantwortet es mit **401 „Nicht angemeldet oder Sitzung abgelaufen“**, ohne
+  ein Byte zu lesen — nicht mit 413, sonst sucht man (z. B. beim
+  Restore-Upload) nach einem Größenlimit statt nach der Anmeldung. Nur unter
+  `/api/v1/auth/` bleibt es bei 413. Mit gültiger Sitzung gilt
+  `METERS_REQUEST_MAX_BODY_BYTES`, für `/restore/upload`
+  `METERS_BACKUP_MAX_UPLOAD_BYTES`; darüber weiterhin 413.
+
 ## Gleichzeitige Erfassung (Concurrency)
 
 Mehrere Nutzer können parallel Readings erfassen. Konflikte werden
