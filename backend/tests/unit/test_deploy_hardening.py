@@ -45,3 +45,34 @@ def test_root_never_runs_backup_script_directly() -> None:
             f"backup.sh direkt aufgerufen in Zeile {text.count(chr(10), 0, hit.start()) + 1}"
             " — als root stattdessen cmd_backup verwenden"
         )
+
+
+def _case_branch(text: str, mode: str) -> str:
+    """Rumpf eines ``case``-Zweigs aus ``cmd_configure_network`` (bis zum ``;;``)."""
+    match = re.search(rf"^\s*{re.escape(mode)}\)\n(.*?)^\s*;;", text, re.S | re.M)
+    assert match is not None, f"case-Zweig {mode!r} nicht gefunden"
+    return match.group(1)
+
+
+def test_every_proxy_mode_sets_public_base_url_for_qr_links() -> None:
+    """Jeder Modus mit HTTPS-Proxy-Domain muss ``METERS_PUBLIC_BASE_URL`` setzen.
+
+    Sonst leitet die App die QR-URL aus dem internen Request ab und druckt
+    ``http://`` auf die Etiketten (``proxy-other`` hatte das vergessen).
+    """
+    text = SCRIPT.read_text(encoding="utf-8")
+    for mode in ("proxy-other", "proxy-same", "proxy-external"):
+        assert 'public_base_url="https://$proxy_domain"' in _case_branch(text, mode), mode
+
+
+def test_lan_only_leaves_public_base_url_empty() -> None:
+    text = SCRIPT.read_text(encoding="utf-8")
+    assert "public_base_url=" not in _case_branch(text, "lan-only")
+
+
+def test_install_writes_public_base_url_when_proxy_host_given() -> None:
+    """Die Erstinstallation mit Proxy-Domain schreibt die QR-Basis-URL mit."""
+    text = SCRIPT.read_text(encoding="utf-8")
+    assert 'public_base_url_value="https://$WIZ_REVERSE_PROXY_HOST"' in text
+    assert "METERS_PUBLIC_BASE_URL=$public_base_url_value" in text
+    assert "grep -q '^METERS_PUBLIC_BASE_URL='" in text

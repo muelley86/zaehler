@@ -113,7 +113,9 @@ Vier Optionen im Menü:
 - **HTTPS-Proxy + offene LAN-IP** (`proxy-other`, NPM/nginx auf anderem Host —
   App bleibt parallel per IP erreichbar; **nur LAN, nicht fürs Internet**).
   Fragt die Proxy-IP ab und glaubt `X-Forwarded-For` nur von ihr
-  (`trusted_proxy_ips`); leer gelassen wird XFF ignoriert. Bestands-Setups in
+  (`trusted_proxy_ips`); leer gelassen wird XFF ignoriert. Setzt
+  `public_base_url=https://<domain>`, damit QR-Etiketten nie eine
+  `http://`-URL tragen. Bestands-Setups in
   diesem Modus seit v2.90.2 einmal neu durchlaufen.
 - **Strikt HTTPS via Proxy auf gleichem Host** (`proxy-same`, Caddy/nginx neben
   der App, App nur auf `127.0.0.1` — der saubere Internet-Modus)
