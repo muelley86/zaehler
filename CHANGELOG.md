@@ -10,6 +10,13 @@ Ab v1.0.0 wird dieses File **automatisch** von
 generiert. Manuelle Einträge bitte oberhalb der nächsten Tag-Zeile
 ergänzen, sonst werden sie beim nächsten Lauf überschrieben.
 
+## [2.94.2](https://github.com/muelley86/zaehler/compare/v2.94.1...v2.94.2) (2026-11-20)
+
+
+### Dokumentation
+
+* QR-Etiketten hinter HTTPS-Proxy und HTTP-Weiterleitung beschreiben ([#416](https://github.com/muelley86/zaehler/issues/416)) ([a7f51dc](https://github.com/muelley86/zaehler/commit/a7f51dc3c2ddb9a88f9a4669fd6829801c3133c8))
+
 ## [2.94.1](https://github.com/muelley86/zaehler/compare/v2.94.0...v2.94.1) (2026-11-20)
 
 
