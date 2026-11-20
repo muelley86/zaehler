@@ -433,7 +433,11 @@ cmd_install() {
     # True schaltet erst `configure-network` bei einem echten Proxy (proxy-*).
     local trust_proxy_value="False"
     local allowed_origins_value=""
+    # Feste Basis für gedruckte QR-Links: hinter dem HTTPS-Proxy sieht die App
+    # intern nur http und würde sonst http://-URLs auf die Etiketten drucken.
+    local public_base_url_value=""
     if [ -n "$WIZ_REVERSE_PROXY_HOST" ]; then
+        public_base_url_value="https://$WIZ_REVERSE_PROXY_HOST"
         # Beide Origins erlauben: Direkt-IP + Reverse-Proxy-Domain.
         local container_ip
         container_ip=$(hostname -I 2>/dev/null | awk '{print $1}')
@@ -454,6 +458,7 @@ METERS_COOKIE_SECURE=$cookie_secure_value
 METERS_TRUST_PROXY=$trust_proxy_value
 METERS_PUBLIC_FACING=False
 METERS_ALLOWED_ORIGINS=$allowed_origins_value
+METERS_PUBLIC_BASE_URL=$public_base_url_value
 EOF
         ok "Konfiguration mit zufälligem SECRET_KEY angelegt (cookie_secure=$cookie_secure_value, trust_proxy=$trust_proxy_value)"
     else
@@ -469,6 +474,10 @@ EOF
         fi
         if ! grep -q '^METERS_ALLOWED_ORIGINS=' "$env_file"; then
             echo "METERS_ALLOWED_ORIGINS=$allowed_origins_value" >> "$env_file"
+            appended=1
+        fi
+        if ! grep -q '^METERS_PUBLIC_BASE_URL=' "$env_file"; then
+            echo "METERS_PUBLIC_BASE_URL=$public_base_url_value" >> "$env_file"
             appended=1
         fi
         if [ "$appended" = "1" ]; then
@@ -1043,6 +1052,9 @@ cmd_configure_network() {
             public_facing="False"
             origins="https://$proxy_domain"
             [ -n "$container_ip" ] && origins="$origins,http://$container_ip:$current_port"
+            # QR-Etiketten immer auf die HTTPS-Domain zeigen lassen — auch wenn
+            # der Admin sie über die offene LAN-IP (http) erzeugt.
+            public_base_url="https://$proxy_domain"
             ;;
         proxy-same)
             local proxy_domain
