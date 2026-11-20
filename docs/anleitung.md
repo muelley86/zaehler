@@ -281,6 +281,27 @@ sudo bash /opt/zaehler/repo/deploy/lxc/zaehler.sh upgrade-all
 
    Mit `Strg+C` schließt du das wieder.
 
+### QR-Code führt auf `http://` statt `https://`
+
+Die Adresse steht fest im gedruckten QR-Code — ein altes Etikett ändert sich
+nicht mehr. Im Container prüfen:
+
+```bash
+grep PUBLIC_BASE_URL /opt/zaehler/data/meters.env
+curl -sI http://zaehler.example.com/q/TEST | grep -i -E '^(HTTP|location)'
+```
+
+- **`METERS_PUBLIC_BASE_URL` leer oder fehlt:** neue Etiketten bekommen
+  `http://`. `configure-network` erneut durchlaufen (Teil 5.3) oder
+  `METERS_PUBLIC_BASE_URL=https://zaehler.example.com` eintragen und
+  `systemctl restart zaehler.service`.
+- **`curl` liefert kein `301`/`308` mit `Location: https://…`:** der
+  Reverse-Proxy leitet HTTP nicht um. Im Nginx Proxy Manager am Proxy-Host
+  **SSL ▸ „Force SSL"** einschalten (Teil 5.2). Danach funktionieren auch die
+  alten Etiketten ohne Neudruck.
+- **Etikett zeigt `http://<container-ip>:8000/…`:** der Scan geht am Proxy
+  vorbei — hier hilft nur Neudruck.
+
 ### Login lehnt mein Passwort ab
 
 Mit dem Skript-Wizard zurücksetzen:
@@ -530,8 +551,8 @@ Wizard fragt dich aus drei Topologien:
 
 Bei den Proxy-Optionen fragt der Wizard nach der **Domain**, unter der
 die App via Proxy erreichbar ist. Er schreibt dann automatisch die
-richtigen vier Schlüssel in `meters.env` (`BIND_HOST`,
-`COOKIE_SECURE`, `TRUST_PROXY`, `ALLOWED_ORIGINS`), startet den Service
+richtigen Schlüssel in `meters.env` (u. a. `BIND_HOST`,
+`COOKIE_SECURE`, `TRUST_PROXY`, `ALLOWED_ORIGINS`, `PUBLIC_BASE_URL`), startet den Service
 neu und prüft, ob er antwortet.
 
 **Was die Werte hinter den Kulissen bewirken** (nur zur Info — du
@@ -543,6 +564,7 @@ musst sie nicht selbst setzen):
 | `METERS_COOKIE_SECURE` | `True` = Cookie nur über HTTPS (= reines HTTPS-Setup), `False` = auch HTTP-Login OK |
 | `METERS_TRUST_PROXY` | `True` = X-Forwarded-For-Header vom Proxy wird gewertet (echte Client-IP im Audit-Log) |
 | `METERS_ALLOWED_ORIGINS` | Komma-getrennte Liste der erlaubten Origins für POST/PATCH/DELETE — verhindert CSRF |
+| `METERS_PUBLIC_BASE_URL` | Feste `https://<domain>`-Basis für QR-Etiketten — ohne sie stünde hinter dem Proxy `http://` im QR-Code |
 
 Wenn du die Topologie ändern willst (z. B. später doch nur HTTPS),
 ruf einfach erneut `configure-network` auf — der Wizard ist
@@ -557,6 +579,15 @@ curl -fsSI https://zaehler.example.com/api/v1/health
 Erwartet: `HTTP/2 200`. Plus die Header `Strict-Transport-Security` und
 `X-Frame-Options: DENY` müssen vorhanden sein — die kommen jetzt vom
 Backend, sind ein Indiz für ein korrektes HTTPS-Setup.
+
+Zusätzlich die Weiterleitung von HTTP auf HTTPS prüfen — sonst bleiben alte
+QR-Etiketten und eingetippte Adressen ohne `https://` unverschlüsselt hängen:
+
+```bash
+curl -sI http://zaehler.example.com/q/TEST | grep -i -E '^(HTTP|location)'
+```
+
+Erwartet: `301` (oder `308`) mit `Location: https://zaehler.example.com/q/TEST`.
 
 ---
 
