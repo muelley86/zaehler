@@ -154,12 +154,48 @@ METERS_BIND_HOST=127.0.0.1
 METERS_COOKIE_SECURE=True
 METERS_TRUST_PROXY=True
 METERS_ALLOWED_ORIGINS=https://zaehler.example.com
+METERS_PUBLIC_BASE_URL=https://zaehler.example.com
 ```
 
 und `systemctl restart zaehler.service`. Damit ist die App nur noch über den
 HTTPS-Proxy erreichbar, nicht mehr direkt im Klartext im LAN. Wenn du den
 Wizard mit der HTTPS-Frage durchgeklickt hast, ist all das schon
 automatisch eingetragen.
+
+### QR-Etiketten und HTTPS
+
+Die Adresse wird beim Erzeugen **fest in den QR-Code geschrieben**. Ein
+gedrucktes Etikett behält seine URL, auch wenn sich die Konfiguration später
+ändert. Zwei Dinge müssen deshalb stimmen:
+
+1. **`METERS_PUBLIC_BASE_URL=https://<domain>`** — sonst leitet die App die
+   Adresse aus dem internen Request ab, und der ist hinter dem Proxy `http`.
+   Der Installer und `configure-network` setzen den Wert in allen
+   Proxy-Modi (seit v2.94.1 auch bei `proxy-other` und bei der
+   Erstinstallation mit Proxy-Domain). Ältere Setups: `configure-network`
+   einmal neu durchlaufen oder den Wert von Hand eintragen und den Dienst neu
+   starten.
+2. **Der Proxy leitet HTTP auf HTTPS um.** Nur so funktionieren Etiketten, die
+   noch mit `http://<domain>/…` gedruckt wurden — und jeder Aufruf, bei dem
+   jemand die Adresse ohne `https://` eintippt. Caddy macht das von selbst; im
+   Nginx Proxy Manager am Proxy-Host unter **SSL ▸ „Force SSL"** einschalten;
+   bei nginx von Hand `return 301 https://$host$request_uri;` im
+   Port-80-Block.
+
+Prüfen (im Container):
+
+```bash
+grep PUBLIC_BASE_URL /opt/zaehler/data/meters.env
+curl -sI http://zaehler.example.com/q/TEST | grep -i -E '^(HTTP|location)'
+```
+
+Erwartet: die `https://`-Basis in der ersten Zeile, beim `curl` ein `301`
+(oder `308`) mit `Location: https://zaehler.example.com/q/TEST`. Antwortet
+stattdessen die App selbst (z. B. `405` mit `application/problem+json`), reicht
+der Proxy Port 80 unverschlüsselt durch — dann fehlt die Weiterleitung.
+
+Etiketten mit `http://<container-ip>:8000/…` gehen am Proxy vorbei; die lassen
+sich nur durch Neudruck auf HTTPS bringen.
 
 ## 5. (Empfohlen) Zwei-Faktor-Authentisierung
 
